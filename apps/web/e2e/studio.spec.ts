@@ -293,6 +293,26 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await studioPage.close();
   });
 
+  await test.step("Download all saves one zip with every file in it", async () => {
+    const studioPage = await host.context().newPage();
+    await studioPage.goto(studioUrl);
+    const recording = studioPage.getByTestId("recording").first();
+    const names = await recording.getByTestId("download").evaluateAll((as) => as.map((a) => a.querySelector("span")!.textContent!));
+    const [download] = await Promise.all([studioPage.waitForEvent("download"), recording.getByTestId("download-zip").click()]);
+    expect(download.suggestedFilename()).toMatch(/^E2E Show \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
+    const file = join(mkdtempSync(join(tmpdir(), "opentake-zip-")), "all.zip");
+    await download.saveAs(file);
+    // Python's zipfile checks every CRC and lists what's inside.
+    const listed = execFileSync("python3", [
+      "-I",
+      "-c",
+      "import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))",
+      file,
+    ]).toString();
+    expect(JSON.parse(listed)).toEqual(names);
+    await studioPage.close();
+  });
+
   await test.step("guest goes offline and closes the tab mid-recording; the upload finishes when they return", async () => {
     await host.getByRole("button", { name: "Record", exact: true }).click();
     await expect(guest.getByText("You're being recorded.")).toBeVisible();

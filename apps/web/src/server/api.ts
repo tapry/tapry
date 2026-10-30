@@ -11,11 +11,13 @@ import {
   uploadUrlBody,
   type SessionState,
 } from "@opentake/shared";
+import { downloadZip } from "client-zip";
 import { z } from "zod";
 import type { User } from "./auth";
 import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
+import { contentDisposition } from "./storage";
 
 type Params = Record<string, string>;
 type Handler = (req: Request, params: Params) => Promise<Response>;
@@ -116,6 +118,32 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     downloadOutput: asUser(async (svc, user, _req, params) => {
       const url = await svc.processing.downloadUrl(user, params.studioId!, params.recordingId!, params.outputId!);
       return new Response(null, { status: 302, headers: { location: url, "cache-control": "no-store" } });
+    }),
+
+    /**
+     * Every file of a recording in one zip, streamed from storage as it is read: nothing is
+     * built ahead or kept on disk, and the transcript is in it as soon as it exists. Files are
+     * stored, not compressed (video and audio don't shrink), so the size is known up front
+     * and browsers show real progress. ZIP64, so files over 4 GB are fine.
+     */
+    downloadZip: asUser(async (svc, user, req, params) => {
+      const { fileName, files } = await svc.processing.zipContents(user, params.studioId!, params.recordingId!);
+      const storage = svc.storage;
+      // Opened one at a time, when the zip reaches each file.
+      async function* entries() {
+        for (const f of files) {
+          yield { name: f.name, size: f.size, lastModified: f.lastModified, input: await storage.openRead(f.key, req.signal) };
+        }
+      }
+      const zip = downloadZip(entries(), { metadata: files.map((f) => ({ name: f.name, size: f.size })) });
+      return new Response(zip.body, {
+        headers: {
+          "content-type": "application/zip",
+          "content-length": zip.headers.get("content-length")!,
+          "content-disposition": contentDisposition(fileName),
+          "cache-control": "no-store",
+        },
+      });
     }),
 
     // ── Guests ─────────────────────────────────────────────────────────────────

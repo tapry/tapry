@@ -31,6 +31,8 @@ export interface StoredObject {
 export interface Storage {
   presignPut(key: string, opts: { bytes: number; sha256: string; contentType: string }): Promise<PresignedPut>;
   head(key: string): Promise<StoredObject | null>;
+  /** Stream an object (the zip download reads outputs this way). Aborting `signal` stops the transfer. */
+  openRead(key: string, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>>;
   /** Download an object to a local file (the worker reads chunks this way). */
   downloadTo(key: string, path: string): Promise<void>;
   /** Upload a local file; returns its size. Large files go up in parts. */
@@ -109,6 +111,12 @@ export class S3Storage implements Storage {
       if (err instanceof S3ServiceException && err.$metadata.httpStatusCode === 404) return null;
       throw err;
     }
+  }
+
+  async openRead(key: string, signal?: AbortSignal) {
+    const res = await this.client.send(new GetObjectCommand({ Bucket: this.config.bucket, Key: key }), { abortSignal: signal });
+    if (!res.Body) throw new Error(`Empty body for ${key}`);
+    return res.Body.transformToWebStream() as ReadableStream<Uint8Array>;
   }
 
   async downloadTo(key: string, path: string) {

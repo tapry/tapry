@@ -24,6 +24,7 @@
     "@opentake/recorder": "workspace:*",
     "@opentake/shared": "workspace:*",
     "@opentake/worker": "workspace:*",
+    "client-zip": "2.5.1",
     "livekit-client": "^2.23.0",
     "livekit-server-sdk": "^2.19.2",
     "next": "^15.5.0",

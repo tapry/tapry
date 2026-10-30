@@ -29,6 +29,16 @@ export class FakeStorage implements Storage {
     this.objects.set(key, { bytes: buf.length, sha256: sha256(buf), contentType, data: buf });
   }
 
+  /** Keys opened with openRead, in order (tests check files are opened one at a time). */
+  reads: string[] = [];
+
+  async openRead(key: string): Promise<ReadableStream<Uint8Array>> {
+    const o = this.objects.get(key);
+    if (!o) throw new Error(`NoSuchKey: ${key}`);
+    this.reads.push(key);
+    return new Blob([new Uint8Array(o.data)]).stream();
+  }
+
   async downloadTo(key: string, path: string) {
     const o = this.objects.get(key);
     if (!o) throw new Error(`NoSuchKey: ${key}`);
