@@ -12,11 +12,11 @@ import { S3Storage } from "./storage";
  * to every route). `next dev` re-evaluates server modules each time it compiles a route
  * or you edit a file, so module variables would get a second copy of each.
  *
- * The services themselves are rebuilt from the current code on every module evaluation,
- * so edits to server code take effect without restarting the dev server.
+ * The services (and the storage client, which holds no state) are rebuilt from the current
+ * code on every module evaluation, so edits to server code take effect without restarting.
  */
 interface Shared {
-  resources?: Promise<{ db: Db; storage: S3Storage; config: Config }>;
+  resources?: Promise<{ db: Db; config: Config }>;
   hub?: LiveHub;
   runner?: JobRunner;
 }
@@ -27,7 +27,8 @@ let services: Promise<Services> | undefined;
 
 /** Services for this module evaluation, on top of the process-wide resources. */
 export function getServices(): Promise<Services> {
-  return (services ??= resources().then(async ({ db, storage, config }) => {
+  return (services ??= resources().then(async ({ db, config }) => {
+    const storage = new S3Storage(config.storage);
     // The connection outlives code edits in dev; a pulled or new migration applies on the next reload.
     await migrate(db);
     const svc = createServices(db, storage, {
@@ -61,9 +62,8 @@ function resources(): NonNullable<Shared["resources"]> {
 
 async function openResources() {
   const config = loadConfig();
-  const storage = new S3Storage(config.storage);
-  await storage.ensureBucket();
-  return { db: await openDb(config.databaseUrl), storage, config };
+  await new S3Storage(config.storage).ensureBucket();
+  return { db: await openDb(config.databaseUrl), config };
 }
 
 export const api = createApiHandlers(getServices);

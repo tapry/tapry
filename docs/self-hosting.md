@@ -108,6 +108,10 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
   storage provider's replication). Recordings are useless without the database that indexes them.
 - **Health:** `GET /api/health` returns `{"ok":true}` when the app and its database are up.
+- **Downloads:** single files come straight from storage through short-lived signed links.
+  "Download all (.zip)" is put together on the fly by the web container as it streams, so
+  it uses no extra disk but does pass through the web container: a 5 GB zip is 5 GB of its
+  bandwidth. Zips can't be resumed if the connection drops; single files can.
 - **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
   processed files). Deleting a recording or a studio removes its files from storage within
   seconds, and once more about 16 minutes later to catch uploads that were already on their way.

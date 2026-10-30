@@ -9,6 +9,7 @@ import { UploadService } from "./uploads";
 
 export interface Services {
   db: Db;
+  storage: Storage;
   auth: AuthService;
   studios: StudioService;
   live: LiveService;
@@ -31,6 +32,7 @@ export function createServices(
   processing = new ProcessingService(db, storage, (sessionId) => live.publishSoon(sessionId));
   return {
     db,
+    storage,
     auth: new AuthService(db, { now: opts.now, ...opts.auth }),
     studios: new StudioService(db, live, () => processing.onEnqueue()),
     live,

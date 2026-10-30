@@ -35,6 +35,7 @@ docs/               self-hosting, architecture, browser support
 - A recording is processed once it is stopped and every track is complete; hosts can force it ("Process now").
 - All outputs are aligned to the recording start and cut to its exact length.
 - Deleting (a recording, or a studio with all of its recordings) is soft for the rows and hard for the media: chunk and output rows go at once (usage drops), the recording/track rows stay with `deleted_at` so late uploads get **410 Gone**, and a `purge_recording` job deletes the stored files by prefix, then once more after presigned upload URLs have expired. Refused while recording or while a worker holds a job on it. Re-processing deletes the previous run's files.
+- Zip download (`GET …/recordings/:id/zip`) is streamed by the web server from storage with client-zip: no stored zip, files stored uncompressed, exact Content-Length, ZIP64. It is the one download that passes through the web server; single files redirect to signed storage URLs.
 - Transcripts: a separate `transcribe_recording` job queued when processing succeeds. Each person's WAV is transcribed alone (speaker = track), then merged by time into TXT/SRT/VTT. Off when `WHISPER_MODEL` is unset.
 
 ## Live call

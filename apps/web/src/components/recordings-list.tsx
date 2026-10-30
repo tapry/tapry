@@ -109,6 +109,15 @@ export function RecordingsList({ studioId, initial }: { studioId: string; initia
                   <StatusDot tone="danger" /> The transcript couldn't be made. The recording itself is fine.
                 </p>
               )}
+              {r.processing === "ready" && r.outputs.length > 1 && (
+                <a
+                  href={`/api/studios/${studioId}/recordings/${r.id}/zip`}
+                  className="inline-flex h-10 items-center gap-2 rounded-md bg-text px-4 text-sm font-medium text-bg hover:opacity-90"
+                  data-testid="download-zip"
+                >
+                  Download all (.zip) · {formatBytes(r.outputs.reduce((n, o) => n + o.bytes, 0))}
+                </a>
+              )}
               {r.processing === "ready" && (
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {r.outputs.map((o) => (

@@ -146,6 +146,33 @@ export class ProcessingService {
     }));
   }
 
+  /**
+   * Everything a processed recording produced, for one zip: file names, sizes and storage
+   * keys, plus a name for the zip ("My Podcast - 2026-10-30 19.59 UTC.zip").
+   */
+  async zipContents(owner: User, studioId: string, recordingId: string) {
+    const [rec] = await this.db.query<{ processing: ProcessingStatus; started_at: number; studio_name: string }>(
+      `SELECT r.processing, r.started_at, st.name AS studio_name FROM recordings r
+       JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
+       WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
+      [recordingId, studioId, owner.id],
+    );
+    if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
+    if (rec.processing !== "ready") throw new ApiError(409, "not_ready", "This recording hasn't been processed yet");
+    const files = await this.db.query<{ file_name: string; bytes: number; storage_key: string; created_at: Date }>(
+      `SELECT o.file_name, o.bytes, o.storage_key, o.created_at
+       FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
+       WHERE o.recording_id = $1
+       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, o.file_name`,
+      [recordingId],
+    );
+    const started = new Date(rec.started_at).toISOString(); // 2026-10-30T19:59:…Z
+    return {
+      fileName: `${rec.studio_name} - ${started.slice(0, 10)} ${started.slice(11, 13)}.${started.slice(14, 16)} UTC.zip`,
+      files: files.map((f) => ({ name: f.file_name, size: f.bytes, key: f.storage_key, lastModified: new Date(f.created_at) })),
+    };
+  }
+
   /** Signed, short-lived storage URL that downloads the file under its friendly name. */
   async downloadUrl(owner: User, studioId: string, recordingId: string, outputId: string) {
     await this.ownedRecording(owner, studioId, recordingId);
