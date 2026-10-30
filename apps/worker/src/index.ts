@@ -8,6 +8,7 @@ export {
   type TrackInput,
 } from "./pipeline.js";
 export { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";
+export { findFont, FONT_CANDIDATES } from "./pipeline.js";
 export {
   mergeSpeakers,
   toSrt,

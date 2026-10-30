@@ -47,9 +47,10 @@ RUN curl -fsSL -o "/out/ggml-${WHISPER_MODEL}.bin" "https://huggingface.co/ggerg
 FROM node:22-bookworm-slim AS runtime
 ARG WHISPER_MODEL=base
 ARG VAD_MODEL=ggml-silero-v6.2.0.bin
-# ffmpeg from Debian (5.1: libx264, libopus, libvpx); libgomp1 for whisper.cpp; curl for the health check.
+# ffmpeg from Debian (5.1: libx264, libopus, libvpx); DejaVu for names on the combined video;
+# libgomp1 for whisper.cpp; curl for the health check.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg libgomp1 curl ca-certificates \
+ && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core libgomp1 curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=whisper /out/whisper-cli /usr/local/bin/whisper-cli
 COPY --from=whisper /out/*.bin /opt/whisper/

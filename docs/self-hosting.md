@@ -64,6 +64,12 @@ They appear on the recording a little after its audio and video files.
 - **Speed:** CPU only. `WHISPER_THREADS` (default 4) sets how many cores one transcript uses.
 - **Off:** set `WHISPER_MODEL=` (empty) in `.env` and `docker compose up -d`.
 
+## Names on the combined video
+
+Each tile of `Combined.mp4` carries the person's name (DejaVu Sans, shipped in the image; set
+`TILE_FONT` to another font file to change it). Known limit: ffmpeg's text drawing has no
+right-to-left shaping, so Arabic or Hebrew names render with unjoined letters.
+
 ## Using your own S3 (R2, AWS, Backblaze…)
 
 Delete the `seaweedfs` service, then in the `web` service set `S3_ENDPOINT` (your provider's
