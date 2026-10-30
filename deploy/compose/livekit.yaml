@@ -1,0 +1,9 @@
+# LiveKit for a public server. Keys come from LIVEKIT_KEYS (set by docker-compose.yml).
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  # Discover the server's public IP via STUN so browsers can reach it.
+  use_external_ip: true
+logging:
+  level: info

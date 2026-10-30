@@ -1,0 +1,41 @@
+import { AuthService, type AuthOptions } from "./auth";
+import { CallService, type CallConfig } from "./call";
+import type { Db } from "./db";
+import { LiveHub, LiveService } from "./live";
+import { ProcessingService } from "./processing";
+import type { Storage } from "./storage";
+import { StudioService } from "./studios";
+import { UploadService } from "./uploads";
+
+export interface Services {
+  db: Db;
+  auth: AuthService;
+  studios: StudioService;
+  live: LiveService;
+  uploads: UploadService;
+  processing: ProcessingService;
+  call: CallService;
+}
+
+export function createServices(
+  db: Db,
+  storage: Storage,
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null } = { auth: { allowSignup: false } },
+): Services {
+  let processing: ProcessingService;
+  // Processing is queued when the last track finishes uploading or the host presses Stop,
+  // whichever comes last; both paths check whether everything has arrived.
+  const maybeProcess = (recordingId: string) =>
+    processing.maybeEnqueue(recordingId).catch((err) => console.error("[processing] enqueue failed", err));
+  const live = new LiveService(db, { now: opts.now, hub: opts.hub, onStopped: maybeProcess });
+  processing = new ProcessingService(db, storage, (sessionId) => live.publishSoon(sessionId));
+  return {
+    db,
+    auth: new AuthService(db, { now: opts.now, ...opts.auth }),
+    studios: new StudioService(db, live),
+    live,
+    uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess),
+    processing,
+    call: new CallService(db, opts.call ?? null),
+  };
+}

@@ -1,0 +1,108 @@
+# OpenTake self-host stack. Quick start: ./setup.sh studio.example.com you@example.com && docker compose up -d
+# See docs/self-hosting.md.
+name: opentake
+
+services:
+  # HTTPS for all three public names (app, storage, LiveKit), certificates from Let's Encrypt.
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      PUBLIC_SCHEME: ${PUBLIC_SCHEME:-https}
+      ACME_EMAIL: ${ACME_EMAIL:-noreply@localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Studio UI + API. Also processes recordings (WORKER=inprocess, ffmpeg in the image).
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+    image: opentake/web:${OPENTAKE_VERSION:-local}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://opentake:${POSTGRES_PASSWORD:?}@postgres:5432/opentake
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+      S3_ENDPOINT: http://seaweedfs:8333
+      # Browsers upload to and download from storage directly, through Caddy.
+      S3_PUBLIC_ENDPOINT: ${PUBLIC_SCHEME:-https}://s3.${DOMAIN}
+      S3_REGION: us-east-1
+      S3_BUCKET: opentake
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?}
+      S3_FORCE_PATH_STYLE: "true"
+      LIVEKIT_URL: ${LIVEKIT_WS_SCHEME:-wss}://livekit.${DOMAIN}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?}
+      WORKER: inprocess
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opentake
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: opentake
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opentake -d opentake"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # S3-compatible storage for recordings (docs/decisions/0002). Any S3 works instead:
+  # remove this service and point S3_* in the web service at it.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.51
+    restart: unless-stopped
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf '{"identities":[{"name":"opentake","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","List","Tagging","Write"]}]}' \
+          "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8333"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Live call. Media goes over UDP 7882 (TCP 7881 as fallback), so those ports must be open.
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?}: ${LIVEKIT_API_SECRET:?}"
+    ports:
+      - "7881:7881/tcp"
+      - "7882:7882/udp"
+    volumes:
+      - ${LIVEKIT_CONFIG:-./livekit.yaml}:/etc/livekit.yaml:ro
+
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  seaweedfs-data:

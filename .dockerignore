@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/.next-e2e
+**/dist
+**/.turbo
+**/.data
+**/test-results
+**/playwright-report
+**/.env
+**/.env.local
+.git
+.claude
+docs
+deploy/compose/.env

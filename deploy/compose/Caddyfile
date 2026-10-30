@@ -1,0 +1,21 @@
+# Three public names: the app, storage (browsers upload recordings straight to it; the signed
+# URLs name this host, so it can't live under a path of the main site), and LiveKit.
+{
+	# Let's Encrypt contact (setup.sh requires one for public domains; unused for http://localhost).
+	email {$ACME_EMAIL:noreply@localhost}
+}
+
+{$PUBLIC_SCHEME}://{$DOMAIN} {
+	reverse_proxy web:3000 {
+		# Server-sent events (live session state) must not be buffered.
+		flush_interval -1
+	}
+}
+
+{$PUBLIC_SCHEME}://s3.{$DOMAIN} {
+	reverse_proxy seaweedfs:8333
+}
+
+{$PUBLIC_SCHEME}://livekit.{$DOMAIN} {
+	reverse_proxy livekit:7880
+}

@@ -1,0 +1,170 @@
+import {
+  studioSettings,
+  type createStudioBody,
+  type joinBody,
+  type SessionTicket,
+  type StudioSettings,
+  type updateStudioBody,
+} from "@opentake/shared";
+import type { z } from "zod";
+import type { User } from "./auth";
+import type { Db, Queryable } from "./db";
+import { ApiError } from "./errors";
+import { hashToken, newId, newInviteCode, newToken } from "./ids";
+import type { LiveService } from "./live";
+
+export interface Studio {
+  id: string;
+  name: string;
+  inviteCode: string;
+  settings: StudioSettings;
+  createdAt: string;
+}
+
+export type { SessionTicket };
+
+export class StudioService {
+  constructor(
+    private db: Db,
+    private live: LiveService,
+  ) {}
+
+  async create(owner: User, body: z.infer<typeof createStudioBody>): Promise<Studio> {
+    const [row] = await this.db.query<StudioRow>(
+      "INSERT INTO studios (id, owner_id, name, invite_code, settings) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [newId("std"), owner.id, body.name, newInviteCode(), studioSettings.parse(body.settings ?? {})],
+    );
+    return toStudio(row!);
+  }
+
+  async list(owner: User): Promise<Studio[]> {
+    const rows = await this.db.query<StudioRow>("SELECT * FROM studios WHERE owner_id = $1 ORDER BY created_at DESC", [
+      owner.id,
+    ]);
+    return rows.map(toStudio);
+  }
+
+  async get(owner: User, studioId: string): Promise<Studio> {
+    return toStudio(await this.owned(owner, studioId));
+  }
+
+  async update(owner: User, studioId: string, body: z.infer<typeof updateStudioBody>): Promise<Studio> {
+    const current = await this.owned(owner, studioId);
+    const settings = studioSettings.parse({ ...current.settings, ...body.settings });
+    const [row] = await this.db.query<StudioRow>(
+      "UPDATE studios SET name = $2, settings = $3 WHERE id = $1 RETURNING *",
+      [studioId, body.name ?? current.name, settings],
+    );
+    return toStudio(row!);
+  }
+
+  /** New guest link. Old links stop working; guests already in a session keep their tokens. */
+  async rotateInvite(owner: User, studioId: string): Promise<Studio> {
+    await this.owned(owner, studioId);
+    const [row] = await this.db.query<StudioRow>("UPDATE studios SET invite_code = $2 WHERE id = $1 RETURNING *", [
+      studioId,
+      newInviteCode(),
+    ]);
+    return toStudio(row!);
+  }
+
+  /**
+   * Host enters the studio: reuses the open session or starts one, and issues a host
+   * token. A host who opens a second tab gets a fresh token; the old one stops working.
+   */
+  async openAsHost(owner: User, studioId: string): Promise<SessionTicket> {
+    const studio = await this.owned(owner, studioId);
+    const ticket = await this.db.transaction(async (tx) => {
+      const sessionId = await openSession(tx, studioId);
+      const token = newToken();
+      const [existing] = await tx.query<{ id: string }>(
+        "UPDATE participants SET token_hash = $3 WHERE session_id = $1 AND user_id = $2 AND role = 'host' RETURNING id",
+        [sessionId, owner.id, hashToken(token)],
+      );
+      const participantId = existing?.id ?? newId("par");
+      if (!existing) {
+        await tx.query(
+          `INSERT INTO participants (id, session_id, user_id, display_name, role, token_hash)
+           VALUES ($1, $2, $3, $4, 'host', $5)`,
+          [participantId, sessionId, owner.id, owner.name, hashToken(token)],
+        );
+      }
+      return { sessionId, participantId, token, role: "host" as const };
+    });
+    await this.live.publish(ticket.sessionId);
+    return { ...ticket, studio: { name: studio.name, settings: studioSettings.parse(studio.settings) } };
+  }
+
+  /** Guest opens the invite link. No account; consent to recording is required by the schema. */
+  async join(body: z.infer<typeof joinBody>): Promise<SessionTicket> {
+    const [studio] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE invite_code = $1", [body.inviteCode]);
+    if (!studio) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
+    const settings = studioSettings.parse(studio.settings);
+
+    const ticket = await this.db.transaction(async (tx) => {
+      const [session] = await tx.query<{ id: string }>(
+        "SELECT id FROM sessions WHERE studio_id = $1 AND status = 'open' FOR UPDATE",
+        [studio.id],
+      );
+      // Guests can only join once the host has opened the studio.
+      if (!session) throw new ApiError(409, "host_not_here", "The host hasn't opened the studio yet");
+
+      // Counts everyone who ever joined, not who is connected right now: presence comes
+      // with the live call. Guests rejoin with their saved token instead of joining again.
+      const [{ guests }] = (await tx.query<{ guests: number }>(
+        "SELECT count(*)::int AS guests FROM participants WHERE session_id = $1 AND role = 'guest'",
+        [session.id],
+      )) as [{ guests: number }];
+      if (guests >= settings.maxGuests) throw new ApiError(409, "studio_full", "This studio is full");
+
+      const participantId = newId("par");
+      const token = newToken();
+      await tx.query(
+        `INSERT INTO participants (id, session_id, display_name, role, token_hash, consented_at)
+         VALUES ($1, $2, $3, 'guest', $4, now())`,
+        [participantId, session.id, body.displayName, hashToken(token)],
+      );
+      return { sessionId: session.id, participantId, token, role: "guest" as const };
+    });
+    await this.live.publish(ticket.sessionId);
+    return { ...ticket, studio: { name: studio.name, settings } };
+  }
+
+  private async owned(owner: User, studioId: string) {
+    const [row] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE id = $1 AND owner_id = $2", [
+      studioId,
+      owner.id,
+    ]);
+    // 404 for "not yours" too, so studio ids can't be probed.
+    if (!row) throw new ApiError(404, "studio_not_found", "Studio not found");
+    return row;
+  }
+}
+
+async function openSession(tx: Queryable, studioId: string): Promise<string> {
+  await tx.query("SELECT id FROM studios WHERE id = $1 FOR UPDATE", [studioId]);
+  const [open] = await tx.query<{ id: string }>("SELECT id FROM sessions WHERE studio_id = $1 AND status = 'open'", [
+    studioId,
+  ]);
+  if (open) return open.id;
+  const id = newId("ses");
+  await tx.query("INSERT INTO sessions (id, studio_id) VALUES ($1, $2)", [id, studioId]);
+  return id;
+}
+
+interface StudioRow {
+  id: string;
+  owner_id: string;
+  name: string;
+  invite_code: string;
+  settings: Partial<StudioSettings>;
+  created_at: Date;
+}
+
+const toStudio = (r: StudioRow): Studio => ({
+  id: r.id,
+  name: r.name,
+  inviteCode: r.invite_code,
+  settings: studioSettings.parse(r.settings),
+  createdAt: new Date(r.created_at).toISOString(),
+});

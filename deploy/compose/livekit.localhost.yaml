@@ -1,0 +1,9 @@
+# LiveKit for trying the stack on this machine (DOMAIN=localhost): advertise 127.0.0.1.
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  node_ip: 127.0.0.1
+  use_external_ip: false
+logging:
+  level: info
