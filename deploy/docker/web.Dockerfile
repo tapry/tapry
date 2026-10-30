@@ -47,6 +47,8 @@ RUN curl -fsSL -o "/out/ggml-${WHISPER_MODEL}.bin" "https://huggingface.co/ggerg
 
 FROM node:22-bookworm-slim AS runtime
 ARG WHISPER_MODEL=base
+# Set by the release workflow; shown by /api/health.
+ARG OPENTAKE_VERSION=dev
 ARG VAD_MODEL=ggml-silero-v6.2.0.bin
 # ffmpeg from Debian (5.1: libx264, libopus, libvpx); DejaVu for names on the combined video;
 # libgomp1 for whisper.cpp; curl for the health check.
@@ -55,7 +57,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=whisper /out/whisper-cli /usr/local/bin/whisper-cli
 COPY --from=whisper /out/*.bin /opt/whisper/
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 \
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 OPENTAKE_VERSION=${OPENTAKE_VERSION} \
     FFMPEG_PATH=ffmpeg FFPROBE_PATH=ffprobe \
     WHISPER_PATH=/usr/local/bin/whisper-cli \
     WHISPER_MODEL=/opt/whisper/ggml-${WHISPER_MODEL}.bin \

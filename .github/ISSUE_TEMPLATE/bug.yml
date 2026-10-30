@@ -1,0 +1,34 @@
+name: Bug
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: browsers
+    attributes:
+      label: Participants' browsers
+      description: Browser, version and OS for the host and each guest (e.g. "Host Chrome 156 macOS, guest Safari 18 iPhone").
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenTake version
+      description: The `version` from https://your-studio/api/health, or the git commit.
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install
+      options: [Docker Compose (setup.sh), Docker Compose with my own S3, Development (pnpm dev), Other]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`docker compose logs web worker` around the time. Logs never contain media."
+      render: text

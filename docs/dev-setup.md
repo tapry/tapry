@@ -60,6 +60,17 @@ Without `FFMPEG_PATH` the media tests are skipped; without `WHISPER_MODEL` the t
 tests are; without `LIVEKIT_BIN` the e2e call step is
 skipped (recording is still tested end to end).
 
+## Testing the Docker stack
+
+With the stack running (`./setup.sh localhost && docker compose up -d` in `deploy/compose`),
+run the full flow against it in a browser. `LIVEKIT_E2E_URL` only tells the test that the stack
+has a live call; `WHISPER_MODEL=1` that it has transcripts; ffmpeg checks the downloads.
+
+```bash
+E2E_BASE_URL=http://localhost LIVEKIT_E2E_URL=ws://livekit.localhost WHISPER_MODEL=1 \
+FFMPEG_PATH=… FFPROBE_PATH=… pnpm --filter @opentake/web exec playwright test e2e/studio.spec.ts --project chromium
+```
+
 ## Testing TURN like a real server
 
 Host networking on macOS (OrbStack / Docker Desktop) runs inside their own VM, so the TURN
