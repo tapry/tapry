@@ -1,21 +1,54 @@
-# Three public names: the app, storage (browsers upload recordings straight to it; the signed
-# URLs name this host, so it can't live under a path of the main site), and LiveKit.
+# Public server. Four names: the app; storage (browsers upload straight to it, and signed URLs
+# name this host, so it can't live under a path of the main site); LiveKit; and TURN.
+#
+# Port 443 carries two things, routed by the name the client asks for (caddy-l4):
+#   turn.<domain>  → TLS ends here → LiveKit's TURN server (for guests whose network only
+#                    allows HTTPS-like traffic: the call's media is relayed over this connection)
+#   anything else  → passed through untouched to the HTTPS sites below, which listen on 8443.
 {
-	# Let's Encrypt contact (setup.sh requires one for public domains; unused for http://localhost).
+	# Let's Encrypt contact (setup.sh requires one for public domains).
 	email {$ACME_EMAIL:noreply@localhost}
+	https_port 8443
+	# Automatic redirects would point at :8443; the http:// block below redirects instead.
+	auto_https disable_redirects
+	servers {
+		# HTTP/3 would advertise UDP 8443, which isn't published.
+		protocols h1 h2
+	}
+	layer4 {
+		:443 {
+			@turn tls sni turn.{$DOMAIN}
+			route @turn {
+				tls
+				proxy 127.0.0.1:5349
+			}
+			route {
+				proxy 127.0.0.1:8443
+			}
+		}
+	}
 }
 
-{$PUBLIC_SCHEME}://{$DOMAIN} {
-	reverse_proxy web:3000 {
+http://{$DOMAIN}, http://s3.{$DOMAIN}, http://livekit.{$DOMAIN}, http://turn.{$DOMAIN} {
+	redir https://{host}{uri} 308
+}
+
+https://{$DOMAIN} {
+	reverse_proxy 127.0.0.1:3000 {
 		# Server-sent events (live session state) must not be buffered.
 		flush_interval -1
 	}
 }
 
-{$PUBLIC_SCHEME}://s3.{$DOMAIN} {
-	reverse_proxy seaweedfs:8333
+https://s3.{$DOMAIN} {
+	reverse_proxy 127.0.0.1:8333
 }
 
-{$PUBLIC_SCHEME}://livekit.{$DOMAIN} {
-	reverse_proxy livekit:7880
+https://livekit.{$DOMAIN} {
+	reverse_proxy 127.0.0.1:7880
+}
+
+# Not a website: it makes Caddy obtain and renew the certificate the TURN route above uses.
+https://turn.{$DOMAIN} {
+	respond "TURN relay" 404
 }
