@@ -40,6 +40,7 @@ docs/               self-hosting, architecture, browser support
 - LiveKit, one room per session, identity = participant id. Optional: no `LIVEKIT_URL` → recording works without a call.
 - The call publishes **clones** of the camera/mic tracks (scaled to 360p). Never publish, constrain or stop the tracks the recorder uses.
 - Mute/camera-off disable the original tracks too: muted means silent in the recording as well.
+- TURN: LiveKit's built-in relay at `turns:turn.<domain>:443`, routed by SNI in Caddy (caddy-l4). LiveKit and Caddy need `network_mode: host`; LiveKit excludes Docker bridge IPs for media. `?relay=1` on a session URL forces relay-only (for testing). Test: `e2e/turn.spec.ts` against a Linux host (see docs/dev-setup.md).
 - No macOS LiveKit binaries exist; the dev build is compiled from source with a CGO-free CPU-stats patch: see `docs/dev-setup.md`.
 
 ## Rules

@@ -33,7 +33,12 @@ export default defineConfig<{ forceMp4: boolean }>({
         launchOptions: {
           // Chromium's built-in fake camera (test pattern) and mic (a beep every second),
           // with the permission prompt auto-accepted.
-          args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+          args: [
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            // E2E_CHROMIUM_ARGS (JSON array): extra flags, e.g. --host-resolver-rules for a test server.
+            ...(process.env.E2E_CHROMIUM_ARGS ? (JSON.parse(process.env.E2E_CHROMIUM_ARGS) as string[]) : []),
+          ],
         },
       },
     },

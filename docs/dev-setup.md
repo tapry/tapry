@@ -59,3 +59,19 @@ Add `WHISPER_PATH=… WHISPER_MODEL=… WHISPER_VAD_MODEL=…` (and `apps/web/.e
 Without `FFMPEG_PATH` the media tests are skipped; without `WHISPER_MODEL` the transcription
 tests are; without `LIVEKIT_BIN` the e2e call step is
 skipped (recording is still tested end to end).
+
+## Testing TURN like a real server
+
+Host networking on macOS (OrbStack / Docker Desktop) runs inside their own VM, so the TURN
+test uses a Linux machine: `orb create ubuntu:noble opentake-vm`, install `docker.io` and
+`docker-compose-v2` in it, load the images (`docker save … | orb -m opentake-vm sudo docker load`),
+and start the stack there with an env file whose `LIVEKIT_NODE_IP` and
+`LIVEKIT_TURN_ALLOW_PEERS` are the VM's IP, plus `-f docker-compose.turn-test.yml` (TURN over
+UDP off, so 443 is the only path). Then from the Mac:
+
+```bash
+VM=<vm ip>
+E2E_BASE_URL=http://opentake.test E2E_TURN=1 \
+E2E_CHROMIUM_ARGS="[\"--host-resolver-rules=MAP opentake.test $VM, MAP *.opentake.test $VM\", \"--unsafely-treat-insecure-origin-as-secure=http://opentake.test,http://s3.opentake.test\"]" \
+  pnpm --filter @opentake/web exec playwright test turn.spec.ts --project chromium
+```

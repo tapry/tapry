@@ -1,0 +1,39 @@
+# Trying the stack on this machine (DOMAIN=localhost): sites over plain http, which browsers
+# accept for camera/mic on *.localhost. TURN over TLS on 443 works like on a public server,
+# with Caddy's internal certificate for turn.localhost.
+{
+	https_port 8443
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+	layer4 {
+		:443 {
+			@turn tls sni turn.{$DOMAIN}
+			route @turn {
+				tls
+				proxy 127.0.0.1:5349
+			}
+		}
+	}
+}
+
+http://{$DOMAIN} {
+	reverse_proxy 127.0.0.1:3000 {
+		flush_interval -1
+	}
+}
+
+http://s3.{$DOMAIN} {
+	reverse_proxy 127.0.0.1:8333
+}
+
+http://livekit.{$DOMAIN} {
+	reverse_proxy 127.0.0.1:7880
+}
+
+# Not a website: it makes Caddy issue the (internal) certificate the TURN route uses.
+https://turn.{$DOMAIN} {
+	tls internal
+	respond "TURN relay" 404
+}

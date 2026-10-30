@@ -99,7 +99,10 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
           retry = setTimeout(() => void connect(attempt + 1), Math.min(10_000, 1000 * 2 ** attempt));
         });
 
-        await r.connect(t.url, t.token);
+        // ?relay=1: use only TURN-relayed connections. For checking that guests behind strict
+        // firewalls can still join (and for tests); normal visits never set it.
+        const relayOnly = new URLSearchParams(window.location.search).get("relay") === "1";
+        await r.connect(t.url, t.token, relayOnly ? { rtcConfig: { iceTransportPolicy: "relay" } } : undefined);
         if (cancelled) return void r.disconnect();
         await publish(r, stream, local.current);
         snapshot(r);

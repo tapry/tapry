@@ -1,0 +1,6 @@
+# Test override (e2e/turn.spec.ts): no TURN over UDP, so 443 is the only way to the relay,
+# like on a network that only allows HTTPS.
+services:
+  livekit:
+    environment:
+      LIVEKIT_TURN_UDP_PORT: "0"

@@ -3,20 +3,23 @@
 name: opentake
 
 services:
-  # HTTPS for all three public names (app, storage, LiveKit), certificates from Let's Encrypt.
+  # HTTPS for the public names (app, storage, LiveKit, TURN), certificates from Let's Encrypt.
+  # Built with the layer4 plugin: port 443 also carries TURN over TLS (see Caddyfile).
+  # Host networking (like LiveKit): it listens on the server's 80/443 and reaches the other
+  # services on 127.0.0.1.
   caddy:
-    image: caddy:2.11.7-alpine
+    build:
+      context: ../..
+      dockerfile: deploy/docker/caddy.Dockerfile
+    image: opentake/caddy:${OPENTAKE_VERSION:-local}
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+    network_mode: host
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in .env}
       PUBLIC_SCHEME: ${PUBLIC_SCHEME:-https}
       ACME_EMAIL: ${ACME_EMAIL:-noreply@localhost}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
@@ -24,12 +27,15 @@ services:
         condition: service_healthy
 
   # Studio UI + API. Also processes recordings (WORKER=inprocess, ffmpeg in the image).
+  # Published on loopback only: the outside world reaches it through Caddy.
   web:
     build:
       context: ../..
       dockerfile: deploy/docker/web.Dockerfile
     image: opentake/web:${OPENTAKE_VERSION:-local}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       DATABASE_URL: postgres://opentake:${POSTGRES_PASSWORD:?}@postgres:5432/opentake
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
@@ -74,6 +80,8 @@ services:
   seaweedfs:
     image: chrislusf/seaweedfs:4.51
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8333:8333"
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?}
@@ -91,18 +99,46 @@ services:
       timeout: 3s
       retries: 30
 
-  # Live call. Media goes over UDP 7882 (TCP 7881 as fallback), so those ports must be open.
+  # Live call. Media goes over UDP 7882 directly when it can; otherwise TCP 7881, then TURN:
+  # UDP 3478, or TLS on 443 (through Caddy) for networks that only allow HTTPS.
+  # Host networking, as LiveKit recommends: its built-in TURN relays to LiveKit's own media
+  # port, which only works when LiveKit sends from the address it advertises. Under Docker's
+  # default bridge network it sends from the container's address and the relay drops it.
   livekit:
     image: livekit/livekit-server:v1.13.11
     restart: unless-stopped
-    command: ["--config", "/etc/livekit.yaml"]
+    network_mode: host
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?}: ${LIVEKIT_API_SECRET:?}"
-    ports:
-      - "7881:7881/tcp"
-      - "7882:7882/udp"
-    volumes:
-      - ${LIVEKIT_CONFIG:-./livekit.yaml}:/etc/livekit.yaml:ro
+      LIVEKIT_CONFIG: |
+        port: 7880
+        # Signalling only via Caddy (wss://livekit.<domain>), not on the public interface.
+        bind_addresses: ["127.0.0.1"]
+        rtc:
+          tcp_port: 7881
+          udp_port: 7882
+          # Public servers: discover the public IP. setup.sh localhost: advertise 127.0.0.1.
+          use_external_ip: ${LIVEKIT_USE_EXTERNAL_IP:-true}
+          node_ip: "${LIVEKIT_NODE_IP:-}"
+          # Don't send media from Docker's own bridge addresses (or private IPv6): they aren't
+          # the address LiveKit advertises, so TURN would drop what's relayed from them.
+          ips:
+            excludes: ["172.16.0.0/12", "fd00::/8"]
+        turn:
+          enabled: true
+          domain: turn.${DOMAIN}
+          # TLS is terminated by Caddy on 443; LiveKit tells browsers turns:turn.<domain>:443.
+          tls_port: 5349
+          external_tls: true
+          udp_port: ${LIVEKIT_TURN_UDP_PORT:-3478}
+          # TURN never relays to private/loopback addresses (no reaching into internal networks),
+          # except these. Empty on public servers; setup.sh localhost allows only 127.0.0.1, where
+          # LiveKit's own media port is.
+          allow_restricted_peer_cidrs: [${LIVEKIT_TURN_ALLOW_PEERS:-}]
+        logging:
+          level: ${LIVEKIT_LOG_LEVEL:-info}
+          pion_level: ${LIVEKIT_PION_LOG_LEVEL:-error}
+
 
 volumes:
   caddy-data:

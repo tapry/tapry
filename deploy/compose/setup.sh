@@ -9,10 +9,10 @@ EMAIL="${2:-}"
 if [ -e .env ]; then echo ".env already exists; remove it to start over (this changes all secrets)." >&2; exit 1; fi
 secret() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 if [ "$DOMAIN" = "localhost" ]; then
-  SCHEME=http; WS=ws; LIVEKIT_CONFIG=./livekit.localhost.yaml
+  SCHEME=http; WS=ws; CADDYFILE=./Caddyfile.localhost; EXTERNAL_IP=false; NODE_IP=127.0.0.1; TURN_ALLOW=127.0.0.1/32
 else
   [ -n "$EMAIL" ] || { echo "An email is needed for Let's Encrypt certificates: ./setup.sh $DOMAIN you@example.com" >&2; exit 1; }
-  SCHEME=https; WS=wss; LIVEKIT_CONFIG=./livekit.yaml
+  SCHEME=https; WS=wss; CADDYFILE=./Caddyfile; EXTERNAL_IP=true; NODE_IP=; TURN_ALLOW=
 fi
 umask 077
 cat > .env <<ENV
@@ -20,7 +20,10 @@ cat > .env <<ENV
 DOMAIN=$DOMAIN
 PUBLIC_SCHEME=$SCHEME
 LIVEKIT_WS_SCHEME=$WS
-LIVEKIT_CONFIG=$LIVEKIT_CONFIG
+CADDYFILE=$CADDYFILE
+LIVEKIT_USE_EXTERNAL_IP=$EXTERNAL_IP
+LIVEKIT_NODE_IP=$NODE_IP
+LIVEKIT_TURN_ALLOW_PEERS=$TURN_ALLOW
 ACME_EMAIL=$EMAIL
 POSTGRES_PASSWORD=$(secret 24)
 S3_ACCESS_KEY=opentake
@@ -31,5 +34,5 @@ LIVEKIT_API_SECRET=$(secret 32)
 ALLOW_SIGNUP=false
 ENV
 echo "Wrote .env for $SCHEME://$DOMAIN"
-[ "$DOMAIN" = "localhost" ] || echo "DNS: point $DOMAIN, s3.$DOMAIN and livekit.$DOMAIN at this server. Open TCP 80, 443, 7881 and UDP 443, 7882."
+[ "$DOMAIN" = "localhost" ] || echo "DNS: point $DOMAIN, s3.$DOMAIN, livekit.$DOMAIN and turn.$DOMAIN at this server. Open TCP 80, 443, 7881 and UDP 3478, 7882."
 echo "Then: docker compose up -d   (first build takes a few minutes)"
