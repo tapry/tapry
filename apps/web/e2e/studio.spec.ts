@@ -1,5 +1,5 @@
 // Full host + guest flow in real Chromium with fake camera and mic (see playwright.config.ts).
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,6 +32,19 @@ async function listChunks(sessionId: string) {
     token = page.NextContinuationToken;
   } while (token);
   return keys;
+}
+
+/** Integrated loudness (LUFS) and true peak (dBTP) of a file, via ffmpeg's EBU R128 meter. */
+function loudness(file: string) {
+  // The meter reports on stderr.
+  const { stderr } = spawnSync(process.env.FFMPEG_PATH ?? "ffmpeg", [
+    "-hide_banner", "-nostats", "-i", file, "-af", "ebur128=peak=true", "-f", "null", "-",
+  ]);
+  const report = stderr.toString();
+  return {
+    integrated: Number.parseFloat(/I:\s+(-?[\d.]+) LUFS/.exec(report.slice(report.lastIndexOf("Summary")))?.[1] ?? "NaN"),
+    truePeak: Number.parseFloat(/True peak:\s+Peak:\s+(-?[\d.]+) dBFS/.exec(report)?.[1] ?? "NaN"),
+  };
 }
 
 /** Duration in seconds of a downloaded file, via ffprobe. */
@@ -272,6 +285,12 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
       if (name.endsWith(".wav")) {
         expect(got.type).toBe("audio/wav");
         expect(body.subarray(0, 4).toString()).toBe("RIFF");
+        // Levelled (the studio default): at -16 LUFS, or as close as the -1 dBTP peak ceiling allows.
+        // Chromium's fake mic beeps, so its peaks are what stop it.
+        const { integrated, truePeak } = loudness(file);
+        expect(integrated, name).toBeLessThan(-15);
+        expect(truePeak, name).toBeLessThan(-0.9);
+        expect(integrated > -17 || truePeak > -1.6, `${name}: ${integrated} LUFS, ${truePeak} dBTP`).toBe(true);
       } else {
         expect(got.type).toBe("video/mp4");
         expect(body.subarray(4, 8).toString()).toBe("ftyp");

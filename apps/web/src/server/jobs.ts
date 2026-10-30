@@ -6,6 +6,7 @@ import {
   concatChunks,
   FfmpegError,
   mergeSpeakers,
+  PODCAST_LOUDNESS,
   renderRecording,
   toSrt,
   toTxt,
@@ -410,6 +411,7 @@ export class JobRunner {
       durationMs: Math.max(1000, (rec.stopped_at ?? lastEnd) - rec.started_at),
       videoHeight: settings.videoQuality === "720p" ? 720 : 1080,
       font: this.opts.font,
+      loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
     });
 
     const uploaded = [];

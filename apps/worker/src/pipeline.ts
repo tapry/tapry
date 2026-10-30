@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import { probeDurationMs, probeStreams, run } from "./ffmpeg.js";
@@ -27,6 +27,27 @@ export interface PipelineOptions {
   timeoutMs?: number;
   /** Font for names on the combined video's tiles. Unset: found automatically; null: no names. */
   font?: string | null;
+  /** Level every person's audio, and the combined mix, to this target. Unset or null: left as recorded. */
+  loudness?: LoudnessTarget | null;
+}
+
+export interface LoudnessTarget {
+  /** Integrated loudness to aim for (EBU R128, LUFS). */
+  lufs: number;
+  /** Never let the true peak go above this (dBTP): the gain is lowered instead. */
+  truePeakDb: number;
+  /** Most a quiet track is raised, so a near-silent mic doesn't become loud hiss. */
+  maxBoostDb: number;
+}
+
+/** What podcast platforms ask for (Apple: -16 LUFS, peaks under -1 dBTP). */
+export const PODCAST_LOUDNESS: LoudnessTarget = { lufs: -16, truePeakDb: -1, maxBoostDb: 20 };
+
+export interface LoudnessMeasurement {
+  /** Integrated loudness in LUFS; null for silence (nothing above the -70 LUFS gate). */
+  integrated: number | null;
+  /** True peak in dBTP; null for digital silence. */
+  truePeak: number | null;
 }
 
 export interface OutputFile {
@@ -37,6 +58,8 @@ export interface OutputFile {
   fileName: string;
   contentType: string;
   durationMs: number | null;
+  /** Gain applied to level the audio (dB), when loudness levelling is on and the file has sound. */
+  gainDb?: number;
 }
 
 const FPS = 30;
@@ -87,6 +110,42 @@ export function alignmentFilters(
     .join(",");
 }
 
+/**
+ * Loudness of a file's audio, measured the EBU R128 way by ffmpeg's loudnorm filter
+ * (measurement only: its output is discarded).
+ */
+export async function measureLoudness(ffmpeg: string, path: string, timeoutMs?: number): Promise<LoudnessMeasurement> {
+  const stderr = await run(
+    ffmpeg,
+    ["-hide_banner", "-nostdin", "-nostats", "-i", path, "-vn", "-af", "loudnorm=print_format=json", "-f", "null", "-"],
+    { timeoutMs, stderr: true },
+  );
+  const json = /\{[^{}]*"input_i"[^{}]*\}/.exec(stderr)?.[0];
+  if (!json) throw new Error("ffmpeg did not report loudness");
+  const report = JSON.parse(json) as { input_i: string; input_tp: string };
+  const num = (v: string) => {
+    const n = Number.parseFloat(v);
+    return Number.isFinite(n) ? n : null; // "-inf" for silence
+  };
+  const integrated = num(report.input_i);
+  return { integrated: integrated !== null && integrated > -70 ? integrated : null, truePeak: num(report.input_tp) };
+}
+
+/**
+ * The one fixed gain (dB) that brings audio to the target: plain volume, no compression or
+ * limiting, so it sounds exactly as recorded, only louder or quieter. Lower than the target
+ * asks when the peaks would otherwise pass the ceiling; 0 for silence.
+ */
+export function loudnessGain(m: LoudnessMeasurement, target: LoudnessTarget): number {
+  if (m.integrated === null) return 0;
+  let gain = Math.min(target.lufs - m.integrated, target.maxBoostDb);
+  if (m.truePeak !== null) gain = Math.min(gain, target.truePeakDb - m.truePeak);
+  return Math.round(gain * 100) / 100;
+}
+
+/** A volume filter for the gain, or "" when it is too small to matter. */
+const volumeFilter = (gainDb: number | undefined) => (gainDb && Math.abs(gainDb) >= 0.05 ? `volume=${gainDb}dB` : "");
+
 /** Grid for n tiles in a 16:9 frame: 1 → 1×1, 2 → 2×1, 3–4 → 2×2, 5–9 → 3×3. */
 export function gridLayout(n: number, width = 1920, height = 1080) {
   const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
@@ -114,26 +173,34 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   const timeoutMs = opts.timeoutMs ?? Math.max(120_000, opts.durationMs * 10);
   const duration = sec(opts.durationMs);
   const names = uniqueNames(tracks);
-  const outputs: OutputFile[] = [];
+  // Each person's gain comes from their WAV and also applies to the sound in their video,
+  // so audio files are rendered first; outputs keep the tracks' order.
+  const gains = new Map<string, number>();
+  const groups = groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`);
+  const byGroup = new Map<TrackInput[], OutputFile>();
+  const audioFirst = [...groups].sort((a, b) => Number(a[0]!.kind === "video") - Number(b[0]!.kind === "video"));
 
   // One file per person per kind. A person can have several tracks of a kind when they
   // rejoined during the recording (tab crash, reload): those pieces are merged in place.
-  for (const pieces of groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`)) {
+  for (const pieces of audioFirst) {
     const first = pieces[0]!;
     const base = names.get(first.trackId)!;
     const ext = first.kind === "audio" ? "wav" : "mp4";
     const path = join(opts.workDir, `${first.trackId}.${ext}`);
+    const gainDb = first.kind === "video" ? gains.get(first.participantId) : undefined;
+    let hasAudio: boolean;
     if (pieces.length === 1) {
-      await renderPiece(first, path, { opts, duration, timeoutMs, multi: false });
+      hasAudio = await renderPiece(first, path, { opts, duration, timeoutMs, multi: false, gainDb });
     } else {
       const parts: Array<{ path: string; hasAudio: boolean }> = [];
       for (const piece of pieces) {
         const partPath = join(opts.workDir, `${piece.trackId}.part.${ext}`);
         parts.push({ path: partPath, hasAudio: await renderPiece(piece, partPath, { opts, duration, timeoutMs, multi: true }) });
       }
-      await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs });
+      await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs, gainDb });
+      hasAudio = parts.some((p) => p.hasAudio);
     }
-    outputs.push({
+    const output: OutputFile = {
       kind: first.kind,
       trackId: first.trackId,
       participantId: first.participantId,
@@ -141,8 +208,16 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
       fileName: `${base} - ${first.kind}.${ext}`,
       contentType: first.kind === "audio" ? "audio/wav" : "video/mp4",
       durationMs: await probeDurationMs(opts.ffprobe, path),
-    });
+    };
+    if (opts.loudness && first.kind === "audio") {
+      output.gainDb = await levelWav(path, opts.loudness, { opts, duration, timeoutMs });
+      gains.set(first.participantId, output.gainDb);
+    } else if (gainDb !== undefined && hasAudio) {
+      output.gainDb = gainDb;
+    }
+    byGroup.set(pieces, output);
   }
+  const outputs = groups.map((g) => byGroup.get(g)!);
 
   const combined = await renderCombined(tracks, outputs, opts, timeoutMs);
   if (combined) outputs.push(combined);
@@ -153,6 +228,23 @@ interface RenderContext {
   opts: PipelineOptions;
   duration: string;
   timeoutMs: number;
+  /** Volume change for the sound (a person's levelling gain, applied to their video). */
+  gainDb?: number;
+}
+
+/** Measure a rendered WAV and rewrite it at the target loudness. Returns the gain applied. */
+async function levelWav(path: string, target: LoudnessTarget, { opts, duration, timeoutMs }: RenderContext) {
+  const gainDb = loudnessGain(await measureLoudness(opts.ffmpeg, path, timeoutMs), target);
+  const volume = volumeFilter(gainDb);
+  if (!volume) return 0;
+  const levelled = `${path}.levelled.wav`;
+  await run(
+    opts.ffmpeg,
+    ["-y", "-hide_banner", "-nostdin", "-i", path, "-af", volume, "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", levelled],
+    { timeoutMs },
+  );
+  await rename(levelled, path);
+  return gainDb;
 }
 
 /**
@@ -160,7 +252,7 @@ interface RenderContext {
  * `multi`: it's one piece of several for the same person, so pad with black rather than
  * freezing the last frame, and use a fixed 16:9 frame so the pieces can be merged.
  */
-async function renderPiece(track: TrackInput, path: string, { opts, duration, timeoutMs, multi }: RenderContext & { multi: boolean }) {
+async function renderPiece(track: TrackInput, path: string, { opts, duration, timeoutMs, multi, gainDb }: RenderContext & { multi: boolean }) {
   if (track.kind === "audio") {
     await run(
       opts.ffmpeg,
@@ -179,7 +271,7 @@ async function renderPiece(track: TrackInput, path: string, { opts, duration, ti
     opts.ffmpeg,
     [...INPUT_FLAGS, "-i", track.rawPath,
       "-vf", `${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
-      ...(hasAudio ? ["-af", alignmentFilters("audio", track.offsetMs), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
+      ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs), volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
       "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", multi ? "16" : "20", "-r", String(FPS),
       ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
     { timeoutMs },
@@ -196,11 +288,16 @@ async function mergePieces(
   kind: "audio" | "video",
   parts: Array<{ path: string; hasAudio: boolean }>,
   out: string,
-  { opts, duration, timeoutMs }: RenderContext,
+  { opts, duration, timeoutMs, gainDb }: RenderContext,
 ) {
   const inputs = parts.flatMap((p) => ["-i", p.path]);
+  // Audio files are levelled after merging (levelWav); a video's sound takes the person's gain here.
+  const volume = kind === "video" ? volumeFilter(gainDb) : "";
+  const after = volume ? `,${volume}` : "";
   const mix = (labels: string[]) =>
-    labels.length > 1 ? `${labels.join("")}amix=inputs=${labels.length}:normalize=0:dropout_transition=0[a]` : `${labels[0]}anull[a]`;
+    labels.length > 1
+      ? `${labels.join("")}amix=inputs=${labels.length}:normalize=0:dropout_transition=0${after}[a]`
+      : `${labels[0]}${volume || "anull"}[a]`;
   if (kind === "audio") {
     await run(
       opts.ffmpeg,
@@ -295,6 +392,7 @@ async function renderCombined(
   const args: string[] = [];
   const filters: string[] = [`color=c=black:s=1920x1080:r=${FPS}:d=${duration}[base]`];
   const audioLabels: string[] = [];
+  const voices: string[] = [];
   let input = 0;
   let canvas = "base";
 
@@ -319,15 +417,38 @@ async function renderCombined(
     }
     filters.push(`[${canvas}][t${i}]overlay=x=${tile.x}:y=${tile.y}:shortest=0[c${i}]`);
     canvas = `c${i}`;
-    if (audio) {
-      args.push("-i", audio.path);
+    if (audio) voices.push(audio.path);
+  }
+  // Voices go in after the cameras, so their input numbers follow.
+  if (!opts.loudness) {
+    for (const path of voices) {
+      args.push("-i", path);
       audioLabels.push(`[${input}:a]`);
       input++;
     }
   }
 
-  const mixAudio = audioLabels.length > 0;
-  if (audioLabels.length > 1) {
+  const mixAudio = voices.length > 0;
+  let gainDb: number | undefined;
+  if (mixAudio && opts.loudness) {
+    // Level the mix as a whole: several levelled voices together are louder than one, and
+    // their peaks can add up. Mixed into a float WAV first, which can't clip, to measure it.
+    const mixPath = join(opts.workDir, "mix.wav");
+    await run(
+      opts.ffmpeg,
+      ["-y", "-hide_banner", "-nostdin", ...voices.flatMap((p) => ["-i", p]), "-filter_complex",
+        voices.length > 1
+          ? `${voices.map((_, i) => `[${i}:a]`).join("")}amix=inputs=${voices.length}:normalize=0:dropout_transition=0[a]`
+          : "[0:a]anull[a]",
+        "-map", "[a]", "-t", duration, "-c:a", "pcm_f32le", mixPath],
+      { timeoutMs },
+    );
+    gainDb = loudnessGain(await measureLoudness(opts.ffmpeg, mixPath, timeoutMs), opts.loudness);
+    // The mix replaces the separate voices as the combined video's sound.
+    args.push("-i", mixPath);
+    filters.push(`[${input}:a]${volumeFilter(gainDb) || "anull"}[a]`);
+    input++;
+  } else if (audioLabels.length > 1) {
     filters.push(`${audioLabels.join("")}amix=inputs=${audioLabels.length}:normalize=0:dropout_transition=0[a]`);
   } else if (mixAudio) {
     filters.push(`${audioLabels[0]}anull[a]`);
@@ -343,7 +464,7 @@ async function renderCombined(
     { timeoutMs },
   );
   return { kind: "combined", path, fileName: "Combined.mp4", contentType: "video/mp4",
-    durationMs: await probeDurationMs(opts.ffprobe, path) };
+    durationMs: await probeDurationMs(opts.ffprobe, path), ...(gainDb !== undefined && { gainDb }) };
 }
 
 // MediaRecorder output has no index and sometimes odd timestamps: regenerate them.

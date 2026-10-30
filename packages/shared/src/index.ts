@@ -38,6 +38,8 @@ const settingsFields = {
   maxGuests: z.number().int().min(1).max(7),
   /** Off gives better audio for guests on headphones. */
   echoCancellation: z.boolean(),
+  /** Bring each person's audio, and the combined mix, to podcast loudness (-16 LUFS) after recording. */
+  levelLoudness: z.boolean(),
 };
 
 /** Full settings, with defaults filled in. */
@@ -45,6 +47,7 @@ export const studioSettings = z.object({
   videoQuality: settingsFields.videoQuality.default("1080p"),
   maxGuests: settingsFields.maxGuests.default(3),
   echoCancellation: settingsFields.echoCancellation.default(true),
+  levelLoudness: settingsFields.levelLoudness.default(true),
 });
 export type StudioSettings = z.infer<typeof studioSettings>;
 

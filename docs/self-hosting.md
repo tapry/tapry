@@ -76,6 +76,15 @@ first (or the other way round).
 | seaweedfs | `chrislusf/seaweedfs:4.51` | recordings in `seaweedfs-data` |
 | livekit | `livekit/livekit-server:v1.13.11` | — |
 
+## Even volume
+
+Studios level everyone's audio by default ("Even out volume" in the studio's settings): each
+person's WAV, the sound in their video, and the combined video's mix are brought toward
+-16 LUFS, the loudness podcast apps expect. It's one fixed volume change per file, never
+compression or limiting, so the recording sounds exactly as captured. Two limits keep it
+honest: peaks never go above -1 dBTP (a voice with sharp peaks stays a little under -16), and
+a quiet track is raised by at most 20 dB (so a mic left muted doesn't turn into hiss).
+
 ## Transcripts
 
 On by default. Each person's audio is transcribed separately with whisper.cpp (language
