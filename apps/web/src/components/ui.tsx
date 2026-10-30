@@ -6,13 +6,14 @@ export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-type Variant = "primary" | "record" | "secondary" | "ghost";
+type Variant = "primary" | "record" | "secondary" | "ghost" | "danger";
 
 const variants: Record<Variant, string> = {
   primary: "bg-text text-bg hover:opacity-90",
   record: "bg-accent text-accent-text hover:opacity-90",
   secondary: "bg-surface-2 text-text border border-border hover:bg-border/60",
   ghost: "text-muted hover:text-text hover:bg-surface-2",
+  danger: "bg-danger text-white hover:opacity-90",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }>(

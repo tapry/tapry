@@ -5,6 +5,7 @@ import {
   IndexedDBChunkStore,
   MemoryChunkStore,
   pickMimeType,
+  TrackGoneError,
   TrackRecorder,
   UploadQueue,
   type ChunkStore,
@@ -81,6 +82,7 @@ class AppTransport implements ChunkTransport {
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
+    if (res.status === 410) throw new TrackGoneError("The host deleted this recording");
     if (!res.ok) throw new Error(`register track → ${res.status}`);
   }
 }

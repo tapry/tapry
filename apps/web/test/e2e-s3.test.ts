@@ -1,8 +1,9 @@
 // Runs only against a real S3-compatible server: `pnpm --filter @opentake/web test:s3`.
 // Proves the parts a fake can't: presigned URLs work from a plain fetch, and storage
-// itself refuses uploads whose size or content differ from what was signed.
+// itself refuses uploads whose size or content differ from what was signed, and deletes
+// really remove objects.
 import { randomBytes } from "node:crypto";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHttpTransport, MemoryChunkStore, UploadQueue, type ChunkMeta } from "@opentake/recorder";
 import { chunkStorageKey } from "@opentake/shared";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -149,6 +150,28 @@ describe.skipIf(!endpoint)("upload API against real S3 storage", () => {
       expect(put.status).toBe(200);
       expect((await commit(0, data)).status).toBe(200);
       expect((await readObject(chunkStorageKey(t.sessionId, trackId, 0))).equals(data)).toBe(true);
+    });
+  });
+
+  describe("deleting", () => {
+    const put = (Key: string) => s3.send(new PutObjectCommand({ Bucket: bucket, Key, Body: "x" }));
+    const list = async (Prefix: string) =>
+      ((await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix }))).Contents ?? []).map((o) => o.Key);
+
+    it("deletes by prefix, past one listing page and one DeleteObjects batch, and nothing outside it", async () => {
+      const keys = Array.from({ length: 1005 }, (_, i) => `purge-test/rec/${String(i).padStart(5, "0")}.chunk`);
+      for (let i = 0; i < keys.length; i += 50) await Promise.all(keys.slice(i, i + 50).map(put));
+      await put("purge-test/recording-other/keep.chunk"); // shares the text "purge-test/rec" but not the folder
+
+      expect(await storage.deletePrefix("purge-test/rec/")).toBe(1005);
+      expect(await list("purge-test/")).toEqual(["purge-test/recording-other/keep.chunk"]);
+      expect(await storage.deletePrefix("purge-test/rec/")).toBe(0);
+    });
+
+    it("deletes listed keys, ignoring ones already gone", async () => {
+      await put("delete-test/a");
+      await storage.delete(["delete-test/a", "delete-test/never-existed"]);
+      expect(await list("delete-test/")).toEqual([]);
     });
   });
 });

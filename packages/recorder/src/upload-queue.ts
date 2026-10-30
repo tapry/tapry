@@ -1,5 +1,5 @@
 import { isLockHeld, trackLockName } from "./locks.js";
-import type { ChunkMeta, ChunkStore, ChunkTransport, CompletedTrack, StoredChunk } from "./types.js";
+import { isTrackGone, type ChunkMeta, type ChunkStore, type ChunkTransport, type CompletedTrack, type StoredChunk } from "./types.js";
 
 export interface UploadProgress {
   /** Chunks waiting or uploading. */
@@ -45,7 +45,8 @@ interface TrackJob {
 /**
  * Uploads chunks from the local store and deletes each one only after the
  * transport confirms it. Failures retry forever with capped exponential
- * backoff: the data stays on disk, so giving up would only lose it.
+ * backoff: the data stays on disk, so giving up would only lose it. The one
+ * exception is TrackGoneError (the recording was deleted): that track is dropped.
  */
 export class UploadQueue {
   private store: ChunkStore;
@@ -62,6 +63,8 @@ export class UploadQueue {
   private tracksWaiting = new Map<string, TrackJob>();
   private tracksCompleting = new Set<string>();
   private mimeTypes = new Map<string, string>();
+  /** Tracks the server said it will never take (TrackGoneError). */
+  private gone = new Set<string>();
   private uploadedChunks = 0;
   private uploadedBytes = 0;
   private lastError: unknown = null;
@@ -86,6 +89,7 @@ export class UploadQueue {
   enqueue(meta: ChunkMeta, memoryData?: ArrayBuffer) {
     const key = chunkKey(meta);
     if (this.waiting.has(key) || this.uploading.has(key)) return;
+    if (this.gone.has(trackKey(meta.sessionId, meta.trackId))) return;
     this.waiting.set(key, { meta, attempts: 0, notBefore: 0, memoryData });
     this.pump();
   }
@@ -93,6 +97,7 @@ export class UploadQueue {
   /** Tell the server the track is complete once all of its chunks are uploaded. */
   finishTrack(info: CompletedTrack) {
     const key = trackKey(info.sessionId, info.trackId);
+    if (this.gone.has(key)) return;
     this.mimeTypes.set(key, info.mimeType);
     if (!this.tracksCompleting.has(key)) this.tracksWaiting.set(key, { info, attempts: 0, notBefore: 0 });
     this.pump();
@@ -210,9 +215,12 @@ export class UploadQueue {
       // No chunk: another tab's recovery already uploaded and deleted it.
       this.uploading.delete(key);
     } catch (err) {
-      this.lastError = err;
       this.uploading.delete(key);
-      this.waiting.set(key, this.backoff(job));
+      if (isTrackGone(err)) await this.dropTrack(sessionId, trackId);
+      else if (!this.gone.has(trackKey(sessionId, trackId))) {
+        this.lastError = err;
+        this.waiting.set(key, this.backoff(job));
+      }
     }
     this.pump();
   }
@@ -222,11 +230,24 @@ export class UploadQueue {
       await this.transport.completeTrack(job.info);
       await this.store.deleteTrack(job.info.sessionId, job.info.trackId).catch((err) => (this.lastError = err));
     } catch (err) {
-      this.lastError = err;
-      this.tracksWaiting.set(key, this.backoff(job));
+      if (isTrackGone(err)) await this.dropTrack(job.info.sessionId, job.info.trackId);
+      else {
+        this.lastError = err;
+        this.tracksWaiting.set(key, this.backoff(job));
+      }
     }
     this.tracksCompleting.delete(key);
     this.pump();
+  }
+
+  /** The server will never take this track: forget it here and delete it from the local store. */
+  private async dropTrack(sessionId: string, trackId: string) {
+    const key = trackKey(sessionId, trackId);
+    this.gone.add(key);
+    for (const k of [...this.waiting.keys()]) if (k.startsWith(key + "\u0000")) this.waiting.delete(k);
+    this.tracksWaiting.delete(key);
+    // If this fails, the next page load finds the track again and the server says 410 again.
+    await this.store.deleteTrack(sessionId, trackId).catch((err) => (this.lastError = err));
   }
 
   private async deleteQuietly(sessionId: string, trackId: string, seq: number) {

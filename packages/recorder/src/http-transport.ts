@@ -1,4 +1,4 @@
-import type { ChunkTransport, CompletedTrack, StoredChunk } from "./types.js";
+import { TrackGoneError, type ChunkTransport, type CompletedTrack, type StoredChunk } from "./types.js";
 
 export interface HttpTransportOptions {
   /** API root, e.g. "https://studio.example.com/api". */
@@ -24,6 +24,8 @@ export class HttpError extends Error {
  *   PUT  <presigned url>                                       ← chunk bytes
  *   POST {base}/sessions/:s/tracks/:t/chunks/:seq/commit      ← { bytes, startTs, endTs, sha256 }
  *   POST {base}/sessions/:s/tracks/:t/complete                ← CompletedTrack
+ *
+ * 410 Gone from the API means the recording was deleted: TrackGoneError.
  */
 export function createHttpTransport(opts: HttpTransportOptions): ChunkTransport {
   const doFetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
@@ -36,6 +38,7 @@ export function createHttpTransport(opts: HttpTransportOptions): ChunkTransport 
       headers: { "content-type": "application/json", ...(await opts.headers?.()) },
       body: JSON.stringify(body),
     });
+    if (res.status === 410) throw new TrackGoneError(`Track deleted on the server (${url})`);
     if (!res.ok) throw new HttpError(res.status, url);
     const text = await res.text();
     return (text ? JSON.parse(text) : undefined) as T;

@@ -17,7 +17,7 @@ import {
 } from "@opentake/worker";
 import type { Db, Queryable } from "./db";
 import { newId } from "./ids";
-import type { Storage } from "./storage";
+import { UPLOAD_URL_TTL_S, type Storage } from "./storage";
 
 export interface JobRunnerOptions {
   ffmpeg: string;
@@ -38,9 +38,15 @@ export interface JobRunnerOptions {
   font?: string;
   /** Transcription; leave out to turn it off. */
   whisper?: Omit<WhisperOptions, "ffmpeg">;
+  /**
+   * A deleted recording's files are purged at once and again this long after, once every
+   * upload URL signed before the delete has expired. Default: upload URL lifetime + 1 min.
+   */
+  purgeRepeatMs?: number;
 }
 
-type JobType = "process_recording" | "transcribe_recording";
+type JobType = "process_recording" | "transcribe_recording" | "purge_recording";
+type MediaJobType = Exclude<JobType, "purge_recording">;
 
 interface JobRow {
   id: string;
@@ -58,7 +64,7 @@ interface RecordingRow {
 }
 
 /** Which recordings column shows a job type's progress. */
-const STATUS_COLUMN: Record<JobType, "processing" | "transcript"> = {
+const STATUS_COLUMN: Record<MediaJobType, "processing" | "transcript"> = {
   process_recording: "processing",
   transcribe_recording: "transcript",
 };
@@ -106,7 +112,9 @@ export class JobRunner {
        WHERE id = $1 AND status = 'running'`,
       [job.id],
     );
-    await this.db.query(`UPDATE recordings SET ${STATUS_COLUMN[job.type]} = 'queued' WHERE id = $1`, [job.recording_id]);
+    if (job.type !== "purge_recording") {
+      await this.db.query(`UPDATE recordings SET ${STATUS_COLUMN[job.type]} = 'queued' WHERE id = $1`, [job.recording_id]);
+    }
     return job.id;
   }
 
@@ -170,17 +178,18 @@ export class JobRunner {
   }
 
   private async process(job: JobRow) {
+    if (job.type === "purge_recording") return this.purge(job);
     const [rec] = await this.db.query<RecordingRow>(
       `SELECT r.id, r.session_id, r.started_at, r.stopped_at, st.settings
        FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
-       WHERE r.id = $1`,
+       WHERE r.id = $1 AND r.deleted_at IS NULL`,
       [job.recording_id],
     );
     if (!rec) {
       await this.db.query("UPDATE jobs SET status = 'done', finished_at = now() WHERE id = $1", [job.id]);
       return;
     }
-    const column = STATUS_COLUMN[job.type];
+    const column = STATUS_COLUMN[job.type as MediaJobType];
     await this.db.query(`UPDATE recordings SET ${column} = 'processing' WHERE id = $1`, [rec.id]);
     this.opts.onChange?.(rec.session_id);
 
@@ -227,16 +236,60 @@ export class JobRunner {
     }
   }
 
+  /**
+   * Remove a deleted recording's files: its chunks (by track prefix, so objects that were
+   * uploaded but never committed go too) and its outputs. A guest's PUT signed just before
+   * the delete can still land afterwards, so the job comes back once more after those URLs
+   * have expired, and only then is done.
+   */
+  private async purge(job: JobRow) {
+    try {
+      const [rec] = await this.db.query<{ session_id: string; due: boolean }>(
+        `SELECT r.session_id, now() < j.created_at + make_interval(secs => $2) AS due
+         FROM recordings r JOIN jobs j ON j.id = $3 WHERE r.id = $1`,
+        [job.recording_id, this.purgeRepeatMs() / 1000, job.id],
+      );
+      if (rec) {
+        const tracks = await this.db.query<{ id: string }>("SELECT id FROM tracks WHERE recording_id = $1", [job.recording_id]);
+        let removed = await this.storage.deletePrefix(`outputs/${rec.session_id}/${job.recording_id}/`);
+        for (const t of tracks) removed += await this.storage.deletePrefix(`recordings/${rec.session_id}/${t.id}/`);
+        console.log(`[worker] purged ${removed} object(s) of deleted recording ${job.recording_id}`);
+      }
+      if (rec?.due) {
+        await this.db.query(
+          `UPDATE jobs SET status = 'queued', attempts = 0, locked_until = NULL,
+                  run_after = created_at + make_interval(secs => $2) WHERE id = $1`,
+          [job.id, this.purgeRepeatMs() / 1000],
+        );
+      } else {
+        await this.db.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+      }
+    } catch (err) {
+      console.error(`[worker] purge ${job.id} attempt ${job.attempts} failed:`, String(err));
+      // Keeps trying (storage may be down for a while); never leave files of a deleted recording behind.
+      await this.db.query(
+        "UPDATE jobs SET status = 'queued', run_after = now() + make_interval(secs => $3), error = $2 WHERE id = $1",
+        [job.id, String(err).slice(0, 2000), Math.min(3600, 30 * job.attempts)],
+      );
+    }
+  }
+
+  private purgeRepeatMs() {
+    return this.opts.purgeRepeatMs ?? (UPLOAD_URL_TTL_S + 60) * 1000;
+  }
+
   private lockSeconds() {
     return Math.max(1, Math.round((this.opts.lockMs ?? 10 * 60 * 1000) / 1000));
   }
 
   private async processRecording(rec: RecordingRow, work: string, job: JobRow) {
     const outputs = await this.render(rec, work);
-    await this.db.transaction(async (tx) => {
+    const replaced = await this.db.transaction(async (tx) => {
       // Re-processing (a late upload, "Process now" twice) replaces the previous files,
       // transcripts included: they are redone from the new audio.
-      await tx.query("DELETE FROM outputs WHERE recording_id = $1", [rec.id]);
+      const old = await tx.query<{ storage_key: string }>("DELETE FROM outputs WHERE recording_id = $1 RETURNING storage_key", [
+        rec.id,
+      ]);
       for (const o of outputs) await insertOutput(tx, rec.id, o);
       await tx.query(
         "UPDATE recordings SET processing = 'ready', processed_at = now(), processing_error = NULL WHERE id = $1",
@@ -254,7 +307,9 @@ export class JobRunner {
       } else {
         await tx.query("UPDATE recordings SET transcript = 'off' WHERE id = $1", [rec.id]);
       }
+      return old.map((o) => o.storage_key);
     });
+    await this.removeReplaced(replaced);
     if (this.opts.whisper) this.kicked = true; // pick the transcript up right after
   }
 
@@ -289,12 +344,23 @@ export class JobRunner {
       const bytes = await this.storage.uploadFrom(key, path, f.type);
       uploaded.push({ id, key, bytes, kind: "transcript" as const, fileName: f.name, contentType: f.type, durationMs: null });
     }
-    await this.db.transaction(async (tx) => {
-      await tx.query("DELETE FROM outputs WHERE recording_id = $1 AND kind = 'transcript'", [rec.id]);
+    const replaced = await this.db.transaction(async (tx) => {
+      const old = await tx.query<{ storage_key: string }>(
+        "DELETE FROM outputs WHERE recording_id = $1 AND kind = 'transcript' RETURNING storage_key",
+        [rec.id],
+      );
       for (const o of uploaded) await insertOutput(tx, rec.id, o);
       await tx.query("UPDATE recordings SET transcript = 'ready' WHERE id = $1", [rec.id]);
       await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+      return old.map((o) => o.storage_key);
     });
+    await this.removeReplaced(replaced);
+  }
+
+  /** Files of an earlier run, no longer listed anywhere. Best effort: the job itself succeeded. */
+  private async removeReplaced(keys: string[]) {
+    if (keys.length === 0) return;
+    await this.storage.delete(keys).catch((err) => console.error("[worker] could not remove replaced files:", String(err)));
   }
 
   private async render(rec: RecordingRow, work: string) {

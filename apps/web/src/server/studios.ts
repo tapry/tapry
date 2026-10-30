@@ -12,6 +12,7 @@ import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
 import { hashToken, newId, newInviteCode, newToken } from "./ids";
 import type { LiveService } from "./live";
+import { deleteRecordingIn, RECORDING_BYTES } from "./processing";
 
 export interface Studio {
   id: string;
@@ -21,12 +22,20 @@ export interface Studio {
   createdAt: string;
 }
 
+export interface StudioWithUsage extends Studio {
+  recordings: number;
+  /** Space its recordings use in storage. */
+  bytes: number;
+}
+
 export type { SessionTicket };
 
 export class StudioService {
   constructor(
     private db: Db,
     private live: LiveService,
+    /** A purge job was queued (lets an in-process worker start it now). */
+    private onPurgeQueued: () => void = () => {},
   ) {}
 
   async create(owner: User, body: z.infer<typeof createStudioBody>): Promise<Studio> {
@@ -37,11 +46,47 @@ export class StudioService {
     return toStudio(row!);
   }
 
-  async list(owner: User): Promise<Studio[]> {
-    const rows = await this.db.query<StudioRow>("SELECT * FROM studios WHERE owner_id = $1 ORDER BY created_at DESC", [
-      owner.id,
-    ]);
-    return rows.map(toStudio);
+  async list(owner: User): Promise<StudioWithUsage[]> {
+    const rows = await this.db.query<StudioRow & { recordings: number; bytes: number }>(
+      `SELECT st.*,
+              count(r.id)::int AS recordings,
+              coalesce(sum(${RECORDING_BYTES}), 0)::bigint AS bytes
+       FROM studios st
+       LEFT JOIN sessions s ON s.studio_id = st.id
+       LEFT JOIN recordings r ON r.session_id = s.id AND r.deleted_at IS NULL
+       WHERE st.owner_id = $1 AND st.deleted_at IS NULL
+       GROUP BY st.id
+       ORDER BY st.created_at DESC`,
+      [owner.id],
+    );
+    return rows.map((r) => ({ ...toStudio(r), recordings: r.recordings, bytes: r.bytes }));
+  }
+
+  /**
+   * Delete a studio with all its recordings and their files. Its open session ends and the
+   * guest link stops working. Refused (nothing deleted) while a recording is running or
+   * being processed.
+   */
+  async delete(owner: User, studioId: string) {
+    await this.owned(owner, studioId);
+    const sessions = await this.db.transaction(async (tx) => {
+      await tx.query("SELECT id FROM studios WHERE id = $1 FOR UPDATE", [studioId]);
+      const recordings = await tx.query<{ id: string }>(
+        `SELECT r.id FROM recordings r JOIN sessions s ON s.id = r.session_id
+         WHERE s.studio_id = $1 AND r.deleted_at IS NULL`,
+        [studioId],
+      );
+      for (const r of recordings) await deleteRecordingIn(tx, r.id);
+      const open = await tx.query<{ id: string }>(
+        "UPDATE sessions SET status = 'ended', ended_at = now() WHERE studio_id = $1 AND status = 'open' RETURNING id",
+        [studioId],
+      );
+      // A fresh random code frees the old one and keeps the row from matching any link.
+      await tx.query("UPDATE studios SET deleted_at = now(), invite_code = $2 WHERE id = $1", [studioId, newInviteCode()]);
+      return open.map((s) => s.id);
+    });
+    for (const id of sessions) await this.live.publish(id);
+    this.onPurgeQueued();
   }
 
   async get(owner: User, studioId: string): Promise<Studio> {
@@ -97,7 +142,7 @@ export class StudioService {
 
   /** Guest opens the invite link. No account; consent to recording is required by the schema. */
   async join(body: z.infer<typeof joinBody>): Promise<SessionTicket> {
-    const [studio] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE invite_code = $1", [body.inviteCode]);
+    const [studio] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE invite_code = $1 AND deleted_at IS NULL", [body.inviteCode]);
     if (!studio) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
     const settings = studioSettings.parse(studio.settings);
 
@@ -131,7 +176,7 @@ export class StudioService {
   }
 
   private async owned(owner: User, studioId: string) {
-    const [row] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE id = $1 AND owner_id = $2", [
+    const [row] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL", [
       studioId,
       owner.id,
     ]);

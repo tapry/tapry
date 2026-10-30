@@ -1,5 +1,5 @@
 import type { User } from "./auth";
-import type { Db } from "./db";
+import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
 import { newId } from "./ids";
 import type { Storage } from "./storage";
@@ -19,6 +19,8 @@ export interface RecordingSummary {
   tracks: number;
   /** Tracks whose upload isn't confirmed yet (a guest may still be uploading, or gone). */
   incompleteTracks: number;
+  /** Space used in storage: uploaded chunks plus processed files. */
+  bytes: number;
   outputs: Array<{ id: string; kind: "audio" | "video" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
@@ -45,7 +47,7 @@ export class ProcessingService {
       `SELECT r.status,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS open
-       FROM recordings r WHERE r.id = $1`,
+       FROM recordings r WHERE r.id = $1 AND r.deleted_at IS NULL`,
       [recordingId],
     );
     if (r?.status === "stopped" && r.tracks > 0 && r.open === 0) await this.enqueue(recordingId);
@@ -74,6 +76,17 @@ export class ProcessingService {
     await this.enqueue(recordingId);
   }
 
+  /**
+   * Host deletes a recording: it leaves the list at once, its chunks and files are removed
+   * from storage by a purge job. Refused while it is still recording or a worker is on it.
+   */
+  async deleteRecording(owner: User, studioId: string, recordingId: string) {
+    await this.ownedRecording(owner, studioId, recordingId);
+    const sessionId = await this.db.transaction((tx) => deleteRecordingIn(tx, recordingId));
+    this.onChange(sessionId);
+    this.onEnqueue();
+  }
+
   async listForStudio(owner: User, studioId: string): Promise<RecordingSummary[]> {
     const rows = await this.db.query<{
       id: string;
@@ -86,14 +99,16 @@ export class ProcessingService {
       stopped_at: number | null;
       tracks: number;
       incomplete: number;
+      bytes: number;
     }>(
       `SELECT r.id, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
-              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
+              ${RECORDING_BYTES} AS bytes
        FROM recordings r
        JOIN sessions s ON s.id = r.session_id
        JOIN studios st ON st.id = s.studio_id
-       WHERE st.id = $1 AND st.owner_id = $2
+       WHERE st.id = $1 AND st.owner_id = $2 AND st.deleted_at IS NULL AND r.deleted_at IS NULL
        ORDER BY r.started_at DESC
        LIMIT 100`,
       [studioId, owner.id],
@@ -124,6 +139,7 @@ export class ProcessingService {
       stoppedAt: r.stopped_at,
       tracks: r.tracks,
       incompleteTracks: r.incomplete,
+      bytes: r.bytes,
       outputs: outputs
         .filter((o) => o.recording_id === r.id)
         .map((o) => ({ id: o.id, kind: o.kind, fileName: o.file_name, bytes: o.bytes, durationMs: o.duration_ms })),
@@ -145,10 +161,55 @@ export class ProcessingService {
     const [rec] = await this.db.query<{ status: string }>(
       `SELECT r.status FROM recordings r
        JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
-       WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3`,
+       WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
       [recordingId, studioId, owner.id],
     );
     if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
     return rec;
   }
+}
+
+/** Bytes a recording (alias r) takes in storage: its uploaded chunks plus its processed files. */
+export const RECORDING_BYTES = `(
+  (SELECT coalesce(sum(c.bytes), 0) FROM chunks c JOIN tracks t ON t.id = c.track_id WHERE t.recording_id = r.id) +
+  (SELECT coalesce(sum(o.bytes), 0) FROM outputs o WHERE o.recording_id = r.id)
+)::bigint`;
+
+/**
+ * Marks a recording deleted inside `tx` and queues the purge of its files; returns its session.
+ * The rows that name stored objects (chunks, outputs) go now, so usage drops at once; the
+ * recording's and tracks' rows stay so late uploads get 410 Gone (see migration 4).
+ */
+export async function deleteRecordingIn(tx: Queryable, recordingId: string): Promise<string> {
+  const [rec] = await tx.query<{ session_id: string; status: string; deleted_at: Date | null }>(
+    "SELECT session_id, status, deleted_at FROM recordings WHERE id = $1 FOR UPDATE",
+    [recordingId],
+  );
+  if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
+  if (rec.deleted_at) return rec.session_id;
+  if (rec.status === "recording") throw new ApiError(409, "still_recording", "Stop the recording before deleting it");
+
+  // Drop work not started yet. A job a worker claimed meanwhile is 'running' when this
+  // re-checks the row, so it survives this and the check below refuses.
+  await tx.query(
+    `DELETE FROM jobs WHERE recording_id = $1 AND type <> 'purge_recording'
+       AND (status IN ('queued', 'done', 'failed') OR (status = 'running' AND locked_until < now()))`,
+    [recordingId],
+  );
+  const [busy] = await tx.query("SELECT 1 FROM jobs WHERE recording_id = $1 AND status = 'running' AND type <> 'purge_recording'", [
+    recordingId,
+  ]);
+  if (busy) {
+    throw new ApiError(409, "processing_busy", "This recording is being processed right now. Delete it once that finishes.");
+  }
+
+  await tx.query("DELETE FROM chunks WHERE track_id IN (SELECT id FROM tracks WHERE recording_id = $1)", [recordingId]);
+  await tx.query("DELETE FROM outputs WHERE recording_id = $1", [recordingId]);
+  await tx.query("UPDATE recordings SET deleted_at = now() WHERE id = $1", [recordingId]);
+  await tx.query(
+    `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'purge_recording', $2)
+     ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running') DO NOTHING`,
+    [newId("job"), recordingId],
+  );
+  return rec.session_id;
 }

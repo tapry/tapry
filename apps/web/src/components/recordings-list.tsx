@@ -1,11 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
+import { formatBytes } from "@/lib/format";
 import type { RecordingSummary } from "@/server/processing";
+import { ConfirmAction } from "./confirm-action";
 import { Button, cn, Notice, StatusDot } from "./ui";
-
-const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 const clock = (ms: number) => {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -24,6 +25,7 @@ const settled = (r: RecordingSummary) =>
 
 /** A studio's recordings with their state and download links. Polls while anything is in flight. */
 export function RecordingsList({ studioId, initial }: { studioId: string; initial: RecordingSummary[] }) {
+  const router = useRouter();
   const [recordings, setRecordings] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const inFlight = recordings.some((r) => !settled(r));
@@ -50,6 +52,12 @@ export function RecordingsList({ studioId, initial }: { studioId: string; initia
     }
   }
 
+  async function remove(r: RecordingSummary) {
+    await apiFetch(`/studios/${studioId}/recordings/${r.id}`, { method: "DELETE" });
+    setRecordings((list) => list.filter((x) => x.id !== r.id));
+    router.refresh(); // the studio's storage total
+  }
+
   if (recordings.length === 0) {
     return <p className="text-sm text-muted">No recordings yet. Enter the studio and press Record.</p>;
   }
@@ -70,7 +78,7 @@ export function RecordingsList({ studioId, initial }: { studioId: string; initia
                   </p>
                   <p className="text-sm text-muted">
                     {r.stoppedAt ? clock(r.stoppedAt - r.startedAt) : "in progress"} · {r.tracks} track
-                    {r.tracks === 1 ? "" : "s"}
+                    {r.tracks === 1 ? "" : "s"} · <span data-testid="recording-bytes">{formatBytes(r.bytes)}</span>
                   </p>
                 </div>
                 <span className="flex items-center gap-2 text-sm" data-testid="recording-status">
@@ -114,11 +122,26 @@ export function RecordingsList({ studioId, initial }: { studioId: string; initia
                         data-testid="download"
                       >
                         <span className="truncate">{o.fileName}</span>
-                        <span className="shrink-0 text-muted">{mb(o.bytes)}</span>
+                        <span className="shrink-0 text-muted">{formatBytes(o.bytes)}</span>
                       </a>
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {r.status === "stopped" && (
+                <ConfirmAction
+                  label="Delete"
+                  testId="delete-recording"
+                  question={
+                    <>
+                      Delete this recording and all of its files from the server? This can&apos;t be undone.
+                      {r.incompleteTracks > 0 && " Guests still uploading it will stop, and their copies are discarded."}
+                    </>
+                  }
+                  confirmLabel="Delete recording"
+                  action={() => remove(r)}
+                />
               )}
             </li>
           );

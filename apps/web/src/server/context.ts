@@ -1,6 +1,6 @@
 import { createApiHandlers } from "./api";
 import { loadConfig, type Config } from "./config";
-import { openDb, type Db } from "./db";
+import { migrate, openDb, type Db } from "./db";
 import { JobRunner } from "./jobs";
 import { LiveHub } from "./live";
 import { createServices, type Services } from "./services";
@@ -27,7 +27,9 @@ let services: Promise<Services> | undefined;
 
 /** Services for this module evaluation, on top of the process-wide resources. */
 export function getServices(): Promise<Services> {
-  return (services ??= resources().then(({ db, storage, config }) => {
+  return (services ??= resources().then(async ({ db, storage, config }) => {
+    // The connection outlives code edits in dev; a pulled or new migration applies on the next reload.
+    await migrate(db);
     const svc = createServices(db, storage, {
       auth: { allowSignup: config.allowSignup },
       hub: (shared.hub ??= new LiveHub()),
@@ -43,6 +45,9 @@ export function getServices(): Promise<Services> {
     }
     // Otherwise a separate worker (worker-main.ts) polls the jobs table.
     return svc;
+  }).catch((err) => {
+    services = undefined; // retry on the next request
+    throw err;
   }));
 }
 

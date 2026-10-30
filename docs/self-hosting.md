@@ -108,6 +108,11 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
   storage provider's replication). Recordings are useless without the database that indexes them.
 - **Health:** `GET /api/health` returns `{"ok":true}` when the app and its database are up.
+- **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
+  processed files). Deleting a recording or a studio removes its files from storage within
+  seconds, and once more about 16 minutes later to catch uploads that were already on their way.
+  Guests still uploading a deleted recording are told to stop, and their browsers discard their
+  copies. Names and timestamps of deleted recordings stay in the database (no media).
 
 ## Known limits (v1)
 

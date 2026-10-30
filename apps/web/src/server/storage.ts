@@ -4,9 +4,11 @@ import type { Readable } from "node:stream";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import {
   CreateBucketCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   S3ServiceException,
@@ -35,7 +37,14 @@ export interface Storage {
   uploadFrom(key: string, path: string, contentType: string): Promise<number>;
   /** Short-lived download link that saves under `fileName`. */
   presignGet(key: string, opts: { fileName: string; contentType: string; ttlSeconds?: number }): Promise<string>;
+  /** Delete these objects. Missing ones are fine. */
+  delete(keys: string[]): Promise<void>;
+  /** Delete every object whose key starts with `prefix`; returns how many there were. */
+  deletePrefix(prefix: string): Promise<number>;
 }
+
+/** Default lifetime of presigned upload URLs, in seconds. */
+export const UPLOAD_URL_TTL_S = 15 * 60;
 
 export interface S3StorageConfig {
   endpoint?: string;
@@ -78,7 +87,7 @@ export class S3Storage implements Storage {
       ChecksumSHA256: checksum,
     });
     const url = await getSignedUrl(this.signer, command, {
-      expiresIn: this.config.urlTtl ?? 15 * 60,
+      expiresIn: this.config.urlTtl ?? UPLOAD_URL_TTL_S,
       // Signing these means storage rejects a PUT whose size, type or content differs
       // from what the client declared — the browser sets Content-Length itself.
       signableHeaders: new Set(["content-length", "content-type"]),
@@ -127,6 +136,35 @@ export class S3Storage implements Storage {
       ResponseContentDisposition: contentDisposition(opts.fileName),
     });
     return getSignedUrl(this.signer, command, { expiresIn: opts.ttlSeconds ?? 10 * 60 });
+  }
+
+  async delete(keys: string[]) {
+    // DeleteObjects takes at most 1000 keys per request.
+    for (let i = 0; i < keys.length; i += 1000) {
+      const res = await this.client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.config.bucket,
+          Delete: { Objects: keys.slice(i, i + 1000).map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+      const failed = res.Errors?.filter((e) => e.Code !== "NoSuchKey") ?? [];
+      if (failed.length) throw new Error(`Could not delete ${failed.length} object(s): ${failed[0]!.Code} ${failed[0]!.Message ?? ""}`);
+    }
+  }
+
+  async deletePrefix(prefix: string) {
+    let deleted = 0;
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.config.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      const keys = (page.Contents ?? []).flatMap((o) => (o.Key ? [o.Key] : []));
+      await this.delete(keys);
+      deleted += keys.length;
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return deleted;
   }
 
   /** Create the bucket on first start of a fresh self-hosted install. */

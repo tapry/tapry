@@ -56,6 +56,20 @@ export interface ChunkStore {
 }
 
 /**
+ * Thrown by a transport when the server says it will never accept this track: the host
+ * deleted its recording. The one case where local chunks go without the server confirming
+ * each one: the server has confirmed that nobody wants them, so retrying would only fill
+ * the disk. Recognised by its `trackGone` flag, so it works across bundles.
+ */
+export class TrackGoneError extends Error {
+  readonly trackGone = true;
+}
+
+export function isTrackGone(err: unknown): err is TrackGoneError {
+  return typeof err === "object" && err !== null && (err as { trackGone?: unknown }).trackGone === true;
+}
+
+/**
  * Moves chunks to the server. Both methods must be idempotent and must only
  * resolve once the server has durably stored the data — the caller deletes
  * the local copy as soon as `uploadChunk` resolves.
@@ -63,4 +77,5 @@ export interface ChunkStore {
 export interface ChunkTransport {
   uploadChunk(chunk: StoredChunk, mimeType: string): Promise<void>;
   completeTrack(info: CompletedTrack): Promise<void>;
+  // Either may throw TrackGoneError: the queue then drops the whole track locally.
 }
