@@ -31,7 +31,7 @@ docs/               self-hosting, architecture, browser support
 9. Test matrix automation where possible (Playwright with fake media devices; network throttling).
 
 ## Processing
-- Jobs live in Postgres (`jobs`, claimed with `FOR UPDATE SKIP LOCKED`); `WORKER=inprocess` (default) runs them inside the web server, required with PGlite (single-process). A standalone worker CLI for Postgres deployments is still to do.
+- Jobs live in Postgres (`jobs`, claimed with `FOR UPDATE SKIP LOCKED`). `WORKER=inprocess` (default, required with PGlite) runs them inside the web server; with Postgres, `src/worker-main.ts` (bundled to `dist-worker/worker.cjs`, the `worker` Compose service) runs them separately and the web server uses `WORKER=off`. Running jobs renew their lock; a stopped worker hands its job back; migrations take an advisory lock so web and workers can start together.
 - A recording is processed once it is stopped and every track is complete; hosts can force it ("Process now").
 - All outputs are aligned to the recording start and cut to its exact length.
 - Transcripts: a separate `transcribe_recording` job queued when processing succeeds. Each person's WAV is transcribed alone (speaker = track), then merged by time into TXT/SRT/VTT. Off when `WHISPER_MODEL` is unset.

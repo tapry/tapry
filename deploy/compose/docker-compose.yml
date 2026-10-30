@@ -2,6 +2,21 @@
 # See docs/self-hosting.md.
 name: opentake
 
+# Settings the web app and the workers share: database, storage, media tools.
+x-app-env: &app-env
+  DATABASE_URL: postgres://opentake:${POSTGRES_PASSWORD:?}@postgres:5432/opentake
+  S3_ENDPOINT: http://seaweedfs:8333
+  # Browsers upload to and download from storage directly, through Caddy.
+  S3_PUBLIC_ENDPOINT: ${PUBLIC_SCHEME:-https}://s3.${DOMAIN}
+  S3_REGION: us-east-1
+  S3_BUCKET: opentake
+  S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?}
+  S3_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?}
+  S3_FORCE_PATH_STYLE: "true"
+  # Transcripts (whisper.cpp + model are in the image). Set WHISPER_MODEL= (empty) in .env to turn off.
+  WHISPER_MODEL: ${WHISPER_MODEL-/opt/whisper/ggml-base.bin}
+  WHISPER_THREADS: ${WHISPER_THREADS:-4}
+
 services:
   # HTTPS for the public names (app, storage, LiveKit, TURN), certificates from Let's Encrypt.
   # Built with the layer4 plugin: port 443 also carries TURN over TLS (see Caddyfile).
@@ -37,27 +52,41 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      DATABASE_URL: postgres://opentake:${POSTGRES_PASSWORD:?}@postgres:5432/opentake
+      <<: *app-env
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
-      S3_ENDPOINT: http://seaweedfs:8333
-      # Browsers upload to and download from storage directly, through Caddy.
-      S3_PUBLIC_ENDPOINT: ${PUBLIC_SCHEME:-https}://s3.${DOMAIN}
-      S3_REGION: us-east-1
-      S3_BUCKET: opentake
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?}
-      S3_FORCE_PATH_STYLE: "true"
       LIVEKIT_URL: ${LIVEKIT_WS_SCHEME:-wss}://livekit.${DOMAIN}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?}
-      WORKER: inprocess
-      # Transcripts (whisper.cpp + model are in the image). Set WHISPER_MODEL= (empty) in .env to turn off.
-      WHISPER_MODEL: ${WHISPER_MODEL-/opt/whisper/ggml-base.bin}
-      WHISPER_THREADS: ${WHISPER_THREADS:-4}
+      # Recordings are processed by the worker service below; the web app only queues jobs.
+      WORKER: "off"
     depends_on:
       postgres:
         condition: service_healthy
       seaweedfs:
+        condition: service_healthy
+
+  # Processes and transcribes recordings (same image, other entry point). Scale with
+  # WORKER_REPLICAS=n; workers share the queue safely, a stopped one hands its job back.
+  worker:
+    image: opentake/web:${OPENTAKE_VERSION:-local}
+    restart: unless-stopped
+    command: ["node", "worker.cjs"]
+    environment:
+      <<: *app-env
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+    # Long enough to hand a running job back cleanly.
+    stop_grace_period: 30s
+    healthcheck:
+      # The worker writes a heartbeat after every poll; stale means stuck.
+      test: ["CMD", "node", "-e", "process.exit(Date.now() - Number(require('fs').readFileSync('/tmp/opentake-worker-heartbeat', 'utf8')) < 60000 ? 0 : 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    depends_on:
+      # The web app runs migrations first (workers would also wait on the migration lock).
+      web:
         condition: service_healthy
 
   postgres:
