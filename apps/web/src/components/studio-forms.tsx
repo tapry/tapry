@@ -101,6 +101,7 @@ export function StudioSettingsForm({ studioId, name, settings }: { studioId: str
             videoQuality: f.get("videoQuality"),
             maxGuests: Number(f.get("maxGuests")),
             echoCancellation: f.get("echoCancellation") === "on",
+            levelLoudness: f.get("levelLoudness") === "on",
           },
         },
       });
@@ -139,6 +140,16 @@ export function StudioSettingsForm({ studioId, name, settings }: { studioId: str
           <span className="font-medium">Echo cancellation for guests on speakers</span>
           <span className="block text-muted">
             Guests who say they're on headphones always get it switched off, which sounds better.
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="levelLoudness" defaultChecked={settings.levelLoudness} className="mt-0.5 size-4" />
+        <span>
+          <span className="font-medium">Even out volume</span>
+          <span className="block text-muted">
+            Brings everyone&apos;s audio to podcast loudness (−16 LUFS) after recording, quiet guests included. Only the
+            volume changes, never the sound. Applies to recordings processed from now on.
           </span>
         </span>
       </label>

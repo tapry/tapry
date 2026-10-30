@@ -5,7 +5,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { FfmpegError, run } from "../src/ffmpeg.js";
-import { alignmentFilters, concatChunks, findFont, gridLayout, renderRecording, type TrackInput } from "../src/pipeline.js";
+import {
+  alignmentFilters,
+  concatChunks,
+  findFont,
+  gridLayout,
+  loudnessGain,
+  measureLoudness,
+  PODCAST_LOUDNESS,
+  renderRecording,
+  type TrackInput,
+} from "../src/pipeline.js";
 
 const ffmpeg = process.env.FFMPEG_PATH ?? "ffmpeg";
 const ffprobe = process.env.FFPROBE_PATH ?? "ffprobe";
@@ -48,6 +58,28 @@ describe("gridLayout", () => {
         expect(t.w % 2 + (t.h % 2)).toBe(0); // H.264 needs even sizes
       }
     }
+  });
+});
+
+describe("loudnessGain", () => {
+  const target = PODCAST_LOUDNESS; // -16 LUFS, -1 dBTP, at most +20 dB
+
+  it("raises a quiet track and lowers a loud one to the target", () => {
+    expect(loudnessGain({ integrated: -28, truePeak: -18 }, target)).toBe(12);
+    expect(loudnessGain({ integrated: -9.5, truePeak: -2 }, target)).toBe(-6.5);
+  });
+
+  it("raises less when the peaks would pass the ceiling (it never compresses or clips)", () => {
+    // +12 dB wanted, but a -8 dBTP peak only has 7 dB of room under -1 dBTP.
+    expect(loudnessGain({ integrated: -28, truePeak: -8 }, target)).toBe(7);
+  });
+
+  it("caps the boost, so a near-silent mic doesn't become loud hiss", () => {
+    expect(loudnessGain({ integrated: -60, truePeak: -50 }, target)).toBe(20);
+  });
+
+  it("leaves silence alone", () => {
+    expect(loudnessGain({ integrated: null, truePeak: null }, target)).toBe(0);
   });
 });
 
@@ -148,6 +180,56 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     );
   });
 
+  it("levels everyone to podcast loudness, the video's sound and the combined mix too", async () => {
+    // A quiet guest (about -32 LUFS), a louder host, and a guest whose mic was muted throughout.
+    const quiet = join(dir, "quiet.webm");
+    const silent = join(dir, "silent.webm");
+    await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "sine=frequency=300:sample_rate=48000:duration=3", "-af", "volume=0.3", "-c:a", "libopus", quiet]);
+    await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", "3", "-c:a", "libopus", silent]);
+    const tracks: TrackInput[] = [
+      { trackId: "trk_host_a", participantId: "par_host", participantName: "Host", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_host_v", participantId: "par_host", participantName: "Host", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      { trackId: "trk_quiet", participantId: "par_quiet", participantName: "Quiet", kind: "audio", rawPath: quiet, offsetMs: 0 },
+      { trackId: "trk_muted", participantId: "par_muted", participantName: "Muted", kind: "audio", rawPath: silent, offsetMs: 0 },
+    ];
+    const plain = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "plain"), durationMs: 3000, videoHeight: 720 });
+    const levelled = await renderRecording(tracks, {
+      ffmpeg, ffprobe, workDir: join(dir, "levelled"), durationMs: 3000, videoHeight: 720, loudness: PODCAST_LOUDNESS,
+    });
+    const loudness = async (o: { path: string }) => measureLoudness(ffmpeg, o.path);
+    const byName = (list: typeof levelled, name: string) => list.find((o) => o.fileName === name)!;
+
+    // Off (the default): files are as recorded.
+    expect((await loudness(byName(plain, "Quiet - audio.wav"))).integrated).toBeLessThan(-30);
+    expect(plain.every((o) => o.gainDb === undefined)).toBe(true);
+
+    // On: each voice lands on -16 LUFS, with its peaks under the -1 dBTP ceiling.
+    for (const name of ["Host - audio.wav", "Quiet - audio.wav"]) {
+      const m = await loudness(byName(levelled, name));
+      expect(m.integrated!, name).toBeCloseTo(-16, 0);
+      expect(m.truePeak!, name).toBeLessThanOrEqual(-0.9);
+    }
+    expect(byName(levelled, "Quiet - audio.wav").gainDb).toBeGreaterThan(15);
+    // Silence stays silence: no gain, nothing amplified.
+    expect(byName(levelled, "Muted - audio.wav").gainDb).toBe(0);
+    expect((await loudness(byName(levelled, "Muted - audio.wav"))).integrated).toBeNull();
+
+    // The host's video gets the host's gain, so it sounds like their WAV.
+    const hostGain = byName(levelled, "Host - audio.wav").gainDb!;
+    expect(byName(levelled, "Host - video.mp4").gainDb).toBe(hostGain);
+    const videoBefore = (await loudness(byName(plain, "Host - video.mp4"))).integrated!;
+    const videoAfter = (await loudness(byName(levelled, "Host - video.mp4"))).integrated!;
+    expect(videoAfter - videoBefore).toBeCloseTo(hostGain, 0);
+
+    // The combined mix is levelled as a whole, not just the sum of levelled voices.
+    const combined = await loudness(byName(levelled, "Combined.mp4"));
+    expect(combined.integrated!).toBeCloseTo(-16, 0);
+    expect(combined.truePeak!).toBeLessThanOrEqual(-0.5); // AAC adds a little overshoot
+
+    // Still exactly the recording length.
+    expect(samples(byName(levelled, "Quiet - audio.wav").path).length).toBe(144_000);
+  });
+
   it("merges the pieces of someone who rejoined mid-recording into one file each, gap included", async () => {
     // Recording of 6 s: the guest's tab died at ~3 s and they were back at 4 s.
     const pieces: TrackInput[] = [
@@ -176,6 +258,29 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     expect(brightness(1.5)).toBeGreaterThan(40);
     expect(brightness(3.5)).toBeLessThan(20);
     expect(brightness(5)).toBeGreaterThan(40);
+  });
+
+  it("levels a rejoined person's merged pieces with one gain, gap still silent", async () => {
+    const pieces: TrackInput[] = [
+      { trackId: "trk_a1", participantId: "par_g", participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_a2", participantId: "par_g", participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 4000 },
+      { trackId: "trk_v1", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      { trackId: "trk_v2", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 4000 },
+    ];
+    const opts = { ffmpeg, ffprobe, durationMs: 6000, videoHeight: 720 as const };
+    const plain = await renderRecording(pieces, { ...opts, workDir: join(dir, "rejoin-plain") });
+    const levelled = await renderRecording(pieces, { ...opts, workDir: join(dir, "rejoin-levelled"), loudness: PODCAST_LOUDNESS });
+
+    expect((await measureLoudness(ffmpeg, levelled[0]!.path)).integrated!).toBeCloseTo(-16, 0);
+    const audio = samples(levelled[0]!.path);
+    expect(audio.length).toBe(6 * 48000);
+    expect(peak(audio, 3.1, 3.9)).toBeLessThan(100); // the gap is not raised into noise
+
+    const gain = levelled[0]!.gainDb!;
+    expect(levelled[1]!.gainDb).toBe(gain);
+    const before = (await measureLoudness(ffmpeg, plain[1]!.path)).integrated!;
+    const after = (await measureLoudness(ffmpeg, levelled[1]!.path)).integrated!;
+    expect(after - before).toBeCloseTo(gain, 0);
   });
 
   it("writes each person's name on their tile of the combined video, whatever characters it has", async () => {

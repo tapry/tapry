@@ -9,8 +9,11 @@ export class FfmpegError extends Error {
   }
 }
 
-/** Run a binary; resolves on exit 0, rejects with the end of stderr otherwise. */
-export function run(bin: string, args: string[], opts: { timeoutMs?: number } = {}): Promise<string> {
+/**
+ * Run a binary; resolves with stdout on exit 0 (or the end of stderr, with `stderr: true`:
+ * ffmpeg's filters report measurements there), rejects with the end of stderr otherwise.
+ */
+export function run(bin: string, args: string[], opts: { timeoutMs?: number; stderr?: boolean } = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
@@ -27,7 +30,7 @@ export function run(bin: string, args: string[], opts: { timeoutMs?: number } = 
     });
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      if (code === 0) resolve(stdout);
+      if (code === 0) resolve(opts.stderr ? stderr : stdout);
       else reject(new FfmpegError(`${bin} exited with ${signal ?? code}`, stderr.slice(-2000)));
     });
   });
