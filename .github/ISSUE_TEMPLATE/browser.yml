@@ -1,0 +1,30 @@
+name: Browser report
+description: Recording or the call does (or doesn't) work in a browser
+labels: [browser]
+body:
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: Safari 18.4, iOS 18.5, iPhone 15
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Used as
+      options: [Host, Guest, Both]
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What worked
+      options:
+        - label: Green room (camera preview, mic meter)
+        - label: Joining the live call, seeing and hearing others
+        - label: Recording and uploading (progress reached "uploaded")
+        - label: The processed files play correctly
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What went wrong, and anything unusual (Bluetooth headset, external camera, low battery mode, VPN).

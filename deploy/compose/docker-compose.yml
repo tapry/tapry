@@ -26,7 +26,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/caddy.Dockerfile
-    image: opentake/caddy:${OPENTAKE_VERSION:-local}
+    image: ${OPENTAKE_IMAGES:-opentake}/opentake-caddy:${OPENTAKE_VERSION:-local}
     restart: unless-stopped
     network_mode: host
     environment:
@@ -41,13 +41,15 @@ services:
       web:
         condition: service_healthy
 
-  # Studio UI + API. Also processes recordings (WORKER=inprocess, ffmpeg in the image).
+  # Studio UI + API. Queues processing jobs; the worker service below does the work.
   # Published on loopback only: the outside world reaches it through Caddy.
   web:
     build:
       context: ../..
       dockerfile: deploy/docker/web.Dockerfile
-    image: opentake/web:${OPENTAKE_VERSION:-local}
+      args:
+        OPENTAKE_VERSION: ${OPENTAKE_VERSION:-local}
+    image: ${OPENTAKE_IMAGES:-opentake}/opentake-web:${OPENTAKE_VERSION:-local}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
@@ -68,7 +70,7 @@ services:
   # Processes and transcribes recordings (same image, other entry point). Scale with
   # WORKER_REPLICAS=n; workers share the queue safely, a stopped one hands its job back.
   worker:
-    image: opentake/web:${OPENTAKE_VERSION:-local}
+    image: ${OPENTAKE_IMAGES:-opentake}/opentake-web:${OPENTAKE_VERSION:-local}
     restart: unless-stopped
     command: ["node", "worker.cjs"]
     environment:

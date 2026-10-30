@@ -1,6 +1,8 @@
 {
   "name": "opentake",
+  "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": ">=22"

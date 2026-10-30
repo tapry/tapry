@@ -47,6 +47,16 @@ docker compose up -d                            # first run builds the image (a 
 Open `https://studio.example.com`. The **first account you create becomes the admin**; after
 that sign-up is closed (set `ALLOW_SIGNUP=true` in `.env` to let others register).
 
+### Using the release images instead of building
+
+Every release publishes ready-made images (amd64 and arm64), which skips the few-minute build.
+After `./setup.sh`, add to `.env` the two lines from the
+[release notes](../../../releases) (`OPENTAKE_IMAGES=ghcr.io/…` and `OPENTAKE_VERSION=…`), then:
+
+```bash
+docker compose pull && docker compose up -d --no-build
+```
+
 ### Try it on your own machine
 
 ```bash
@@ -104,7 +114,8 @@ right-to-left shaping, so Arabic or Hebrew names render with unjoined letters.
 
 ## Using your own S3 (R2, AWS, Backblaze…)
 
-Delete the `seaweedfs` service, then in the `web` service set `S3_ENDPOINT` (your provider's
+Delete the `seaweedfs` service, then in the `x-app-env` block at the top of
+`docker-compose.yml` (shared by `web` and `worker`) set `S3_ENDPOINT` (your provider's
 endpoint), `S3_PUBLIC_ENDPOINT` (remove it if it's the same), `S3_REGION`, `S3_BUCKET` and the
 keys. Your provider must accept presigned `PUT`s with a signed `x-amz-checksum-sha256` header;
 check with `pnpm --filter @opentake/web test:s3` pointed at it (`S3_E2E_*` variables).
@@ -112,11 +123,13 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 
 ## Operating
 
-- **Update:** `git pull && docker compose up -d --build`. Database migrations run on start.
-- **Logs:** `docker compose logs -f web`. Logs never contain media, only ids and errors.
+- **Update:** `git pull && docker compose up -d --build` (or, with release images, set the new
+  `OPENTAKE_VERSION` in `.env` and `docker compose pull && docker compose up -d --no-build`).
+  Database migrations run on start. Read the [changelog](../CHANGELOG.md) first.
+- **Logs:** `docker compose logs -f web worker`. Logs never contain media, only ids and errors.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
   storage provider's replication). Recordings are useless without the database that indexes them.
-- **Health:** `GET /api/health` returns `{"ok":true}` when the app and its database are up.
+- **Health:** `GET /api/health` returns `{"ok":true,"version":"0.1.0"}` when the app and its database are up.
 - **Downloads:** single files come straight from storage through short-lived signed links.
   "Download all (.zip)" is put together on the fly by the web container as it streams, so
   it uses no extra disk but does pass through the web container: a 5 GB zip is 5 GB of its
