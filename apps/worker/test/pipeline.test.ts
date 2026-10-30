@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { FfmpegError, run } from "../src/ffmpeg.js";
-import { alignmentFilters, concatChunks, gridLayout, renderRecording, type TrackInput } from "../src/pipeline.js";
+import { alignmentFilters, concatChunks, findFont, gridLayout, renderRecording, type TrackInput } from "../src/pipeline.js";
 
 const ffmpeg = process.env.FFMPEG_PATH ?? "ffmpeg";
 const ffprobe = process.env.FFPROBE_PATH ?? "ffprobe";
@@ -176,6 +176,40 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     expect(brightness(1.5)).toBeGreaterThan(40);
     expect(brightness(3.5)).toBeLessThan(20);
     expect(brightness(5)).toBeGreaterThan(40);
+  });
+
+  it("writes each person's name on their tile of the combined video, whatever characters it has", async () => {
+    const font = await findFont();
+    expect(font, "a font for drawtext").toBeTruthy();
+    const people: TrackInput[] = [
+      { trackId: "trk_v", participantId: "par_1", participantName: "Host", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      { trackId: "trk_a", participantId: "par_1", participantName: "Host", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      // Audio-only guest whose name would break a naive filter string.
+      { trackId: "trk_g", participantId: "par_2", participantName: `Zoë "O'Brien": 100% \\ yes`, kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+    ];
+    const render = async (f: string | null, name: string) =>
+      (await renderRecording(people, { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 2000, videoHeight: 720, font: f })).find(
+        (o) => o.kind === "combined",
+      )!.path;
+    const labelled = await render(font, "labels");
+    const plain = await render(null, "no-labels");
+
+    // Brightest pixel of a region of the frame at 1 s (white text vs the dark tile background).
+    const brightest = (file: string, crop: string) =>
+      Number.parseFloat(
+        execFileSync(ffmpeg, ["-v", "error", "-ss", "1", "-i", file, "-frames:v", "1",
+          "-vf", `crop=${crop},signalstats,metadata=print:key=lavfi.signalstats.YMAX:file=-`, "-f", "null", "-"])
+          .toString().match(/YMAX=([\d.]+)/)![1]!,
+      );
+    // Two tiles side by side (960x540 at y=270): the host's name bottom-left of the left tile,
+    // the guest's name centred on the right (dark, audio-only) tile.
+    // The host's 4:3 camera is pillarboxed in its 16:9 tile, so its tag lands on the dark margin.
+    const hostTag = "110:50:4:755";
+    const guestName = "560:60:1150:505";
+    for (const region of [hostTag, guestName]) {
+      expect(brightest(plain, region), `no text at ${region} without names`).toBeLessThan(60);
+      expect(brightest(labelled, region), `text at ${region}`).toBeGreaterThan(180);
+    }
   });
 
   it("gives two people with the same name distinct files", async () => {

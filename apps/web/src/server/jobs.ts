@@ -29,6 +29,8 @@ export interface JobRunnerOptions {
   lockMs?: number;
   /** Something changed for this session (status shown to the host). */
   onChange?: (sessionId: string) => void;
+  /** Font file for names on the combined video. Unset: found automatically. */
+  font?: string;
   /** Transcription; leave out to turn it off. */
   whisper?: Omit<WhisperOptions, "ffmpeg">;
 }
@@ -292,6 +294,7 @@ export class JobRunner {
       workDir: join(work, "out"),
       durationMs: Math.max(1000, (rec.stopped_at ?? lastEnd) - rec.started_at),
       videoHeight: settings.videoQuality === "720p" ? 720 : 1080,
+      font: this.opts.font,
     });
 
     const uploaded = [];

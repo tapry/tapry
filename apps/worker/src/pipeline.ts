@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import { probeDurationMs, probeStreams, run } from "./ffmpeg.js";
@@ -25,6 +25,8 @@ export interface PipelineOptions {
   videoHeight: 720 | 1080;
   /** Per ffmpeg invocation. Default: 10× real time, at least 2 minutes. */
   timeoutMs?: number;
+  /** Font for names on the combined video's tiles. Unset: found automatically; null: no names. */
+  font?: string | null;
 }
 
 export interface OutputFile {
@@ -234,6 +236,51 @@ function groupBy<T>(items: T[], key: (item: T) => string): T[][] {
   return [...groups.values()];
 }
 
+/** Fonts tried for tile names when none is configured: Debian's DejaVu (Docker), then macOS. */
+export const FONT_CANDIDATES = [
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+  "/System/Library/Fonts/Supplemental/Arial.ttf",
+  "/System/Library/Fonts/Helvetica.ttc",
+];
+
+export async function findFont(candidates = FONT_CANDIDATES): Promise<string | null> {
+  for (const path of candidates) {
+    try {
+      await access(path);
+      return path;
+    } catch {}
+  }
+  return null;
+}
+
+const MAX_LABEL_CHARS = 32;
+
+/**
+ * A drawtext filter (with a leading comma) that writes `name` onto a tile. The name goes
+ * through a text file with expansion off, so quotes, colons, % or backslashes in a guest's
+ * name can't break or inject into the filter graph. Returns "" if the font path itself
+ * can't be quoted safely.
+ */
+async function nameLabel(font: string, name: string, tile: { w: number; h: number }, centred: boolean, textPath: string) {
+  if (font.includes("'") || textPath.includes("'")) return "";
+  const clean = name.replace(/[\u0000-\u001f]/g, " ").trim() || "Participant";
+  const text = [...clean].length > MAX_LABEL_CHARS ? `${[...clean].slice(0, MAX_LABEL_CHARS - 1).join("")}…` : clean;
+  await writeFile(textPath, text);
+  const common = `fontfile='${font}':textfile='${textPath}':expansion=none:fontcolor=white`;
+  if (centred) {
+    const size = Math.max(18, Math.round(tile.h * 0.08));
+    return `,drawtext=${common}:fontsize=${size}:x=(w-tw)/2:y=(h-th)/2`;
+  }
+  const size = Math.max(14, Math.round(tile.h * 0.045));
+  const margin = Math.round(size * 0.8);
+  return (
+    `,drawtext=${common}:fontsize=${size}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(size * 0.35)}` +
+    `:x=${margin}:y=h-th-${margin}`
+  );
+}
+
 /** One tile per participant (their camera, or a dark tile when audio-only), all audio mixed. */
 async function renderCombined(
   tracks: TrackInput[],
@@ -251,19 +298,24 @@ async function renderCombined(
   let input = 0;
   let canvas = "base";
 
-  participants.forEach((pid, i) => {
+  const font = opts.font === undefined ? await findFont() : opts.font;
+
+  for (const [i, pid] of participants.entries()) {
     const tile = tiles[i]!;
     const video = rendered.find((o) => o.participantId === pid && o.kind === "video");
     const audio = rendered.find((o) => o.participantId === pid && o.kind === "audio");
+    const name = tracks.find((t) => t.participantId === pid)!.participantName;
+    // Name tag like in the room: bottom-left on a camera, centred on an audio-only tile.
+    const label = font ? await nameLabel(font, name, tile, !video, join(opts.workDir, `label-${i}.txt`)) : "";
     if (video) {
       args.push("-i", video.path);
       filters.push(
         `[${input}:v]scale=${tile.w}:${tile.h}:force_original_aspect_ratio=decrease,` +
-          `pad=${tile.w}:${tile.h}:(ow-iw)/2:(oh-ih)/2:color=${TILE_BG},setsar=1[t${i}]`,
+          `pad=${tile.w}:${tile.h}:(ow-iw)/2:(oh-ih)/2:color=${TILE_BG},setsar=1${label}[t${i}]`,
       );
       input++;
     } else {
-      filters.push(`color=c=${TILE_BG}:s=${tile.w}x${tile.h}:r=${FPS}:d=${duration}[t${i}]`);
+      filters.push(`color=c=${TILE_BG}:s=${tile.w}x${tile.h}:r=${FPS}:d=${duration}${label}[t${i}]`);
     }
     filters.push(`[${canvas}][t${i}]overlay=x=${tile.x}:y=${tile.y}:shortest=0[c${i}]`);
     canvas = `c${i}`;
@@ -272,7 +324,7 @@ async function renderCombined(
       audioLabels.push(`[${input}:a]`);
       input++;
     }
-  });
+  }
 
   const mixAudio = audioLabels.length > 0;
   if (audioLabels.length > 1) {
