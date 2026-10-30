@@ -68,22 +68,27 @@ async function openPglite(url: string): Promise<Db> {
   };
 }
 
+// The web server and workers can start at the same time. Every migration step takes this
+// advisory lock, so they migrate one after another; whoever comes second sees the work done.
+// (Even CREATE TABLE IF NOT EXISTS isn't safe when two sessions run it concurrently.)
+const MIGRATION_LOCK = 7472736; // arbitrary key: "migrations"
+
 async function migrate(db: Db) {
-  await db.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    version integer PRIMARY KEY,
-    applied_at timestamptz NOT NULL DEFAULT now()
-  )`);
-  const applied = new Set(
-    (await db.query<{ version: number }>("SELECT version FROM schema_migrations")).map((r) => r.version),
-  );
+  await db.transaction(async (tx) => {
+    await tx.query("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
+    await tx.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      version integer PRIMARY KEY,
+      applied_at timestamptz NOT NULL DEFAULT now()
+    )`);
+  });
   for (const [i, sql] of MIGRATIONS.entries()) {
     const version = i + 1;
-    if (applied.has(version)) continue;
     await db.transaction(async (tx) => {
+      await tx.query("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
+      const [done] = await tx.query("SELECT 1 FROM schema_migrations WHERE version = $1", [version]);
+      if (done) return;
       for (const statement of sql.split(/;\s*$/m).filter((s) => s.trim())) await tx.query(statement);
-      // ON CONFLICT: two server processes starting at once both try to migrate; the loser's
-      // CREATE TABLE fails first and rolls back, so this only guards the narrow remaining race.
-      await tx.query("INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING", [version]);
+      await tx.query("INSERT INTO schema_migrations (version) VALUES ($1)", [version]);
     });
   }
 }

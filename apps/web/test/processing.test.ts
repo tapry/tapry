@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chunkStorageKey } from "@opentake/shared";
@@ -120,6 +120,69 @@ describe("recording processing", () => {
       expect(recordings).toEqual([
         expect.objectContaining({ id: t.recordingId, status: "stopped", processing: "pending", tracks: 1, incompleteTracks: 1, outputs: [] }),
       ]);
+    });
+  });
+
+  describe("job runner lifecycle (separate workers)", () => {
+    /** A stand-in for ffmpeg that just takes its time, so a job stays running. */
+    function slowFfmpeg(seconds: number) {
+      const path = join(mkdtempSync(join(tmpdir(), "opentake-slow-")), "ffmpeg");
+      writeFileSync(path, `#!/bin/sh\nsleep ${seconds}\nexit 1\n`);
+      chmodSync(path, 0o755);
+      return path;
+    }
+    const lockedUntil = async () =>
+      new Date(
+        (await t.db.query<{ locked_until: string }>("SELECT locked_until FROM jobs WHERE recording_id = $1", [t.recordingId]))[0]!
+          .locked_until,
+      ).getTime();
+    const waitFor = async (check: () => Promise<boolean>) => {
+      for (let i = 0; i < 100 && !(await check()); i++) await new Promise((r) => setTimeout(r, 50));
+    };
+
+    it("keeps renewing the lock while a job runs, so no other worker takes it", async () => {
+      await uploadTrack([Buffer.from("a")]);
+      await stop();
+      const slow = slowFfmpeg(3);
+      const runner = new JobRunner(t.db, storage, { ffmpeg: slow, ffprobe: slow, lockMs: 1500, maxAttempts: 1 });
+      const running = runner.drain();
+      await waitFor(async () => (await jobs())[0]?.status === "running");
+      const first = await lockedUntil();
+      await new Promise((r) => setTimeout(r, 1200));
+      expect(await lockedUntil()).toBeGreaterThan(first); // renewed while still working
+
+      // A second worker polling now finds nothing to claim.
+      const other = new JobRunner(t.db, storage, { ffmpeg: slow, ffprobe: slow, lockMs: 1500 });
+      const claimed = await (other as unknown as { claim(): Promise<unknown> }).claim();
+      expect(claimed).toBeNull();
+      await running;
+    });
+
+    it("hands a running job back to the queue on shutdown, without counting it as a failure", async () => {
+      await uploadTrack([Buffer.from("a")]);
+      await stop();
+      const slow = slowFfmpeg(5);
+      const runner = new JobRunner(t.db, storage, { ffmpeg: slow, ffprobe: slow });
+      void runner.drain();
+      await waitFor(async () => (await jobs())[0]?.status === "running");
+
+      const released = await runner.shutdown();
+      expect(released).toMatch(/^job_/);
+      const [job] = await t.db.query<{ status: string; attempts: number; locked_until: unknown }>(
+        "SELECT status, attempts, locked_until FROM jobs WHERE recording_id = $1",
+        [t.recordingId],
+      );
+      expect(job).toEqual({ status: "queued", attempts: 0, locked_until: null });
+      expect(await processing()).toBe("queued");
+
+      // Another worker can claim it straight away.
+      const next = new JobRunner(t.db, storage, { ffmpeg: slow, ffprobe: slow });
+      expect(await (next as unknown as { claim(): Promise<{ id: string } | null> }).claim()).toMatchObject({ id: released });
+    });
+
+    it("has nothing to hand back when idle", async () => {
+      const runner = new JobRunner(t.db, storage, { ffmpeg: "ffmpeg", ffprobe: "ffprobe" });
+      expect(await runner.shutdown()).toBeNull();
     });
   });
 

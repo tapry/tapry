@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# OpenTake web app (studio UI, API, and in-process recording processing + transcripts).
+# OpenTake web app (studio UI, API) and worker (`node worker.cjs`: recording processing + transcripts).
 # Build from the repo root:  docker build -f deploy/docker/web.Dockerfile -t opentake/web .
 
 FROM node:22-bookworm-slim AS base
@@ -18,7 +18,8 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lo
 COPY packages packages
 COPY apps apps
 RUN pnpm --filter @opentake/shared --filter @opentake/recorder --filter @opentake/worker build \
- && pnpm --filter @opentake/web build
+ && pnpm --filter @opentake/web build \
+ && pnpm --filter @opentake/web build:worker
 
 # whisper.cpp for transcripts, built for the image's CPU family (not -march=native, so the
 # image runs on any x86-64 / arm64 host), plus the model and the voice-activity model.
@@ -63,6 +64,8 @@ RUN useradd --system --uid 1001 --home-dir /app opentake
 WORKDIR /app
 COPY --from=build --chown=opentake /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=opentake /repo/apps/web/.next/static ./apps/web/.next/static
+# The standalone worker (docker-compose `worker` service): one bundled file.
+COPY --from=build --chown=opentake /repo/apps/web/dist-worker/worker.cjs ./worker.cjs
 USER opentake
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=6 \

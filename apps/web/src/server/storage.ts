@@ -135,7 +135,13 @@ export class S3Storage implements Storage {
       await this.client.send(new HeadBucketCommand({ Bucket: this.config.bucket }));
     } catch (err) {
       if (!(err instanceof S3ServiceException) || err.$metadata.httpStatusCode !== 404) throw err;
-      await this.client.send(new CreateBucketCommand({ Bucket: this.config.bucket }));
+      try {
+        await this.client.send(new CreateBucketCommand({ Bucket: this.config.bucket }));
+      } catch (createErr) {
+        // The web server and workers start together; if another one created it first, fine.
+        if (createErr instanceof S3ServiceException && createErr.name === "BucketAlreadyOwnedByYou") return;
+        throw createErr;
+      }
     }
   }
 }

@@ -14,3 +14,4 @@ test-results/
 playwright-report/
 .next-check/
 deploy/compose/.env.*
+dist-worker/

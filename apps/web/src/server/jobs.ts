@@ -25,8 +25,13 @@ export interface JobRunnerOptions {
   /** How often to look for work when nothing kicked us. */
   pollMs?: number;
   maxAttempts?: number;
-  /** A claimed job is given back if its worker hasn't finished by then (crash, kill). */
+  /**
+   * A claimed job goes back to the queue if its worker stops renewing the lock for this
+   * long (crash, kill -9, lost machine). Renewed every minute while the job runs.
+   */
   lockMs?: number;
+  /** Called after every poll; the standalone worker uses it as its health heartbeat. */
+  onPoll?: () => void;
   /** Something changed for this session (status shown to the host). */
   onChange?: (sessionId: string) => void;
   /** Font file for names on the combined video. Unset: found automatically. */
@@ -68,6 +73,7 @@ export class JobRunner {
   private busy = false;
   private stopped = false;
   private kicked = false;
+  private current: JobRow | null = null;
 
   constructor(
     private db: Db,
@@ -86,6 +92,24 @@ export class JobRunner {
     clearTimeout(this.timer);
   }
 
+  /**
+   * For a worker process that is about to exit: stop, and hand a running job straight back
+   * to the queue (not as a failed attempt) so another worker starts it now, instead of
+   * waiting for the lock to expire. Rendering is idempotent, so redoing it is safe.
+   */
+  async shutdown() {
+    this.stop();
+    const job = this.current;
+    if (!job) return null;
+    await this.db.query(
+      `UPDATE jobs SET status = 'queued', locked_until = NULL, run_after = now(), attempts = GREATEST(attempts - 1, 0)
+       WHERE id = $1 AND status = 'running'`,
+      [job.id],
+    );
+    await this.db.query(`UPDATE recordings SET ${STATUS_COLUMN[job.type]} = 'queued' WHERE id = $1`, [job.recording_id]);
+    return job.id;
+  }
+
   /** Look for work now (a job was just queued). */
   kick() {
     if (this.busy) this.kicked = true;
@@ -99,7 +123,14 @@ export class JobRunner {
     try {
       do {
         this.kicked = false;
-        for (let job = await this.claim(); job && !this.stopped; job = await this.claim()) await this.process(job);
+        for (let job = await this.claim(); job && !this.stopped; job = await this.claim()) {
+          this.current = job;
+          try {
+            await this.process(job);
+          } finally {
+            this.current = null;
+          }
+        }
       } while (this.kicked && !this.stopped);
     } finally {
       this.busy = false;
@@ -112,6 +143,7 @@ export class JobRunner {
     this.timer = setTimeout(async () => {
       try {
         await this.drain();
+        this.opts.onPoll?.();
       } catch (err) {
         console.error("[worker] poll failed", err);
       }
@@ -120,7 +152,7 @@ export class JobRunner {
   }
 
   private async claim(): Promise<JobRow | null> {
-    const lockSeconds = Math.round((this.opts.lockMs ?? 60 * 60 * 1000) / 1000);
+    const lockSeconds = this.lockSeconds();
     return this.db.transaction(async (tx) => {
       const [job] = await tx.query<JobRow>(
         `SELECT id, type, recording_id, attempts FROM jobs
@@ -152,10 +184,22 @@ export class JobRunner {
     await this.db.query(`UPDATE recordings SET ${column} = 'processing' WHERE id = $1`, [rec.id]);
     this.opts.onChange?.(rec.session_id);
 
+    // Keep the claim alive for as long as the work takes (transcribing a long episode on a
+    // small CPU can outlast any fixed lock); a dead worker stops renewing and loses it.
+    const renew = setInterval(() => {
+      this.db
+        .query(
+          "UPDATE jobs SET locked_until = now() + make_interval(secs => $2) WHERE id = $1 AND status = 'running'",
+          [job.id, this.lockSeconds()],
+        )
+        .catch((err) => console.error(`[worker] could not renew the lock on ${job.id}`, err));
+    }, Math.min(60_000, (this.lockSeconds() * 1000) / 3));
     const work = await mkdtemp(join(tmpdir(), "opentake-job-"));
+    const started = Date.now();
     try {
       if (job.type === "process_recording") await this.processRecording(rec, work, job);
       else await this.transcribeRecording(rec, work, job);
+      console.log(`[worker] ${job.type} ${job.id} for ${rec.id} done in ${((Date.now() - started) / 1000).toFixed(1)} s`);
     } catch (err) {
       // Logs and the database get the reason only, never media.
       const reason = err instanceof FfmpegError ? `${err.message}: ${err.stderrTail.split("\n").slice(-3).join(" ")}` : String(err);
@@ -177,9 +221,14 @@ export class JobRunner {
         await this.db.query("UPDATE recordings SET transcript = $2 WHERE id = $1", [rec.id, finalAttempt ? "failed" : "queued"]);
       }
     } finally {
+      clearInterval(renew);
       await rm(work, { recursive: true, force: true });
       this.opts.onChange?.(rec.session_id);
     }
+  }
+
+  private lockSeconds() {
+    return Math.max(1, Math.round((this.opts.lockMs ?? 10 * 60 * 1000) / 1000));
   }
 
   private async processRecording(rec: RecordingRow, work: string, job: JobRow) {

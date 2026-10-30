@@ -70,7 +70,8 @@ first (or the other way round).
 | Service | Image | Data |
 |---|---|---|
 | caddy | built from `deploy/docker/caddy.Dockerfile` (Caddy 2.11.7 + caddy-l4) | certificates in `caddy-data` |
-| web | built from `deploy/docker/web.Dockerfile` | — (also runs recording processing with ffmpeg) |
+| web | built from `deploy/docker/web.Dockerfile` | — (studio UI and API; queues processing jobs) |
+| worker | same image, `node worker.cjs` | — (processes and transcribes recordings) |
 | postgres | `postgres:17.11-alpine` | `postgres-data` |
 | seaweedfs | `chrislusf/seaweedfs:4.51` | recordings in `seaweedfs-data` |
 | livekit | `livekit/livekit-server:v1.13.11` | — |
@@ -112,7 +113,10 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 
 - TURN relays the call through your server: budget bandwidth for guests who need it
   (≈ 1 Mbit/s each way per relayed guest at the call's 360p).
+- Processing scales out: `WORKER_REPLICAS=3 docker compose up -d` runs three workers on the
+  same queue (each job runs once). A stopped worker hands its job back; a crashed one's job is
+  picked up again after `WORKER_LOCK_SECONDS` (default 10 min). Running jobs renew their lock,
+  so long transcriptions are never taken over mid-way.
 - One web container. Live-session updates and the sign-in lockout are held in memory, so
   scaling to several web containers needs a shared channel first (Redis / Postgres NOTIFY).
-- Recording processing runs inside the web container. A separate worker container is planned.
 
