@@ -3,13 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
+const MATRIX = /matrix\.spec\.ts/;
+
 // Run through `pnpm test:e2e`, which starts a throwaway SeaweedFS and sets S3_E2E_*.
 const PORT = 3100;
 const dbDir = mkdtempSync(join(tmpdir(), "opentake-e2e-db-"));
 
-export default defineConfig({
+export default defineConfig<{ forceMp4: boolean }>({
   testDir: "e2e",
-  timeout: 60_000,
+  // Long enough to wait for a recording to be processed inside one test.
+  timeout: 180_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
@@ -33,6 +36,29 @@ export default defineConfig({
           args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
         },
       },
+    },
+    // Browser matrix: the recording flow in every engine (e2e/matrix.spec.ts).
+    {
+      name: "firefox",
+      testMatch: MATRIX,
+      use: {
+        ...devices["Desktop Firefox"],
+        permissions: [], // Firefox takes camera/mic permission from the prefs below
+        launchOptions: {
+          firefoxUserPrefs: { "media.navigator.streams.fake": true, "media.navigator.permission.disabled": true },
+        },
+      },
+    },
+    {
+      name: "webkit",
+      testMatch: MATRIX,
+      use: { ...devices["Desktop Safari"] }, // WebKit uses mock camera/mic devices
+    },
+    {
+      // Safari before 18.4 and iOS record MP4 only: hide WebM to take that path.
+      name: "webkit-mp4",
+      testMatch: MATRIX,
+      use: { ...devices["Desktop Safari"], forceMp4: true },
     },
   ],
   webServer: process.env.E2E_BASE_URL ? undefined : {

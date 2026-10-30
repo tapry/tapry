@@ -74,8 +74,10 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   async function join() {
     if (!stream) return;
     setJoining(true);
-    // Ask the browser not to evict the local backup under disk pressure (Firefox shows a prompt).
-    await requestPersistentStorage().catch(() => false);
+    // Ask the browser not to evict the local backup under disk pressure. Never wait for the
+    // answer: Firefox shows a prompt and the promise stays pending until the guest responds,
+    // which would block joining for anyone who ignores it.
+    void requestPersistentStorage().catch(() => false);
     // The room owns the stream from here; the green room must not stop it on unmount.
     onJoin({ stream: handOff() ?? stream, choice, clock });
   }

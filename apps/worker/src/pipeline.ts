@@ -54,7 +54,12 @@ const sec = (ms: number) => (ms / 1000).toFixed(3);
  * silence / black, an early start (clock error) is trimmed, the end is padded so -t can
  * cut every output to the same length.
  */
-export function alignmentFilters(kind: "audio" | "video", offsetMs: number): string {
+export function alignmentFilters(
+  kind: "audio" | "video",
+  offsetMs: number,
+  /** How video ends: freeze the last frame (a whole track), or black (one piece of several). */
+  videoEnd: "clone" | "black" = "clone",
+): string {
   const late = Math.max(0, Math.round(offsetMs));
   const early = Math.max(0, Math.round(-offsetMs));
   if (kind === "audio") {
@@ -74,7 +79,7 @@ export function alignmentFilters(kind: "audio" | "video", offsetMs: number): str
     // MediaRecorder writes variable frame rate; editors want constant.
     `fps=${FPS}`,
     late ? `tpad=start_duration=${sec(late)}:start_mode=add:color=black` : "",
-    "tpad=stop=-1:stop_mode=clone",
+    videoEnd === "clone" ? "tpad=stop=-1:stop_mode=clone" : "tpad=stop=-1:stop_mode=add:color=black",
   ]
     .filter(Boolean)
     .join(",");
@@ -109,38 +114,124 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   const names = uniqueNames(tracks);
   const outputs: OutputFile[] = [];
 
-  for (const track of tracks) {
-    const base = names.get(track.trackId)!;
-    if (track.kind === "audio") {
-      const path = join(opts.workDir, `${track.trackId}.wav`);
-      await run(
-        opts.ffmpeg,
-        [...INPUT_FLAGS, "-i", track.rawPath, "-vn", "-af", alignmentFilters("audio", track.offsetMs),
-          "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", path],
-        { timeoutMs },
-      );
-      outputs.push({ kind: "audio", trackId: track.trackId, participantId: track.participantId, path,
-        fileName: `${base} - audio.wav`, contentType: "audio/wav", durationMs: await probeDurationMs(opts.ffprobe, path) });
+  // One file per person per kind. A person can have several tracks of a kind when they
+  // rejoined during the recording (tab crash, reload): those pieces are merged in place.
+  for (const pieces of groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`)) {
+    const first = pieces[0]!;
+    const base = names.get(first.trackId)!;
+    const ext = first.kind === "audio" ? "wav" : "mp4";
+    const path = join(opts.workDir, `${first.trackId}.${ext}`);
+    if (pieces.length === 1) {
+      await renderPiece(first, path, { opts, duration, timeoutMs, multi: false });
     } else {
-      const path = join(opts.workDir, `${track.trackId}.mp4`);
-      const hasAudio = (await probeStreams(opts.ffprobe, track.rawPath)).includes("audio");
-      await run(
-        opts.ffmpeg,
-        [...INPUT_FLAGS, "-i", track.rawPath,
-          "-vf", `${alignmentFilters("video", track.offsetMs)},scale=-2:${opts.videoHeight},format=yuv420p`,
-          ...(hasAudio ? ["-af", alignmentFilters("audio", track.offsetMs), "-c:a", "aac", "-b:a", "192k"] : ["-an"]),
-          "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", String(FPS),
-          "-movflags", "+faststart", path],
-        { timeoutMs },
-      );
-      outputs.push({ kind: "video", trackId: track.trackId, participantId: track.participantId, path,
-        fileName: `${base} - video.mp4`, contentType: "video/mp4", durationMs: await probeDurationMs(opts.ffprobe, path) });
+      const parts: Array<{ path: string; hasAudio: boolean }> = [];
+      for (const piece of pieces) {
+        const partPath = join(opts.workDir, `${piece.trackId}.part.${ext}`);
+        parts.push({ path: partPath, hasAudio: await renderPiece(piece, partPath, { opts, duration, timeoutMs, multi: true }) });
+      }
+      await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs });
     }
+    outputs.push({
+      kind: first.kind,
+      trackId: first.trackId,
+      participantId: first.participantId,
+      path,
+      fileName: `${base} - ${first.kind}.${ext}`,
+      contentType: first.kind === "audio" ? "audio/wav" : "video/mp4",
+      durationMs: await probeDurationMs(opts.ffprobe, path),
+    });
   }
 
   const combined = await renderCombined(tracks, outputs, opts, timeoutMs);
   if (combined) outputs.push(combined);
   return outputs;
+}
+
+interface RenderContext {
+  opts: PipelineOptions;
+  duration: string;
+  timeoutMs: number;
+}
+
+/**
+ * Render one track onto the recording timeline. Returns whether it had audio.
+ * `multi`: it's one piece of several for the same person, so pad with black rather than
+ * freezing the last frame, and use a fixed 16:9 frame so the pieces can be merged.
+ */
+async function renderPiece(track: TrackInput, path: string, { opts, duration, timeoutMs, multi }: RenderContext & { multi: boolean }) {
+  if (track.kind === "audio") {
+    await run(
+      opts.ffmpeg,
+      [...INPUT_FLAGS, "-i", track.rawPath, "-vn", "-af", alignmentFilters("audio", track.offsetMs),
+        "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", path],
+      { timeoutMs },
+    );
+    return true;
+  }
+  const hasAudio = (await probeStreams(opts.ffprobe, track.rawPath)).includes("audio");
+  const h = opts.videoHeight;
+  const frame = multi
+    ? `scale=${even((h * 16) / 9)}:${h}:force_original_aspect_ratio=decrease,pad=${even((h * 16) / 9)}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`
+    : `scale=-2:${h}`;
+  await run(
+    opts.ffmpeg,
+    [...INPUT_FLAGS, "-i", track.rawPath,
+      "-vf", `${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
+      ...(hasAudio ? ["-af", alignmentFilters("audio", track.offsetMs), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
+      "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", multi ? "16" : "20", "-r", String(FPS),
+      ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
+    { timeoutMs },
+  );
+  return hasAudio;
+}
+
+/**
+ * Merge aligned pieces of one person's track. Each piece is silent / black outside the time
+ * it covers, so mixing the audio and taking the brighter pixel of the videos ("lighten")
+ * shows whichever piece was recording at each moment.
+ */
+async function mergePieces(
+  kind: "audio" | "video",
+  parts: Array<{ path: string; hasAudio: boolean }>,
+  out: string,
+  { opts, duration, timeoutMs }: RenderContext,
+) {
+  const inputs = parts.flatMap((p) => ["-i", p.path]);
+  const mix = (labels: string[]) =>
+    labels.length > 1 ? `${labels.join("")}amix=inputs=${labels.length}:normalize=0:dropout_transition=0[a]` : `${labels[0]}anull[a]`;
+  if (kind === "audio") {
+    await run(
+      opts.ffmpeg,
+      ["-y", "-hide_banner", "-nostdin", ...inputs, "-filter_complex", mix(parts.map((_, i) => `[${i}:a]`)), "-map", "[a]",
+        "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", out],
+      { timeoutMs },
+    );
+    return;
+  }
+  const filters: string[] = [];
+  let video = "[0:v]";
+  for (let i = 1; i < parts.length; i++) {
+    filters.push(`${video}[${i}:v]blend=all_mode=lighten[v${i}]`);
+    video = `[v${i}]`;
+  }
+  const audioLabels = parts.flatMap((p, i) => (p.hasAudio ? [`[${i}:a]`] : []));
+  if (audioLabels.length) filters.push(mix(audioLabels));
+  await run(
+    opts.ffmpeg,
+    ["-y", "-hide_banner", "-nostdin", ...inputs, "-filter_complex", filters.join(";"), "-map", video,
+      ...(audioLabels.length ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : []),
+      "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", String(FPS),
+      "-pix_fmt", "yuv420p", "-movflags", "+faststart", out],
+    { timeoutMs },
+  );
+}
+
+const even = (x: number) => Math.floor(x / 2) * 2;
+
+function groupBy<T>(items: T[], key: (item: T) => string): T[][] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) groups.set(key(item), [...(groups.get(key(item)) ?? []), item]);
+  return [...groups.values()];
 }
 
 /** One tile per participant (their camera, or a dark tile when audio-only), all audio mixed. */
