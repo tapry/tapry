@@ -230,9 +230,14 @@ describe("recording processing", () => {
       t.tick(2000);
       await stop();
       await runner().drain();
+      const outputKeys = () => [...storage.objects.keys()].filter((k) => k.startsWith(`outputs/${t.sessionId}/`));
+      const first = outputKeys();
       await t.hostBrowser.post(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`);
       await runner().drain();
       expect(await t.db.query("SELECT id FROM outputs WHERE recording_id = $1", [t.recordingId])).toHaveLength(2);
+      // The first run's files are gone from storage, not just from the list.
+      expect(outputKeys()).toHaveLength(2);
+      expect(outputKeys().filter((k) => first.includes(k))).toEqual([]);
     });
 
     it("marks the recording failed with a reason when the media is broken", async () => {

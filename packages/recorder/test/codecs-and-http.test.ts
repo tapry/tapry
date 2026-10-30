@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { extensionFor, pickMimeType } from "../src/codecs.js";
 import { createHttpTransport, HttpError } from "../src/http-transport.js";
+import { isTrackGone } from "../src/types.js";
 import type { StoredChunk } from "../src/types.js";
 import { bytes } from "./fakes.js";
 
@@ -80,6 +81,17 @@ describe("createHttpTransport", () => {
     expect(err.status).toBe(503);
     expect(err.message).not.toContain("secret");
     expect(calls.some((c) => c.url.endsWith("/commit"))).toBe(false);
+  });
+
+  it("turns 410 Gone from the API into TrackGoneError, but not a 410 from storage", async () => {
+    const gone = (async () => new Response(null, { status: 410 })) as typeof globalThis.fetch;
+    const err = await createHttpTransport({ baseUrl: "https://app.test/api", fetch: gone }).uploadChunk(chunk, "video/webm").catch((e) => e);
+    expect(isTrackGone(err)).toBe(true);
+
+    const { fetch } = mockFetch(410); // the presigned PUT answers 410
+    const putErr = await createHttpTransport({ baseUrl: "https://app.test/api", fetch }).uploadChunk(chunk, "video/webm").catch((e) => e);
+    expect(isTrackGone(putErr)).toBe(false);
+    expect(putErr).toBeInstanceOf(HttpError);
   });
 
   it("skips the PUT and commit when the server already has the chunk", async () => {

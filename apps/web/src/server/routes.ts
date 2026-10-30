@@ -4,7 +4,7 @@ import type { ApiHandlers } from "./api";
  * Every API route. Next.js needs a physical route.ts per path under src/app/api;
  * test/routes.test.ts checks that each entry here has one, bound to the right handler.
  */
-export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH", string, keyof ApiHandlers]> = [
+export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE", string, keyof ApiHandlers]> = [
   ["POST", "/api/auth/signup", "signup"],
   ["POST", "/api/auth/login", "login"],
   ["POST", "/api/auth/logout", "logout"],
@@ -14,9 +14,11 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH", string, k
   ["POST", "/api/studios", "createStudio"],
   ["GET", "/api/studios/[studioId]", "getStudio"],
   ["PATCH", "/api/studios/[studioId]", "updateStudio"],
+  ["DELETE", "/api/studios/[studioId]", "deleteStudio"],
   ["POST", "/api/studios/[studioId]/invite", "rotateInvite"],
   ["POST", "/api/studios/[studioId]/open", "openStudio"],
   ["GET", "/api/studios/[studioId]/recordings", "listRecordings"],
+  ["DELETE", "/api/studios/[studioId]/recordings/[recordingId]", "deleteRecording"],
   ["POST", "/api/studios/[studioId]/recordings/[recordingId]/process", "processRecording"],
   ["GET", "/api/studios/[studioId]/recordings/[recordingId]/outputs/[outputId]", "downloadOutput"],
 

@@ -21,6 +21,7 @@ The client then calls a `commit` endpoint (bytes, start/end time, SHA-256) so th
 
 ## Consequences
 - Re-uploading a chunk is naturally idempotent (same key, same bytes).
+- Deleting a recording is deleting by prefix (`recordings/{sessionId}/{trackId}/` per track). The API answers a deleted recording's upload calls with 410 Gone, the one response that tells a client to discard its local copy.
 - Works the same on S3, MinIO and R2.
 - More PUT requests: 1 h at 4 s chunks = 900 PUTs per track ≈ $0.004 on R2 Class A pricing. Negligible.
 - The worker concatenates objects instead of S3 doing it. It was going to read them anyway for ffmpeg.

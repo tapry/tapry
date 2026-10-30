@@ -44,6 +44,16 @@ export class FakeStorage implements Storage {
   async presignGet(key: string, opts: { fileName: string }) {
     return `https://storage.test/${key}?download=${encodeURIComponent(opts.fileName)}`;
   }
+
+  async delete(keys: string[]) {
+    for (const k of keys) this.objects.delete(k);
+  }
+
+  async deletePrefix(prefix: string) {
+    const keys = [...this.objects.keys()].filter((k) => k.startsWith(prefix));
+    await this.delete(keys);
+    return keys.length;
+  }
 }
 
 export function sha256(data: Uint8Array | string) {
@@ -119,6 +129,7 @@ export async function createServer(storage: Storage = new FakeStorage(), opts: {
       post: (path: string, body: unknown = {}, opts?: { token?: string | null; origin?: string }) =>
         request("POST", path, body, opts),
       patch: (path: string, body: unknown, opts?: { origin?: string }) => request("PATCH", path, body, opts),
+      del: (path: string, opts?: { origin?: string }) => request("DELETE", path, undefined, opts),
     };
   };
 

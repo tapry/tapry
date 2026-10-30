@@ -72,7 +72,7 @@ export class LiveService {
       started_at: number;
       stopped_at: number | null;
     }>(
-      `SELECT id, status, started_at, stopped_at FROM recordings WHERE session_id = $1
+      `SELECT id, status, started_at, stopped_at FROM recordings WHERE session_id = $1 AND deleted_at IS NULL
        ORDER BY (status = 'recording') DESC, started_at DESC LIMIT 1`,
       [sessionId],
     );

@@ -85,6 +85,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     updateStudio: asUser(async (svc, user, req, params) =>
       json(200, await svc.studios.update(user, params.studioId!, await parseBody(req, updateStudioBody))),
     ),
+    /** Deletes every recording in it (files included) and ends its session. */
+    deleteStudio: asUser(async (svc, user, _req, params) => {
+      await svc.studios.delete(user, params.studioId!);
+      return new Response(null, { status: 204 });
+    }),
     rotateInvite: asUser(async (svc, user, _req, params) =>
       json(200, await svc.studios.rotateInvite(user, params.studioId!)),
     ),
@@ -97,6 +102,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     listRecordings: asUser(async (svc, user, _req, params) =>
       json(200, { recordings: await svc.processing.listForStudio(user, params.studioId!) }),
     ),
+    /** Removes the recording's files from storage and the list. Not while it records or a worker is on it. */
+    deleteRecording: asUser(async (svc, user, _req, params) => {
+      await svc.processing.deleteRecording(user, params.studioId!, params.recordingId!);
+      return new Response(null, { status: 204 });
+    }),
     /** Process now, without tracks that never finished uploading. */
     processRecording: asUser(async (svc, user, _req, params) => {
       await svc.processing.processNow(user, params.studioId!, params.recordingId!);

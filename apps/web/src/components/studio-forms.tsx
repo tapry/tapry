@@ -4,6 +4,7 @@ import type { SessionTicket, StudioSettings } from "@opentake/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
+import { ConfirmAction } from "./confirm-action";
 import { Button, Field, Input, Notice, Select } from "./ui";
 
 const message = (err: unknown) => (err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
@@ -176,6 +177,29 @@ export function OpenStudioButton({ studioId }: { studioId: string }) {
       </Button>
       {error && <Notice tone="danger">{error}</Notice>}
     </div>
+  );
+}
+
+export function DeleteStudioButton({ studioId, name, recordings }: { studioId: string; name: string; recordings: number }) {
+  const router = useRouter();
+  return (
+    <ConfirmAction
+      label="Delete studio…"
+      testId="delete-studio"
+      question={
+        <>
+          Delete “{name}”
+          {recordings > 0 && ` and its ${recordings} recording${recordings === 1 ? "" : "s"}`}? Guests in it are
+          disconnected and the files are removed from the server. This can&apos;t be undone.
+        </>
+      }
+      confirmLabel="Delete studio"
+      action={async () => {
+        await apiFetch(`/studios/${studioId}`, { method: "DELETE" });
+        router.replace("/studios");
+        router.refresh();
+      }}
+    />
   );
 }
 

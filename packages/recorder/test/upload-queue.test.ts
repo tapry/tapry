@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryChunkStore } from "../src/store/memory.js";
-import type { ChunkMeta, TrackInfo } from "../src/types.js";
+import { TrackGoneError, type ChunkMeta, type TrackInfo } from "../src/types.js";
 import { UploadQueue, type UploadProgress } from "../src/upload-queue.js";
 import { bytes, FakeTransport } from "./fakes.js";
 
@@ -211,5 +211,46 @@ describe("UploadQueue", () => {
         vi.unstubAllGlobals();
       }
     });
+  });
+
+  it("drops a track the server says is gone (recording deleted), and keeps uploading the others", async () => {
+    await store.putTrack(track);
+    await store.putTrack({ ...track, trackId: "t2" });
+    const gone = await putChunks(store, 3);
+    const kept = await putChunks(store, 2, "t2");
+    const upload = transport.uploadChunk.bind(transport);
+    transport.uploadChunk = async (chunk, mimeType) => {
+      if (chunk.trackId === "t1") {
+        transport.uploadCalls++;
+        throw new TrackGoneError("deleted");
+      }
+      return upload(chunk, mimeType);
+    };
+    for (const m of [...gone, ...kept]) queue.enqueue(m);
+    queue.finishTrack({ ...track, stoppedAt: 12_000, lastSeq: 2 });
+    queue.finishTrack({ ...track, trackId: "t2", stoppedAt: 8000, lastSeq: 1 });
+    await queue.drain();
+
+    expect(await store.getTrack("s1", "t1")).toBeUndefined();
+    expect(await store.listChunks("s1", "t1")).toEqual([]);
+    expect(transport.completed.map((c) => c.trackId)).toEqual(["t2"]);
+    expect([...transport.uploaded.keys()].sort()).toEqual(["t2/0", "t2/1"]);
+    // Every t1 chunk was tried at most once: no retry loop after the first 410.
+    expect(transport.uploadCalls).toBeLessThanOrEqual(3 + 2);
+    expect(queue.progress().lastError).toBeNull();
+
+    // A chunk of that track turning up again (another tab, a reload) is ignored.
+    queue.enqueue(gone[0]!);
+    expect(queue.progress().pendingChunks).toBe(0);
+  });
+
+  it("drops the track when only its completion is refused as gone", async () => {
+    await store.putTrack(track);
+    transport.completeTrack = async () => {
+      throw new TrackGoneError("deleted");
+    };
+    queue.finishTrack({ ...track, stoppedAt: 1000, lastSeq: -1 });
+    await queue.drain();
+    expect(await store.listTracks()).toEqual([]);
   });
 });

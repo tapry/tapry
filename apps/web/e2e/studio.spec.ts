@@ -337,5 +337,32 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await expect(host.getByRole("button", { name: "Record", exact: true })).toHaveCount(0);
   });
 
+  await test.step("host deletes a recording, then the studio; their files leave storage", async () => {
+    const studioPage = await host.context().newPage();
+    await studioPage.goto(studioUrl);
+    const recordings = studioPage.getByTestId("recording");
+    await expect(recordings).toHaveCount(2);
+    const before = canReadStorage ? (await listChunks(sessionId)).length : 0;
+
+    const first = recordings.first();
+    await first.getByTestId("delete-recording").click();
+    await expect(first.getByRole("alertdialog")).toContainText("can't be undone");
+    await first.getByTestId("delete-recording-confirm").click();
+    await expect(recordings).toHaveCount(1);
+    if (canReadStorage) {
+      // The in-process worker purges right away; the other recording's chunks stay.
+      await expect.poll(async () => (await listChunks(sessionId)).length, { timeout: 15_000 }).toBeLessThan(before);
+      expect((await listChunks(sessionId)).length).toBeGreaterThan(0);
+    }
+
+    await studioPage.getByTestId("delete-studio").click();
+    await studioPage.getByTestId("delete-studio-confirm").click();
+    await expect(studioPage).toHaveURL(/\/studios$/);
+    await expect(studioPage.getByRole("heading", { name: "Studios" })).toBeVisible();
+    await expect(studioPage.getByRole("link", { name: new RegExp(studioName) })).toHaveCount(0);
+    if (canReadStorage) await expect.poll(async () => listChunks(sessionId), { timeout: 15_000 }).toEqual([]);
+    await studioPage.close();
+  });
+
   await guestContext.close();
 });

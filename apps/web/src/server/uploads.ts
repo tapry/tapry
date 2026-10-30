@@ -55,11 +55,12 @@ export class UploadService {
    * they register (and upload) once they're back, possibly after Stop.
    */
   async createTrack(p: Participant, body: z.infer<typeof createTrackBody>) {
-    const [recording] = await this.db.query<{ status: string; stopped_at: number | null }>(
-      "SELECT status, stopped_at FROM recordings WHERE id = $1 AND session_id = $2",
+    const [recording] = await this.db.query<{ status: string; stopped_at: number | null; deleted_at: Date | null }>(
+      "SELECT status, stopped_at, deleted_at FROM recordings WHERE id = $1 AND session_id = $2",
       [body.recordingId, p.sessionId],
     );
     if (!recording) throw new ApiError(404, "recording_not_found", "Recording not found");
+    if (recording.deleted_at) throw recordingGone();
     const startedBeforeStop =
       recording.status === "recording" ||
       (recording.stopped_at !== null && body.startedAt <= recording.stopped_at + LATE_TRACK_SLACK_MS);
@@ -187,12 +188,14 @@ export class UploadService {
   }
 
   private async ownedTrack(p: Participant, trackId: string) {
-    const [track] = await this.db.query<TrackRow>(
-      "SELECT * FROM tracks WHERE id = $1 AND session_id = $2 AND participant_id = $3",
+    const [track] = await this.db.query<TrackRow & { deleted_at: Date | null }>(
+      `SELECT t.*, r.deleted_at FROM tracks t JOIN recordings r ON r.id = t.recording_id
+       WHERE t.id = $1 AND t.session_id = $2 AND t.participant_id = $3`,
       [trackId, p.sessionId, p.id],
     );
     // Same 404 for "doesn't exist" and "not yours", so ids can't be probed.
     if (!track) throw new ApiError(404, "track_not_found", "Track not found");
+    if (track.deleted_at) throw recordingGone();
     return track;
   }
 
@@ -204,3 +207,9 @@ export class UploadService {
     return row;
   }
 }
+
+/**
+ * The host deleted the recording. 410 is the one answer that tells the recorder to drop its
+ * local copy of the track (TrackGoneError) instead of retrying: nobody wants it any more.
+ */
+const recordingGone = () => new ApiError(410, "recording_deleted", "The host deleted this recording");

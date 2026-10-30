@@ -32,7 +32,7 @@ export function createServices(
   return {
     db,
     auth: new AuthService(db, { now: opts.now, ...opts.auth }),
-    studios: new StudioService(db, live),
+    studios: new StudioService(db, live, () => processing.onEnqueue()),
     live,
     uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess),
     processing,

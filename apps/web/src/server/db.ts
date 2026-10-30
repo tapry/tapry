@@ -73,7 +73,8 @@ async function openPglite(url: string): Promise<Db> {
 // (Even CREATE TABLE IF NOT EXISTS isn't safe when two sessions run it concurrently.)
 const MIGRATION_LOCK = 7472736; // arbitrary key: "migrations"
 
-async function migrate(db: Db) {
+/** Applies pending migrations. Safe to call again (and from several processes at once). */
+export async function migrate(db: Db) {
   await db.transaction(async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
     await tx.query(`CREATE TABLE IF NOT EXISTS schema_migrations (

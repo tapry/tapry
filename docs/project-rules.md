@@ -34,6 +34,7 @@ docs/               self-hosting, architecture, browser support
 - Jobs live in Postgres (`jobs`, claimed with `FOR UPDATE SKIP LOCKED`). `WORKER=inprocess` (default, required with PGlite) runs them inside the web server; with Postgres, `src/worker-main.ts` (bundled to `dist-worker/worker.cjs`, the `worker` Compose service) runs them separately and the web server uses `WORKER=off`. Running jobs renew their lock; a stopped worker hands its job back; migrations take an advisory lock so web and workers can start together.
 - A recording is processed once it is stopped and every track is complete; hosts can force it ("Process now").
 - All outputs are aligned to the recording start and cut to its exact length.
+- Deleting (a recording, or a studio with all of its recordings) is soft for the rows and hard for the media: chunk and output rows go at once (usage drops), the recording/track rows stay with `deleted_at` so late uploads get **410 Gone**, and a `purge_recording` job deletes the stored files by prefix, then once more after presigned upload URLs have expired. Refused while recording or while a worker holds a job on it. Re-processing deletes the previous run's files.
 - Transcripts: a separate `transcribe_recording` job queued when processing succeeds. Each person's WAV is transcribed alone (speaker = track), then merged by time into TXT/SRT/VTT. Off when `WHISPER_MODEL` is unset.
 
 ## Live call
@@ -44,7 +45,7 @@ docs/               self-hosting, architecture, browser support
 - No macOS LiveKit binaries exist; the dev build is compiled from source with a CGO-free CPU-stats patch: see `docs/dev-setup.md`.
 
 ## Rules
-- **Never delete a local chunk until the server has confirmed it.** Data loss is the worst bug.
+- **Never delete a local chunk until the server has confirmed it.** Data loss is the worst bug. The one exception: 410 Gone from the API (`TrackGoneError`) means the host deleted that recording, and the queue drops the whole track locally.
 - Every chunk has seq number + server-time start; uploads are idempotent (re-uploading a part is safe).
 - Media never appears in logs or analytics; only metadata.
 - All features must work on self-hosted installs (cloud-only code goes behind flags or in `/ee`).

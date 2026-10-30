@@ -155,4 +155,16 @@ ALTER TABLE jobs ADD CONSTRAINT jobs_type_check CHECK (type IN ('process_recordi
 ALTER TABLE outputs DROP CONSTRAINT outputs_kind_check;
 ALTER TABLE outputs ADD CONSTRAINT outputs_kind_check CHECK (kind IN ('audio', 'video', 'combined', 'transcript'));
 `,
+  `
+-- Deleting. A deleted recording keeps its row and its tracks' rows (no media, just ids and
+-- times) so a guest still uploading it is told 410 Gone and drops its local copy, instead of
+-- retrying forever. Chunks, outputs and the stored files themselves are removed.
+ALTER TABLE recordings ADD COLUMN deleted_at timestamptz;
+ALTER TABLE studios ADD COLUMN deleted_at timestamptz;
+
+-- Removes a deleted recording's files from storage (twice: see JobRunner.purge).
+ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
+ALTER TABLE jobs ADD CONSTRAINT jobs_type_check
+  CHECK (type IN ('process_recording', 'transcribe_recording', 'purge_recording'));
+`,
 ];
