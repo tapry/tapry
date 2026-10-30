@@ -19,7 +19,8 @@ function phase(r: RecordingSummary) {
   return { tone: "warn", label: r.incompleteTracks ? "Waiting for uploads" : "Waiting" } as const;
 }
 
-const settled = (r: RecordingSummary) => r.processing === "ready" || r.processing === "failed";
+const settled = (r: RecordingSummary) =>
+  (r.processing === "ready" || r.processing === "failed") && r.transcript !== "queued" && r.transcript !== "processing";
 
 /** A studio's recordings with their state and download links. Polls while anything is in flight. */
 export function RecordingsList({ studioId, initial }: { studioId: string; initial: RecordingSummary[] }) {
@@ -90,6 +91,16 @@ export function RecordingsList({ studioId, initial }: { studioId: string; initia
                 </Button>
               )}
 
+              {r.processing === "ready" && (r.transcript === "queued" || r.transcript === "processing") && (
+                <p className="flex items-center gap-2 text-sm text-muted" data-testid="transcript-status">
+                  <StatusDot tone="warn" /> Transcribing… the files below are ready to download already.
+                </p>
+              )}
+              {r.processing === "ready" && r.transcript === "failed" && (
+                <p className="flex items-center gap-2 text-sm text-muted" data-testid="transcript-status">
+                  <StatusDot tone="danger" /> The transcript couldn't be made. The recording itself is fine.
+                </p>
+              )}
               {r.processing === "ready" && (
                 <ul className="grid gap-2 sm:grid-cols-2">
                   {r.outputs.map((o) => (

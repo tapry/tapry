@@ -20,7 +20,10 @@
       ],
       "passThroughEnv": [
         "FFMPEG_PATH",
-        "FFPROBE_PATH"
+        "FFPROBE_PATH",
+        "WHISPER_PATH",
+        "WHISPER_MODEL",
+        "WHISPER_VAD_MODEL"
       ]
     },
     "dev": {

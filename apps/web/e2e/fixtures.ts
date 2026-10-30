@@ -63,10 +63,13 @@ export async function createStudio(page: Page, name: string) {
   return { studioUrl: page.url(), inviteUrl: await page.getByLabel("Guest invite link").inputValue() };
 }
 
-/** Download every file of the newest recording through the browser; returns name, type, bytes, duration. */
+/** Download links of the newest recording's media (transcripts arrive later, separately). */
+export const mediaLinks = (page: Page) =>
+  page.getByTestId("recording").first().getByTestId("download").filter({ hasNotText: /^Transcript\./ });
+
+/** Download every media file of the newest recording through the browser; returns name, type, bytes, duration. */
 export async function downloadOutputs(page: Page) {
-  const recording = page.getByTestId("recording").first();
-  const links = await recording.getByTestId("download").evaluateAll((as) =>
+  const links = await mediaLinks(page).evaluateAll((as) =>
     as.map((a) => ({ href: (a as HTMLAnchorElement).href, name: a.querySelector("span")!.textContent! })),
   );
   const files = [];

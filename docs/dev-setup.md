@@ -9,6 +9,7 @@ paths go into `apps/web/.env.local` and the test commands.
 | SeaweedFS | S3 storage for dev and tests (MinIO no longer ships binaries, see `docs/decisions/0002`) | `darwin_arm64.tar.gz` from github.com/seaweedfs/seaweedfs/releases (check the `.md5`) |
 | ffmpeg + ffprobe | recording processing | `ffmpeg-darwin-arm64.gz` / `ffprobe-darwin-arm64.gz` from github.com/eugeneware/ffmpeg-static/releases |
 | LiveKit server | the live call | build from source (below): LiveKit publishes no macOS binaries |
+| whisper.cpp + model | transcripts (optional) | build `whisper-cli` from the github.com/ggml-org/whisper.cpp release tarball with CMake (cmake.org macOS tarball); `ggml-base.bin` and `ggml-silero-v6.2.0.bin` from Hugging Face (check the SHA-256s in `deploy/docker/web.Dockerfile`) |
 | Playwright Chromium | e2e tests | `pnpm --filter @opentake/web exec playwright install chromium` |
 
 ## Building LiveKit on macOS
@@ -54,5 +55,7 @@ FFMPEG_PATH=… FFPROBE_PATH=… pnpm test
 WEED_BIN=… LIVEKIT_BIN=… FFMPEG_PATH=… FFPROBE_PATH=… pnpm --filter @opentake/web test:e2e
 ```
 
-Without `FFMPEG_PATH` the media tests are skipped; without `LIVEKIT_BIN` the e2e call step is
+Add `WHISPER_PATH=… WHISPER_MODEL=… WHISPER_VAD_MODEL=…` (and `apps/web/.env.local`) for transcripts.
+Without `FFMPEG_PATH` the media tests are skipped; without `WHISPER_MODEL` the transcription
+tests are; without `LIVEKIT_BIN` the e2e call step is
 skipped (recording is still tested end to end).

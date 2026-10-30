@@ -11,7 +11,7 @@ TypeScript monorepo (pnpm + turborepo). Next.js (App Router), Tailwind, shadcn/u
 ## Layout
 ```
 apps/web            studio UI, dashboard, API routes
-apps/worker         media pipeline (ffmpeg): chunks → aligned WAV/MP4 + combined grid; transcription later
+apps/worker         media pipeline (ffmpeg): chunks → aligned WAV/MP4 + combined grid; transcripts (whisper.cpp)
 packages/recorder   capture → MediaRecorder → local chunk store → upload queue (MIT, standalone)
 packages/sync       clock offset estimation + alignment helpers
 packages/shared     zod schemas, types
@@ -34,6 +34,7 @@ docs/               self-hosting, architecture, browser support
 - Jobs live in Postgres (`jobs`, claimed with `FOR UPDATE SKIP LOCKED`); `WORKER=inprocess` (default) runs them inside the web server, required with PGlite (single-process). A standalone worker CLI for Postgres deployments is still to do.
 - A recording is processed once it is stopped and every track is complete; hosts can force it ("Process now").
 - All outputs are aligned to the recording start and cut to its exact length.
+- Transcripts: a separate `transcribe_recording` job queued when processing succeeds. Each person's WAV is transcribed alone (speaker = track), then merged by time into TXT/SRT/VTT. Off when `WHISPER_MODEL` is unset.
 
 ## Live call
 - LiveKit, one room per session, identity = participant id. Optional: no `LIVEKIT_URL` → recording works without a call.

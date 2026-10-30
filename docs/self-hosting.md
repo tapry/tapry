@@ -53,6 +53,17 @@ config (no logs, nothing on port 80). Allow access, then `docker compose restart
 | seaweedfs | `chrislusf/seaweedfs:4.51` | recordings in `seaweedfs-data` |
 | livekit | `livekit/livekit-server:v1.13.11` | — |
 
+## Transcripts
+
+On by default. Each person's audio is transcribed separately with whisper.cpp (language
+detected per speaker), then merged into `Transcript.txt`, `.srt` and `.vtt` with speaker names.
+They appear on the recording a little after its audio and video files.
+
+- **Model:** the image ships Whisper `base` (multilingual, 148 MB). For better accuracy, build
+  with `--build-arg WHISPER_MODEL=small --build-arg WHISPER_MODEL_SHA256=<sha>` (466 MB, ~3x slower).
+- **Speed:** CPU only. `WHISPER_THREADS` (default 4) sets how many cores one transcript uses.
+- **Off:** set `WHISPER_MODEL=` (empty) in `.env` and `docker compose up -d`.
+
 ## Using your own S3 (R2, AWS, Backblaze…)
 
 Delete the `seaweedfs` service, then in the `web` service set `S3_ENDPOINT` (your provider's

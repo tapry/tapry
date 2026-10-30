@@ -45,6 +45,9 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?}
       WORKER: inprocess
+      # Transcripts (whisper.cpp + model are in the image). Set WHISPER_MODEL= (empty) in .env to turn off.
+      WHISPER_MODEL: ${WHISPER_MODEL-/opt/whisper/ggml-base.bin}
+      WHISPER_THREADS: ${WHISPER_THREADS:-4}
     depends_on:
       postgres:
         condition: service_healthy
