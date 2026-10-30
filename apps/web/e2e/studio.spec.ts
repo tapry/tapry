@@ -242,7 +242,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const recording = studioPage.getByTestId("recording").first();
     await expect(recording.getByTestId("recording-status")).toHaveText(/Ready/, { timeout: 90_000 });
 
-    const links = recording.getByTestId("download");
+    const links = recording.getByTestId("download").filter({ hasNotText: /^Transcript\./ });
     await expect(links).toHaveText([
       /^Combined\.mp4/,
       /^Dev Host - audio\.wav/,
@@ -281,6 +281,15 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     // Everything is cut to the recording's length, so the files line up in an editor.
     expect(Math.max(...durations) - Math.min(...durations)).toBeLessThan(0.1);
     expect(durations[0]).toBeGreaterThan(8);
+    await studioPage.close();
+  });
+
+  await test.step("transcript follows, when the server has Whisper", async () => {
+    if (!process.env.WHISPER_MODEL) return;
+    const studioPage = await host.context().newPage();
+    await studioPage.goto(studioUrl);
+    const transcripts = studioPage.getByTestId("recording").first().getByTestId("download").filter({ hasText: /^Transcript\./ });
+    await expect(transcripts).toHaveText([/^Transcript\.srt/, /^Transcript\.txt/, /^Transcript\.vtt/], { timeout: 120_000 });
     await studioPage.close();
   });
 

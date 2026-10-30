@@ -144,4 +144,15 @@ CREATE TABLE outputs (
 
 CREATE INDEX outputs_recording_idx ON outputs (recording_id);
 `,
+  `
+-- Transcripts: a separate job after processing, so downloads don't wait for Whisper.
+ALTER TABLE recordings ADD COLUMN transcript text NOT NULL DEFAULT 'off'
+  CHECK (transcript IN ('off', 'queued', 'processing', 'ready', 'failed'));
+
+ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
+ALTER TABLE jobs ADD CONSTRAINT jobs_type_check CHECK (type IN ('process_recording', 'transcribe_recording'));
+
+ALTER TABLE outputs DROP CONSTRAINT outputs_kind_check;
+ALTER TABLE outputs ADD CONSTRAINT outputs_kind_check CHECK (kind IN ('audio', 'video', 'combined', 'transcript'));
+`,
 ];

@@ -76,6 +76,10 @@ export default defineConfig<{ forceMp4: boolean }>({
       // Recordings are processed in-process; pass FFMPEG_PATH / FFPROBE_PATH if they are not on PATH.
       FFMPEG_PATH: process.env.FFMPEG_PATH ?? "ffmpeg",
       FFPROBE_PATH: process.env.FFPROBE_PATH ?? "ffprobe",
+      // Transcripts only when a model is given; empty keeps .env.local's settings out.
+      WHISPER_PATH: process.env.WHISPER_PATH ?? "whisper-cli",
+      WHISPER_MODEL: process.env.WHISPER_MODEL ?? "",
+      WHISPER_VAD_MODEL: process.env.WHISPER_VAD_MODEL ?? "",
       // Live call when scripts/with-seaweedfs.mjs started LiveKit (LIVEKIT_BIN set); otherwise
       // explicitly off, so a LIVEKIT_URL in .env.local (which next dev also reads) can't leak in.
       LIVEKIT_URL: process.env.LIVEKIT_E2E_URL ?? "",

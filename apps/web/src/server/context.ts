@@ -28,6 +28,11 @@ const env = z.object({
   WORKER: z.enum(["inprocess", "off"]).default("inprocess"),
   FFMPEG_PATH: z.string().default("ffmpeg"),
   FFPROBE_PATH: z.string().default("ffprobe"),
+  /** Transcripts: set WHISPER_MODEL (a whisper.cpp ggml model file) to turn them on. */
+  WHISPER_PATH: z.string().default("whisper-cli"),
+  WHISPER_MODEL: unsetIfEmpty(z.string()),
+  WHISPER_VAD_MODEL: unsetIfEmpty(z.string()),
+  WHISPER_THREADS: z.coerce.number().int().min(1).max(64).default(4),
   /** Live call. All three set: call on. LIVEKIT_URL unset: recording works without a call. */
   LIVEKIT_URL: unsetIfEmpty(z.string().url()),
   LIVEKIT_API_KEY: unsetIfEmpty(z.string()),
@@ -56,6 +61,7 @@ interface Shared {
 interface WorkerConfig {
   ffmpeg: string;
   ffprobe: string;
+  whisper?: { whisper: string; model: string; vadModel?: string; threads: number };
 }
 const shared = ((globalThis as typeof globalThis & { __opentake?: Shared }).__opentake ??= {});
 
@@ -102,7 +108,10 @@ async function openResources() {
     forcePathStyle: cfg.S3_FORCE_PATH_STYLE,
   });
   await storage.ensureBucket();
-  const worker = cfg.WORKER === "inprocess" ? { ffmpeg: cfg.FFMPEG_PATH, ffprobe: cfg.FFPROBE_PATH } : null;
+  const whisper = cfg.WHISPER_MODEL
+    ? { whisper: cfg.WHISPER_PATH, model: cfg.WHISPER_MODEL, vadModel: cfg.WHISPER_VAD_MODEL, threads: cfg.WHISPER_THREADS }
+    : undefined;
+  const worker = cfg.WORKER === "inprocess" ? { ffmpeg: cfg.FFMPEG_PATH, ffprobe: cfg.FFPROBE_PATH, whisper } : null;
   if (cfg.LIVEKIT_URL && !(cfg.LIVEKIT_API_KEY && cfg.LIVEKIT_API_SECRET)) {
     throw new Error("LIVEKIT_URL is set but LIVEKIT_API_KEY / LIVEKIT_API_SECRET are missing");
   }

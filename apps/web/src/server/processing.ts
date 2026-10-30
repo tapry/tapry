@@ -12,12 +12,14 @@ export interface RecordingSummary {
   status: "recording" | "stopped";
   processing: ProcessingStatus;
   processingError: string | null;
+  /** off: transcription not configured on this server. */
+  transcript: "off" | "queued" | "processing" | "ready" | "failed";
   startedAt: number;
   stoppedAt: number | null;
   tracks: number;
   /** Tracks whose upload isn't confirmed yet (a guest may still be uploading, or gone). */
   incompleteTracks: number;
-  outputs: Array<{ id: string; kind: "audio" | "video" | "combined"; fileName: string; bytes: number; durationMs: number | null }>;
+  outputs: Array<{ id: string; kind: "audio" | "video" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
 /**
@@ -79,12 +81,13 @@ export class ProcessingService {
       status: "recording" | "stopped";
       processing: ProcessingStatus;
       processing_error: string | null;
+      transcript: RecordingSummary["transcript"];
       started_at: number;
       stopped_at: number | null;
       tracks: number;
       incomplete: number;
     }>(
-      `SELECT r.id, r.session_id, r.status, r.processing, r.processing_error, r.started_at, r.stopped_at,
+      `SELECT r.id, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete
        FROM recordings r
@@ -99,7 +102,7 @@ export class ProcessingService {
     const outputs = await this.db.query<{
       id: string;
       recording_id: string;
-      kind: "audio" | "video" | "combined";
+      kind: RecordingSummary["outputs"][number]["kind"];
       file_name: string;
       bytes: number;
       duration_ms: number | null;
@@ -107,7 +110,7 @@ export class ProcessingService {
       `SELECT o.id, o.recording_id, o.kind, o.file_name, o.bytes, o.duration_ms
        FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
        WHERE o.recording_id = ANY($1::text[])
-       ORDER BY (o.kind = 'combined') DESC, p.created_at, o.kind`,
+       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, o.file_name`,
       [rows.map((r) => r.id)],
     );
     return rows.map((r) => ({
@@ -116,6 +119,7 @@ export class ProcessingService {
       status: r.status,
       processing: r.processing,
       processingError: r.processing_error,
+      transcript: r.transcript,
       startedAt: r.started_at,
       stoppedAt: r.stopped_at,
       tracks: r.tracks,

@@ -185,6 +185,57 @@ describe("recording processing", () => {
       expect(job).toMatchObject({ status: "failed", error: expect.stringMatching(/ffmpeg exited/) });
     });
 
+    const whisper = process.env.WHISPER_PATH;
+    const model = process.env.WHISPER_MODEL;
+    const canSay = (() => {
+      try {
+        execFileSync("say", ["-v", "?"], { stdio: "ignore" });
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+
+    it.skipIf(!whisper || !model || !canSay)("transcribes after processing, labelled by speaker", async () => {
+      const dir = mkdtempSync(join(tmpdir(), "opentake-speech-"));
+      execFileSync("say", ["-v", "Samantha", "-o", join(dir, "s.aiff"), "Thanks for having me on the show today."]);
+      execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-i", join(dir, "s.aiff"), "-ar", "48000", "-c:a", "libopus", join(dir, "s.webm")]);
+      await uploadTrack(split(readFileSync(join(dir, "s.webm")), 3));
+      t.tick(4000);
+      await stop();
+      const r = new JobRunner(t.db, storage, { ffmpeg, ffprobe, whisper: { whisper: whisper!, model: model!, threads: 4 } });
+      await r.drain(); // processing, then the transcript job it queues
+
+      const [rec] = await t.db.query<{ processing: string; transcript: string }>(
+        "SELECT processing, transcript FROM recordings WHERE id = $1",
+        [t.recordingId],
+      );
+      expect(rec).toEqual({ processing: "ready", transcript: "ready" });
+      const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
+      expect(recordings[0].transcript).toBe("ready");
+      expect(recordings[0].outputs.map((o: { fileName: string }) => o.fileName)).toEqual([
+        "Combined.mp4",
+        "Guest - audio.wav",
+        "Transcript.srt",
+        "Transcript.txt",
+        "Transcript.vtt",
+      ]);
+      const [txt] = await t.db.query<{ storage_key: string }>("SELECT storage_key FROM outputs WHERE file_name = 'Transcript.txt'");
+      const text = storage.objects.get(txt!.storage_key)!.data.toString();
+      expect(text).toMatch(/^\[00:00:0\d\] Guest: /);
+      expect(text.toLowerCase()).toContain("thanks for having me");
+    });
+
+    it("leaves transcripts off when no Whisper model is configured", async () => {
+      await uploadTrack(split(media, 2));
+      t.tick(2000);
+      await stop();
+      await runner().drain();
+      const [rec] = await t.db.query<{ transcript: string }>("SELECT transcript FROM recordings WHERE id = $1", [t.recordingId]);
+      expect(rec!.transcript).toBe("off");
+      expect(await t.db.query("SELECT id FROM jobs WHERE type = 'transcribe_recording'")).toEqual([]);
+    });
+
     it("retries a failed job later instead of giving up at once", async () => {
       await uploadTrack([Buffer.from("broken")]);
       await stop();
