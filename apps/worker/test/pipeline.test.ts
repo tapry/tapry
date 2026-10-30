@@ -148,6 +148,36 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     );
   });
 
+  it("merges the pieces of someone who rejoined mid-recording into one file each, gap included", async () => {
+    // Recording of 6 s: the guest's tab died at ~3 s and they were back at 4 s.
+    const pieces: TrackInput[] = [
+      { trackId: "trk_a1", participantId: "par_g", participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_a2", participantId: "par_g", participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 4000 },
+      { trackId: "trk_v1", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      { trackId: "trk_v2", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 4000 },
+    ];
+    const outputs = await renderRecording(pieces, { ffmpeg, ffprobe, workDir: join(dir, "rejoin"), durationMs: 6000, videoHeight: 720 });
+    expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam - video.mp4", "Combined.mp4"]);
+    for (const o of outputs) expect(Math.abs(o.durationMs! - 6000), o.fileName).toBeLessThan(80);
+
+    const audio = samples(outputs[0]!.path);
+    expect(audio.length).toBe(6 * 48000);
+    expect(peak(audio, 0.1, 2.9)).toBeGreaterThan(5000); // first piece
+    expect(peak(audio, 3.1, 3.9)).toBeLessThan(100); // the gap is silent
+    expect(peak(audio, 4.1, 5.9)).toBeGreaterThan(5000); // second piece, in its place
+
+    // Video brightness: the test pattern while each piece records, black in the gap.
+    const brightness = (t: number) =>
+      Number.parseFloat(
+        execFileSync(ffmpeg, ["-v", "error", "-ss", String(t), "-i", outputs[1]!.path, "-frames:v", "1",
+          "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-", "-f", "null", "-"])
+          .toString().match(/YAVG=([\d.]+)/)![1]!,
+      );
+    expect(brightness(1.5)).toBeGreaterThan(40);
+    expect(brightness(3.5)).toBeLessThan(20);
+    expect(brightness(5)).toBeGreaterThan(40);
+  });
+
   it("gives two people with the same name distinct files", async () => {
     const tracks: TrackInput[] = ["par_1", "par_2"].map((pid, i) => ({
       trackId: `trk_${i}`, participantId: pid, participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 0,
