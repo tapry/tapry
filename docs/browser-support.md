@@ -1,7 +1,7 @@
 # Browser support
 
 What is **tested**, not what should work. Per `CLAUDE.md`, claims here must match the test
-matrix. Last run: 30 Oct 2026, macOS (Apple Silicon), Playwright 1.64.
+matrix. Last run: 31 Oct 2026, macOS (Apple Silicon), Playwright 1.64.
 
 ## Recording (record → upload → process → download)
 
@@ -25,10 +25,25 @@ the green room warns about it.
 
 ## Live call
 
-| Engine | Result |
-|---|---|
-| Chromium | ✅ two participants see and hear each other, mute propagates (`e2e/studio.spec.ts`) |
-| Firefox, WebKit | not yet covered by a two-person test |
+`e2e/call.spec.ts`: the host in each engine, a guest in Chromium, both with camera and mic.
+Each run checks both directions: the host's camera plays for the guest at no more than 360p
+and the guest's for the host, the sound measured from what actually arrives; mute reaches the
+other side and silences the recorded mic; and the call leaves the recorded camera track
+untouched.
+
+| Host engine | Version | Result |
+|---|---|---|
+| Chromium | Chrome for Testing 156 | ✅ |
+| Firefox | 157 | ✅ (the call's video is scaled down in the encoder: Firefox ignores size constraints on a cloned camera track) |
+| WebKit | 27.2 (Playwright build) | ✅ |
+
+The test server's LiveKit listens on 127.0.0.1, so the test Firefox is allowed loopback ICE
+candidates (`playwright.config.ts`); real servers don't need that. Also covered: a call that
+can't connect retries one attempt at a time, and the host and guest flow in
+`e2e/studio.spec.ts` (Chromium).
+
+**Not tested:** a call between two non-Chromium browsers (e.g. Firefox to Safari), real Safari,
+and phones.
 
 ## Reliability (Chromium)
 
@@ -37,6 +52,7 @@ the green room warns about it.
 | Upload capped at 1 Mbit/s, 200 ms latency, 30% of upload requests failing | `reliability.spec.ts` | ✅ every chunk arrives, files complete |
 | Guest offline mid-recording, tab closed, comes back later | `studio.spec.ts` | ✅ leftovers upload on return, track completed |
 | Tab killed while offline mid-recording, rejoins while still recording | `reliability.spec.ts` | ✅ offline chunks recovered; both pieces merged into one file per kind |
+| Recorders slow to stop after Stop (2.5 s) | `reliability.spec.ts` | ✅ "uploaded" only once every track is complete on the server; until then the page says it's finishing and warns before closing |
 | 10-minute recording (`E2E_LONG_MINUTES=10`) | `long.spec.ts` (opt-in) | ✅ page heap 59.8 MB at 1 min → 50.5 MB at 10 min (no growth); uploads never behind (~7 MB/min sent); every output ≥ 598 s, all equal length; processed in ~1 min |
 
 Not yet run: 60- and 120-minute recordings (the plan's release gate), laptop sleep, disk nearly

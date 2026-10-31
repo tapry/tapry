@@ -23,6 +23,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const [recorderError, setRecorderError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState<UploadProgress | null>(null);
+  const [localActive, setLocalActive] = useState(false);
   const [durable, setDurable] = useState(true);
   const controller = useRef<RecordingController | null>(null);
   const [micMuted, setMicMuted] = useState(false);
@@ -60,6 +61,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         console.error("[recording]", err);
         setRecorderError(err instanceof Error ? err.message : String(err));
       },
+      onLocalActive: setLocalActive,
     });
     return () => {
       setTimeout(() => {
@@ -76,7 +78,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   }, [state, recording?.id]);
 
   // Closing the tab now would lose what hasn't reached the server yet.
-  const unsent = !!recording || (upload !== null && !upload.idle);
+  const unsent = !!recording || localActive || (upload !== null && !upload.idle);
   useEffect(() => {
     if (!unsent) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -172,7 +174,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           {micMuted && recording && (
             <p className="text-sm text-warn">You're muted: your microphone is silent in the recording too.</p>
           )}
-          <LocalUploadStatus recording={!!recording} upload={upload} />
+          <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} />
         </div>
 
         <Card className="space-y-4">
@@ -247,8 +249,17 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
 
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 
-function LocalUploadStatus({ recording, upload }: { recording: boolean; upload: UploadProgress | null }) {
-  if (!upload || (!recording && upload.uploadedChunks === 0 && upload.idle)) return null;
+function LocalUploadStatus({
+  recording,
+  finishing,
+  upload,
+}: {
+  recording: boolean;
+  /** Stopped on the server, but this device's recorders are still handing over their last chunk. */
+  finishing: boolean;
+  upload: UploadProgress | null;
+}) {
+  if (!upload || (!recording && !finishing && upload.uploadedChunks === 0 && upload.idle)) return null;
   const behindS = upload.oldestPendingTs !== null ? Math.round((Date.now() - upload.oldestPendingTs) / 1000) : 0;
   let tone: "ok" | "warn" | "idle" = "ok";
   let text: string;
@@ -259,6 +270,9 @@ function LocalUploadStatus({ recording, upload }: { recording: boolean; upload: 
       behindS > 30
         ? `Recording on this device. Upload is ${behindS} s behind; it will catch up.`
         : `Recording on this device and uploading as you go (${mb(upload.uploadedBytes)} sent).`;
+  } else if (finishing) {
+    tone = "warn";
+    text = "Finishing the recording on this device. Keep this tab open.";
   } else if (upload.idle) {
     text = `All of your recording is uploaded (${mb(upload.uploadedBytes)}).`;
   } else {

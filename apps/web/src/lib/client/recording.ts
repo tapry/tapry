@@ -141,6 +141,12 @@ export interface RecordingOptions {
   /** Add to Date.now() to get server time (from the green room's clock estimate). */
   clockOffsetMs: number;
   onError: (err: unknown) => void;
+  /**
+   * True while this device's recorders run, and until each has stopped and handed its last
+   * chunk and completion to the upload queue. Stop on the server comes first: until this goes
+   * false, an idle queue doesn't mean everything is sent.
+   */
+  onLocalActive?: (active: boolean) => void;
 }
 
 const VIDEO_BITRATE = { "1080p": 8_000_000, "720p": 4_000_000 } as const;
@@ -189,6 +195,7 @@ export class RecordingController {
     const recorders: TrackRecorder[] = [];
     const trackIds: string[] = [];
     this.active = { recordingId, recorders };
+    this.opts.onLocalActive?.(true);
     for (const p of plan) {
       const trackId = newTrackId();
       const recorder = new TrackRecorder({
@@ -220,7 +227,11 @@ export class RecordingController {
     const active = this.active;
     if (!active) return;
     this.active = null;
-    await Promise.all(active.recorders.map((r) => r.stop()));
+    try {
+      await Promise.all(active.recorders.map((r) => r.stop()));
+    } finally {
+      this.opts.onLocalActive?.(false);
+    }
   }
 }
 

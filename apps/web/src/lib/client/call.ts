@@ -54,6 +54,17 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     let retry: ReturnType<typeof setTimeout> | undefined;
     let current: Room | null = null;
 
+    // One retry at a time. A failure can surface twice (connect or publish throws, and the room
+    // also emits Disconnected): two retries would join the same person twice, and LiveKit kicks
+    // the older copy each time, so the copies would keep throwing each other out.
+    const retryLater = (attempt: number) => {
+      if (cancelled || retry !== undefined) return;
+      retry = setTimeout(() => {
+        retry = undefined;
+        void connect(attempt);
+      }, Math.min(10_000, 1000 * 2 ** (attempt - 1)));
+    };
+
     const snapshot = (r: Room) => {
       if (cancelled) return;
       const peers = [...r.remoteParticipants.values()].map(toPeer);
@@ -67,6 +78,13 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
 
     const connect = async (attempt: number) => {
       setState((s) => ({ ...s, status: attempt === 0 ? "connecting" : "reconnecting" }));
+      // Drop the previous room completely before joining again.
+      const previous = current;
+      current = null;
+      if (previous) {
+        previous.removeAllListeners();
+        void previous.disconnect();
+      }
       try {
         const t = await apiFetch<CallToken>(`/sessions/${ticket.sessionId}/call-token`, { body: {}, token: ticket.token });
         if (cancelled) return;
@@ -93,10 +111,10 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
           r.on(e, update);
         }
         r.on(RoomEvent.Disconnected, () => {
-          if (cancelled) return;
+          if (cancelled || r !== current) return;
           snapshot(r);
           // LiveKit gave up reconnecting by itself: start over with a fresh token.
-          retry = setTimeout(() => void connect(attempt + 1), Math.min(10_000, 1000 * 2 ** attempt));
+          retryLater(attempt + 1);
         });
 
         // ?relay=1: use only TURN-relayed connections. For checking that guests behind strict
@@ -110,7 +128,7 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
         if (cancelled) return;
         console.error("[call]", err);
         setState((s) => ({ ...s, status: "failed" }));
-        retry = setTimeout(() => void connect(attempt + 1), Math.min(10_000, 1000 * 2 ** attempt));
+        retryLater(attempt + 1);
       }
     };
     void connect(0);
@@ -170,6 +188,23 @@ async function publish(r: Room, stream: MediaStream, local: { audio?: LocalAudio
       simulcast: false,
       videoEncoding: { maxBitrate: 600_000, maxFramerate: CALL_VIDEO.frameRate },
     });
+    // Firefox ignores those constraints on a cloned camera track and keeps its full size. Then
+    // the encoder scales the call's copy down instead (the camera itself is left alone).
+    const height = clone.getSettings().height ?? 0;
+    if (height > CALL_VIDEO.height * 1.1) await scaleDown(local.video, height / CALL_VIDEO.height);
+  }
+}
+
+async function scaleDown(track: LocalVideoTrack, factor: number) {
+  const sender = track.sender;
+  if (!sender) return;
+  try {
+    const params = sender.getParameters();
+    if (!params.encodings?.length) params.encodings = [{}];
+    for (const e of params.encodings) e.scaleResolutionDownBy = factor;
+    await sender.setParameters(params);
+  } catch (err) {
+    console.warn("[call] could not scale the call video down", err);
   }
 }
 

@@ -14,6 +14,11 @@ export const test = base.extend<{
 }>({
   forceMp4: [false, { option: true }],
   page: async ({ page, forceMp4 }, use) => {
+    // Headless browsers still play sound; WebKit has no mute switch, so mute media elements
+    // as they start. The tests measure received audio from the streams, not the speakers.
+    await page.addInitScript(() => {
+      document.addEventListener("play", (e) => ((e.target as HTMLMediaElement).muted = true), true);
+    });
     // Record which formats MediaRecorder was actually created with.
     await page.addInitScript((mp4Only: boolean) => {
       const MR = window.MediaRecorder;

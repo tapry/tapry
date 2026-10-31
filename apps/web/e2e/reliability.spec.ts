@@ -99,3 +99,35 @@ test("tab dies mid-recording while offline: leftovers upload after rejoining, pi
   // The crashed tab's chunks (recorded offline) made it: the merged files cover the whole take.
   await expectProcessed(again, studioUrl, 13);
 });
+
+// Regression: Stop reaches the server before each recorder has handed over its last chunk.
+// The page said "All of your recording is uploaded" in that gap (and stopped warning before
+// closing the tab), so leaving then left the track unfinished. Seen with WebKit's slower stop.
+test("'all uploaded' only once every track is complete on the server, even with a slow recorder stop", async ({ page }) => {
+  // Make every MediaRecorder take 2.5 s to stop, like a slow device.
+  await page.addInitScript(() => {
+    const stop = MediaRecorder.prototype.stop;
+    MediaRecorder.prototype.stop = function (this: MediaRecorder) {
+      setTimeout(() => stop.call(this), 2500);
+    };
+  });
+  await signInHost(page);
+  await createStudio(page, `Slow stop ${randomBytes(2).toString("hex")}`);
+  await enterRoom(page);
+
+  await page.getByRole("button", { name: "Record", exact: true }).click();
+  await page.waitForTimeout(5_000);
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  // While the recorders finish, the page says so (and warns before closing).
+  await expect(page.getByTestId("local-upload")).toContainText("Finishing the recording on this device");
+  await expect(page.getByTestId("local-upload")).toContainText("All of your recording is uploaded", { timeout: 30_000 });
+
+  // At that moment the server must already have every track complete.
+  const sessionId = new URL(page.url()).pathname.split("/").pop()!;
+  const uploads = await page.evaluate(async (id) => {
+    const { token } = JSON.parse(localStorage.getItem(`opentake:ticket:${id}`)!);
+    const res = await fetch(`/api/sessions/${id}/state`, { headers: { authorization: `Bearer ${token}` } });
+    return (await res.json()).uploads as Array<{ tracks: number; completeTracks: number }>;
+  }, sessionId);
+  expect(uploads).toEqual([expect.objectContaining({ tracks: 2, completeTracks: 2 })]);
+});

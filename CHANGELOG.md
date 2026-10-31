@@ -3,6 +3,21 @@
 All notable changes. Versions follow [semantic versioning](https://semver.org); while the
 version is 0.x, a minor release can change behaviour or configuration (the notes say how).
 
+## Unreleased
+
+### Fixed
+- Firefox sent the live call's video at full camera size instead of 360p; the encoder now
+  scales it down (the recording is unaffected).
+- After Stop, the page could say "All of your recording is uploaded" while a recorder was
+  still handing over its last piece, and stopped warning before closing the tab. Closing it
+  then left that track unfinished until the person came back. It now says it's finishing.
+- A call attempt that failed partway could schedule two reconnects, joining the same person
+  twice so the two copies kept kicking each other out. Reconnects now go one at a time.
+
+### Tests
+- Live call tested with the host in Chromium, Firefox and WebKit (`e2e/call.spec.ts`).
+- Test browsers no longer play the fake microphones through the speakers.
+
 ## 0.1.0 — first release
 
 The complete recording flow, self-hostable with Docker Compose.
