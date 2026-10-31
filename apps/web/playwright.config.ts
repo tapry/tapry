@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const MATRIX = /matrix\.spec\.ts/;
+/** Specs every engine runs: the recording matrix and the cross-engine live call. */
+const ENGINES = /(matrix|call)\.spec\.ts/;
 
 // Run through `pnpm test:e2e`, which starts a throwaway SeaweedFS and sets S3_E2E_*.
 const PORT = 3100;
@@ -36,27 +38,38 @@ export default defineConfig<{ forceMp4: boolean }>({
           args: [
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
+            // Headless still plays sound: keep the fake mics' beeps off the speakers.
+            "--mute-audio",
             // E2E_CHROMIUM_ARGS (JSON array): extra flags, e.g. --host-resolver-rules for a test server.
             ...(process.env.E2E_CHROMIUM_ARGS ? (JSON.parse(process.env.E2E_CHROMIUM_ARGS) as string[]) : []),
           ],
         },
       },
     },
-    // Browser matrix: the recording flow in every engine (e2e/matrix.spec.ts).
+    // Browser matrix: the recording flow and the live call in every engine.
     {
       name: "firefox",
-      testMatch: MATRIX,
+      testMatch: ENGINES,
       use: {
         ...devices["Desktop Firefox"],
         permissions: [], // Firefox takes camera/mic permission from the prefs below
         launchOptions: {
-          firefoxUserPrefs: { "media.navigator.streams.fake": true, "media.navigator.permission.disabled": true },
+          firefoxUserPrefs: {
+            "media.navigator.streams.fake": true,
+            "media.navigator.permission.disabled": true,
+            "media.volume_scale": "0.0", // silent speakers; the tests measure the streams themselves
+            // The test LiveKit listens on 127.0.0.1, and Firefox skips loopback ICE candidates
+            // by default (real servers aren't on loopback, so this is only for tests).
+            "media.peerconnection.ice.loopback": true,
+            "media.peerconnection.ice.obfuscate_host_addresses": false,
+            "media.peerconnection.ice.default_address_only": false,
+          },
         },
       },
     },
     {
       name: "webkit",
-      testMatch: MATRIX,
+      testMatch: ENGINES,
       use: { ...devices["Desktop Safari"] }, // WebKit uses mock camera/mic devices
     },
     {
