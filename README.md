@@ -88,7 +88,8 @@ pnpm dev     # http://localhost:3000
 pnpm test
 ```
 
-Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Contributors sign a
+[CLA](CLA.md) once.
 
 ## License
 
