@@ -1,6 +1,6 @@
 {
   "name": "@opentake/recorder",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser recording core: capture, durable local chunks, resumable upload.",
   "license": "MIT",
   "type": "module",

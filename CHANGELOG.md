@@ -3,7 +3,7 @@
 All notable changes. Versions follow [semantic versioning](https://semver.org); while the
 version is 0.x, a minor release can change behaviour or configuration (the notes say how).
 
-## Unreleased
+## 0.1.1
 
 ### Fixed
 - Firefox sent the live call's video at full camera size instead of 360p; the encoder now
