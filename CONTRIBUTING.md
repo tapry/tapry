@@ -25,14 +25,19 @@ bug this project can have.
 - Claims about browsers must match what the tests cover.
 - Match the style around you: plain names, comments that say why.
 
-## Sign-off (DCO)
+## Contributor License Agreement
 
-Contributions are accepted under the project's licenses (AGPL-3.0, MIT for
-`packages/recorder`). Sign off each commit to certify you wrote it or have the right to submit
-it, per the [Developer Certificate of Origin](https://developercertificate.org):
+Before your first pull request is merged, you accept the [CLA](CLA.md) once. You keep the
+copyright in your work. The CLA lets the project license OpenTake as a whole, including under
+commercial terms that fund its development, and promises that every contribution stays
+available as open source.
 
-```bash
-git commit -s
+To sign, comment this on your pull request (a check called **CLA** explains it when you open
+one):
+
+```
+I have read the OpenTake CLA and I agree to it.
 ```
 
-This adds `Signed-off-by: Your Name <you@example.com>` to the commit message.
+It covers all your future contributions. Commits must use an email that is on your GitHub
+account, so the check can tell who wrote them.

@@ -1,0 +1,142 @@
+# Contributor License Agreement check (CLA.md).
+#
+# Every pull request gets a "CLA" commit status. It passes once the PR's author and every
+# commit author have signed, by commenting the phrase below on any OpenTake pull request.
+# Signatures are kept in cla-signatures.json on the `cla-signatures` branch: who, when, and a
+# link to the comment. The repository owner and bots don't need to sign.
+#
+# pull_request_target runs this file from the default branch with write access, so it must
+# never check out or run code from the pull request. It only reads metadata and comments.
+name: CLA
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write # the signatures branch
+  pull-requests: write # the instructions comment
+  statuses: write # the "CLA" status
+
+concurrency:
+  # One run at a time, so two signatures can't overwrite each other.
+  group: cla
+  cancel-in-progress: false
+
+jobs:
+  cla:
+    if: github.event_name == 'pull_request_target' || github.event.issue.pull_request
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/github-script@v9
+        env:
+          # Set the repository variable CLA_EXEMPT_OWNER=false to make the owner sign too (testing).
+          EXEMPT_OWNER: ${{ vars.CLA_EXEMPT_OWNER != 'false' }}
+        with:
+          script: |
+            const PHRASE = "I have read the OpenTake CLA and I agree to it.";
+            const BRANCH = "cla-signatures";
+            const FILE = "cla-signatures.json";
+            const MARKER = "<!-- opentake-cla -->";
+            const { owner, repo } = context.repo;
+            const number = (context.payload.pull_request ?? context.payload.issue).number;
+            const claUrl = `${context.serverUrl}/${owner}/${repo}/blob/${context.payload.repository.default_branch}/CLA.md`;
+            const normalise = (s) => s.trim().replace(/\s+/g, " ").replace(/[.!]$/, "").toLowerCase();
+
+            async function loadSignatures() {
+              try {
+                const { data } = await github.rest.repos.getContent({ owner, repo, path: FILE, ref: BRANCH });
+                return { sha: data.sha, list: JSON.parse(Buffer.from(data.content, "base64").toString("utf8")) };
+              } catch (err) {
+                if (err.status === 404) return { sha: undefined, list: [] };
+                throw err;
+              }
+            }
+
+            async function ensureBranch() {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `heads/${BRANCH}` });
+              } catch (err) {
+                if (err.status !== 404) throw err;
+                const base = context.payload.repository.default_branch;
+                const { data } = await github.rest.git.getRef({ owner, repo, ref: `heads/${base}` });
+                await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${BRANCH}`, sha: data.object.sha });
+              }
+            }
+
+            let signatures = await loadSignatures();
+
+            // A signature: the exact phrase as a comment on a pull request.
+            if (context.eventName === "issue_comment") {
+              const comment = context.payload.comment;
+              if (normalise(comment.body) !== normalise(PHRASE)) return; // an ordinary comment
+              const login = comment.user.login;
+              if (!signatures.list.some((s) => s.id === comment.user.id)) {
+                await ensureBranch();
+                signatures = await loadSignatures();
+                signatures.list.push({
+                  login,
+                  id: comment.user.id,
+                  signedAt: comment.created_at,
+                  claVersion: "1.0",
+                  pullRequest: number,
+                  comment: comment.html_url,
+                });
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner, repo, branch: BRANCH, path: FILE, sha: signatures.sha,
+                  message: `CLA signed by @${login} (#${number})`,
+                  content: Buffer.from(JSON.stringify(signatures.list, null, 2) + "\n").toString("base64"),
+                });
+                core.info(`Recorded the signature of ${login}`);
+              }
+            }
+
+            // Who has to sign: the PR's author and every commit author.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number: number, per_page: 100 });
+            const people = new Map([[pr.user.id, pr.user.login]]);
+            const unlinked = new Set();
+            for (const c of commits) {
+              if (c.author) people.set(c.author.id, c.author.login);
+              else unlinked.add(c.commit.author?.email ?? c.sha.slice(0, 7));
+            }
+            const exempt = (id, login) =>
+              login.endsWith("[bot]") || (process.env.EXEMPT_OWNER === "true" && login.toLowerCase() === owner.toLowerCase());
+            const signed = new Set(signatures.list.map((s) => s.id));
+            const missing = [...people].filter(([id, login]) => !exempt(id, login) && !signed.has(id)).map(([, login]) => login);
+            const ok = missing.length === 0 && unlinked.size === 0;
+
+            await github.rest.repos.createCommitStatus({
+              owner, repo, sha: pr.head.sha, context: "CLA", target_url: claUrl,
+              state: ok ? "success" : "failure",
+              description: ok ? "Everyone has signed the CLA" : `Waiting for: ${[...missing, ...unlinked].join(", ")}`.slice(0, 140),
+            });
+
+            // One comment per pull request, updated in place.
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: number, per_page: 100 });
+            const mine = comments.find((c) => c.user.type === "Bot" && c.body.includes(MARKER));
+            let body;
+            if (ok) {
+              if (!mine) return; // nothing to say when everyone had signed already
+              body = `${MARKER}\n✅ Everyone in this pull request has signed the [CLA](${claUrl}). Thank you!`;
+            } else {
+              body = [
+                MARKER,
+                `Thanks for contributing to OpenTake! Before this can be merged, everyone who wrote a commit here needs to accept the [Contributor License Agreement](${claUrl}) once. You keep the copyright in your work; the CLA lets the project license OpenTake as a whole, and promises it stays open source.`,
+                "",
+                "To sign, read it and post this comment exactly:",
+                "",
+                "```",
+                PHRASE,
+                "```",
+                "",
+                missing.length ? `Still to sign: ${missing.map((l) => `@${l}`).join(", ")}` : "",
+                unlinked.size
+                  ? `Some commits aren't linked to a GitHub account (${[...unlinked].join(", ")}). Add that email to your GitHub account, or rewrite the commits with an email that is on it, then push again.`
+                  : "",
+              ].filter((line, i, all) => line !== "" || all[i - 1] !== "").join("\n");
+            }
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
