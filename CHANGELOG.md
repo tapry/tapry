@@ -21,7 +21,9 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ### Storage
 - `RAW_RETENTION_DAYS` (off by default): remove each episode's original uploads that many days
-  after its files are ready, keeping the processed files. Saves about 40% of the space.
+  after its files are ready, keeping the processed files. Saves 40–50% of the space.
+- Each person's processed video is capped at the bitrate it was recorded at (8 Mbit/s at 1080p,
+  4 at 720p), so it can't come out bigger than the upload: 22% smaller on noisy footage.
 - `docs/costs.md`: measured storage and CPU per recorded hour, and what it means for pricing;
   `apps/worker/scripts/cost-benchmark.sh` re-runs the measurement.
 

@@ -63,6 +63,19 @@ export interface OutputFile {
 }
 
 const FPS = 30;
+
+/**
+ * Most bits per second a person's processed video may use: what the browser recorded at
+ * (apps/web recording.ts). x264 aims for quality (CRF 20) but never spends more than the original
+ * had, so noisy or busy footage can't come out bigger than the upload without being better.
+ */
+export const VIDEO_MAX_BITRATE = { 1080: 8_000_000, 720: 4_000_000 } as const;
+
+/** x264 flags for a person's final video: constant quality, capped at the original's bitrate. */
+function cappedVideo(height: 720 | 1080) {
+  const max = VIDEO_MAX_BITRATE[height];
+  return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", String(max), "-bufsize", String(max * 2)];
+}
 const TILE_BG = "0x202020";
 
 /** Join chunk files into one, in the order given. MediaRecorder chunks are byte-continuous. */
@@ -272,7 +285,8 @@ async function renderPiece(track: TrackInput, path: string, { opts, duration, ti
     [...INPUT_FLAGS, "-i", track.rawPath,
       "-vf", `${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
       ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs), volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
-      "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", multi ? "16" : "20", "-r", String(FPS),
+      // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
+      "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(opts.videoHeight)), "-r", String(FPS),
       ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
     { timeoutMs },
   );
@@ -319,7 +333,7 @@ async function mergePieces(
     opts.ffmpeg,
     ["-y", "-hide_banner", "-nostdin", ...inputs, "-filter_complex", filters.join(";"), "-map", video,
       ...(audioLabels.length ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : []),
-      "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-r", String(FPS),
+      "-t", duration, ...cappedVideo(opts.videoHeight), "-r", String(FPS),
       "-pix_fmt", "yuv420p", "-movflags", "+faststart", out],
     { timeoutMs },
   );

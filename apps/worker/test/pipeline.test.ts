@@ -15,6 +15,7 @@ import {
   PODCAST_LOUDNESS,
   renderRecording,
   type TrackInput,
+  VIDEO_MAX_BITRATE,
 } from "../src/pipeline.js";
 
 const ffmpeg = process.env.FFMPEG_PATH ?? "ffmpeg";
@@ -228,6 +229,20 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
 
     // Still exactly the recording length.
     expect(samples(byName(levelled, "Quiet - audio.wav").path).length).toBe(144_000);
+  });
+
+  it("never makes a person's video bigger than what they recorded (bitrate capped)", { timeout: 120_000 }, async () => {
+    // Noisy 1080p at the recorder's 8 Mbit/s: uncapped, CRF 20 spent ~10.5 Mbit/s on this.
+    const noisy = join(dir, "noisy.webm");
+    await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30,noise=alls=10:allf=t+u", "-t", "10",
+      "-c:v", "libvpx-vp9", "-b:v", "8M", "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1", "-an", noisy]);
+    const [video] = await renderRecording(
+      [{ trackId: "v", participantId: "p", participantName: "Sam", kind: "video", rawPath: noisy, offsetMs: 0 }],
+      { ffmpeg, ffprobe, workDir: join(dir, "capped"), durationMs: 10_000, videoHeight: 1080 },
+    );
+    const bitrate = Number(probe(video!.path, "stream=bit_rate").split("\n")[0]);
+    expect(bitrate).toBeLessThan(VIDEO_MAX_BITRATE[1080] * 1.1);
+    expect(probe(video!.path, "stream=height").split("\n")[0]).toBe("1080");
   });
 
   it("merges the pieces of someone who rejoined mid-recording into one file each, gap included", async () => {
