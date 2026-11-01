@@ -6,6 +6,7 @@
 import { checkStorage, type UploadProgress } from "@opentake/recorder";
 import type { QualityAlert, SessionTicket } from "@opentake/shared";
 import { useEffect, useRef, useState } from "react";
+import { localNow } from "./clock";
 
 /** Peak at or above this counts as clipping: -1 dBFS. */
 export const CLIP_LEVEL = 0.891;
@@ -126,7 +127,7 @@ export function useQualityAlerts(q: QualityInputs) {
         mic.reset(now);
         wasMuted = cur.micMuted;
       }
-      const behind = uploadBehindS(cur.upload, now + cur.clockOffsetMs);
+      const behind = uploadBehindS(cur.upload, localNow() + cur.clockOffsetMs);
       const list: QualityAlert[] = [...mic.alerts(now, cur.micMuted)];
       if (behind !== null && behind >= UPLOAD_BEHIND_AFTER_S) list.push("upload_behind");
       if (lowDisk) list.push("low_disk");

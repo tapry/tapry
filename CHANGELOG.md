@@ -19,6 +19,14 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - When a session ends, everyone sees their recording arriving, then "That's a wrap".
 - Studio keyboard shortcuts: ⌘/Ctrl+Shift+R start or stop recording, M mute, L copy the invite link.
 
+### Sync
+- Measured: tracks line up within 1–5 ms between people over 5 minutes, with no drift, including a
+  guest whose clock is 3.7 s off (`e2e/sync.spec.ts`, results in docs/browser-support.md).
+- Recording timestamps now use the same steady clock as the clock-offset estimate. They used the
+  wall clock, which jumps when the system clock is adjusted mid-session (NTP, waking from sleep).
+- The "upload is behind" note compared server time with the device clock without the offset; a
+  device with a wrong clock showed the wrong lag.
+
 ### In-call quality alerts
 - Each person's device watches its own mic (distorting, silent for 30 s while unmuted), upload
   (more than a minute behind), storage, tab (in the background) and recorders, and reports only

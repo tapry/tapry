@@ -49,6 +49,24 @@ a call that can't connect retries one attempt at a time, and the host and guest 
 phones, and calls over the internet rather than one machine (TURN has its own test,
 `e2e/turn.spec.ts`, against a Linux host).
 
+## Sync (Chromium)
+
+`e2e/sync.spec.ts`: two browsers whose microphones beep on every whole second of the real
+clock, so each beep happens at the same instant for both; the guest's device clock is set 3.7 s
+wrong. After processing, each beep is found in each person's WAV (`E2E_SYNC_SECONDS`, default 20).
+
+| Length | Between the two people (worst) | Against the Record moment | Drift start → end | Beeps found |
+|---|---|---|---|---|
+| 20 s | 0.8 ms | 13–14 ms | 0 ms | 19 / 19 |
+| 5 min | 5.4 ms | 14–20 ms | 0 ms | 299 / 299 |
+
+Plan target (Gate A): under 50 ms between people. With the clock-offset correction switched off,
+the same test fails (beeps ~300 ms apart).
+
+**Not covered:** each device's own input delay. A Bluetooth headset can add 100–200 ms before
+the browser sees the sound, and timestamps can't know it; lining tracks up by the audio itself
+(cross-correlation) would be the way to catch that. Not tested beyond 5 minutes yet.
+
 ## Reliability (Chromium)
 
 | Scenario | Test | Result |
