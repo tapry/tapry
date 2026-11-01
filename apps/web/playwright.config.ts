@@ -58,11 +58,6 @@ export default defineConfig<{ forceMp4: boolean }>({
             "media.navigator.streams.fake": true,
             "media.navigator.permission.disabled": true,
             "media.volume_scale": "0.0", // silent speakers; the tests measure the streams themselves
-            // The test LiveKit listens on 127.0.0.1, and Firefox skips loopback ICE candidates
-            // by default (real servers aren't on loopback, so this is only for tests).
-            "media.peerconnection.ice.loopback": true,
-            "media.peerconnection.ice.obfuscate_host_addresses": false,
-            "media.peerconnection.ice.default_address_only": false,
           },
         },
       },

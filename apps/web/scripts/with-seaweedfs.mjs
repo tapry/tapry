@@ -10,7 +10,7 @@
 // sets LIVEKIT_E2E_URL / _API_KEY / _API_SECRET, so the live call can be tested too.
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 
 // SeaweedFS also listens on port+10000 for gRPC; 18433 avoids a dev instance on 8333 (gRPC 18333).
@@ -62,6 +62,14 @@ server.on("error", (err) => {
 
 // ── Optional LiveKit ─────────────────────────────────────────────────────────
 const LIVEKIT_PORT = 17880;
+
+/** The first non-loopback IPv4 address (Wi-Fi / Ethernet), or loopback when there is none. */
+function mediaAddress() {
+  const all = Object.entries(networkInterfaces()).flatMap(([name, list]) =>
+    (list ?? []).filter((a) => a.family === "IPv4" && !a.internal).map((a) => ({ name, address: a.address })),
+  );
+  return (all.find((a) => /^(en|eth|wl)/.test(a.name)) ?? all[0])?.address ?? "127.0.0.1";
+}
 const LIVEKIT_KEY = "e2ekey";
 const LIVEKIT_SECRET = "e2e-livekit-secret-of-at-least-32-chars";
 let livekit = null;
@@ -75,7 +83,9 @@ if (process.env.LIVEKIT_BIN) {
       "rtc:",
       "  tcp_port: 17881",
       "  udp_port: 17882",
-      "  node_ip: 127.0.0.1",
+      // Media on this machine's network address, like a real server: Firefox doesn't use
+      // loopback ICE candidates. (Signalling stays on 127.0.0.1.)
+      `  node_ip: ${mediaAddress()}`,
       "  use_external_ip: false",
       "keys:",
       `  ${LIVEKIT_KEY}: ${LIVEKIT_SECRET}`,
