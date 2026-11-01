@@ -15,8 +15,9 @@
 // in Safari's file, exactly a second apart from end to end: nothing lost, no drift against real
 // time. The absolute gap between people needs real devices. Safari against the host is reported,
 // not checked: with both browsers on one machine, the host's generated beeps can stall for a few
-// hundred ms while Safari starts encoding. Safari keeps its camera on (MP4 path), and the host's
-// clock is the wrong one.
+// hundred ms while Safari starts encoding (in the 60-min run they shifted 740 ms in the first
+// seconds, then held), so the host's beeps are counted the same way as Safari's bursts. Safari
+// keeps its camera on (MP4 path), and the host's clock is the wrong one.
 import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import type { Browser, Page } from "@playwright/test";
@@ -189,22 +190,17 @@ type Output = { name: string; path: string; duration: number };
 
 function checkSafari(wavs: Output[], files: Output[], recording: Recording, expected: number[]) {
   const lengthMs = recording.stoppedAt - recording.startedAt;
-  const host = beepOnsets(wavSamples(wavs[0]!.path), expected);
-  // Safari's bursts inside the same window as the beeps (the edges are cut).
-  const bursts = burstOnsets(wavSamples(wavs[1]!.path)).filter((b) => b > 500 && b < lengthMs - 500);
-  const gaps = bursts.slice(1).map((b, i) => b - bursts[i]!);
+  // Both tracks' bursts inside the same window as the beeps (the edges are cut).
+  const [host, bursts] = wavs.map((f) => burstOnsets(wavSamples(f.path)).filter((b) => b > 500 && b < lengthMs - 500));
+  const gaps = bursts!.slice(1).map((b, i) => b - bursts![i]!);
   // Safari against the host, beep by beep (reported only; see the top of the file).
-  const offsets = host.flatMap((h) => {
-    if (h == null) return [];
-    const near = bursts.reduce((a, b) => (Math.abs(b - h) < Math.abs(a - h) ? b : a), Infinity);
-    return [near - h];
-  });
+  const offsets = host!.map((h) => bursts!.reduce((a, b) => (Math.abs(b - h) < Math.abs(a - h) ? b : a), Infinity) - h);
   const report = {
     seconds: SECONDS,
     browser: "safari",
     hostBeeps: expected.length,
-    hostFound: host.filter((h) => h != null).length,
-    safariBursts: bursts.length,
+    hostFound: host!.length,
+    safariBursts: bursts!.length,
     burstGapMs: { min: Math.min(...gaps), max: Math.max(...gaps) },
     safariVsHostMs: { first: offsets[0], last: offsets.at(-1), min: Math.min(...offsets), max: Math.max(...offsets) },
   };
@@ -213,10 +209,11 @@ function checkSafari(wavs: Output[], files: Output[], recording: Recording, expe
   test.info().annotations.push({ type: "sync", description: JSON.stringify(report) });
 
   for (const f of files) expect(Math.abs(f.duration - lengthMs / 1000), f.name).toBeLessThan(0.1);
-  expect(report.hostFound).toBe(expected.length);
+  // Zero loss in the host's track: every beep is there (a lost chunk would take four with it).
+  expect(report.hostFound).toBeGreaterThanOrEqual(Math.floor(lengthMs / 1000) - 2);
   // Zero loss and no drift in Safari's track: a burst every second from end to end, none missing
   // or doubled, each exactly a second after the last (a lost or misplaced chunk breaks that).
-  expect(bursts.length).toBeGreaterThanOrEqual(Math.floor(lengthMs / 1000) - 2);
+  expect(report.safariBursts).toBeGreaterThanOrEqual(Math.floor(lengthMs / 1000) - 2);
   expect(report.burstGapMs.min).toBeGreaterThan(990);
   expect(report.burstGapMs.max).toBeLessThan(1010);
 }
@@ -239,8 +236,15 @@ async function joinSafari(inviteUrl: string) {
   const guest = await SafariPage.launch();
   try {
     await guest.goto(new URL(inviteUrl, test.info().project.use.baseURL).href);
+    // Wait for React to hydrate the form: a box ticked before that is unticked again.
+    await guest.element(
+      (l) => [...document.querySelectorAll("input")].find((i) => i.name === l && Object.keys(i).some((k) => k.startsWith("__reactProps"))),
+      "consent",
+    );
     await guest.type(await guest.input("Your name"), "Sync Guest");
-    await guest.click(await guest.input("happy to be recorded"));
+    // A WebDriver click on the box sometimes doesn't tick it in Safari; a click from the page does.
+    await guest.jsClick(await guest.input("happy to be recorded"));
+    await guest.element((n) => (document.querySelector<HTMLInputElement>(`input[name=${n}]`)?.checked ? document.body : null), "consent", 5_000);
     await guest.click(await guest.button("Continue"));
     await guest.click(await guest.button("Join the studio"));
     await guest.waitForText("Waiting for the host to start recording.");

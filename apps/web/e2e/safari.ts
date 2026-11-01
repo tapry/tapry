@@ -72,8 +72,11 @@ export class SafariPage {
       });
       if (ref) return ref[ELEMENT];
       if (Date.now() > until) {
-        const text = await this.call<string>("POST", "/execute/sync", { script: "return document.body.innerText", args: [] });
-        throw new Error(`Safari: no element for ${JSON.stringify(arg)}. The page says:\n${text.slice(0, 1500)}`);
+        const text = await this.call<string>("POST", "/execute/sync", {
+          script: `return document.body.innerText + "\\nInputs: " + [...document.querySelectorAll("input")].map((i) => i.name + "=" + (i.type === "checkbox" ? i.checked : i.value)).join(", ")`,
+          args: [],
+        });
+        throw new Error(`Safari: no element for ${JSON.stringify(arg)}. The page says:\n${text.slice(-1500)}`);
       }
       await new Promise((r) => setTimeout(r, 250));
     }
@@ -81,6 +84,11 @@ export class SafariPage {
 
   async click(id: string) {
     await this.call("POST", `/element/${id}/click`, {});
+  }
+
+  /** Clicks from inside the page (`element.click()`): for a checkbox that a WebDriver click sometimes misses. */
+  async jsClick(id: string) {
+    await this.call("POST", "/execute/sync", { script: "arguments[0].click()", args: [{ [ELEMENT]: id }] });
   }
 
   async type(id: string, text: string) {
