@@ -1,43 +1,76 @@
-# 01 — Market & Competition
+# 01 — Market & Competition (checked Oct–Nov 2026, re-verify before launch)
 
-## Incumbent pricing (checked Oct 2026 — re-verify on vendor sites)
+## Paid cloud tools (same core function: per-guest local recording)
 
-| Product | Plans | Notes |
+| Product | Price | Notes |
 |---|---|---|
-| **Riverside** | Free: 2h separate-track recording (one-time), 720p, watermark. **Pro $29/mo** ($24 annual): 5h/month, 4K. **Grow $39/mo**: 15h/month. **Webinar $99/mo**. Business: custom (SSO, API, SOC 2) | Top plan raised $34 → $99 in Sep 2026 |
-| **StreamYard** | Paid plans for live streaming + recording | Now owned by Bending Spoons (known for price increases) — verify |
-| **Zencastr** | Paid podcast recording + hosting | — |
-| **SquadCast** | Part of Descript | Bundled with Descript editing |
-| **Zoom / Meet / Teams** | Cloud recordings are compressed, single mixed track | "Good enough" for many — our main free competitor |
+| **Riverside** | Free 2 h (one-time); Pro **$29/mo for 5 h**; Grow $39 (15 h); Webinar $99; Business custom | Top plan raised $34 → $99 (Sep 2026). 17+ AI features (clips, dubbing, translation, eye contact, B-roll, AI agents, MCP). Lock-in to its editor. |
+| **SquadCast** | Free to ~$80/mo | Owned by **Descript** since 2023. "Eventually Descript Rooms will replace SquadCast" — no sunset date. |
+| **Descript Rooms** | Included in Descript plans (counts media minutes) | Recording inside Descript's editor |
+| **Zencastr** | From ~$20/mo | Up to 12 participants |
+| **Iris** | Free 1 h; **from $9/mo** | 4K, 48 kHz, separate tracks |
+| **Remotely.fm** | From $19 (audio) / $35 (video) | Auto-mixes tracks |
+| **Ringr** | **From $7.99/mo** | Mobile + web |
+| **Zoom / Meet / Teams** | Already paid by most orgs | Records the compressed call; "good enough" for many — the main free competitor |
+
+**Takeaway:** we can't win on cloud price. Iris ($9) and Ringr ($7.99) are already cheap.
 
 ## Open-source landscape
 
-| Project | What it is | Gap |
+| Project | What it is | Why it isn't Tapry |
 |---|---|---|
-| **Ennuicastr** | Web-based audio recorder (Opus/FLAC), "open source, but paid" | Audio-focused, small, little visibility |
-| **VDO.Ninja** | Free AGPL WebRTC tool for bringing remote guests into OBS; has recording options | Built for live producers; complex URL-parameter UX; not a podcast studio |
-| **Jitsi Meet** | Open-source meetings; server-side recording (Jibri) | Records the mixed, compressed call — not per-guest local quality |
-| **LiveKit** | Open-source WebRTC server + SDKs (Apache 2.0) | Building block, not a product → we build on it |
+| **Ennuicastr** | Open-source browser recorder, per-guest local recording | Audio-focused, sold as a paid hosted service, not packaged for self-hosting. **Closest OSS competitor.** |
+| **VDO.Ninja** | AGPL WebRTC tool with local recording | Built for live streamers using OBS; technical URL-parameter UX; no automatic sync/exports |
+| **Jitsi Meet** | Open-source meetings, self-hostable | Server-side recording of the compressed call |
+| **LiveKit** | Open-source WebRTC server + SDKs (Apache 2.0) | Building block → we build on it |
+| **CoProd** | Source-available (Elastic License 2.0) AI video editor for Mac | Post-production for solo creators, no remote guests → **a partner (export target), not a competitor** |
 
-**Gap:** no polished, simple, self-hostable "Riverside": local per-guest recording + automatic upload + multitrack + transcripts.
+Directories of open-source podcast recorders list **no open-source Riverside equivalent**. The gap is open.
 
-## Target users
+## Research and organisations (adjacent tools)
 
-| Segment | Pain | Pays? |
+| Tool | What it does | Relationship to us |
 |---|---|---|
-| **Indie podcasters / YouTubers** (interview shows) | $29 for 5h/month; Zoom quality is bad | Yes, if cheaper/more hours |
-| **Privacy-sensitive orgs** (EU companies, universities, newsrooms, legal, health) | Recordings on US SaaS; procurement/GDPR | **Yes — business license / self-host** |
-| **Companies** (webinars, internal shows, customer interviews) | Per-seat pricing, branding | Yes (team plan) |
-| **Platforms** (podcast hosts, course platforms, hiring tools) | Want recording built in | Yes (API/white-label) — later |
-| **Self-hosters / homelab** | Want to own data | Rarely pay — they bring stars and word of mouth |
+| **Dovetail**, Great Question, Looppanel | Research repositories: upload interviews, transcribe, tag, analyse | **Integrate, don't compete.** They need clean recordings; UK Crown Commercial Service paid ~£25k for Dovetail partly because Teams recordings were inadequate. |
+| **University in-house tools** (e.g., Aarhus "Secured Video", Groningen's secure transcription, Kaltura) | Universities build or license GDPR-safe recording/transcription | Confirms demand; also means some universities are already covered → **target research groups and institutions without such a tool**, and pitch self-hosting to university IT |
+| NVivo, ATLAS.ti, MAXQDA | Qualitative analysis software | **Export targets** (transcripts with speakers/timestamps) |
+
+## The 3 gaps we fill
+
+| Gap | Evidence | Our answer |
+|---|---|---|
+| **Reliability** | Riverside complaints: performance/speed 30%, stability 23% (crashes, sync, lost recordings, failed uploads); 38% negative | "Never lose a recording": live per-guest upload status, crash recovery, in-call quality alerts |
+| **Privacy and data control** | Ethics boards and GDPR: third-party cloud = vendor reviews, data agreements, weeks of delay; sensitive topics need safeguards | Self-hosted; **AI runs on the customer's servers**; consent capture; redaction; retention policies; EU hosting |
+| **Lock-in** | Riverside/Descript push their own editor; SquadCast folded into Descript | Export to any editor with aligned tracks; bring your own storage; open source |
+
+## Target segments (priority order)
+
+| # | Segment | Pain | Pays? | How to reach |
+|---|---|---|---|---|
+| 1 | **Research teams** (academic qualitative research, UX/market research) | Ethics/GDPR block cloud tools; need consent, transcripts, speakers | **Yes**: team plan or licence | Research methods communities, university IT, ethics office guidance pages, LinkedIn |
+| 2 | **Newsrooms and journalists** | Source protection, data control | Yes: organisation licence | Journalism tech communities, newsroom innovation leads |
+| 3 | **Privacy-bound companies** (health, legal, HR training, EU firms) | Data residency, procurement | Yes: Business plan | LinkedIn, security/compliance angle |
+| 4 | **Podcasters and YouTubers** | Riverside cost/limits, Zoom quality | Some (Creator/Studio) | Open-source launch, Reddit, SEO "Riverside/SquadCast alternative" |
+| 5 | **Self-hosters** | Want to own data | Rarely — bring stars and word of mouth | r/selfhosted, awesome-selfhosted |
+| 6 | **Platforms** (course, hiring, podcast hosts) | Want recording built in | Later (embeddable recorder) | After v2 |
 
 ## Positioning
 
-- **vs Riverside:** "Unlimited recording on your own server. Generous cloud hours. No per-seat pricing."
-- **vs Zoom:** "Each guest recorded locally in studio quality — even on bad Wi-Fi."
-- **vs VDO.Ninja:** "Built for podcasts, not live production. One link, done."
+- **Main:** "The remote recording studio you own."
+- **For organisations:** "The interview recording studio your ethics board will approve." / "Recordings and AI that never leave your servers."
+- **vs Riverside:** "Same studio quality. Your servers, your storage, any editor."
+- **vs SquadCast users:** "Switching? Keep separate-track recording without being moved into someone else's editor."
+- **vs Zoom:** "Each guest recorded locally in full quality, even on bad Wi-Fi."
+- **vs VDO.Ninja:** "Built for interviews and podcasts, not live production. One link, done."
+
+**Not:** "cheaper Riverside."
 
 ## Market signals to track
-- Riverside / StreamYard pricing complaints (Reddit r/podcasting, r/podcast, X).
-- Search volume: "Riverside alternative", "free Riverside alternative", "self-hosted podcast recording".
-- GitHub stars of adjacent repos (LiveKit, Cap, VDO.Ninja) as audience proxies.
+- Reddit/X complaints about Riverside reliability and pricing; SquadCast/Descript Rooms migration threads.
+- Searches: "Riverside alternative", "SquadCast alternative", "self-hosted podcast recording", "GDPR interview recording tool".
+- University ethics office guidance on recording tools (which tools they approve).
+- GitHub stars of LiveKit, Cap, VDO.Ninja as audience proxies.
+
+## Still to validate (before Gate D)
+- Do research groups actually buy a separate recording tool, or do they settle for Teams/Zoom plus a transcription tool? → 10 interviews in Phase 2.
+- How long is university procurement for a small licence (< €2k/year)? Can a research group pay by card?

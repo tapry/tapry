@@ -4,67 +4,79 @@
 
 | Layer | Choice | Why |
 |---|---|---|
-| Web app | Next.js (App Router) + TypeScript | One codebase for studio, dashboard, marketing |
-| UI | Tailwind + shadcn/ui | Fast, clean |
-| Real-time call | **LiveKit** (self-hosted SFU, Apache 2.0) + LiveKit JS SDK | Mature WebRTC, TURN included, self-hostable |
-| API | Next.js route handlers or a small Go/Node service | Studios, sessions, presigned uploads |
-| DB | Postgres | Sessions, tracks, chunks, users |
-| Queue | Redis + BullMQ (or pg-boss) | Post-processing jobs |
-| Storage | S3-compatible: **MinIO** (self-host), **Cloudflare R2** (cloud, no egress fees) | Multipart uploads |
-| Media worker | Node/Python + **ffmpeg** | Concatenate, normalize, render, package |
-| Transcription | faster-whisper (GPU) / whisper.cpp (CPU) / optional API | Self-host friendly |
-| Auth | Auth.js or Lucia-style sessions; magic link | Guests need no account |
-| Billing (cloud) | Paddle or Lemon Squeezy (merchant of record) | VAT handled; check payouts to Morocco |
-| Observability | OpenTelemetry + Sentry; no media in logs | — |
+| Web app | Next.js (App Router) + TypeScript | Studio, dashboard, marketing in one codebase |
+| UI | Tailwind + shadcn/ui | Fast, clean; matches Cap/Dub-style design |
+| Real-time call | **LiveKit** (self-hosted SFU, Apache 2.0) + JS SDK | Mature WebRTC, TURN, data channel for telemetry |
+| API | Next.js route handlers (split into a service later if needed) | Studios, sessions, presigned uploads, telemetry |
+| DB | Postgres | Sessions, tracks, chunks, consents, audit log |
+| Queue | Redis + BullMQ (or pg-boss) | Processing jobs |
+| Storage | S3-compatible: **MinIO** (self-host), **Cloudflare R2** (cloud), **customer bucket** (BYO storage) | Multipart uploads, no egress fees on R2 |
+| Media worker | Node/Python + **ffmpeg** | Concatenate, normalise, align, render, export |
+| Transcription | faster-whisper (GPU) / whisper.cpp (CPU) | Runs on our or customer's servers |
+| Private AI | Small open-weight model served locally (e.g., via Ollama/vLLM) for summaries, chapters, redaction assist; optional external API only if workspace allows | "AI that never leaves your servers" |
+| Redaction | Named-entity detection (spaCy/Presidio-style) + regex for emails/phones | Mask personal data in transcripts |
+| Auth | Auth.js sessions, magic link; SSO later in `/ee` | Guests need no account |
+| Billing (cloud) | Paddle or Lemon Squeezy (merchant of record) | VAT handled; **confirm payouts to Morocco** |
+| Observability | OpenTelemetry + Sentry; **no media or transcript text in logs** | — |
 
 ## Services
 
 ```
-apps/web        Next.js: studio UI, dashboard, admin, marketing
-apps/api        sessions, presigned multipart, webhooks (can live in web initially)
-apps/worker     media pipeline (ffmpeg), transcription
-packages/recorder   browser recording + OPFS + upload queue (the core library)
+apps/web            Next.js: studio UI, dashboard, admin, marketing, API routes
+apps/worker         media pipeline (ffmpeg), transcription, AI, exports
+packages/recorder   browser recording + OPFS + upload queue + local telemetry (MIT, standalone)
 packages/sync       clock offset + alignment utilities
+packages/exports    editor (FCPXML/XML), research (NVivo/ATLAS.ti/MAXQDA), subtitle formats
 packages/shared     types, zod schemas
-deploy/compose      docker-compose.yml (web, worker, postgres, redis, livekit, minio, caddy)
+deploy/compose      docker-compose.yml (web, worker, postgres, redis, livekit, minio, caddy, optional ai)
 deploy/helm         Kubernetes chart (later)
+ee/                 SSO, advanced roles, admin policies (commercial license)
 ```
 
-`packages/recorder` should be usable standalone → potential separate OSS library (more stars, more contributors).
-
-## Data model (first cut)
+## Data model
 
 ```
 users(id, email, name, created_at)
-workspaces(id, name, plan, owner_id)
-studios(id, workspace_id, name, slug, settings_json)          -- quality, max guests, branding
+workspaces(id, name, plan, owner_id, region, storage_mode, ai_mode, retention_days)
+storage_configs(id, workspace_id, endpoint, bucket, region, credentials_ref)   -- BYO storage
+studios(id, workspace_id, name, slug, settings_json, consent_text)
 sessions(id, studio_id, status, started_at, stopped_at, server_start_ts)
-participants(id, session_id, display_name, role, device_info_json, clock_offset_ms)
+participants(id, session_id, display_name, pseudonym, role, device_info_json, clock_offset_ms)
+consents(id, participant_id, text_hash, accepted_at, ip_hash, user_agent)
 tracks(id, participant_id, kind, mime, upload_id, status, duration_ms, size_bytes)
-chunks(id, track_id, seq, start_ts, bytes, etag, uploaded_at)
-outputs(id, session_id, type, storage_key, status)            -- per-track wav/mp4, combined, transcript
+chunks(id, track_id, seq, start_ts, bytes, checksum, uploaded_at)
+telemetry_events(id, participant_id, type, value, ts)        -- metadata only; short retention
+outputs(id, session_id, type, storage_key, status)           -- tracks, combined, transcript, exports
+redactions(id, output_id, entity_type, start_ms, end_ms, status)
 jobs(id, session_id, type, status, error, timings_json)
-usage(workspace_id, month, recorded_minutes, storage_gb)
+audit_log(id, workspace_id, actor_id, action, target, ts)
+usage(workspace_id, month, recorded_minutes, storage_gb, ai_minutes)
 ```
 
 ## Self-hosting
-- `docker compose up` with `.env` (domain, S3, LiveKit keys).
-- Caddy for automatic HTTPS (WebRTC + getUserMedia require HTTPS).
-- Defaults: MinIO for storage, CPU transcription (optional), single node.
-- Docs: requirements (CPU/RAM/disk per concurrent session), ports (LiveKit UDP range, TURN), backups.
+- `docker compose up` with `.env` (domain, S3, LiveKit keys, AI on/off).
+- Caddy for automatic HTTPS (required for WebRTC + getUserMedia).
+- Defaults: MinIO, CPU transcription, AI container optional (GPU recommended).
+- **Admin health page:** services status, job queue, storage, version + "update available" (Immich/Coolify style).
+- Docs: hardware per concurrent session, ports (LiveKit UDP, TURN), backups, upgrades.
+- One-click templates: Coolify, Dokploy, Railway, Unraid, TrueNAS.
 
 ## Cloud costs (estimates — measure in beta)
 
 | Item | Estimate |
 |---|---|
-| Storage | 1h, 4 people @1080p ≈ 6–12 GB raw → R2 ≈ $0.015/GB-month → ~$0.10–0.20 per recording-month; compress/expire raw after N days |
-| Egress | R2: no egress fees |
-| LiveKit | Low-res call only → modest bandwidth; self-hosted on a VPS, or LiveKit Cloud for convenience |
-| Processing | ffmpeg CPU minutes per recorded hour; GPU for Whisper (cents per hour self-run) |
-| Target | Total cost < 20% of revenue per paying user |
+| Storage | 1 h, 4 people @1080p ≈ 6–12 GB raw → R2 ≈ $0.015/GB-month; expire/compress raw after N days |
+| Egress | R2: none |
+| LiveKit | Low-res call only; self-hosted VPS |
+| Processing | ffmpeg CPU minutes; Whisper on GPU ≈ cents per recorded hour |
+| Private AI | Small model on shared GPU; batch jobs |
+| **BYO storage plan** | Storage cost = $0 for us → only processing + call |
+| Target | < $0.30/recorded hour without AI, < $0.60 with transcription; total cost < 20–30% of revenue |
 
 ## Security & privacy
-- Media encrypted in transit (HTTPS/SRTP) and at rest (bucket encryption).
-- Signed, expiring download URLs.
-- Cloud region choice (EU default for EU customers).
-- Delete raw chunks after outputs are verified (configurable retention).
+- Encryption in transit (HTTPS/SRTP) and at rest (bucket encryption).
+- Signed, expiring download URLs; downloads written to audit log.
+- Region choice (EU default for EU workspaces).
+- Retention jobs delete raw chunks/outputs per workspace policy; deletion logged.
+- AI mode per workspace: `local` (default) / `external-allowed` / `off`.
+- No media, transcript text or personal data in logs or analytics.

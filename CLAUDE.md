@@ -1,35 +1,37 @@
-# CLAUDE.md — OpenTake (open-source Riverside)
+# CLAUDE.md — Tapry (formerly OpenTake)
 
-Read `docs/plan/00-README.md` → `docs/plan/02-product-spec.md` → `docs/plan/03-recording-architecture.md` → `docs/plan/04-system-architecture.md`, then `docs/decisions/` before writing code.
+Read `docs/plan/00-README.md` → `02-product-spec.md` → `03-recording-architecture.md` → `04-system-architecture.md` (plan v3, 1 Nov 2026), then `docs/decisions/`, before writing code. `10-design-inspiration.md` before UI, `12-ai-features.md` before AI work, `13-growth-features.md` before growth features, `14-riverside-parity.md` before adding any "Riverside has it" feature (check it isn't in Skip).
+
+The product is being renamed **Tapry** (plan v3). Until the rename lands, code, packages and the UI still say OpenTake; browser storage names (IndexedDB, localStorage keys) must keep working across the rename, or unsent recordings would be orphaned.
 
 ## What we're building
-A self-hostable, open-source remote recording studio. Guests join via link in the browser; each participant is recorded locally at high quality, chunks are buffered locally (IndexedDB) and uploaded one object per chunk during the session; a worker syncs and packages per-track files, a combined video, and transcripts. Live call via LiveKit.
+"The remote recording studio you own." A self-hostable, open-source remote recording studio: guests join by link in the browser; each participant is recorded locally at full quality, chunks are buffered in the browser (IndexedDB) and uploaded one object per chunk during the session (our storage or, later, the customer's own bucket); the host sees live per-guest upload status and quality alerts; a worker syncs and packages per-track files, a combined video and transcripts (speaker = track). AI runs on our/the customer's servers by default. Live call via LiveKit.
+
+Priorities, in order: **1. never lose a recording · 2. simple guest flow · 3. privacy by default · 4. openness (exports, own storage)**. First paying customers: research teams, newsrooms, privacy-bound organisations; podcasters come through the free open-source version. v1 scope guard (plan v3): reliability + guest flow + transcripts + AI producer alerts + guest tech check + 2 free tools; everything else waits for paying users.
 
 ## Stack
-TypeScript monorepo (pnpm + turborepo). Next.js (App Router), Tailwind, shadcn/ui, LiveKit (server + JS SDK), Postgres, Redis + BullMQ, S3-compatible storage (SeaweedFS for tests, self-host default undecided (docs/decisions/0002), R2 cloud), ffmpeg worker, faster-whisper/whisper.cpp for transcripts, Docker Compose for self-hosting, Caddy for HTTPS.
+TypeScript monorepo (pnpm + turborepo). Next.js (App Router), Tailwind, LiveKit (server + JS SDK), Postgres (PGlite in dev), S3-compatible storage (SeaweedFS for self-host and tests, R2 cloud, customer bucket later), ffmpeg worker, whisper.cpp for transcripts, Docker Compose, Caddy.
+
+## Where the code deliberately differs from the plan
+- **Chunks are stored in IndexedDB**, not OPFS: it works in every engine we test and gives atomic writes. OPFS can come later behind the same `ChunkStore` interface.
+- **One storage object per chunk**, not S3 multipart parts: `docs/decisions/0001-one-object-per-chunk.md`.
+- **Jobs live in Postgres** (`FOR UPDATE SKIP LOCKED`), not Redis + BullMQ: one less service to self-host.
+- **Live status and quality alerts go through the server** (SSE + `/telemetry`), not the LiveKit data channel, so they work when the call doesn't.
 
 ## Layout
 ```
-apps/web            studio UI, dashboard, API routes
-apps/worker         media pipeline (ffmpeg): chunks → aligned WAV/MP4 + combined grid; transcripts (whisper.cpp)
+apps/web            studio UI, dashboard, API routes, job runner (src/worker-main.ts for separate workers)
+apps/worker         media pipeline (ffmpeg): chunks → aligned WAV/MP4 + combined grid; loudness; transcripts (whisper.cpp)
 apps/site           the project website (landing page), static export; separate from the self-hosted app
 packages/recorder   capture → MediaRecorder → local chunk store → upload queue (MIT, standalone)
-packages/sync       clock offset estimation + alignment helpers
 packages/shared     zod schemas, types
-deploy/compose      docker-compose.yml + .env.example
-docs/               self-hosting, architecture, browser support
+deploy/compose      docker-compose.yml + setup.sh
+docs/               plan (v2), decisions, self-hosting, browser support, costs
 ```
+Not yet: `packages/sync`, `packages/exports`, `ee/`.
 
-## Build order (MVP)
-1. `packages/recorder`: capture, codec detection, timeslice chunks, durable local write, per-chunk upload with retry, crash recovery. Unit + browser tests.
-2. Chunk upload API (presign PUT / commit / complete) against MinIO — see `docs/decisions/0001-one-object-per-chunk.md`.
-3. Studio + session model; host Record/Stop broadcast (LiveKit data channel or server events) with server timestamp.
-4. Green room (device pickers, level meter, storage estimate, headphones prompt).
-5. LiveKit call (low-res, audio) alongside local recording.
-6. Worker: concat → CFR normalize → loudness normalize → align (timestamps + audio cross-correlation) → outputs (WAV/MP4 per track, grid video, zip).
-7. Dashboard: sessions, upload/processing status, downloads, delete.
-8. Docker Compose self-host + docs.
-9. Test matrix automation where possible (Playwright with fake media devices; network throttling).
+## Status against plan v3 (1 Nov 2026)
+Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (not echo or too-quiet yet), live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync. Open for v1: Gate A (60-min two-person run, real Safari), talk balance, echo and too-quiet alerts, audio-only mode, guest tech-check link, guest end screen + recap email, free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, the Tapry rename, release 0.2.0.
 
 ## UI
 - Users see **shows** and **episodes**; the API, database and code say studios and recordings. Pages live under `/shows`.
@@ -64,7 +66,9 @@ docs/               self-hosting, architecture, browser support
 ## Rules
 - **Never delete a local chunk until the server has confirmed it.** Data loss is the worst bug. The one exception: 410 Gone from the API (`TrackGoneError`) means the host deleted that recording, and the queue drops the whole track locally.
 - Every chunk has seq number + server-time start; uploads are idempotent (re-uploading a part is safe).
-- Media never appears in logs or analytics; only metadata.
+- **Media, transcript text and personal data never appear in logs, telemetry or analytics**: metadata only.
+- AI defaults to local; external AI only when the workspace allows it (when AI arrives).
+- Don't build a full video editor or generative AI features (non-goals in `docs/plan/02-product-spec.md`).
 - All features must work on self-hosted installs (cloud-only code goes behind flags or in `/ee`).
 - Keep `packages/recorder` framework-agnostic and dependency-light.
 - Add a regression test for every recording/sync bug found.
