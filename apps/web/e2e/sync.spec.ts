@@ -6,7 +6,8 @@
 //   - between the two WAVs, the same beep should sit at the same position (sync error);
 //   - in each WAV, it should sit at (beep time − Record time) (error against Record).
 // The guest's device clock is set 3.7 s wrong, so the clock-offset correction is tested too.
-// Length: E2E_SYNC_SECONDS (default 20); the plan's Gate A asks for 60 minutes.
+// Length: E2E_SYNC_SECONDS (default 20); the plan's Gate A is E2E_SYNC_SECONDS=3600. Every beep
+// must be found in both files and every file must run the full length: that is the zero-loss check.
 import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import type { Page } from "@playwright/test";
@@ -96,7 +97,7 @@ const stats = (xs: number[]) => {
 };
 
 test("tracks line up: the same moment lands at the same place in everyone's files", async ({ page: host, browser }) => {
-  test.setTimeout(240_000 + SECONDS * 3_000);
+  test.setTimeout(300_000 + SECONDS * 3_000);
   await beepingMic(host);
   await signInHost(host);
   const { studioUrl, inviteUrl } = await createStudio(host, `Sync ${randomBytes(2).toString("hex")}`);
@@ -129,8 +130,10 @@ test("tracks line up: the same moment lands at the same place in everyone's file
   }, sessionId);
 
   await host.goto(studioUrl);
-  await expect(host.getByTestId("recording-status").first()).toHaveText(/Ready/, { timeout: 120_000 });
-  const wavs = (await downloadOutputs(host)).filter((f) => f.name.endsWith(".wav"));
+  // Processing takes time in proportion to the length (an hour of video: many minutes).
+  await expect(host.getByTestId("recording-status").first()).toHaveText(/Ready/, { timeout: Math.max(120_000, SECONDS * 1_000) });
+  const files = await downloadOutputs(host);
+  const wavs = files.filter((f) => f.name.endsWith(".wav"));
   expect(wavs.map((f) => f.name)).toEqual(["Dev Host - audio.wav", "Sync Guest - audio.wav"]);
 
   // Every whole second inside the recording, except the first and last (edges are cut).
@@ -147,7 +150,11 @@ test("tracks line up: the same moment lands at the same place in everyone's file
   console.log("SYNC", JSON.stringify(report));
   test.info().annotations.push({ type: "sync", description: JSON.stringify(report) });
 
-  expect(pairs.length).toBeGreaterThanOrEqual(expected.length - 1);
+  // Zero loss: every beep is in both files (a lost or skipped chunk would leave a gap without
+  // its beeps), and every file runs the whole recording.
+  const lengthS = (recording.stoppedAt - recording.startedAt) / 1000;
+  for (const f of files) expect(Math.abs(f.duration - lengthS), f.name).toBeLessThan(0.1);
+  expect(pairs.length).toBe(expected.length);
   // The plan's Gate A: under 50 ms between people.
   expect(between.max).toBeLessThan(50);
   await guestContext.close();

@@ -59,8 +59,11 @@ wrong. After processing, each beep is found in each person's WAV (`E2E_SYNC_SECO
 |---|---|---|---|---|
 | 20 s | 0.8 ms | 13–14 ms | 0 ms | 19 / 19 |
 | 5 min | 5.4 ms | 14–20 ms | 0 ms | 299 / 299 |
+| 60 min (Gate A) | 4.3 ms | 26–44 ms | 0 ms | 3,601 / 3,601 |
 
-Plan target (Gate A): under 50 ms between people. With the clock-offset correction switched off,
+Plan target (Gate A): under 50 ms between people, with no lost audio. The 60-minute run (1 Nov 2026)
+also checks that every output file runs the whole recording (within 0.1 s) and that every beep is
+in both files. Safari is still to be done by hand with a real session. With the clock-offset correction switched off,
 the same test fails (beeps ~300 ms apart).
 
 **Not covered:** each device's own input delay. A Bluetooth headset can add 100–200 ms before
