@@ -18,6 +18,7 @@ import {
 } from "@opentake/recorder";
 import type { SessionTicket } from "@opentake/shared";
 import { loadTicket } from "./api";
+import { localNow } from "./clock";
 
 // ── Transport ────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function getPipeline(): Promise<Pipeline> {
 export interface RecordingOptions {
   ticket: SessionTicket;
   stream: MediaStream;
-  /** Add to Date.now() to get server time (from the green room's clock estimate). */
+  /** Add to localNow() to get server time (from the green room's clock estimate). */
   clockOffsetMs: number;
   onError: (err: unknown) => void;
   /**
@@ -182,7 +183,9 @@ export class RecordingController {
   private async start(recordingId: string) {
     const { ticket, stream, clockOffsetMs } = this.opts;
     const { store, queue, transport } = await getPipeline();
-    const now = () => Date.now() + clockOffsetMs;
+    // The same clock the offset was measured on (Date.now() can jump if the system clock is
+    // adjusted), in whole milliseconds like every timestamp the server takes.
+    const now = () => Math.round(localNow() + clockOffsetMs);
 
     const audio = stream.getAudioTracks()[0];
     const video = stream.getVideoTracks()[0];

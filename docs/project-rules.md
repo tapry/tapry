@@ -36,6 +36,10 @@ docs/               self-hosting, architecture, browser support
 - Design tokens are in `apps/web/src/app/globals.css` (light + dark); components use the Tailwind names, never raw colors. Primitives in `src/components/ui.tsx`.
 - Download links show friendly titles; the real file name is in `data-file-name` (tests read that).
 
+## Sync
+- Every timestamp a device sends is `localNow()` (`src/lib/client/clock.ts`: performance.timeOrigin + performance.now(), rounded) plus the green room's offset estimate. Never Date.now() for anything compared with the server: it jumps when the system clock is adjusted.
+- Measured by `e2e/sync.spec.ts` (beeps on the real clock, skewed guest clock): ~1–5 ms between people, no drift over 5 min. Device input latency (Bluetooth) isn't covered.
+
 ## Quality alerts
 - Computed on each device (`src/lib/client/quality.ts`: mic peaks from the recorder's stream, upload lag, `storage.estimate`, visibility, recorder errors) and POSTed as codes to `/sessions/:id/telemetry` on change and every 3 s. Kept in memory in `LiveHub.health` and pushed in `SessionState.health`; stale after `STALE_REPORT_MS` (15 s). Metadata only: never audio, video or transcript text.
 - Thresholds (tune with alpha users): clipping = more than 3 peaks ≥ −1 dBFS in 10 s; silent = below −55 dBFS for 30 s unmuted; upload behind = oldest unsent chunk over 60 s; low disk = under 1 GB of browser storage.

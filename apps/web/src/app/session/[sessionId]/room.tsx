@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { useCall, type CallStatus } from "@/lib/client/call";
+import { localNow } from "@/lib/client/clock";
 import { alertAdvice, alertLabel, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid } from "./call-grid";
@@ -294,7 +295,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
               {micMuted && recording && (
                 <p className="text-sm text-warn-strong">You&apos;re muted: your microphone is silent in the recording too.</p>
               )}
-              <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} />
+              <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} offsetMs={ready.clock?.offsetMs ?? 0} />
               <div className="flex flex-wrap justify-center gap-x-4">
                 <ConnectionLabel status={connection} />
                 <CallLabel status={call.status} />
@@ -424,9 +425,9 @@ function ToolButton({
 
 /** The host's view of one person's quality alerts; "Not reporting" when their device went quiet. */
 function HealthChips({ health, offsetMs }: { health: SessionState["health"][number] | undefined; offsetMs: number }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(localNow);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 5000);
+    const id = setInterval(() => setNow(localNow()), 5000);
     return () => clearInterval(id);
   }, []);
   if (!health) return null;
@@ -596,14 +597,17 @@ function LocalUploadStatus({
   recording,
   finishing,
   upload,
+  offsetMs,
 }: {
+  /** Server time minus this device's clock: upload timestamps are in server time. */
+  offsetMs: number;
   recording: boolean;
   /** Stopped on the server, but this device's recorders are still handing over their last chunk. */
   finishing: boolean;
   upload: UploadProgress | null;
 }) {
   if (!upload || (!recording && !finishing && upload.uploadedChunks === 0 && upload.idle)) return null;
-  const behindS = upload.oldestPendingTs !== null ? Math.round((Date.now() - upload.oldestPendingTs) / 1000) : 0;
+  const behindS = upload.oldestPendingTs !== null ? Math.round((localNow() + offsetMs - upload.oldestPendingTs) / 1000) : 0;
   let tone: "ok" | "warn" | "idle" = "ok";
   let text: string;
   // Recording comes first: the queue is idle between chunks, which doesn't mean we're done.
@@ -686,10 +690,10 @@ function ConnectionLabel({ status }: { status: ConnectionStatus }) {
 
 /** "REC 12:04" while recording, "Not recording" otherwise. */
 function RecPill({ startedAt, offsetMs }: { startedAt: number | null; offsetMs: number }) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(localNow);
   useEffect(() => {
     if (startedAt === null) return;
-    const id = setInterval(() => setNow(Date.now()), 500);
+    const id = setInterval(() => setNow(localNow()), 500);
     return () => clearInterval(id);
   }, [startedAt]);
   if (startedAt === null) {
