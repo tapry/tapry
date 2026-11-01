@@ -1,48 +1,61 @@
 # 06 — Monetization
 
-## Revenue streams (priority order)
+**Principle:** don't race Iris ($9) and Ringr ($7.99) to the bottom. Be **free where it hurts competitors** (self-hosting), **unbeatable value** where hobbyists pay (BYO storage), and earn real money from **organisations paying a flat yearly price**.
 
-| # | Stream | What | Price (test) |
+## Plans
+
+| Plan | Price | Includes | Compared with |
 |---|---|---|---|
-| 1 | **Cloud (hosted)** | We run everything | See tiers below |
-| 2 | **AI add-ons** | Transcripts beyond quota, edit-by-transcript, show notes, chapters, clips | Included quotas + usage packs |
-| 3 | **Business license (self-host)** | SSO, audit logs, branding removal, priority support, compliance docs | **$1–5k/year** per org |
-| 4 | **API / white-label** | Recording embedded in other platforms | Per recorded minute or monthly contract |
-| 5 | Sponsors | GitHub Sponsors / Open Collective | Small |
+| **Self-hosted** | **Free forever** | All core features, unlimited recording, transcripts (CPU) | Nothing comparable |
+| **Free cloud** | $0 | 5 h/month, 1080p, transcripts, 30-day retention, "Powered by" badge | Riverside: 2 h total, once |
+| **Bring your own storage** | **$6/month** | **Unlimited recording** into your own S3/R2 bucket, transcripts, no badge | Nothing comparable |
+| **Creator** | **$9/month** | 20 h/month, 4K, transcripts, 90-day retention, no badge | Iris $9; Riverside $29 for 5 h |
+| **Studio** | **$19/month** | 60 h/month, 3 seats, branding, private AI summaries/chapters, editor exports | Riverside Pro/Grow $29–39 |
+| **Business** (hosted) | from **$99/month** | Unlimited studios, SSO, EU hosting, retention policies, audit log, redaction, data agreement, priority support | Riverside Business: custom |
+| **Organisation licence** (self-host) | **$1–5k/year** flat per organisation | `/ee` features, compliance docs, support, update assistance | Riverside: no self-host |
+| **Research team** | ~$29–49/month or ~$300–500/year flat | Business privacy features for one research group (consent, redaction, research exports) | Card-payable, avoids long procurement |
 
-## Cloud tiers (vs Riverside: Pro $29 for 5h, Grow $39 for 15h)
+**Rules**
+- Unlimited guests on all plans; no per-seat pricing below Studio.
+- Recording quality never locked behind payment — show it off on free.
+- Transcripts included everywhere (they're cheap to run ourselves).
+- Annual billing: 2 months free.
+- Education/nonprofit: 50% off.
+- Never go below $9 on hosted-storage plans.
 
-| Plan | Price | Includes |
-|---|---|---|
-| **Free** | $0 | 5 h/month recording, 1080p, 3 participants, 30-day retention, small "Powered by" badge |
-| **Creator** | **$12/month** | 25 h/month, 4K, 6 participants, transcripts, 90-day retention, no badge |
-| **Studio** | **$29/month** | 80 h/month, 8 participants, edit-by-transcript, AI show notes/clips, custom branding, 3 seats |
-| **Business** | from **$99/month** | Unlimited studios, SSO, bring-your-own S3 storage, EU data residency, SLA |
+**Headline:** "Free if you host it. $6 if you bring your storage. 4× Riverside's hours if we host it."
 
-Positioning: **"Riverside Pro gives 5 hours for $29. We give 80."**
+## Founding lifetime deal (cash before revenue)
+- **$99–149 one-time**, limited to **~200 seats**, equivalent to Creator with capped hours (e.g., 15 h/month) or BYO storage unlimited.
+- Potential: **$20–30k** if sold out. Launch with the open-source launch (late Jan 2027).
+- Cap usage to protect margins; no lifetime Business.
+
+## Other revenue (later)
+| Stream | When |
+|---|---|
+| Embeddable recorder (per recorded minute or monthly) | v2 |
+| Paid setup/support for self-hosting organisations | From first organisation pilot |
+| Sponsors (GitHub Sponsors / Open Collective) | Small, from launch |
 
 ## Unit economics (targets — measure in beta)
 
 | Item | Target |
 |---|---|
 | Cost per recorded hour (storage 90 days + processing + call) | < $0.30 without AI, < $0.60 with transcription |
-| Creator plan at full usage (25 h) | cost ~$8–15 → tune limits/retention so average usage keeps margin > 60% |
+| BYO storage plan cost | Processing + call only → margin > 80% |
+| Creator at full use (20 h) | ~$6–12 cost → plan limits/retention tuned so **average** use (expect 30–40%) keeps margin > 60% |
 | Gross margin overall | > 70% |
 | Payment/MoR fees | ~5–10% |
 
-Levers: shorter raw-file retention, compressed archival copies, GPU batching for Whisper, storage on R2 (no egress).
+## Projections (from cloud launch, Feb 2027) — monthly recurring revenue
 
-## Projections (from cloud launch)
-
-| Scenario | Paying users at month 12 | Avg revenue | MRR | + Business licenses |
+| Scenario | Chance | Month 12 | Month 24 | Mix |
 |---|---|---|---|---|
-| Bad | 20 | $15 | $300 | 0 |
-| Base | 250 | $18 | **$4.5k** | 2 × $2k/yr |
-| Good | 800 | $20 | **$16k** | 5–10 licenses |
+| Flop | ~40% | $0–500 | $0–1k | Stars, few payers → portfolio |
+| Base | ~40% | **$1.5–5k** | **$5–12k** | 100–300 cloud users + 1–3 organisation licences/research teams |
+| Good | ~15% | $10–20k | $20–40k | Universities/companies self-hosting with licences |
+| Breakout | ~5% | $30k+ | $50–100k+ | The default open-source Riverside; funding possible |
 
-Typical OSS reality: most self-hosters never pay; revenue comes from people who'd rather not run servers, and from businesses.
+Plus lifetime deal cash (one-time) at launch.
 
-## Pricing experiments
-- Annual discount (2 months free).
-- Founding-member lifetime deal (limited, e.g., 200 seats) for early cash — cap usage to protect margins.
-- Education/nonprofit discounts (universities = strong self-host/business segment).
+**Reality:** most self-hosters never pay; money comes from people who don't want to run servers and from organisations.
