@@ -25,25 +25,29 @@ the green room warns about it.
 
 ## Live call
 
-`e2e/call.spec.ts`: the host in each engine, a guest in Chromium, both with camera and mic.
+`e2e/call.spec.ts`: the host in each engine with a guest in Chromium, plus Firefox and WebKit
+calling each other (each hosting once), everyone with camera and mic.
 Each run checks both directions: the host's camera plays for the guest at no more than 360p
 and the guest's for the host, the sound measured from what actually arrives; mute reaches the
 other side and silences the recorded mic; and the call leaves the recorded camera track
 untouched.
 
-| Host engine | Version | Result |
+| Host | Guest | Result |
 |---|---|---|
-| Chromium | Chrome for Testing 156 | ✅ |
-| Firefox | 157 | ✅ (the call's video is scaled down in the encoder: Firefox ignores size constraints on a cloned camera track) |
-| WebKit | 27.2 (Playwright build) | ✅ |
+| Chromium 156 | Chromium | ✅ |
+| Firefox 157 | Chromium | ✅ (the call's video is scaled down in the encoder: Firefox ignores size constraints on a cloned camera track) |
+| WebKit 27.2 (Playwright build) | Chromium | ✅ |
+| Firefox 157 | WebKit | ✅ |
+| WebKit 27.2 | Firefox | ✅ |
 
-The test server's LiveKit listens on 127.0.0.1, so the test Firefox is allowed loopback ICE
-candidates (`playwright.config.ts`); real servers don't need that. Also covered: a call that
-can't connect retries one attempt at a time, and the host and guest flow in
+The test LiveKit sends media on the machine's network address, as a real server would
+(Firefox doesn't use loopback candidates), with Firefox at its default settings. Also covered:
+a call that can't connect retries one attempt at a time, and the host and guest flow in
 `e2e/studio.spec.ts` (Chromium).
 
-**Not tested:** a call between two non-Chromium browsers (e.g. Firefox to Safari), real Safari,
-and phones.
+**Not tested:** real Safari (WebKit is the same engine, but Playwright's build isn't Safari),
+phones, and calls over the internet rather than one machine (TURN has its own test,
+`e2e/turn.spec.ts`, against a Linux host).
 
 ## Reliability (Chromium)
 

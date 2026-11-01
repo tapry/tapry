@@ -3,6 +3,13 @@
 All notable changes. Versions follow [semantic versioning](https://semver.org); while the
 version is 0.x, a minor release can change behaviour or configuration (the notes say how).
 
+## Unreleased
+
+### Tests
+- Firefox and WebKit call each other (each hosting once), on top of each engine with a
+  Chromium guest. The test LiveKit now sends media on the machine's network address like a
+  real server, so Firefox runs with its default settings.
+
 ## 0.1.1
 
 ### Fixed
