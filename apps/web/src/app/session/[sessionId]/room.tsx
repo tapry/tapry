@@ -1,11 +1,12 @@
 "use client";
 
 import type { UploadProgress } from "@opentake/recorder";
-import type { SessionState, SessionTicket } from "@opentake/shared";
+import { STALE_REPORT_MS, type SessionState, type SessionTicket } from "@opentake/shared";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { useCall, type CallStatus } from "@/lib/client/call";
+import { alertAdvice, alertLabel, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid } from "./call-grid";
 import { followSession, type ConnectionStatus } from "@/lib/client/session-events";
@@ -106,6 +107,18 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     }
   }
 
+  const quality = useQualityAlerts({
+    ticket,
+    stream: ready.stream,
+    upload,
+    micMuted,
+    headphones: ready.choice.headphones,
+    recorderError,
+    clockOffsetMs: ready.clock?.offsetMs ?? 0,
+    active: !ended,
+  });
+  const advice = quality.alerts.map((a) => alertAdvice(a, quality.uploadBehindS)).filter((x): x is string => !!x);
+
   const [panelOpen, setPanelOpen] = useState(true);
   const [flash, setFlash] = useState<string | null>(null);
   const lastRecording = state?.recording ?? null;
@@ -204,6 +217,15 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                 recording={!!recording}
               />
             </div>
+            {advice.length > 0 && (
+              <div className="mx-[clamp(14px,2.4vw,28px)] mb-3 flex flex-col gap-1.5" data-testid="own-alerts">
+                {advice.map((text) => (
+                  <Notice key={text} tone="warn">
+                    {text}
+                  </Notice>
+                ))}
+              </div>
+            )}
             <div className="mx-[clamp(14px,2.4vw,28px)] border-t border-border" />
             <div className="flex flex-wrap items-start justify-center gap-3 px-[clamp(10px,2vw,24px)] pt-3.5 pb-[18px]">
               {isHost && (
@@ -302,6 +324,12 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                           {p.id === ticket.participantId && <span className="font-normal text-muted"> (you)</span>}
                           {p.role === "host" && <span className="text-xs font-normal text-muted"> · host</span>}
                         </span>
+                        {isHost && (
+                          <HealthChips
+                            health={state.health.find((h) => h.participantId === p.id)}
+                            offsetMs={ready.clock?.offsetMs ?? 0}
+                          />
+                        )}
                         {isHost && state.recording ? (
                           <ParticipantUpload
                             upload={state.uploads.find((u) => u.participantId === p.id)}
@@ -391,6 +419,37 @@ function ToolButton({
       )}
       {label}
     </button>
+  );
+}
+
+/** The host's view of one person's quality alerts; "Not reporting" when their device went quiet. */
+function HealthChips({ health, offsetMs }: { health: SessionState["health"][number] | undefined; offsetMs: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
+  if (!health) return null;
+  const stale = now + offsetMs - health.reportedAt > STALE_REPORT_MS;
+  const chips = stale
+    ? [{ key: "stale", label: "Not reporting (offline, asleep or left?)", info: false }]
+    : health.alerts.map((a) => ({ key: a, label: alertLabel(a, health.uploadBehindS), info: a === "no_headphones" }));
+  if (chips.length === 0) return null;
+  return (
+    <span className="flex flex-wrap gap-1 py-0.5" data-testid="health">
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          data-alert={c.key}
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[11px] font-medium",
+            c.info ? "bg-surface-2 text-muted" : "bg-warn-soft text-warn-strong",
+          )}
+        >
+          {c.info ? c.label : `⚠ ${c.label}`}
+        </span>
+      ))}
+    </span>
   );
 }
 

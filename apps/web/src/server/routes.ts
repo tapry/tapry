@@ -33,6 +33,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE"
   ["POST", "/api/sessions/[sessionId]/recordings/[recordingId]/stop", "stopRecording"],
   ["POST", "/api/sessions/[sessionId]/end", "endSession"],
   ["POST", "/api/sessions/[sessionId]/call-token", "callToken"],
+  ["POST", "/api/sessions/[sessionId]/telemetry", "telemetry"],
 
   ["POST", "/api/sessions/[sessionId]/tracks", "createTrack"],
   ["POST", "/api/sessions/[sessionId]/tracks/[trackId]/chunks/[seq]/upload-url", "uploadUrl"],

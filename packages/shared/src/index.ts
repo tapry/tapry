@@ -72,6 +72,35 @@ export const joinBody = z.object({
   consent: z.literal(true, { error: "Consent to recording is required" }),
 });
 
+// ── Quality alerts (each device reports metadata about itself; never media) ──
+
+export const qualityAlert = z.enum([
+  /** The mic's level hits the top repeatedly: the recording is distorting. */
+  "clipping",
+  /** Unmuted, yet the mic has picked up nothing for a while. */
+  "mic_silent",
+  /** The oldest chunk not yet uploaded is more than a minute old. */
+  "upload_behind",
+  /** Too little browser storage left to keep buffering the recording. */
+  "low_disk",
+  /** The tab is in the background; some browsers (phones especially) stop recording then. */
+  "tab_hidden",
+  /** A recorder failed on this device. */
+  "recorder_error",
+  /** Not on headphones: the main cause of echo. Information, not a fault. */
+  "no_headphones",
+]);
+export type QualityAlert = z.infer<typeof qualityAlert>;
+
+/** A device that hasn't reported for this long shows as "not reporting" to the host. */
+export const STALE_REPORT_MS = 15_000;
+
+export const telemetryBody = z.object({
+  alerts: z.array(qualityAlert).max(10),
+  /** How far the upload is behind, in seconds; null when caught up. */
+  uploadBehindS: z.number().int().min(0).max(7 * 86_400).nullable(),
+});
+
 // ── Live session state (pushed over SSE, also returned by GET .../state) ─────
 
 export interface SessionState {
@@ -86,6 +115,14 @@ export interface SessionState {
     /** Tracks whose client has confirmed every chunk is uploaded. */
     completeTracks: number;
     bytes: number;
+  }>;
+  /** Each participant's latest quality report (alerts), for the host's view. */
+  health: Array<{
+    participantId: string;
+    alerts: QualityAlert[];
+    uploadBehindS: number | null;
+    /** Server time of the report. A device that stops reporting (offline, asleep) goes stale. */
+    reportedAt: number;
   }>;
   /** Server clock when this snapshot was made. */
   serverTime: number;

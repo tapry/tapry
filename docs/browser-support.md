@@ -56,6 +56,7 @@ phones, and calls over the internet rather than one machine (TURN has its own te
 | Upload capped at 1 Mbit/s, 200 ms latency, 30% of upload requests failing | `reliability.spec.ts` | ✅ every chunk arrives, files complete |
 | Guest offline mid-recording, tab closed, comes back later | `studio.spec.ts` | ✅ leftovers upload on return, track completed |
 | Tab killed while offline mid-recording, rejoins while still recording | `reliability.spec.ts` | ✅ offline chunks recovered; both pieces merged into one file per kind |
+| A guest's tab goes to the background, then closes | `alerts.spec.ts` | ✅ the host sees "Tab in background" at once, then "Not reporting" within 15 s |
 | Recorders slow to stop after Stop (2.5 s) | `reliability.spec.ts` | ✅ "uploaded" only once every track is complete on the server; until then the page says it's finishing and warns before closing |
 | 10-minute recording (`E2E_LONG_MINUTES=10`) | `long.spec.ts` (opt-in) | ✅ page heap 59.8 MB at 1 min → 50.5 MB at 10 min (no growth); uploads never behind (~7 MB/min sent); every output ≥ 598 s, all equal length; processed in ~1 min |
 

@@ -1,4 +1,5 @@
-import type { SessionState } from "@opentake/shared";
+import { STALE_REPORT_MS, type QualityAlert, type SessionState, type telemetryBody } from "@opentake/shared";
+import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
 import { hashToken, newId } from "./ids";
@@ -18,6 +19,8 @@ type Listener = (state: SessionState) => void;
 export class LiveHub {
   readonly listeners = new Map<string, Set<Listener>>();
   readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Latest quality report per session and participant. In memory: it only matters live. */
+  readonly health = new Map<string, Map<string, SessionState["health"][number]>>();
 }
 
 /**
@@ -104,6 +107,7 @@ export class LiveService {
         ? { id: recording.id, status: recording.status, startedAt: recording.started_at, stoppedAt: recording.stopped_at }
         : null,
       participants: participants.map((p) => ({ id: p.id, displayName: p.display_name, role: p.role })),
+      health: [...(this.hub.health.get(sessionId)?.values() ?? [])].filter((h) => participants.some((p) => p.id === h.participantId)),
       serverTime: this.now(),
     };
   }
@@ -159,6 +163,26 @@ export class LiveService {
     await this.publish(host.sessionId);
     for (const r of stopped) await this.onStopped(r.id);
     return this.state(host.sessionId);
+  }
+
+  /**
+   * A device's quality report (metadata only). Kept in memory, and pushed to the session when
+   * it changes in a way the host would see; a report that only refreshes it isn't pushed.
+   */
+  reportHealth(p: Participant, body: z.infer<typeof telemetryBody>) {
+    const reports = this.hub.health.get(p.sessionId) ?? new Map();
+    this.hub.health.set(p.sessionId, reports);
+    const before = reports.get(p.id);
+    const alerts = [...new Set(body.alerts)].sort() as QualityAlert[];
+    // Lag in whole minutes is what the host sees, so finer changes don't need a push.
+    const minutes = (s: number | null) => (s === null ? -1 : Math.floor(s / 60));
+    reports.set(p.id, { participantId: p.id, alerts, uploadBehindS: body.uploadBehindS, reportedAt: this.now() });
+    const changed =
+      !before ||
+      before.alerts.join() !== alerts.join() ||
+      minutes(before.uploadBehindS) !== minutes(body.uploadBehindS) ||
+      this.now() - before.reportedAt > STALE_REPORT_MS; // was stale: the host should see it's back
+    if (changed) this.publishSoon(p.sessionId, 250);
   }
 
   /** Subscribe to state snapshots. The current state is delivered first. */
