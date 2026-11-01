@@ -179,7 +179,8 @@ export function gridLayout(n: number, width = 1920, height = 1080) {
 /**
  * Render every downloadable file for one recording:
  * per participant a WAV of their audio track and an MP4 of their camera track, plus one
- * combined grid video with everyone's audio mixed. All aligned to the moment Record was pressed.
+ * combined grid video with everyone's audio mixed (a mixed WAV when nobody had a camera on).
+ * All aligned to the moment Record was pressed.
  */
 export async function renderRecording(tracks: TrackInput[], opts: PipelineOptions): Promise<OutputFile[]> {
   await mkdir(opts.workDir, { recursive: true });
@@ -401,6 +402,7 @@ async function renderCombined(
 ): Promise<OutputFile | null> {
   const participants = [...new Set(tracks.map((t) => t.participantId))];
   if (participants.length === 0) return null;
+  if (!rendered.some((o) => o.kind === "video")) return renderMix(rendered, opts, timeoutMs);
   const tiles = gridLayout(participants.length);
   const duration = sec(opts.durationMs);
   const args: string[] = [];
@@ -478,6 +480,34 @@ async function renderCombined(
     { timeoutMs },
   );
   return { kind: "combined", path, fileName: "Combined.mp4", contentType: "video/mp4",
+    durationMs: await probeDurationMs(opts.ffprobe, path), ...(gainDb !== undefined && { gainDb }) };
+}
+
+/** Nobody had video (an audio-only show, or everyone's camera off): everyone's voices mixed into one WAV. */
+async function renderMix(rendered: OutputFile[], opts: PipelineOptions, timeoutMs: number): Promise<OutputFile | null> {
+  const voices = rendered.filter((o) => o.kind === "audio").map((o) => o.path);
+  if (voices.length === 0) return null;
+  const duration = sec(opts.durationMs);
+  const inputs = voices.flatMap((p) => ["-i", p]);
+  const mix =
+    voices.length > 1
+      ? `${voices.map((_, i) => `[${i}:a]`).join("")}amix=inputs=${voices.length}:normalize=0:dropout_transition=0`
+      : "[0:a]anull";
+  const path = join(opts.workDir, "combined.wav");
+  let gainDb: number | undefined;
+  if (opts.loudness) {
+    // Level the mix as a whole, like the combined video's sound: mixed in float first, measured, then the gain.
+    const floatPath = join(opts.workDir, "mix.wav");
+    await run(opts.ffmpeg, ["-y", "-hide_banner", "-nostdin", ...inputs, "-filter_complex", `${mix}[a]`, "-map", "[a]",
+      "-t", duration, "-c:a", "pcm_f32le", floatPath], { timeoutMs });
+    gainDb = loudnessGain(await measureLoudness(opts.ffmpeg, floatPath, timeoutMs), opts.loudness);
+    await run(opts.ffmpeg, ["-y", "-hide_banner", "-nostdin", "-i", floatPath, "-af", volumeFilter(gainDb) || "anull",
+      "-c:a", "pcm_s16le", path], { timeoutMs });
+  } else {
+    await run(opts.ffmpeg, ["-y", "-hide_banner", "-nostdin", ...inputs, "-filter_complex", `${mix}[a]`, "-map", "[a]",
+      "-t", duration, "-c:a", "pcm_s16le", path], { timeoutMs });
+  }
+  return { kind: "combined", path, fileName: "Combined.wav", contentType: "audio/wav",
     durationMs: await probeDurationMs(opts.ffprobe, path), ...(gainDb !== undefined && { gainDb }) };
 }
 

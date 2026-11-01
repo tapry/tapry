@@ -86,7 +86,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="flex flex-col gap-3.5">
-        <Preview stream={stream} cameraOff={!!choice.cameraOff} failed={status === "error"} />
+        <Preview stream={stream} cameraOff={!!choice.cameraOff} audioOnly={settings.audioOnly} failed={status === "error"} />
         <MicMeter db={level.rmsDb} state={level.state} live={status === "live"} suspended={level.suspended} />
         {problem && (
           <Notice tone="danger">
@@ -115,26 +115,28 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
               ))}
           </Select>
         </Field>
-        <Field label="Camera">
-          <Select
-            value={choice.cameraOff ? "off" : (choice.videoDeviceId ?? "")}
-            onChange={(e) =>
-              setChoice({
-                ...choice,
-                cameraOff: e.target.value === "off",
-                videoDeviceId: e.target.value && e.target.value !== "off" ? e.target.value : undefined,
-              })
-            }
-          >
-            <option value="">System default</option>
-            {devices.videoInputs.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Camera ${i + 1}`}
-              </option>
-            ))}
-            <option value="off">Camera off (audio only)</option>
-          </Select>
-        </Field>
+        {!settings.audioOnly && (
+          <Field label="Camera">
+            <Select
+              value={choice.cameraOff ? "off" : (choice.videoDeviceId ?? "")}
+              onChange={(e) =>
+                setChoice({
+                  ...choice,
+                  cameraOff: e.target.value === "off",
+                  videoDeviceId: e.target.value && e.target.value !== "off" ? e.target.value : undefined,
+                })
+              }
+            >
+              <option value="">System default</option>
+              {devices.videoInputs.map((d, i) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Camera ${i + 1}`}
+                </option>
+              ))}
+              <option value="off">Camera off (audio only)</option>
+            </Select>
+          </Field>
+        )}
 
         <CheckboxRow
           checked={choice.headphones}
@@ -173,7 +175,17 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   );
 }
 
-function Preview({ stream, cameraOff, failed }: { stream: MediaStream | null; cameraOff: boolean; failed: boolean }) {
+function Preview({
+  stream,
+  cameraOff,
+  audioOnly,
+  failed,
+}: {
+  stream: MediaStream | null;
+  cameraOff: boolean;
+  audioOnly: boolean;
+  failed: boolean;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (video.current) video.current.srcObject = stream;
@@ -190,13 +202,15 @@ function Preview({ stream, cameraOff, failed }: { stream: MediaStream | null; ca
       />
       {!hasVideo && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-text-2">
-          {cameraOff
-            ? "Camera off. You'll be recorded with audio only"
-            : stream
-              ? "No camera"
-              : failed
-                ? "Camera unavailable"
-                : "Starting camera…"}
+          {audioOnly
+            ? "This show is sound only: just your microphone is recorded"
+            : cameraOff
+              ? "Camera off. You'll be recorded with audio only"
+              : stream
+                ? "No camera"
+                : failed
+                  ? "Camera unavailable"
+                  : "Starting camera…"}
         </div>
       )}
       <span className="absolute bottom-3 left-3 rounded-[10px] bg-[rgba(30,26,26,.72)] px-3 py-1.5 text-sm text-white">You</span>

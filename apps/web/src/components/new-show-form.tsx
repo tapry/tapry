@@ -16,7 +16,7 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
   const router = useRouter();
   const [name, setName] = useState("");
   const [guests, setGuests] = useState(3);
-  const [quality, setQuality] = useState<"1080p" | "720p">("1080p");
+  const [quality, setQuality] = useState<"1080p" | "720p" | "audio">("1080p");
   const [echo, setEcho] = useState(true);
   const [level, setLevel] = useState(true);
   const [soundOpen, setSoundOpen] = useState(false);
@@ -33,7 +33,13 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
       const show = await apiFetch<{ id: string }>("/studios", {
         body: {
           name: name.trim(),
-          settings: { maxGuests: guests, videoQuality: quality, echoCancellation: echo, levelLoudness: level },
+          settings: {
+            maxGuests: guests,
+            videoQuality: quality === "audio" ? "1080p" : quality,
+            audioOnly: quality === "audio",
+            echoCancellation: echo,
+            levelLoudness: level,
+          },
         },
       });
       router.push(`/shows/${show.id}`);
@@ -136,15 +142,18 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
           <div className="flex flex-wrap items-center justify-between gap-4">
             <span className="flex flex-col gap-[3px]">
               <span className="text-[15px] font-medium" id="quality-label">
-                Video quality
+                Recording
               </span>
-              <span className="text-sm text-muted">{quality === "1080p" ? "Best quality, larger files" : "Smaller files, still sharp"}</span>
+              <span className="text-sm text-muted">
+                {quality === "1080p" ? "Best quality, larger files" : quality === "720p" ? "Smaller files, still sharp" : "Sound only, no cameras"}
+              </span>
             </span>
             <span className="flex gap-1 rounded-xl bg-[#f2f1ef] p-1 dark:bg-surface-2" role="radiogroup" aria-labelledby="quality-label">
               {(
                 [
                   ["1080p", "Full HD"],
                   ["720p", "Standard"],
+                  ["audio", "Audio only"],
                 ] as const
               ).map(([value, label]) => (
                 <button

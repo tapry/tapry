@@ -181,6 +181,27 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     );
   });
 
+  it("mixes everyone into one WAV instead of a video when nobody had a camera (audio only)", async () => {
+    const tracks: TrackInput[] = [
+      { trackId: "trk_a", participantId: "par_a", participantName: "Ana", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_b", participantId: "par_b", participantName: "Ben", kind: "audio", rawPath: audioWebm, offsetMs: 1000 },
+    ];
+    const outputs = await renderRecording(tracks, {
+      ffmpeg, ffprobe, workDir: join(dir, "audio-only"), durationMs: 3000, videoHeight: 720, loudness: PODCAST_LOUDNESS,
+    });
+    expect(outputs.map((o) => [o.kind, o.fileName, o.contentType])).toEqual([
+      ["audio", "Ana - audio.wav", "audio/wav"],
+      ["audio", "Ben - audio.wav", "audio/wav"],
+      ["combined", "Combined.wav", "audio/wav"],
+    ]);
+    const mix = samples(outputs[2]!.path);
+    expect(mix.length).toBe(144_000); // exactly the recording length
+    // Ana from the start, both together after Ben's 1 s offset: the mix gets louder there.
+    expect(peak(mix, 0.1, 0.9)).toBeGreaterThan(1000);
+    expect(peak(mix, 1.1, 2.9)).toBeGreaterThan(peak(mix, 0.1, 0.9));
+    expect(outputs[2]!.gainDb).toBeTypeOf("number");
+  });
+
   it("levels everyone to podcast loudness, the video's sound and the combined mix too", async () => {
     // A quiet guest (about -32 LUFS), a louder host, and a guest whose mic was muted throughout.
     const quiet = join(dir, "quiet.webm");
@@ -337,7 +358,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       trackId: `trk_${i}`, participantId: pid, participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 0,
     }));
     const outputs = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "dupes"), durationMs: 1000, videoHeight: 720 });
-    expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam (2) - audio.wav", "Combined.mp4"]);
+    expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam (2) - audio.wav", "Combined.wav"]);
   });
 
   it("reports ffmpeg's reason when the input is not media", async () => {
