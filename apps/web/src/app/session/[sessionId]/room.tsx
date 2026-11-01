@@ -3,7 +3,7 @@
 import type { UploadProgress } from "@opentake/recorder";
 import type { SessionState, SessionTicket } from "@opentake/shared";
 import { useEffect, useRef, useState } from "react";
-import { Button, Card, cn, Notice, StatusDot } from "@/components/ui";
+import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
@@ -106,143 +106,427 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     }
   }
 
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [flash, setFlash] = useState<string | null>(null);
+  const lastRecording = state?.recording ?? null;
+
+  function toggleMute() {
+    setMicMuted(!micMuted);
+    void call.setMicMuted(!micMuted);
+  }
+
+  // Keyboard shortcuts (⌘ on Mac, Ctrl elsewhere, plus Shift): R record/stop, M mute, L copy invite link.
+  const shortcut = useRef<(key: string) => boolean>(() => false);
+  shortcut.current = (key) => {
+    if (ended) return false;
+    if (key === "m") {
+      toggleMute();
+      setFlash(micMuted ? "Unmuted" : "Muted");
+      return true;
+    }
+    if (!isHost || !state) return false;
+    if (key === "r") {
+      if (busy || (!recording && connection !== "live")) return true;
+      void (recording ? hostAction(`/recordings/${recording.id}/stop`) : hostAction("/recordings"));
+      setFlash(recording ? "Recording stopped" : "Recording started");
+      return true;
+    }
+    if (key === "l") {
+      void copyInviteLink(state.session.studioId).then((ok) => setFlash(ok ? "Invite link copied" : "Couldn't copy the invite link"));
+      return true;
+    }
+    return false;
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey || e.repeat) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable]")) return;
+      if (shortcut.current(e.key.toLowerCase())) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 1800);
+    return () => clearTimeout(id);
+  }, [flash]);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{ticket.studio.name}</h1>
-          <div className="mt-1 flex flex-wrap gap-x-4">
-            <ConnectionLabel status={connection} />
-            <CallLabel status={call.status} />
-          </div>
-        </div>
-        {recording && <RecordingBadge startedAt={recording.startedAt} offsetMs={ready.clock?.offsetMs ?? 0} />}
+    <div className="flex min-h-dvh flex-col p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2.5 pt-1.5 pb-3.5">
+        <span className="flex min-w-0 flex-wrap items-center gap-3 text-base font-semibold">
+          <span className="truncate">{ticket.studio.name}</span>
+          <RecPill startedAt={recording?.startedAt ?? null} offsetMs={ready.clock?.offsetMs ?? 0} />
+        </span>
+        <span className="flex items-center gap-2.5">
+          {isHost && state && !ended && <InviteButton studioId={state.session.studioId} />}
+          <Avatar name={selfName} className="size-[34px] text-xs" />
+        </span>
       </div>
 
-      {connection === "unauthorized" && (
-        <Notice tone="danger">Your access to this session has ended. Open your invite link again to rejoin.</Notice>
-      )}
-      {ended && <Notice tone="info">The host has ended this session.</Notice>}
-      {!durable && (
-        <Notice tone="warn">
-          This browser blocks local storage (private window?), so your recording can't survive a crash. Keep this tab
-          open until the upload finishes.
-        </Notice>
-      )}
-      {recorderError && <Notice tone="danger">Recording problem: {recorderError}</Notice>}
+      <div className="flex flex-col gap-2 px-2.5 pb-3 empty:hidden">
+        {connection === "unauthorized" && (
+          <Notice tone="danger">Your access to this session has ended. Open your invite link again to rejoin.</Notice>
+        )}
+        {!durable && (
+          <Notice tone="warn">
+            This browser blocks local storage (private window?), so your recording can&apos;t survive a crash. Keep this tab
+            open until the upload finishes.
+          </Notice>
+        )}
+        {recorderError && <Notice tone="danger">Recording problem: {recorderError}</Notice>}
+        {error && <Notice tone="danger">{error}</Notice>}
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="space-y-3">
-          <CallGrid
-            stream={ready.stream}
-            selfName={selfName}
-            selfMicMuted={micMuted}
-            selfCameraOff={cameraOff}
-            selfSpeaking={call.localSpeaking}
-            peers={call.peers}
-            recording={!!recording}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={micMuted ? "record" : "secondary"}
-              aria-pressed={micMuted}
-              onClick={() => {
-                setMicMuted(!micMuted);
-                void call.setMicMuted(!micMuted);
-              }}
-            >
-              {micMuted ? "Unmute" : "Mute"}
-            </Button>
-            {hasCamera && (
-              <Button
-                variant="secondary"
-                aria-pressed={cameraOff}
-                onClick={() => {
-                  setCameraOff(!cameraOff);
-                  void call.setCameraOff(!cameraOff);
-                }}
-              >
-                {cameraOff ? "Turn camera on" : "Turn camera off"}
-              </Button>
-            )}
-            {call.audioBlocked && call.peers.length > 0 && (
-              <Button variant="primary" onClick={call.startAudio}>
-                Click to hear the others
-              </Button>
-            )}
-          </div>
-          {micMuted && recording && (
-            <p className="text-sm text-warn">You're muted: your microphone is silent in the recording too.</p>
-          )}
-          <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} />
-        </div>
-
-        <Card className="space-y-4">
-          <h2 className="text-sm font-medium">In the studio</h2>
-          <ul className="space-y-2 text-sm">
-            {state?.participants.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-2" data-testid="participant">
-                <span className="flex items-center gap-2">
-                  {/* Presence comes from the call; without one we can't tell who is still here. */}
-                  {present && (
-                    <span title={present.has(p.id) ? "In the call" : "Not connected"}>
-                      <StatusDot tone={present.has(p.id) ? "ok" : "idle"} />
+      {ended ? (
+        <EndedView
+          isHost={isHost}
+          selfName={selfName}
+          studioId={state?.session.studioId ?? null}
+          participants={state?.participants ?? []}
+          uploads={lastRecording ? state!.uploads : []}
+          upload={upload}
+          finishing={localActive}
+        />
+      ) : (
+        <div className={cn("grid min-h-0 flex-1 gap-2.5", panelOpen && "lg:grid-cols-[minmax(0,1fr)_300px]")}>
+          <div className="flex min-w-0 flex-col rounded-[18px] bg-surface shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+            <div className="flex flex-1 flex-col justify-center p-[clamp(14px,2.4vw,28px)]">
+              <CallGrid
+                stream={ready.stream}
+                selfName={selfName}
+                selfMicMuted={micMuted}
+                selfCameraOff={cameraOff}
+                selfSpeaking={call.localSpeaking}
+                peers={call.peers}
+                recording={!!recording}
+              />
+            </div>
+            <div className="mx-[clamp(14px,2.4vw,28px)] border-t border-border" />
+            <div className="flex flex-wrap items-start justify-center gap-3 px-[clamp(10px,2vw,24px)] pt-3.5 pb-[18px]">
+              {isHost && (
+                <ToolButton
+                  label={recording ? "Recording" : "Start"}
+                  aria-label={recording ? "Stop recording" : "Record"}
+                  disabled={busy || (!recording && connection !== "live")}
+                  title="Start or stop recording (⌘⇧R / Ctrl+Shift+R)"
+                  onClick={() => (recording ? hostAction(`/recordings/${recording.id}/stop`) : hostAction("/recordings"))}
+                  wide
+                  icon={
+                    <span className={cn("flex h-[42px] items-center gap-[9px] rounded-[10px] px-4 text-[15px] font-semibold text-white", recording ? "bg-[#2b2424]" : "bg-accent")}>
+                      <span className={cn("grid size-3.5 place-items-center border-2 border-white", recording ? "rounded-[3px]" : "rounded-full")}>
+                        <span className={cn("size-1.5 bg-white", recording ? "rounded-[1px]" : "rounded-full")} />
+                      </span>
+                      {recording ? "Stop" : "Record"}
                     </span>
-                  )}
-                  <span className={present && !present.has(p.id) ? "text-muted" : undefined}>{p.displayName}</span>
-                  {p.id === ticket.participantId && <span className="text-muted"> (you)</span>}
-                  {p.role === "host" && <span className="text-xs text-muted"> · host</span>}
-                </span>
-                {isHost && state.recording && (
-                  <ParticipantUpload
-                    upload={state.uploads.find((u) => u.participantId === p.id)}
-                    stopped={state.recording.status === "stopped"}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {isHost && !ended && (
-            <div className="space-y-2 border-t border-border pt-4">
-              {recording ? (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  disabled={busy}
-                  onClick={() => hostAction(`/recordings/${recording.id}/stop`)}
-                >
-                  Stop recording
-                </Button>
-              ) : (
-                <Button
-                  variant="record"
-                  className="w-full"
-                  disabled={busy || connection !== "live"}
-                  onClick={() => hostAction("/recordings")}
-                >
-                  Record
+                  }
+                />
+              )}
+              <ToolButton
+                label={micMuted ? "Unmute" : "Mute"}
+                active={micMuted}
+                aria-pressed={micMuted}
+                onClick={toggleMute}
+                title="Mute or unmute (⌘⇧M / Ctrl+Shift+M)"
+                icon={<Icon d={micMuted ? ICONS.micOff : ICONS.mic} />}
+              />
+              {hasCamera && (
+                <ToolButton
+                  label={cameraOff ? "Camera on" : "Camera"}
+                  aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}
+                  active={cameraOff}
+                  aria-pressed={cameraOff}
+                  onClick={() => {
+                    setCameraOff(!cameraOff);
+                    void call.setCameraOff(!cameraOff);
+                  }}
+                  icon={<Icon d={cameraOff ? ICONS.camOff : ICONS.cam} />}
+                />
+              )}
+              <ToolButton
+                label="People"
+                aria-pressed={panelOpen}
+                inverted={panelOpen}
+                onClick={() => setPanelOpen(!panelOpen)}
+                icon={<Icon d={ICONS.people} />}
+              />
+            </div>
+            <div className="flex flex-col items-center gap-2 px-4 pb-4 text-center">
+              {flash && (
+                <p role="status" className="rounded-full bg-ink px-3.5 py-1.5 text-sm font-medium text-ink-text" data-testid="shortcut-flash">
+                  {flash}
+                </p>
+              )}
+              {call.audioBlocked && call.peers.length > 0 && (
+                <Button variant="primary" onClick={call.startAudio}>
+                  Click to hear the others
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                className="w-full"
-                disabled={busy}
-                onClick={() => confirm("End the session for everyone?") && hostAction("/end")}
-              >
-                End session
-              </Button>
+              {!isHost && (
+                <p className="text-sm font-medium text-text-2">
+                  {recording ? "You're being recorded." : "Waiting for the host to start recording."}
+                </p>
+              )}
+              {micMuted && recording && (
+                <p className="text-sm text-warn-strong">You&apos;re muted: your microphone is silent in the recording too.</p>
+              )}
+              <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} />
+              <div className="flex flex-wrap justify-center gap-x-4">
+                <ConnectionLabel status={connection} />
+                <CallLabel status={call.status} />
+              </div>
             </div>
-          )}
-          {!isHost && !ended && (
-            <p className="border-t border-border pt-4 text-sm text-muted">
-              {recording ? "You're being recorded." : "Waiting for the host to start recording."}
-            </p>
-          )}
-          {error && <Notice tone="danger">{error}</Notice>}
-        </Card>
-      </div>
+          </div>
 
+          {panelOpen && (
+            <aside className="flex min-w-0 flex-col gap-4 rounded-[18px] bg-surface p-5 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold">In the studio</h2>
+                {present && (
+                  <span className="text-[13px] text-subtle">
+                    {state?.participants.filter((p) => present.has(p.id)).length ?? 0} of {state?.participants.length ?? 0} connected
+                  </span>
+                )}
+              </div>
+              <ul className="flex flex-col gap-3">
+                {state?.participants.map((p) => {
+                  const away = present && !present.has(p.id);
+                  return (
+                    <li key={p.id} className="flex items-center gap-3" data-testid="participant">
+                      <Avatar name={p.displayName} className={cn("size-9 text-[13px]", away && "opacity-50 grayscale")} />
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-medium">
+                          {p.displayName}
+                          {p.id === ticket.participantId && <span className="font-normal text-muted"> (you)</span>}
+                          {p.role === "host" && <span className="text-xs font-normal text-muted"> · host</span>}
+                        </span>
+                        {isHost && state.recording ? (
+                          <ParticipantUpload
+                            upload={state.uploads.find((u) => u.participantId === p.id)}
+                            stopped={state.recording.status === "stopped"}
+                            away={!!away}
+                          />
+                        ) : (
+                          present && (
+                            <span className={cn("text-xs", away ? "text-warn-strong" : "text-muted")} title={away ? "Not connected" : "In the call"}>
+                              {away ? "Not connected" : "In the call"}
+                            </span>
+                          )
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {isHost && (
+                <div className="mt-auto flex flex-col gap-3">
+                  <Button
+                    variant="danger"
+                    className="h-11 w-full rounded-[10px] border-accent-line text-sm"
+                    disabled={busy}
+                    onClick={() => confirm("End the session for everyone?") && hostAction("/end")}
+                  >
+                    End session for everyone
+                  </Button>
+                </div>
+              )}
+            </aside>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ICONS = {
+  mic: "M9 4a3 3 0 0 1 6 0v7a3 3 0 0 1 -6 0zM5 11a7 7 0 0 0 14 0M12 18v3",
+  micOff: "M3 3l18 18M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V4a3 3 0 0 0 -5.9 -.7M5 11a7 7 0 0 0 11.5 5.4M12 18v3",
+  cam: "M3 7h12v10H3zM15 10l6 -3v10l-6 -3",
+  camOff: "M3 3l18 18M15 10l6 -3v10l-6 -3M3 7h4M15 15v2H3V7",
+  people: "M9 11a4 4 0 1 0 0 -8a4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M17 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0 -4 -6.3",
+  invite: "M9 11a4 4 0 1 0 0 -8a4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M19 8v6M16 11h6",
+};
+
+function Icon({ d }: { d: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+}
+
+/** A studio toolbar button: an icon tile with a caption underneath. */
+function ToolButton({
+  icon,
+  label,
+  active,
+  inverted,
+  wide,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: React.ReactNode; label: string; active?: boolean; inverted?: boolean; wide?: boolean }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex cursor-pointer flex-col items-center gap-1.5 text-[13px] text-text-2 disabled:cursor-not-allowed disabled:opacity-50",
+        !wide && "min-w-14",
+        className,
+      )}
+      {...props}
+    >
+      {wide ? (
+        icon
+      ) : (
+        <span
+          className={cn(
+            "grid size-[42px] place-items-center rounded-[10px] transition-colors",
+            active ? "bg-accent-soft text-accent-strong" : inverted ? "bg-ink text-ink-text" : "bg-[#f2f1ef] text-text dark:bg-surface-2",
+          )}
+        >
+          {icon}
+        </span>
+      )}
+      {label}
+    </button>
+  );
+}
+
+/** Copies the show's guest link; the room doesn't know it until asked. */
+async function copyInviteLink(studioId: string) {
+  try {
+    const { inviteCode } = await apiFetch<{ inviteCode: string }>(`/studios/${studioId}`);
+    await navigator.clipboard.writeText(`${window.location.origin}/join/${inviteCode}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function InviteButton({ studioId }: { studioId: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    if (await copyInviteLink(studioId)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } else {
+      window.open(`/shows/${studioId}`, "_blank");
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copy the guest link (⌘⇧L / Ctrl+Shift+L)"
+      className="flex cursor-pointer items-center gap-2 rounded-[10px] bg-[#2b2424] px-4 py-[9px] text-sm font-medium whitespace-nowrap text-white"
+    >
+      <Icon d={ICONS.invite} />
+      {copied ? "Link copied" : "Invite"}
+    </button>
+  );
+}
+
+/** After the session: everyone's recording still arriving, then "that's a wrap". */
+function EndedView({
+  isHost,
+  selfName,
+  studioId,
+  participants,
+  uploads,
+  upload,
+  finishing,
+}: {
+  isHost: boolean;
+  selfName: string;
+  studioId: string | null;
+  participants: SessionState["participants"];
+  uploads: SessionState["uploads"];
+  upload: UploadProgress | null;
+  finishing: boolean;
+}) {
+  const ownSent = upload?.uploadedBytes ?? 0;
+  const ownLeft = upload?.pendingBytes ?? 0;
+  const ownDone = !finishing && (upload?.idle ?? true);
+  const rows = isHost
+    ? participants
+        .map((p) => ({ p, u: uploads.find((u) => u.participantId === p.id) }))
+        .filter((r) => r.u)
+        .map(({ p, u }) => {
+          const done = u!.tracks > 0 && u!.completeTracks === u!.tracks;
+          return { name: p.displayName, done, label: done ? "Received ✓" : `still arriving · ${mb(u!.bytes)} so far`, pct: done ? 100 : 60 };
+        })
+    : [
+        {
+          name: selfName,
+          done: ownDone,
+          label: ownDone ? "Sent ✓" : `${mb(ownLeft)} left to send`,
+          pct: ownDone ? 100 : Math.max(5, Math.round((ownSent / Math.max(1, ownSent + ownLeft)) * 100)),
+        },
+      ];
+  const allDone = rows.every((r) => r.done);
+  const title = isHost
+    ? allDone
+      ? "That's a wrap. Everything's here."
+      : "That's a wrap!"
+    : allDone
+      ? `Thanks, ${selfName}. All done!`
+      : `Thanks for joining, ${selfName}!`;
+  const sub = isHost
+    ? rows.length === 0
+      ? "The session has ended. Nothing was recorded in it."
+      : allDone
+        ? "Every recording has arrived. Your files will be ready to download in a few minutes."
+        : "Everyone's recordings are still arriving. You can close this page; they'll keep coming in."
+    : allDone
+      ? "Your recording has reached the host. You can close this tab now."
+      : "Your recording is still being sent to the host. Please keep this tab open until it's done.";
+
+  return (
+    <div className="flex flex-1 items-center justify-center px-5 py-12">
+      <div className="flex w-full max-w-[560px] flex-col gap-[22px] rounded-3xl bg-surface p-6 shadow-[0_30px_60px_-30px_rgba(60,20,30,.3),0_0_0_1px_var(--border)] sm:p-10" data-testid="session-ended">
+        <span className={cn("grid size-[60px] place-items-center rounded-full text-[26px] text-white", allDone ? "bg-ok" : "bg-accent")}>
+          {allDone ? "✓" : "■"}
+        </span>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-[clamp(28px,3.2vw,38px)] leading-[1.08] font-bold tracking-[-.03em]">{title}</h1>
+          <p className="text-base leading-normal text-muted">{sub}</p>
+        </div>
+        {rows.length > 0 && (
+          <div className="flex flex-col gap-3.5">
+            {rows.map((r) => (
+              <div key={r.name} className="flex flex-col gap-[7px]">
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="flex items-center gap-2.5 font-medium">
+                    <Avatar name={r.name} className="size-[26px] text-[10px]" />
+                    {r.name}
+                  </span>
+                  <span className={cn("tabular-nums", r.done ? "text-ok-strong" : "text-accent-strong")}>{r.label}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-border">
+                  <div className={cn("h-full rounded-full transition-[width] duration-300", r.done ? "bg-ok" : "animate-rec-pulse bg-accent")} style={{ width: `${r.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {isHost && studioId && (
+          <a
+            href={`/shows/${studioId}`}
+            className={cn("flex h-[54px] items-center justify-center rounded-xl text-[17px] font-semibold text-white hover:opacity-90", allDone ? "bg-accent" : "bg-[#2b2424]")}
+          >
+            Go to your show
+          </a>
+        )}
+        {!isHost && (
+          <Notice tone={allDone ? "ok" : "warn"}>
+            {allDone
+              ? "You're free to go. The host has everything they need."
+              : "Closed it by accident? Just open the invite link again and the rest will be sent."}
+          </Notice>
+        )}
+      </div>
     </div>
   );
 }
@@ -289,15 +573,22 @@ function LocalUploadStatus({
 function ParticipantUpload({
   upload,
   stopped,
+  away,
 }: {
   upload: SessionState["uploads"][number] | undefined;
   stopped: boolean;
+  away: boolean;
 }) {
-  if (!upload) return <span className="text-xs text-muted">{stopped ? "no tracks" : "starting…"}</span>;
+  if (!upload) return <span className="text-xs text-muted">{stopped ? "Nothing recorded" : "Starting…"}</span>;
   const done = upload.tracks > 0 && upload.completeTracks === upload.tracks;
+  const text = done
+    ? `✓ Uploaded · ${mb(upload.bytes)}`
+    : away
+      ? `Offline. Recording is safe on their computer · ${mb(upload.bytes)} sent`
+      : `${stopped ? "Uploading" : "Recording"} · ${mb(upload.bytes)} sent`;
   return (
-    <span className={cn("text-xs", done ? "text-ok" : "text-muted")} data-testid="participant-upload">
-      {done ? `✓ uploaded · ${mb(upload.bytes)}` : `${stopped ? "uploading" : "recording"} · ${mb(upload.bytes)}`}
+    <span className={cn("text-xs", done ? "text-ok-strong" : away ? "text-warn-strong" : "text-muted")} data-testid="participant-upload">
+      {text}
     </span>
   );
 }
@@ -334,17 +625,26 @@ function ConnectionLabel({ status }: { status: ConnectionStatus }) {
   );
 }
 
-function RecordingBadge({ startedAt, offsetMs }: { startedAt: number; offsetMs: number }) {
+/** "REC 12:04" while recording, "Not recording" otherwise. */
+function RecPill({ startedAt, offsetMs }: { startedAt: number | null; offsetMs: number }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (startedAt === null) return;
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
-  }, []);
+  }, [startedAt]);
+  if (startedAt === null) {
+    return (
+      <span className="inline-flex items-center gap-[7px] rounded-full bg-[#efeeec] px-[11px] py-[5px] font-mono text-xs font-medium text-muted dark:bg-surface-2">
+        <span aria-hidden className="size-[7px] rounded-full bg-current" /> Not recording
+      </span>
+    );
+  }
   const s = Math.max(0, Math.floor((now + offsetMs - startedAt) / 1000));
   const text = `${Math.floor(s / 3600) ? `${Math.floor(s / 3600)}:` : ""}${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-sm font-medium text-accent-text">
-      <span className="size-2 animate-pulse rounded-full bg-accent-text" /> REC {text}
+    <span className="inline-flex items-center gap-[7px] rounded-full bg-accent-soft px-[11px] py-[5px] font-mono text-xs font-medium text-accent-strong">
+      <span aria-hidden className="size-[7px] animate-rec-pulse rounded-full bg-current" /> REC {text}
     </span>
   );
 }

@@ -8,6 +8,8 @@ export type ProcessingStatus = "pending" | "queued" | "processing" | "ready" | "
 
 export interface RecordingSummary {
   id: string;
+  /** "Episode 41": numbered per show, in the order they were recorded. */
+  number: number;
   sessionId: string;
   status: "recording" | "stopped";
   processing: ProcessingStatus;
@@ -21,6 +23,16 @@ export interface RecordingSummary {
   incompleteTracks: number;
   /** Space used in storage: uploaded chunks plus processed files. */
   bytes: number;
+  /** Everyone who recorded in it, host first, with how far their upload got. */
+  people: Array<{
+    participantId: string;
+    name: string;
+    role: "host" | "guest";
+    tracks: number;
+    /** Tracks whose upload the server has confirmed complete. */
+    completeTracks: number;
+    bytes: number;
+  }>;
   outputs: Array<{ id: string; kind: "audio" | "video" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
@@ -90,6 +102,7 @@ export class ProcessingService {
   async listForStudio(owner: User, studioId: string): Promise<RecordingSummary[]> {
     const rows = await this.db.query<{
       id: string;
+      number: number | null;
       session_id: string;
       status: "recording" | "stopped";
       processing: ProcessingStatus;
@@ -101,7 +114,7 @@ export class ProcessingService {
       incomplete: number;
       bytes: number;
     }>(
-      `SELECT r.id, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
+      `SELECT r.id, r.number, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
               ${RECORDING_BYTES} AS bytes
@@ -109,7 +122,7 @@ export class ProcessingService {
        JOIN sessions s ON s.id = r.session_id
        JOIN studios st ON st.id = s.studio_id
        WHERE st.id = $1 AND st.owner_id = $2 AND st.deleted_at IS NULL AND r.deleted_at IS NULL
-       ORDER BY r.started_at DESC
+       ORDER BY r.started_at DESC, r.number DESC
        LIMIT 100`,
       [studioId, owner.id],
     );
@@ -128,8 +141,38 @@ export class ProcessingService {
        ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, o.file_name`,
       [rows.map((r) => r.id)],
     );
+    const people = await this.db.query<{
+      recording_id: string;
+      participant_id: string;
+      display_name: string;
+      role: "host" | "guest";
+      tracks: number;
+      complete: number;
+      bytes: number;
+    }>(
+      `SELECT t.recording_id, p.id AS participant_id, p.display_name, p.role,
+              count(DISTINCT t.id)::int AS tracks,
+              count(DISTINCT t.id) FILTER (WHERE t.status <> 'recording')::int AS complete,
+              coalesce(sum(c.bytes), 0)::bigint AS bytes
+       FROM tracks t JOIN participants p ON p.id = t.participant_id LEFT JOIN chunks c ON c.track_id = t.id
+       WHERE t.recording_id = ANY($1::text[])
+       GROUP BY t.recording_id, p.id, p.display_name, p.role, p.created_at
+       ORDER BY (p.role = 'host') DESC, p.created_at`,
+      [rows.map((r) => r.id)],
+    );
     return rows.map((r) => ({
       id: r.id,
+      number: r.number ?? 0,
+      people: people
+        .filter((p) => p.recording_id === r.id)
+        .map((p) => ({
+          participantId: p.participant_id,
+          name: p.display_name,
+          role: p.role,
+          tracks: p.tracks,
+          completeTracks: p.complete,
+          bytes: p.bytes,
+        })),
       sessionId: r.session_id,
       status: r.status,
       processing: r.processing,

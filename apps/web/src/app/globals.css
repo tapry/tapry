@@ -1,35 +1,70 @@
 @import "tailwindcss";
 
-/* Design tokens. Components use the Tailwind names below (bg-surface, text-muted, …), never raw colors. */
+/*
+ * Design tokens (docs/plan/10-design-inspiration.md; the "OpenTake Dashboard/Pages" mock-ups).
+ * Components use the Tailwind names below (bg-surface-2, text-muted, …), never raw colors.
+ */
 :root {
-  --bg: #f7f7f5;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f0efec;
-  --border: #e2e0db;
-  --text: #1c1b19;
-  --muted: #6b6862;
-  --accent: #d9442b; /* record red */
+  --surface-2: #f7f7f8; /* cards and panels on white */
+  --canvas: #f6f5f3; /* warm backdrop behind the studio and guest pages */
+  --border: #ececef;
+  --border-strong: #e2e2e5;
+  --text: #1d1d1f;
+  --text-2: #3a3a3c;
+  --muted: #6e6e73;
+  --subtle: #8e8e93;
+  --ink: #1d1d1f; /* dark buttons */
+  --ink-text: #ffffff;
+  --accent: #e8553d; /* coral: record, primary actions */
+  --accent-hover: #d4472f;
+  --accent-strong: #c43c25; /* coral text on light backgrounds */
+  --accent-soft: #fdece8;
+  --accent-line: #f5c3b8;
   --accent-text: #ffffff;
-  --ok: #2f8a4c;
-  --warn: #b7791f;
-  --danger: #c53030;
-  --ring: #1c1b19;
+  --ok: #1f9d55;
+  --ok-strong: #1f7a45;
+  --ok-soft: #e6f6ec;
+  --ok-line: #bfe5cc;
+  --warn: #e0a019;
+  --warn-strong: #8a5a0c;
+  --warn-soft: #fdf6e7;
+  --warn-line: #f3dfb0;
+  --danger: #c43c25;
+  --ring: #e8553d;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #141413;
-    --surface: #1d1c1a;
-    --surface-2: #262522;
-    --border: #34322e;
-    --text: #f2f1ee;
-    --muted: #a19e97;
-    --accent: #ef5a3f;
-    --accent-text: #ffffff;
-    --ok: #4cb36b;
-    --warn: #e0a33c;
-    --danger: #f26b6b;
-    --ring: #f2f1ee;
+    --bg: #0b0b0d;
+    --surface: #141416;
+    --surface-2: #1c1c1f;
+    --canvas: #0f0f11;
+    --border: #2a2a2e;
+    --border-strong: #3a3a3e;
+    --text: #f5f5f7;
+    --text-2: #d1d1d6;
+    --muted: #a1a1a6;
+    --subtle: #8e8e93;
+    --ink: #f5f5f7;
+    --ink-text: #0b0b0d;
+    --accent: #ff7a5f;
+    --accent-hover: #ff8f78;
+    --accent-strong: #ff8f78;
+    --accent-soft: #3a1f1a;
+    --accent-line: #6b3227;
+    --accent-text: #1d0f0c;
+    --ok: #3cc173;
+    --ok-strong: #5fd38e;
+    --ok-soft: #13291c;
+    --ok-line: #24533a;
+    --warn: #e8b13a;
+    --warn-strong: #f0c35f;
+    --warn-soft: #2d2412;
+    --warn-line: #5a4721;
+    --danger: #ff8f78;
+    --ring: #ff7a5f;
   }
 }
 
@@ -37,16 +72,43 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-canvas: var(--canvas);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-text: var(--text);
+  --color-text-2: var(--text-2);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-ink: var(--ink);
+  --color-ink-text: var(--ink-text);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
   --color-accent-text: var(--accent-text);
   --color-ok: var(--ok);
+  --color-ok-strong: var(--ok-strong);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-line: var(--ok-line);
   --color-warn: var(--warn);
+  --color-warn-strong: var(--warn-strong);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
   --color-danger: var(--danger);
   --color-ring: var(--ring);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --animate-rec-pulse: rec-pulse 1.2s ease-in-out infinite;
+  @keyframes rec-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
 }
 
 html {
@@ -60,7 +122,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: var(--accent-line);
+}
+
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--accent);
 }

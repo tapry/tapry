@@ -24,6 +24,8 @@ export interface Studio {
 
 export interface StudioWithUsage extends Studio {
   recordings: number;
+  /** A recording is running in it right now. */
+  live: boolean;
   /** Space its recordings use in storage. */
   bytes: number;
 }
@@ -47,9 +49,10 @@ export class StudioService {
   }
 
   async list(owner: User): Promise<StudioWithUsage[]> {
-    const rows = await this.db.query<StudioRow & { recordings: number; bytes: number }>(
+    const rows = await this.db.query<StudioRow & { recordings: number; bytes: number; live: boolean }>(
       `SELECT st.*,
               count(r.id)::int AS recordings,
+              coalesce(bool_or(r.status = 'recording'), false) AS live,
               coalesce(sum(${RECORDING_BYTES}), 0)::bigint AS bytes
        FROM studios st
        LEFT JOIN sessions s ON s.studio_id = st.id
@@ -59,7 +62,7 @@ export class StudioService {
        ORDER BY st.created_at DESC`,
       [owner.id],
     );
-    return rows.map((r) => ({ ...toStudio(r), recordings: r.recordings, bytes: r.bytes }));
+    return rows.map((r) => ({ ...toStudio(r), recordings: r.recordings, bytes: r.bytes, live: r.live }));
   }
 
   /**
@@ -138,6 +141,19 @@ export class StudioService {
     });
     await this.live.publish(ticket.sessionId);
     return { ...ticket, studio: { name: studio.name, settings: studioSettings.parse(studio.settings) } };
+  }
+
+  /**
+   * What a guest sees before joining: the show's name and who invited them. Null for a link
+   * that is wrong, replaced or deleted. Anyone with the link may see this, like the link itself.
+   */
+  async invitePreview(inviteCode: string): Promise<{ showName: string; hostName: string } | null> {
+    const [row] = await this.db.query<{ name: string; host: string }>(
+      `SELECT st.name, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
+       WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
+      [inviteCode],
+    );
+    return row ? { showName: row.name, hostName: row.host } : null;
   }
 
   /** Guest opens the invite link. No account; consent to recording is required by the schema. */

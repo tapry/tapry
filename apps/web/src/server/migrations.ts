@@ -167,4 +167,14 @@ ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
 ALTER TABLE jobs ADD CONSTRAINT jobs_type_check
   CHECK (type IN ('process_recording', 'transcribe_recording', 'purge_recording'));
 `,
+  `
+-- Episodes are numbered per show ("Episode 41"). Assigned when Record is pressed; numbers of
+-- deleted episodes are not reused, so a number always means the same episode.
+ALTER TABLE recordings ADD COLUMN number integer;
+
+UPDATE recordings r SET number = n.number FROM (
+  SELECT r2.id, row_number() OVER (PARTITION BY s.studio_id ORDER BY r2.started_at, r2.id) AS number
+  FROM recordings r2 JOIN sessions s ON s.id = r2.session_id
+) n WHERE n.id = r.id;
+`,
 ];

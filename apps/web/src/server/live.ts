@@ -114,7 +114,10 @@ export class LiveService {
     await this.requireOpen(host.sessionId);
     const id = newId("rec");
     const [row] = await this.db.query<{ id: string }>(
-      `INSERT INTO recordings (id, session_id, started_at) VALUES ($1, $2, $3)
+      `INSERT INTO recordings (id, session_id, started_at, number)
+       SELECT $1, $2, $3, coalesce(max(r.number), 0) + 1
+       FROM sessions s LEFT JOIN sessions s2 ON s2.studio_id = s.studio_id LEFT JOIN recordings r ON r.session_id = s2.id
+       WHERE s.id = $2
        ON CONFLICT (session_id) WHERE status = 'recording' DO NOTHING RETURNING id`,
       [id, host.sessionId, this.now()],
     );

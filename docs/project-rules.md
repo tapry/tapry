@@ -12,6 +12,7 @@ TypeScript monorepo (pnpm + turborepo). Next.js (App Router), Tailwind, shadcn/u
 ```
 apps/web            studio UI, dashboard, API routes
 apps/worker         media pipeline (ffmpeg): chunks → aligned WAV/MP4 + combined grid; transcripts (whisper.cpp)
+apps/site           the project website (landing page), static export; separate from the self-hosted app
 packages/recorder   capture → MediaRecorder → local chunk store → upload queue (MIT, standalone)
 packages/sync       clock offset estimation + alignment helpers
 packages/shared     zod schemas, types
@@ -29,6 +30,11 @@ docs/               self-hosting, architecture, browser support
 7. Dashboard: sessions, upload/processing status, downloads, delete.
 8. Docker Compose self-host + docs.
 9. Test matrix automation where possible (Playwright with fake media devices; network throttling).
+
+## UI
+- Users see **shows** and **episodes**; the API, database and code say studios and recordings. Pages live under `/shows`.
+- Design tokens are in `apps/web/src/app/globals.css` (light + dark); components use the Tailwind names, never raw colors. Primitives in `src/components/ui.tsx`.
+- Download links show friendly titles; the real file name is in `data-file-name` (tests read that).
 
 ## Processing
 - Jobs live in Postgres (`jobs`, claimed with `FOR UPDATE SKIP LOCKED`). `WORKER=inprocess` (default, required with PGlite) runs them inside the web server; with Postgres, `src/worker-main.ts` (bundled to `dist-worker/worker.cjs`, the `worker` Compose service) runs them separately and the web server uses `WORKER=off`. Running jobs renew their lock; a stopped worker hands its job back; migrations take an advisory lock so web and workers can start together.

@@ -5,6 +5,24 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+### New look
+- The app is redesigned (Onest, coral and ink; light and dark): log in, the dashboard, the guest
+  invite, check-in, the studio and the end of a session.
+- Studios are now called **shows** and recordings **episodes**, numbered per show ("Episode 41").
+  Pages moved from `/studios` to `/shows` (old links redirect). The API paths are unchanged.
+- Dashboard: shows in a sidebar with a live dot and space used; per show the numbers (episodes,
+  time recorded, space, live now), episodes that open to show who is still uploading, downloads
+  with friendly names, settings and space used in tabs.
+- A **New show** page: name, guests per episode, video quality and sound options in one place.
+- The guest invite shows the show and who invited you, and keeps retrying by itself while the host
+  hasn't opened the studio yet.
+- When a session ends, everyone sees their recording arriving, then "That's a wrap".
+- Studio keyboard shortcuts: ⌘/Ctrl+Shift+R start or stop recording, M mute, L copy the invite link.
+
+### Website
+- `apps/site`: the OpenTake landing page, a static site separate from the app (self-hosted servers
+  don't show it). `NEXT_PUBLIC_WAITLIST_URL` turns on the cloud waitlist form.
+
 ### Tests
 - Firefox and WebKit call each other (each hosting once), on top of each engine with a
   Chromium guest. The test LiveKit now sends media on the machine's network address like a

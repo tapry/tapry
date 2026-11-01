@@ -1,17 +1,16 @@
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
-import { Page } from "@/components/ui";
+import { AuthShell } from "@/components/auth-shell";
 import { currentUser } from "@/server/page-auth";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Sign in" };
+export const metadata = { title: "Log in" };
 
 export default async function LoginPage() {
-  if (await currentUser()) redirect("/studios");
+  if (await currentUser()) redirect("/shows");
   return (
-    <Page narrow>
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight">Sign in</h1>
+    <AuthShell title="Welcome back" subtitle="Log in to see your shows and record your next episode.">
       <AuthForm mode="login" />
-    </Page>
+    </AuthShell>
   );
 }

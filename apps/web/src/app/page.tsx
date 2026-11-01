@@ -1,36 +1,33 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, Page } from "@/components/ui";
+import { AuthShell } from "@/components/auth-shell";
 import { currentUser, isFreshInstall } from "@/server/page-auth";
 
 export const dynamic = "force-dynamic";
 
+const cta =
+  "inline-flex h-[54px] w-full items-center justify-center rounded-xl bg-accent text-[17px] font-semibold text-accent-text shadow-[0_10px_22px_-12px_var(--accent)] hover:bg-accent-hover";
+
 export default async function Home() {
-  if (await currentUser()) redirect("/studios");
+  if (await currentUser()) redirect("/shows");
   const fresh = await isFreshInstall();
-  return (
-    <Page narrow>
-      <h1 className="text-3xl font-semibold tracking-tight">OpenTake</h1>
-      <p className="mt-2 text-muted">Studio-quality remote recording you can own.</p>
-      <Card className="mt-8 space-y-4">
-        {fresh ? (
-          <>
-            <p className="text-sm">
-              This server has no accounts yet. The first account you create becomes the admin.
-            </p>
-            <Link className="inline-flex h-10 items-center rounded-md bg-text px-4 text-sm font-medium text-bg" href="/signup">
-              Create admin account
-            </Link>
-          </>
-        ) : (
-          <>
-            <p className="text-sm">Hosts sign in to manage studios. Guests: open the invite link your host sent you.</p>
-            <Link className="inline-flex h-10 items-center rounded-md bg-text px-4 text-sm font-medium text-bg" href="/login">
-              Sign in
-            </Link>
-          </>
-        )}
-      </Card>
-    </Page>
+  return fresh ? (
+    <AuthShell
+      title="Your studio is ready"
+      subtitle="This server has no accounts yet. The first account you create is in charge: it can create shows and invite guests."
+    >
+      <Link className={cta} href="/signup">
+        Create admin account
+      </Link>
+    </AuthShell>
+  ) : (
+    <AuthShell
+      title="The recording studio you own"
+      subtitle="Hosts log in to manage their shows. Guests: open the invite link your host sent you."
+    >
+      <Link className={cta} href="/login">
+        Log in
+      </Link>
+    </AuthShell>
   );
 }
