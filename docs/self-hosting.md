@@ -134,6 +134,11 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   "Download all (.zip)" is put together on the fly by the web container as it streams, so
   it uses no extra disk but does pass through the web container: a 5 GB zip is 5 GB of its
   bandwidth. Zips can't be resumed if the connection drops; single files can.
+- **Keeping originals:** by default the original uploads are kept next to the processed files.
+  Set `RAW_RETENTION_DAYS=7` in `.env` to remove them 7 days after an episode's files are ready
+  (0: right away). That saves about 40% of the space ([costs.md](costs.md)). Once they're gone,
+  the episode can't be processed again, and a guest's upload arriving after that is turned away.
+  The originals are the best-quality copies: keep them if you edit from the raw video.
 - **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
   processed files). Deleting a recording or a studio removes its files from storage within
   seconds, and once more about 16 minutes later to catch uploads that were already on their way.

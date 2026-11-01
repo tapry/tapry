@@ -177,4 +177,13 @@ UPDATE recordings r SET number = n.number FROM (
   FROM recordings r2 JOIN sessions s ON s.id = r2.session_id
 ) n WHERE n.id = r.id;
 `,
+  `
+-- Optional: the original uploads (chunks) of a processed episode are deleted after
+-- RAW_RETENTION_DAYS; the processed files stay. Set when that happened.
+ALTER TABLE recordings ADD COLUMN raw_deleted_at timestamptz;
+
+ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
+ALTER TABLE jobs ADD CONSTRAINT jobs_type_check
+  CHECK (type IN ('process_recording', 'transcribe_recording', 'purge_recording', 'purge_raw'));
+`,
 ];

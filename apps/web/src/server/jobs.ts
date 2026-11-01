@@ -31,6 +31,8 @@ export interface JobRunnerOptions {
    * long (crash, kill -9, lost machine). Renewed every minute while the job runs.
    */
   lockMs?: number;
+  /** Delete an episode's original uploads this long after it's processed. Unset: keep them. */
+  rawRetentionMs?: number;
   /** Called after every poll; the standalone worker uses it as its health heartbeat. */
   onPoll?: () => void;
   /** Something changed for this session (status shown to the host). */
@@ -46,8 +48,8 @@ export interface JobRunnerOptions {
   purgeRepeatMs?: number;
 }
 
-type JobType = "process_recording" | "transcribe_recording" | "purge_recording";
-type MediaJobType = Exclude<JobType, "purge_recording">;
+type JobType = "process_recording" | "transcribe_recording" | "purge_recording" | "purge_raw";
+type MediaJobType = Exclude<JobType, "purge_recording" | "purge_raw">;
 
 interface JobRow {
   id: string;
@@ -113,7 +115,7 @@ export class JobRunner {
        WHERE id = $1 AND status = 'running'`,
       [job.id],
     );
-    if (job.type !== "purge_recording") {
+    if (job.type !== "purge_recording" && job.type !== "purge_raw") {
       await this.db.query(`UPDATE recordings SET ${STATUS_COLUMN[job.type]} = 'queued' WHERE id = $1`, [job.recording_id]);
     }
     return job.id;
@@ -180,6 +182,7 @@ export class JobRunner {
 
   private async process(job: JobRow) {
     if (job.type === "purge_recording") return this.purge(job);
+    if (job.type === "purge_raw") return this.purgeRaw(job);
     const [rec] = await this.db.query<RecordingRow>(
       `SELECT r.id, r.session_id, r.started_at, r.stopped_at, st.settings
        FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
@@ -275,6 +278,48 @@ export class JobRunner {
     }
   }
 
+  /**
+   * RAW_RETENTION_DAYS after an episode is processed: delete its original uploads, keep the
+   * processed files. Only when nothing can still need them: processing done and successful,
+   * every track complete, no processing queued. Otherwise it waits (processing under way) or
+   * gives up (it failed, or a track is still arriving); the next successful run schedules it again.
+   */
+  private async purgeRaw(job: JobRow) {
+    const done = (error: string | null = null) =>
+      this.db.query("UPDATE jobs SET status = 'done', finished_at = now(), error = $2 WHERE id = $1", [job.id, error]);
+    try {
+      const [rec] = await this.db.query<{ session_id: string; processing: string; deleted_at: Date | null; raw_deleted_at: Date | null; open_tracks: number; busy: boolean }>(
+        `SELECT r.session_id, r.processing, r.deleted_at, r.raw_deleted_at,
+                (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS open_tracks,
+                EXISTS (SELECT 1 FROM jobs j WHERE j.recording_id = r.id AND j.type = 'process_recording' AND j.status IN ('queued', 'running')) AS busy
+         FROM recordings r WHERE r.id = $1`,
+        [job.recording_id],
+      );
+      if (!rec || rec.deleted_at || rec.raw_deleted_at) return void (await done());
+      if (rec.busy || rec.processing === "queued" || rec.processing === "processing") {
+        await this.db.query("UPDATE jobs SET status = 'queued', attempts = 0, locked_until = NULL, run_after = now() + interval '1 hour' WHERE id = $1", [job.id]);
+        return;
+      }
+      if (rec.processing !== "ready" || rec.open_tracks > 0) return void (await done("kept: not fully processed"));
+
+      // Mark first, so uploads and re-processing are refused while the files go.
+      await this.db.query("UPDATE recordings SET raw_deleted_at = now() WHERE id = $1", [job.recording_id]);
+      const tracks = await this.db.query<{ id: string }>("SELECT id FROM tracks WHERE recording_id = $1", [job.recording_id]);
+      let removed = 0;
+      for (const t of tracks) removed += await this.storage.deletePrefix(`recordings/${rec.session_id}/${t.id}/`);
+      await this.db.query("DELETE FROM chunks WHERE track_id IN (SELECT id FROM tracks WHERE recording_id = $1)", [job.recording_id]);
+      await done();
+      console.log(`[worker] removed ${removed} original upload object(s) of ${job.recording_id} (retention)`);
+      this.opts.onChange?.(rec.session_id);
+    } catch (err) {
+      console.error(`[worker] purge_raw ${job.id} attempt ${job.attempts} failed:`, String(err));
+      await this.db.query(
+        "UPDATE jobs SET status = 'queued', run_after = now() + make_interval(secs => $3), error = $2 WHERE id = $1",
+        [job.id, String(err).slice(0, 2000), Math.min(3600, 30 * job.attempts)],
+      );
+    }
+  }
+
   private purgeRepeatMs() {
     return this.opts.purgeRepeatMs ?? (UPLOAD_URL_TTL_S + 60) * 1000;
   }
@@ -307,6 +352,15 @@ export class JobRunner {
         await tx.query("UPDATE recordings SET transcript = 'queued' WHERE id = $1", [rec.id]);
       } else {
         await tx.query("UPDATE recordings SET transcript = 'off' WHERE id = $1", [rec.id]);
+      }
+      if (this.opts.rawRetentionMs !== undefined) {
+        // The originals go once the retention period is over (see purgeRaw).
+        await tx.query(
+          `INSERT INTO jobs (id, type, recording_id, run_after) VALUES ($1, 'purge_raw', $2, now() + make_interval(secs => $3))
+           ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running')
+           DO UPDATE SET run_after = EXCLUDED.run_after WHERE jobs.status = 'queued'`,
+          [newId("job"), rec.id, this.opts.rawRetentionMs / 1000],
+        );
       }
       return old.map((o) => o.storage_key);
     });

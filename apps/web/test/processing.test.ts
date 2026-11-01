@@ -240,6 +240,26 @@ describe("recording processing", () => {
       expect(outputKeys().filter((k) => first.includes(k))).toEqual([]);
     });
 
+    it("schedules removing the originals only when RAW_RETENTION_DAYS is set", async () => {
+      await uploadTrack(split(media, 2));
+      t.tick(2000);
+      await stop();
+      await new JobRunner(t.db, storage, { ffmpeg, ffprobe, rawRetentionMs: 7 * 86_400_000 }).drain();
+      expect(await processing()).toBe("ready");
+      const [job] = await t.db.query<{ status: string; due_days: number }>(
+        "SELECT status, extract(epoch FROM run_after - now()) / 86400 AS due_days FROM jobs WHERE recording_id = $1 AND type = 'purge_raw'",
+        [t.recordingId],
+      );
+      expect(job!.status).toBe("queued");
+      expect(Number(job!.due_days)).toBeGreaterThan(6.9);
+
+      // Default (unset): processing again schedules nothing new and nothing is removed.
+      await t.db.query("DELETE FROM jobs WHERE type = 'purge_raw'");
+      await t.hostBrowser.post(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`);
+      await runner().drain();
+      expect(await t.db.query("SELECT 1 FROM jobs WHERE type = 'purge_raw'")).toEqual([]);
+    });
+
     it("marks the recording failed with a reason when the media is broken", async () => {
       await uploadTrack([Buffer.from("this is not a webm file")]);
       t.tick(2000);
