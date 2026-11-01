@@ -24,6 +24,7 @@ async function expectProcessed(page: Page, studioUrl: string, seconds: number) {
 }
 
 test("slow, lossy uplink: everything still arrives", async ({ page }) => {
+  test.setTimeout(360_000);
   await signInHost(page);
   const { studioUrl } = await createStudio(page, `Lossy ${randomBytes(2).toString("hex")}`);
   await enterRoom(page);
@@ -61,7 +62,8 @@ test("slow, lossy uplink: everything still arrives", async ({ page }) => {
   await page.getByRole("button", { name: "Record", exact: true }).click();
   await page.waitForTimeout(15_000);
   await page.getByRole("button", { name: "Stop recording" }).click();
-  await expect(page.getByTestId("local-upload")).toContainText("All of your recording is uploaded", { timeout: 150_000 });
+  // With 30% of every step failing, the last chunk can sit out several 30-s backoffs in a row.
+  await expect(page.getByTestId("local-upload")).toContainText("All of your recording is uploaded", { timeout: 240_000 });
 
   expect(failed, "the chaos really happened").toBeGreaterThan(5);
   expect(passed).toBeGreaterThan(failed);

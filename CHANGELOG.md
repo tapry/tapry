@@ -16,6 +16,18 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - Nothing to migrate: browser storage, the Compose project, the database and the bucket keep their
   old names, so unsent recordings and existing data carry over.
 
+### Gate A: an hour, two people, nothing lost
+- 60-minute two-person runs: Chromium + Chromium (every beep in both files, 4.3 ms between
+  people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
+  a second apart). Details and how to run them: `docs/browser-support.md`.
+
+### AI producer: too quiet and talk balance
+- A **too quiet** alert: someone who talks but stays below -38 dBFS for at least 5 s of the last
+  30 s. They're told how to fix it, and the host sees it next to their name.
+- **Talk balance**: while recording, the host sees each person's share of the talking, and a
+  nudge once they've done 70% of it (after two minutes of talking in all). Each device counts its
+  own talking (voice activity on its own mic) and reports only the number.
+
 ### New look
 - The app is redesigned (Onest, coral and ink; light and dark): log in, the dashboard, the guest
   invite, check-in, the studio and the end of a session.

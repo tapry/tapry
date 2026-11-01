@@ -1,4 +1,4 @@
-import { STALE_REPORT_MS, type QualityAlert, type SessionState, type telemetryBody } from "@tapry/shared";
+import { STALE_REPORT_MS, type QualityAlert, type SessionState, type TalkTime, type telemetryBody } from "@tapry/shared";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
@@ -176,11 +176,15 @@ export class LiveService {
     const alerts = [...new Set(body.alerts)].sort() as QualityAlert[];
     // Lag in whole minutes is what the host sees, so finer changes don't need a push.
     const minutes = (s: number | null) => (s === null ? -1 : Math.floor(s / 60));
-    reports.set(p.id, { participantId: p.id, alerts, uploadBehindS: body.uploadBehindS, reportedAt: this.now() });
+    // Talk time moves every report; the host's shares only need it every 5 s.
+    const talkKey = (t: TalkTime | null | undefined) => (t ? `${t.recordingId}:${Math.floor(t.ms / 5000)}` : "");
+    const talk = body.talk ?? null;
+    reports.set(p.id, { participantId: p.id, alerts, uploadBehindS: body.uploadBehindS, talk, reportedAt: this.now() });
     const changed =
       !before ||
       before.alerts.join() !== alerts.join() ||
       minutes(before.uploadBehindS) !== minutes(body.uploadBehindS) ||
+      talkKey(before.talk) !== talkKey(talk) ||
       this.now() - before.reportedAt > STALE_REPORT_MS; // was stale: the host should see it's back
     if (changed) this.publishSoon(p.sessionId, 250);
   }
