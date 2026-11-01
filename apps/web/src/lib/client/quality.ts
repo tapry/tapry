@@ -33,6 +33,19 @@ export const QUIET_LEVEL_DB = -38;
 /** Talk balance: nudge the host once they've done this share of the talking, after TALK_NUDGE_AFTER_MS of it in all. */
 export const TALK_NUDGE_SHARE = 0.7;
 export const TALK_NUDGE_AFTER_MS = 120_000;
+/**
+ * Echo: over the last ECHO_WINDOW_MS, with the others talking for at least ECHO_MIN_FAR_MS, the
+ * mic's level follows the call's level (correlation at least ECHO_CORRELATION at a delay of up
+ * to ECHO_MAX_LAG readings, about 300 ms). People take turns, so without echo the two levels
+ * move apart, not together. The mic must follow, not lead: someone whose own voice comes back
+ * from another person's speakers sees the same likeness the other way round (their mic first,
+ * the call up to a round trip later, ECHO_RETURN_LAG readings) and doesn't have the echo.
+ */
+export const ECHO_WINDOW_MS = 20_000;
+export const ECHO_MIN_FAR_MS = 5_000;
+export const ECHO_CORRELATION = 0.6;
+export const ECHO_MAX_LAG = 3;
+export const ECHO_RETURN_LAG = 6;
 /** Upload lag (oldest unsent chunk) before alerting. */
 export const UPLOAD_BEHIND_AFTER_S = 60;
 /** Less browser storage than this: alert (the green room asks for 2 GB). */
@@ -97,6 +110,62 @@ export class MicAlerts {
   }
 }
 
+const percentile10 = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 10)]!;
+
+function correlation(a: number[], b: number[]) {
+  const n = a.length;
+  const ma = a.reduce((s, x) => s + x, 0) / n;
+  const mb = b.reduce((s, x) => s + x, 0) / n;
+  let ab = 0;
+  let aa = 0;
+  let bb = 0;
+  for (let i = 0; i < n; i++) {
+    ab += (a[i]! - ma) * (b[i]! - mb);
+    aa += (a[i]! - ma) ** 2;
+    bb += (b[i]! - mb) ** 2;
+  }
+  return aa > 0 && bb > 0 ? ab / Math.sqrt(aa * bb) : 0;
+}
+
+/**
+ * Echo, from two levels read together: what the call plays (everyone else, mixed) and what the
+ * mic records. Kept apart from the browser so it can be tested.
+ */
+export class EchoDetector {
+  private readings: Array<{ t: number; ms: number; farDb: number; nearDb: number }> = [];
+
+  add(farDb: number, nearDb: number, now: number) {
+    const last = this.readings.at(-1);
+    this.readings.push({ t: now, ms: last ? Math.min(now - last.t, 500) : 0, farDb, nearDb });
+    while (this.readings[0]!.t < now - ECHO_WINDOW_MS) this.readings.shift();
+  }
+
+  /** No call audio (nobody else, or the call dropped): start again. */
+  clear() {
+    this.readings = [];
+  }
+
+  echo(): boolean {
+    const r = this.readings;
+    if (r.length < 20) return false;
+    const farFloor = percentile10(r.map((x) => x.farDb));
+    const nearFloor = percentile10(r.map((x) => x.nearDb));
+    const farTalk = r.filter((x) => x.farDb >= Math.max(farFloor + SPEECH_ABOVE_FLOOR_DB, SPEECH_MIN_DB));
+    if (farTalk.reduce((sum, x) => sum + x.ms, 0) < ECHO_MIN_FAR_MS) return false;
+    // Levels at or under each side's noise floor all count as the floor: hiss isn't a signal.
+    const far = r.map((x) => Math.max(x.farDb, farFloor));
+    const near = r.map((x) => Math.max(x.nearDb, nearFloor));
+    // Positive lag: the mic `lag` readings after the call. Negative: the mic first.
+    const at = (lag: number) =>
+      lag >= 0 ? correlation(far.slice(0, far.length - lag), near.slice(lag)) : correlation(far.slice(-lag), near.slice(0, near.length + lag));
+    let follows = -1;
+    for (let lag = 0; lag <= ECHO_MAX_LAG; lag++) follows = Math.max(follows, at(lag));
+    let leads = -1;
+    for (let lag = 1; lag <= ECHO_RETURN_LAG; lag++) leads = Math.max(leads, at(-lag));
+    return follows >= ECHO_CORRELATION && follows > leads;
+  }
+}
+
 /** Seconds the upload is behind (oldest unsent chunk's age), or null when caught up. */
 export function uploadBehindS(upload: UploadProgress | null, serverNow: number): number | null {
   if (!upload || upload.oldestPendingTs === null) return null;
@@ -111,6 +180,8 @@ export interface QualityInputs {
   headphones: boolean;
   recorderError: string | null;
   clockOffsetMs: number;
+  /** What the call plays from everyone else (for the echo check); empty without a call. */
+  callAudio: MediaStreamTrack[];
   /** The recording in progress, if any: talk time is counted while it runs. */
   recordingId: string | null;
   /** False once the session ended: stop measuring and reporting. */
@@ -148,6 +219,28 @@ export function useQualityAlerts(q: QualityInputs) {
       void ctx.resume().catch(() => {});
     }
     const buf = new Float32Array(2048);
+    // The call's sound, everyone mixed into one analyser, re-wired as people come and go.
+    const echo = new EchoDetector();
+    const farAnalyser = ctx?.createAnalyser();
+    if (farAnalyser) farAnalyser.fftSize = 2048;
+    const farSources = new Map<string, MediaStreamAudioSourceNode>();
+    const farBuf = new Float32Array(2048);
+    const syncFarSources = () => {
+      if (!ctx || !farAnalyser) return;
+      const tracks = latest.current.callAudio.filter((t) => t.readyState === "live");
+      for (const [id, source] of farSources) {
+        if (!tracks.some((t) => t.id === id)) {
+          source.disconnect();
+          farSources.delete(id);
+        }
+      }
+      for (const t of tracks) {
+        if (farSources.has(t.id)) continue;
+        const source = ctx.createMediaStreamSource(new MediaStream([t]));
+        source.connect(farAnalyser);
+        farSources.set(t.id, source);
+      }
+    };
     let talkFor: string | null = null;
     const levelTimer = setInterval(() => {
       const recordingId = latest.current.recordingId;
@@ -158,6 +251,10 @@ export function useQualityAlerts(q: QualityInputs) {
       analyser.getFloatTimeDomainData(buf);
       const { rmsDb, peakDb } = measureLevel(buf);
       mic.addLevel(10 ** (peakDb / 20), rmsDb, Date.now(), !!recordingId && !latest.current.micMuted);
+      syncFarSources();
+      if (farSources.size === 0 || latest.current.micMuted) return echo.clear();
+      farAnalyser!.getFloatTimeDomainData(farBuf);
+      echo.add(measureLevel(farBuf).rmsDb, rmsDb, Date.now());
     }, LEVEL_EVERY_MS);
 
     const checkDisk = () =>
@@ -178,6 +275,7 @@ export function useQualityAlerts(q: QualityInputs) {
       }
       const behind = uploadBehindS(cur.upload, localNow() + cur.clockOffsetMs);
       const list: QualityAlert[] = [...mic.alerts(now, cur.micMuted)];
+      if (echo.echo()) list.push("echo");
       if (behind !== null && behind >= UPLOAD_BEHIND_AFTER_S) list.push("upload_behind");
       if (lowDisk) list.push("low_disk");
       if (document.visibilityState === "hidden") list.push("tab_hidden");
@@ -230,6 +328,8 @@ export function alertLabel(a: QualityAlert, behindS: number | null): string {
       return "Mic silent";
     case "too_quiet":
       return "Too quiet";
+    case "echo":
+      return "Echo";
     case "upload_behind":
       return behindS !== null && behindS >= 120 ? `Upload ${Math.floor(behindS / 60)} min behind` : "Upload behind";
     case "low_disk":
@@ -252,6 +352,8 @@ export function alertAdvice(a: QualityAlert, behindS: number | null): string | n
       return "We can't hear your microphone. Check it isn't muted on the device itself, or pick another one in your browser.";
     case "too_quiet":
       return "You're quite quiet. Move closer to the microphone, or turn up its input level.";
+    case "echo":
+      return "Your microphone is picking up the others from your speakers, so they're in your recording too. Put on headphones, or turn your speakers down.";
     case "upload_behind":
       return `Your upload is ${behindS !== null && behindS >= 120 ? `${Math.floor(behindS / 60)} minutes` : "a minute"} behind. The recording is safe on this computer and will catch up; keep this tab open.`;
     case "low_disk":

@@ -81,6 +81,8 @@ export const qualityAlert = z.enum([
   "mic_silent",
   /** The person is talking, but their level stays low: hard to hear once mixed. */
   "too_quiet",
+  /** The mic picks up the call from the speakers: the others are in this person's recording. */
+  "echo",
   /** The oldest chunk not yet uploaded is more than a minute old. */
   "upload_behind",
   /** Too little browser storage left to keep buffering the recording. */
