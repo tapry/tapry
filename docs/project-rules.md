@@ -78,6 +78,6 @@ Done for v1: studios ("shows"), invite links, green room with consent checkbox, 
 - `pnpm dev` — web + worker
 - `pnpm test` — unit tests
 - `FFMPEG_PATH=… FFPROBE_PATH=… pnpm test` — ffmpeg-backed worker/processing tests run only when ffmpeg is found
-- `WEED_BIN=… LIVEKIT_BIN=… pnpm --filter @tapry/web test:e2e` (LIVEKIT_BIN optional: without it the call step is skipped, recording still tested) — Playwright, full Chromium with fake camera/mic, host + guest flow (throttled network: not yet)
+- `WEED_BIN=… LIVEKIT_BIN=… pnpm --filter @tapry/web test:e2e` (LIVEKIT_BIN optional: without it the call step is skipped, recording still tested) — Playwright, full Chromium with fake camera/mic, host + guest flow (throttled network: not yet). `E2E_SYNC_GUEST=safari` runs `e2e/sync.spec.ts` with real Safari as the guest (`e2e/safari.ts`, safaridriver; needs Safari's "Allow remote automation")
 - `WEED_BIN=/path/to/weed pnpm --filter @tapry/web test:s3` — upload API against a real S3 server (SeaweedFS)
 - `cd deploy/compose && ./setup.sh localhost && docker compose up -d` — full self-host stack at http://localhost (docs/self-hosting.md)

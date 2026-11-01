@@ -63,12 +63,34 @@ wrong. After processing, each beep is found in each person's WAV (`E2E_SYNC_SECO
 
 Plan target (Gate A): under 50 ms between people, with no lost audio. The 60-minute run (1 Nov 2026)
 also checks that every output file runs the whole recording (within 0.1 s) and that every beep is
-in both files. Safari is still to be done by hand with a real session. With the clock-offset correction switched off,
-the same test fails (beeps ~300 ms apart).
+in both files. With the clock-offset correction switched off, the same test fails (beeps ~300 ms
+apart). `E2E_SYNC_SKEW=host` puts the wrong clock on the host instead (same results).
+
+## Sync and zero loss (real Safari)
+
+`E2E_SYNC_GUEST=safari` makes the guest real Safari on macOS, driven by Apple's `safaridriver`
+(Safari > Settings > Advanced > "Show features for web developers", then Developer > "Allow
+remote automation"). The host stays Chromium, with the wrong clock; Safari keeps its camera on.
+
+Automated Safari only has mock devices. Its Web Audio clock stalls for hundreds of ms at a time
+there, so beeps can't be generated in it; its mock microphone bursts every 1.000 s instead, through
+the same capture → MediaRecorder → upload → processing path as a real mic, at a phase we can't
+know. So the Safari run checks that every burst is in Safari's file, exactly a second after the
+last, from end to end (nothing lost, no drift against real time), and that every file runs the
+whole recording. It doesn't measure the absolute gap between a Safari guest and the host: that
+needs real devices.
+
+| Length | Safari bursts found | Spacing (min–max) | Files full length |
+|---|---|---|---|
+| 2 min | 119 / 119 | 999.9–1000.1 ms | ✓ |
+
+The gap between Safari and the host is reported, not checked: with both browsers on one machine,
+headless Chromium's generated beeps stall for a few hundred ms while Safari starts encoding (the
+host's own track jumps; Safari's stays even).
 
 **Not covered:** each device's own input delay. A Bluetooth headset can add 100–200 ms before
 the browser sees the sound, and timestamps can't know it; lining tracks up by the audio itself
-(cross-correlation) would be the way to catch that. Not tested beyond 5 minutes yet.
+(cross-correlation) would be the way to catch that.
 
 ## Reliability (Chromium)
 
