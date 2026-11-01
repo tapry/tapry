@@ -36,6 +36,10 @@ docs/               self-hosting, architecture, browser support
 - Design tokens are in `apps/web/src/app/globals.css` (light + dark); components use the Tailwind names, never raw colors. Primitives in `src/components/ui.tsx`.
 - Download links show friendly titles; the real file name is in `data-file-name` (tests read that).
 
+## Quality alerts
+- Computed on each device (`src/lib/client/quality.ts`: mic peaks from the recorder's stream, upload lag, `storage.estimate`, visibility, recorder errors) and POSTed as codes to `/sessions/:id/telemetry` on change and every 3 s. Kept in memory in `LiveHub.health` and pushed in `SessionState.health`; stale after `STALE_REPORT_MS` (15 s). Metadata only: never audio, video or transcript text.
+- Thresholds (tune with alpha users): clipping = more than 3 peaks ≥ −1 dBFS in 10 s; silent = below −55 dBFS for 30 s unmuted; upload behind = oldest unsent chunk over 60 s; low disk = under 1 GB of browser storage.
+
 ## Processing
 - Jobs live in Postgres (`jobs`, claimed with `FOR UPDATE SKIP LOCKED`). `WORKER=inprocess` (default, required with PGlite) runs them inside the web server; with Postgres, `src/worker-main.ts` (bundled to `dist-worker/worker.cjs`, the `worker` Compose service) runs them separately and the web server uses `WORKER=off`. Running jobs renew their lock; a stopped worker hands its job back; migrations take an advisory lock so web and workers can start together.
 - A recording is processed once it is stopped and every track is complete; hosts can force it ("Process now").

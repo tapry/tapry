@@ -19,6 +19,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - When a session ends, everyone sees their recording arriving, then "That's a wrap".
 - Studio keyboard shortcuts: ⌘/Ctrl+Shift+R start or stop recording, M mute, L copy the invite link.
 
+### In-call quality alerts
+- Each person's device watches its own mic (distorting, silent for 30 s while unmuted), upload
+  (more than a minute behind), storage, tab (in the background) and recorders, and reports only
+  the alert codes. The host sees them next to each name in the studio, plus "Not reporting" when a
+  device goes quiet for 15 s (offline, asleep, tab closed). Each person sees advice for their own.
+- "No headphones" shows as a note: it's the main cause of echo. Echo itself isn't measured yet.
+
 ### Storage
 - `RAW_RETENTION_DAYS` (off by default): remove each episode's original uploads that many days
   after its files are ready, keeping the processed files. Saves 40–50% of the space.

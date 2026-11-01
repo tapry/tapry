@@ -6,6 +6,7 @@ import {
   joinBody,
   loginBody,
   seqParam,
+  telemetryBody,
   signupBody,
   updateStudioBody,
   uploadUrlBody,
@@ -163,6 +164,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       json(200, await svc.live.stopRecording(p, params.recordingId!)),
     ),
     endSession: asParticipant(async (svc, p) => json(200, await svc.live.endSession(p))),
+    /** A device's quality report: alert codes and upload lag, no media. Every few seconds. */
+    telemetry: asParticipant(async (svc, p, req) => {
+      svc.live.reportHealth(p, await parseBody(req, telemetryBody));
+      return new Response(null, { status: 204 });
+    }),
     /** LiveKit token for the live call (or enabled: false when no LiveKit is configured). */
     callToken: asParticipant(async (svc, p) => json(200, await svc.call.token(p))),
 

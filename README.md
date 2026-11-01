@@ -15,6 +15,9 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
 - **Nothing lost.** Recordings are saved in the browser as they happen and uploaded in small
   pieces while you talk. A dropped connection, closed tab or crashed browser picks up where it
   left off when the guest comes back.
+- **Problems shown while you record.** The host sees, per guest, a distorting or silent mic, an
+  upload falling behind, low disk space or a tab sent to the background, and each guest gets
+  advice for their own.
 - **Guests need nothing.** A link, a browser (Chrome, Edge, Firefox, Safari), no account, no
   install. A green room checks their camera, microphone and storage first.
 - **Live call** alongside the recording (LiveKit), including guests behind strict firewalls
