@@ -23,6 +23,8 @@ export interface RecordingSummary {
   incompleteTracks: number;
   /** Space used in storage: uploaded chunks plus processed files. */
   bytes: number;
+  /** The original uploads were removed after the retention period; only the processed files remain. */
+  rawDeleted: boolean;
   /** Everyone who recorded in it, host first, with how far their upload got. */
   people: Array<{
     participantId: string;
@@ -59,7 +61,7 @@ export class ProcessingService {
       `SELECT r.status,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS open
-       FROM recordings r WHERE r.id = $1 AND r.deleted_at IS NULL`,
+       FROM recordings r WHERE r.id = $1 AND r.deleted_at IS NULL AND r.raw_deleted_at IS NULL`,
       [recordingId],
     );
     if (r?.status === "stopped" && r.tracks > 0 && r.open === 0) await this.enqueue(recordingId);
@@ -85,6 +87,9 @@ export class ProcessingService {
   async processNow(owner: User, studioId: string, recordingId: string) {
     const rec = await this.ownedRecording(owner, studioId, recordingId);
     if (rec.status !== "stopped") throw new ApiError(409, "still_recording", "Stop the recording first");
+    if (rec.raw_deleted_at) {
+      throw new ApiError(409, "originals_removed", "The original uploads were removed after the retention period, so this episode can't be processed again");
+    }
     await this.enqueue(recordingId);
   }
 
@@ -103,6 +108,7 @@ export class ProcessingService {
     const rows = await this.db.query<{
       id: string;
       number: number | null;
+      raw_deleted_at: Date | null;
       session_id: string;
       status: "recording" | "stopped";
       processing: ProcessingStatus;
@@ -114,7 +120,7 @@ export class ProcessingService {
       incomplete: number;
       bytes: number;
     }>(
-      `SELECT r.id, r.number, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
+      `SELECT r.id, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
               ${RECORDING_BYTES} AS bytes
@@ -163,6 +169,7 @@ export class ProcessingService {
     return rows.map((r) => ({
       id: r.id,
       number: r.number ?? 0,
+      rawDeleted: r.raw_deleted_at !== null,
       people: people
         .filter((p) => p.recording_id === r.id)
         .map((p) => ({
@@ -228,8 +235,8 @@ export class ProcessingService {
   }
 
   private async ownedRecording(owner: User, studioId: string, recordingId: string) {
-    const [rec] = await this.db.query<{ status: string }>(
-      `SELECT r.status FROM recordings r
+    const [rec] = await this.db.query<{ status: string; raw_deleted_at: Date | null }>(
+      `SELECT r.status, r.raw_deleted_at FROM recordings r
        JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
        WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
       [recordingId, studioId, owner.id],

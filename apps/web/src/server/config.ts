@@ -31,6 +31,11 @@ const env = z.object({
   WORKER_POLL_MS: z.coerce.number().int().min(200).max(60_000).default(2000),
   /** A crashed worker's job is picked up again after this long (running jobs renew it). */
   WORKER_LOCK_SECONDS: z.coerce.number().int().min(10).max(86_400).default(600),
+  /**
+   * Delete each episode's original uploads this many days after its files are ready (0: right
+   * away). The processed files stay. Unset (default): keep the originals.
+   */
+  RAW_RETENTION_DAYS: unsetIfEmpty(z.coerce.number().min(0).max(3650)),
   FFMPEG_PATH: z.string().default("ffmpeg"),
   FFPROBE_PATH: z.string().default("ffprobe"),
   /** Transcripts: set WHISPER_MODEL (a whisper.cpp ggml model file) to turn them on. */
@@ -53,6 +58,8 @@ export interface WorkerConfig {
   font?: string;
   pollMs: number;
   lockMs: number;
+  /** Delete originals this long after processing; undefined keeps them. */
+  rawRetentionMs?: number;
 }
 
 export interface Config {
@@ -96,6 +103,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       font: cfg.TILE_FONT,
       pollMs: cfg.WORKER_POLL_MS,
       lockMs: cfg.WORKER_LOCK_SECONDS * 1000,
+      rawRetentionMs: cfg.RAW_RETENTION_DAYS === undefined ? undefined : cfg.RAW_RETENTION_DAYS * 86_400_000,
     },
     call: cfg.LIVEKIT_URL ? { url: cfg.LIVEKIT_URL, apiKey: cfg.LIVEKIT_API_KEY!, apiSecret: cfg.LIVEKIT_API_SECRET! } : null,
   };

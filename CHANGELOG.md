@@ -19,6 +19,12 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - When a session ends, everyone sees their recording arriving, then "That's a wrap".
 - Studio keyboard shortcuts: ⌘/Ctrl+Shift+R start or stop recording, M mute, L copy the invite link.
 
+### Storage
+- `RAW_RETENTION_DAYS` (off by default): remove each episode's original uploads that many days
+  after its files are ready, keeping the processed files. Saves about 40% of the space.
+- `docs/costs.md`: measured storage and CPU per recorded hour, and what it means for pricing;
+  `apps/worker/scripts/cost-benchmark.sh` re-runs the measurement.
+
 ### Website
 - `apps/site`: the OpenTake landing page, a static site separate from the app (self-hosted servers
   don't show it). `NEXT_PUBLIC_WAITLIST_URL` turns on the cloud waitlist form.

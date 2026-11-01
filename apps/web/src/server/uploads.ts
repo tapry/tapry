@@ -56,7 +56,7 @@ export class UploadService {
    */
   async createTrack(p: Participant, body: z.infer<typeof createTrackBody>) {
     const [recording] = await this.db.query<{ status: string; stopped_at: number | null; deleted_at: Date | null }>(
-      "SELECT status, stopped_at, deleted_at FROM recordings WHERE id = $1 AND session_id = $2",
+      "SELECT status, stopped_at, coalesce(deleted_at, raw_deleted_at) AS deleted_at FROM recordings WHERE id = $1 AND session_id = $2",
       [body.recordingId, p.sessionId],
     );
     if (!recording) throw new ApiError(404, "recording_not_found", "Recording not found");
@@ -189,7 +189,7 @@ export class UploadService {
 
   private async ownedTrack(p: Participant, trackId: string) {
     const [track] = await this.db.query<TrackRow & { deleted_at: Date | null }>(
-      `SELECT t.*, r.deleted_at FROM tracks t JOIN recordings r ON r.id = t.recording_id
+      `SELECT t.*, coalesce(r.deleted_at, r.raw_deleted_at) AS deleted_at FROM tracks t JOIN recordings r ON r.id = t.recording_id
        WHERE t.id = $1 AND t.session_id = $2 AND t.participant_id = $3`,
       [trackId, p.sessionId, p.id],
     );
@@ -209,7 +209,8 @@ export class UploadService {
 }
 
 /**
- * The host deleted the recording. 410 is the one answer that tells the recorder to drop its
+ * The host deleted the recording, or its originals were removed after the retention period
+ * (an upload arriving that late can't join the processed files). 410 is the one answer that tells the recorder to drop its
  * local copy of the track (TrackGoneError) instead of retrying: nobody wants it any more.
  */
 const recordingGone = () => new ApiError(410, "recording_deleted", "The host deleted this recording");

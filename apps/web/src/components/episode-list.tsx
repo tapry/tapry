@@ -271,6 +271,11 @@ function Downloads({ showId, episode: e }: { showId: string; episode: Episode })
           </a>
         )}
       </div>
+      {e.rawDeleted && (
+        <p className="text-[13px] text-subtle" data-testid="originals-removed">
+          The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.
+        </p>
+      )}
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,250px),1fr))] gap-2">
         {e.outputs.map((o) => {
           const d = describe(o);
