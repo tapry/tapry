@@ -2,16 +2,21 @@
 
 import type { SessionState, SessionTicket } from "@opentake/shared";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
-import { Button, Card, Field, Input, Notice } from "@/components/ui";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Button, cn, Field, Input, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError, loadTicketForInvite, saveTicket } from "@/lib/client/api";
 import { getPipeline } from "@/lib/client/recording";
 
-export function JoinForm({ inviteCode }: { inviteCode: string }) {
+const RETRY_MS = 5_000;
+
+export function JoinForm({ inviteCode, hostName }: { inviteCode: string; hostName: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [waitingForHost, setWaitingForHost] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [consent, setConsent] = useState(false);
   const [previous, setPrevious] = useState<{ ticket: SessionTicket; name: string } | null>(null);
+  const form = useRef<HTMLFormElement>(null);
 
   // Upload anything a crashed or closed tab left behind, as early as possible.
   useEffect(() => void getPipeline(), []);
@@ -28,53 +33,81 @@ export function JoinForm({ inviteCode }: { inviteCode: string }) {
       .catch(() => {});
   }, [inviteCode]);
 
+  // The host hasn't opened the studio yet: try again by ourselves until they do.
+  useEffect(() => {
+    if (!waitingForHost) return;
+    const id = setTimeout(() => form.current?.requestSubmit(), RETRY_MS);
+    return () => clearTimeout(id);
+  }, [waitingForHost, busy]);
+
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
+    const data = new FormData(e.currentTarget);
     setBusy(true);
     setError(null);
     try {
       const ticket = await apiFetch<SessionTicket>("/join", {
-        body: { inviteCode, displayName: form.get("displayName"), consent: form.get("consent") === "on" },
+        body: { inviteCode, displayName: data.get("displayName"), consent: data.get("consent") === "on" },
       });
       saveTicket(ticket, inviteCode);
       router.push(`/session/${ticket.sessionId}`);
     } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.code === "host_not_here"
-            ? "Your host hasn't opened the studio yet. Keep this page open and try again in a moment."
-            : err.message
-          : "Something went wrong. Try again.",
-      );
+      if (err instanceof ApiRequestError && err.code === "host_not_here") setWaitingForHost(true);
+      else {
+        setWaitingForHost(false);
+        setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      }
       setBusy(false);
     }
   }
 
   return (
-    <Card className="space-y-5">
+    <div className="flex flex-col gap-[22px]">
       {previous && (
-        <div className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
-          <p className="text-sm">You already joined this session as {previous.name}.</p>
-          <Button onClick={() => router.push(`/session/${previous.ticket.sessionId}`)}>Continue as {previous.name}</Button>
+        <div className="flex flex-col gap-3 rounded-xl bg-surface-2 p-4">
+          <p className="text-[15px]">You already joined this session as {previous.name}.</p>
+          <Button variant="record" onClick={() => router.push(`/session/${previous.ticket.sessionId}`)}>
+            Continue as {previous.name}
+          </Button>
         </div>
       )}
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Your name" hint="Shown to the host and other guests.">
+      {waitingForHost && (
+        <Notice tone="warn" className="flex items-start gap-2.5">
+          <StatusDot tone="warn" className="mt-1.5 animate-rec-pulse" />
+          <span>
+            {hostName} hasn&apos;t opened the studio yet. Keep this page open, and we&apos;ll try again for you every few
+            seconds.
+          </span>
+        </Notice>
+      )}
+      <form ref={form} onSubmit={submit} className="flex flex-col gap-[22px]">
+        <Field label="Your name" hint={`${hostName} and the other guests will see this.`}>
           <Input name="displayName" autoComplete="name" required maxLength={60} autoFocus={!previous} />
         </Field>
-        <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" name="consent" required className="mt-0.5 size-4" />
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface-2 px-4 py-3.5 text-[15px] leading-normal">
+          <input
+            type="checkbox"
+            name="consent"
+            required
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-[3px] size-[18px] shrink-0"
+          />
           <span>
-            I agree to be recorded. My camera and microphone are recorded on this device and uploaded to the host's
-            storage.
+            I&apos;m happy to be recorded. My camera and microphone are recorded on this computer and sent to {hostName}.
           </span>
         </label>
-        {error && <Notice tone={error.startsWith("Your host") ? "warn" : "danger"}>{error}</Notice>}
-        <Button type="submit" disabled={busy} className="w-full">
+        {error && <Notice tone="danger">{error}</Notice>}
+        <Button
+          type="submit"
+          variant="record"
+          size="lg"
+          disabled={busy && !waitingForHost}
+          className={cn("w-full text-[17px]", !consent && "opacity-60 shadow-none")}
+        >
           {previous ? "Join as someone new" : "Continue"}
         </Button>
       </form>
-    </Card>
+    </div>
   );
 }

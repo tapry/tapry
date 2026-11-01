@@ -2,7 +2,7 @@
 
 import type { RemoteAudioTrack, RemoteVideoTrack } from "livekit-client";
 import { useEffect, useRef } from "react";
-import { cn } from "@/components/ui";
+import { Avatar as Initials, cn } from "@/components/ui";
 import type { RemotePeer } from "@/lib/client/call";
 
 /** You plus everyone in the call, in a grid that fits up to 8 people. */
@@ -24,9 +24,9 @@ export function CallGrid({
   recording: boolean;
 }) {
   const count = peers.length + 1;
-  const cols = count === 1 ? "grid-cols-1" : count <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-3";
+  const cols = count === 1 ? "grid-cols-1" : count <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 lg:grid-cols-3";
   return (
-    <div className={cn("grid gap-3", cols)}>
+    <div className={cn("grid content-center gap-3", cols, count === 1 && "mx-auto w-full max-w-3xl")}>
       <Tile
         name={`${selfName} (you)`}
         micMuted={selfMicMuted}
@@ -70,14 +70,15 @@ function Tile({
       data-testid={testId}
       data-name={name}
       data-mic={micMuted ? "muted" : "on"}
+      data-recording={recording ? "on" : "off"}
       className={cn(
-        "relative aspect-video overflow-hidden rounded-xl border-2 bg-surface-2 transition-colors",
-        speaking ? "border-ok" : recording ? "border-accent" : "border-border",
+        "relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#e9e7e4] outline-3 -outline-offset-3 transition-[outline-color] duration-300 sm:aspect-video dark:bg-surface-2",
+        speaking ? "outline-ok" : "outline-transparent",
       )}
     >
       {children}
-      <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs text-white">
-        {micMuted && <MicOffIcon />}
+      <span className="absolute bottom-2 left-2 flex items-center gap-[7px] rounded-lg bg-[rgba(30,26,26,.72)] px-2.5 py-[5px] text-[13px] font-medium text-white">
+        {micMuted ? <MicOffIcon /> : <span aria-hidden className="size-[7px] rounded-full bg-ok" />}
         {name}
       </span>
     </div>
@@ -120,23 +121,16 @@ function TrackAudio({ track }: { track: RemoteAudioTrack }) {
 }
 
 function Avatar({ name }: { name: string }) {
-  const initials = name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
   return (
     <div className="grid size-full place-items-center">
-      <span className="grid size-16 place-items-center rounded-full bg-border text-xl font-medium">{initials || "?"}</span>
+      <Initials name={name} className="aspect-square w-[28%] max-w-24 text-xl" />
     </div>
   );
 }
 
 function MicOffIcon() {
   return (
-    <svg aria-label="Muted" viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg aria-label="Muted" viewBox="0 0 24 24" className="size-3.5 text-[#ff8f78]" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.8" />
       <path d="M19 10v2a7 7 0 0 1-.9 3.4M5 10v2a7 7 0 0 0 11.6 5.3M12 19v3M2 2l20 20" />
     </svg>

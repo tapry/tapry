@@ -15,3 +15,6 @@ playwright-report/
 .next-check/
 deploy/compose/.env.*
 dist-worker/
+
+# Static website export (apps/site)
+apps/site/out/

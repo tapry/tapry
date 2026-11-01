@@ -1,0 +1,77 @@
+/* The landing page is light by design (with dark sections of its own), whatever the system theme. */
+:root {
+  color-scheme: light;
+  --sans: var(--font-onest), system-ui, sans-serif;
+  --mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #1d1d1f;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: #d4472f;
+  text-decoration: none;
+}
+a:hover {
+  color: #e8553d;
+}
+
+::selection {
+  background: #fbd5cc;
+}
+
+:focus-visible {
+  outline: 2px solid #e8553d;
+  outline-offset: 3px;
+}
+
+button {
+  font-family: var(--sans);
+}
+
+@keyframes otpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Hover states the inline styles can't express. */
+.cta:hover {
+  background: #d4472f !important;
+  color: #ffffff !important;
+}
+.ghost-btn:hover {
+  background: #f7f7f8 !important;
+  color: #1d1d1f !important;
+}
+.dark-btn:hover {
+  background: #3a3a3c !important;
+  color: #ffffff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The nav collapses to the logo and the main button on small screens. */
+@media (max-width: 720px) {
+  .nav-links {
+    display: none !important;
+  }
+}

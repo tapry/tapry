@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 export const PASSWORD = "e2e-only-throwaway-password";
 export const HOST_EMAIL = "host@opentake.test";
@@ -53,29 +53,36 @@ export async function signInHost(page: Page) {
     await page.getByRole("link", { name: "Create admin account" }).click();
     await page.getByLabel("Your name").fill("Dev Host");
   } else {
-    await page.getByRole("link", { name: "Sign in" }).click();
+    await page.getByRole("link", { name: "Log in" }).click();
   }
   await page.getByLabel("Email").fill(HOST_EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: fresh ? "Create account" : "Sign in" }).click();
-  await expect(page).toHaveURL(/\/studios$/);
+  await page.getByRole("button", { name: fresh ? "Create account" : "Log in" }).click();
+  await expect(page).toHaveURL(/\/shows/);
 }
 
+/** A new show (a "studio" in the API), through the New show page. */
 export async function createStudio(page: Page, name: string) {
-  await page.getByLabel("New studio").fill(name);
-  await page.getByRole("button", { name: "Create studio" }).click();
+  await page.goto("/shows/new");
+  await page.getByLabel("What's it called?").fill(name);
+  await page.getByRole("button", { name: "Create show" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
-  return { studioUrl: page.url(), inviteUrl: await page.getByLabel("Guest invite link").inputValue() };
+  const invite = page.getByLabel("Guest invite link");
+  await expect(invite).toHaveValue(/^https?:\/\/.+\/join\//);
+  return { studioUrl: page.url(), inviteUrl: await invite.inputValue() };
 }
 
 /** Download links of the newest recording's media (transcripts arrive later, separately). */
 export const mediaLinks = (page: Page) =>
-  page.getByTestId("recording").first().getByTestId("download").filter({ hasNotText: /^Transcript\./ });
+  page.getByTestId("recording").first().locator('[data-testid="download"]:not([data-file-name^="Transcript."])');
+
+/** The real file names of download links (the links show friendlier titles). */
+export const fileNames = (links: Locator) => links.evaluateAll((as) => as.map((a) => a.getAttribute("data-file-name")!));
 
 /** Download every media file of the newest recording through the browser; returns name, type, bytes, duration. */
 export async function downloadOutputs(page: Page) {
   const links = await mediaLinks(page).evaluateAll((as) =>
-    as.map((a) => ({ href: (a as HTMLAnchorElement).href, name: a.querySelector("span")!.textContent! })),
+    as.map((a) => ({ href: (a as HTMLAnchorElement).href, name: a.getAttribute("data-file-name")! })),
   );
   const files = [];
   for (const { href, name } of links) {

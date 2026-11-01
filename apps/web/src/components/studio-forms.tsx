@@ -1,46 +1,15 @@
 "use client";
 
+// Host-side forms around a show (a "studio" in the API): invite link, settings, enter,
+// delete, and logging out. Creating a show has its own page (new-show-form.tsx).
 import type { SessionTicket, StudioSettings } from "@opentake/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
 import { ConfirmAction } from "./confirm-action";
-import { Button, Field, Input, Notice, Select } from "./ui";
+import { Button, CheckboxRow, cn, Field, Input, Notice, RecDot } from "./ui";
 
 const message = (err: unknown) => (err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
-
-export function CreateStudioForm() {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const studio = await apiFetch<{ id: string }>("/studios", { body: { name: new FormData(e.currentTarget).get("name") } });
-      router.push(`/studios/${studio.id}`);
-    } catch (err) {
-      setError(message(err));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-      <div className="flex-1">
-        <Field label="New studio">
-          <Input name="name" placeholder="e.g. The Weekly Interview" required maxLength={100} />
-        </Field>
-      </div>
-      <Button type="submit" disabled={busy}>
-        Create studio
-      </Button>
-      {error && <Notice tone="danger">{error}</Notice>}
-    </form>
-  );
-}
 
 export function InviteLink({ studioId, inviteCode: initial }: { studioId: string; inviteCode: string }) {
   const [code, setCode] = useState(initial);
@@ -61,7 +30,7 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   }
 
   async function rotate() {
-    if (!confirm("Make a new link? The current link will stop working for anyone who hasn't joined yet.")) return;
+    if (!confirm("Make a new link? The old link will stop working for anyone who hasn't joined yet.")) return;
     try {
       setCode((await apiFetch<{ inviteCode: string }>(`/studios/${studioId}/invite`, { body: {} })).inviteCode);
     } catch (err) {
@@ -70,14 +39,20 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Input readOnly value={link} aria-label="Guest invite link" onFocus={(e) => e.currentTarget.select()} />
-        <Button variant="secondary" onClick={copy} className="shrink-0">
-          {copied ? "Copied" : "Copy link"}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <input
+          readOnly
+          value={link}
+          aria-label="Guest invite link"
+          onFocus={(e) => e.currentTarget.select()}
+          className="h-12 min-w-60 flex-1 truncate rounded-full border border-dashed border-border-strong bg-transparent px-5 font-mono text-sm text-text-2 focus:outline-none"
+        />
+        <Button onClick={copy} className="h-12 px-[22px]">
+          {copied ? "✓ Copied" : "Copy link"}
         </Button>
-        <Button variant="ghost" onClick={rotate} className="shrink-0">
-          New link
+        <Button variant="secondary" onClick={rotate} className="h-12 px-5 font-medium">
+          Make a new link
         </Button>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
@@ -85,8 +60,10 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   );
 }
 
-export function StudioSettingsForm({ studioId, name, settings }: { studioId: string; name: string; settings: StudioSettings }) {
+export function ShowSettingsForm({ studioId, name, settings }: { studioId: string; name: string; settings: StudioSettings }) {
   const router = useRouter();
+  const [quality, setQuality] = useState(settings.videoQuality);
+  const [guests, setGuests] = useState(settings.maxGuests);
   const [status, setStatus] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -98,14 +75,15 @@ export function StudioSettingsForm({ studioId, name, settings }: { studioId: str
         body: {
           name: f.get("name"),
           settings: {
-            videoQuality: f.get("videoQuality"),
-            maxGuests: Number(f.get("maxGuests")),
+            videoQuality: quality,
+            maxGuests: guests,
             echoCancellation: f.get("echoCancellation") === "on",
             levelLoudness: f.get("levelLoudness") === "on",
           },
         },
       });
-      setStatus({ tone: "ok", text: "Saved." });
+      setStatus({ tone: "ok", text: "✓ Saved" });
+      setTimeout(() => setStatus(null), 2500);
       router.refresh();
     } catch (err) {
       setStatus({ tone: "danger", text: message(err) });
@@ -113,57 +91,90 @@ export function StudioSettingsForm({ studioId, name, settings }: { studioId: str
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <Field label="Studio name">
+    <form onSubmit={submit} className="flex flex-col gap-6">
+      <Field label="Show name">
         <Input name="name" defaultValue={name} required maxLength={100} />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Video quality">
-          <Select name="videoQuality" defaultValue={settings.videoQuality}>
-            <option value="1080p">1080p</option>
-            <option value="720p">720p</option>
-          </Select>
-        </Field>
-        <Field label="Guests (besides you)">
-          <Select name="maxGuests" defaultValue={String(settings.maxGuests)}>
-            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </Select>
-        </Field>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 text-[15px] font-medium">Video quality</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              ["1080p", "Full HD", "Best quality, larger files"],
+              ["720p", "Standard", "Smaller files, still sharp"],
+            ] as const
+          ).map(([value, label, sub]) => (
+            <label
+              key={value}
+              className={cn(
+                "flex cursor-pointer flex-col gap-[3px] rounded-[10px] border px-4 py-3.5 text-[15px] font-semibold",
+                quality === value ? "border-accent bg-accent-soft" : "border-border-strong",
+              )}
+            >
+              <input
+                type="radio"
+                name="videoQuality"
+                value={value}
+                checked={quality === value}
+                onChange={() => setQuality(value)}
+                className="sr-only"
+              />
+              {label}
+              <span className="text-[13px] font-normal text-muted">{sub}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="flex flex-wrap items-center justify-between gap-4 text-[15px]">
+        <span className="flex flex-col gap-[3px]">
+          <span className="font-medium" id="guests-label">
+            Number of guests
+          </span>
+          <span className="text-sm text-muted">Not counting you</span>
+        </span>
+        <div className="flex items-center overflow-hidden rounded-full border border-border-strong" role="group" aria-labelledby="guests-label">
+          <button
+            type="button"
+            aria-label="Fewer guests"
+            onClick={() => setGuests(Math.max(1, guests - 1))}
+            className="size-11 cursor-pointer text-lg font-semibold"
+          >
+            −
+          </button>
+          <span className="w-9 text-center font-semibold" aria-live="polite">
+            {guests}
+          </span>
+          <button
+            type="button"
+            aria-label="More guests"
+            onClick={() => setGuests(Math.min(7, guests + 1))}
+            className="size-11 cursor-pointer text-lg font-semibold"
+          >
+            +
+          </button>
+        </div>
       </div>
-      <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="echoCancellation" defaultChecked={settings.echoCancellation} className="mt-0.5 size-4" />
-        <span>
-          <span className="font-medium">Echo cancellation for guests on speakers</span>
-          <span className="block text-muted">
-            Guests who say they're on headphones always get it switched off, which sounds better.
-          </span>
-        </span>
-      </label>
-      <label className="flex items-start gap-3 text-sm">
-        <input type="checkbox" name="levelLoudness" defaultChecked={settings.levelLoudness} className="mt-0.5 size-4" />
-        <span>
-          <span className="font-medium">Even out volume</span>
-          <span className="block text-muted">
-            Brings everyone&apos;s audio to podcast loudness (−16 LUFS) after recording, quiet guests included. Only the
-            volume changes, never the sound. Applies to recordings processed from now on.
-          </span>
-        </span>
-      </label>
-      <div className="flex items-center gap-3">
-        <Button type="submit" variant="secondary">
-          Save settings
-        </Button>
-        {status && <span className={status.tone === "ok" ? "text-sm text-ok" : "text-sm text-danger"}>{status.text}</span>}
+      <CheckboxRow
+        name="echoCancellation"
+        defaultChecked={settings.echoCancellation}
+        label="Reduce echo for guests without headphones"
+        description="It switches off automatically for guests wearing headphones, because they sound better without it."
+      />
+      <CheckboxRow
+        name="levelLoudness"
+        defaultChecked={settings.levelLoudness}
+        label="Even out everyone's volume"
+        description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, podcast loudness). Only the volume changes, never how anyone sounds. Applies to episodes processed from now on."
+      />
+      <div className="flex items-center gap-3.5">
+        <Button type="submit">Save changes</Button>
+        {status && <span className={cn("text-[15px]", status.tone === "ok" ? "text-ok" : "text-danger")}>{status.text}</span>}
       </div>
     </form>
   );
 }
 
-export function OpenStudioButton({ studioId }: { studioId: string }) {
+export function OpenStudioButton({ studioId, live = false }: { studioId: string; live?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -182,50 +193,53 @@ export function OpenStudioButton({ studioId }: { studioId: string }) {
   }
 
   return (
-    <div className="space-y-2">
-      <Button variant="record" onClick={open} disabled={busy}>
-        Enter studio
+    <div className="flex flex-col items-end gap-2">
+      <Button variant="record" size="lg" onClick={open} disabled={busy}>
+        <RecDot />
+        {live ? "Back to the live studio" : "Enter studio"}
       </Button>
       {error && <Notice tone="danger">{error}</Notice>}
     </div>
   );
 }
 
-export function DeleteStudioButton({ studioId, name, recordings }: { studioId: string; name: string; recordings: number }) {
+export function DeleteShowButton({ studioId, name, episodes }: { studioId: string; name: string; episodes: number }) {
   const router = useRouter();
   return (
     <ConfirmAction
-      label="Delete studio…"
+      label="Delete show…"
+      trigger="button"
       testId="delete-studio"
       question={
         <>
           Delete “{name}”
-          {recordings > 0 && ` and its ${recordings} recording${recordings === 1 ? "" : "s"}`}? Guests in it are
-          disconnected and the files are removed from the server. This can&apos;t be undone.
+          {episodes > 0 && ` and its ${episodes} episode${episodes === 1 ? "" : "s"}`}? Guests in it are disconnected and
+          the files are removed from the server. This can&apos;t be undone.
         </>
       }
-      confirmLabel="Delete studio"
+      confirmLabel="Delete show"
       action={async () => {
         await apiFetch(`/studios/${studioId}`, { method: "DELETE" });
-        router.replace("/studios");
+        router.replace("/shows");
         router.refresh();
       }}
     />
   );
 }
 
-export function SignOutButton() {
+export function LogOutButton() {
   const router = useRouter();
   return (
     <Button
-      variant="ghost"
+      variant="secondary"
+      className="h-9 px-4 text-sm font-medium"
       onClick={async () => {
         await apiFetch("/auth/logout", { body: {} }).catch(() => {});
         router.replace("/login");
         router.refresh();
       }}
     >
-      Sign out
+      Log out
     </Button>
   );
 }

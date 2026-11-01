@@ -14,8 +14,11 @@ export function ConfirmAction({
   confirmLabel,
   action,
   testId,
+  trigger = "link",
 }: {
   label: string;
+  /** How the first button looks: a quiet coral text link (default) or an outlined danger button. */
+  trigger?: "link" | "button";
   question: ReactNode;
   confirmLabel: string;
   action: () => Promise<void>;
@@ -40,16 +43,21 @@ export function ConfirmAction({
 
   if (!asking) {
     return (
-      <Button variant="ghost" onClick={() => setAsking(true)} data-testid={testId}>
+      <Button
+        variant={trigger === "button" ? "danger" : "ghost"}
+        className={trigger === "link" ? "h-auto rounded-none p-0 text-sm font-medium text-accent-strong hover:bg-transparent hover:text-accent" : undefined}
+        onClick={() => setAsking(true)}
+        data-testid={testId}
+      >
         {label}
       </Button>
     );
   }
   return (
-    <div className="w-full space-y-3 rounded-md border border-danger/40 bg-danger/10 p-3" role="alertdialog">
-      <p className="text-sm">{question}</p>
+    <div className="w-full space-y-3 rounded-xl border border-dashed border-accent-line bg-accent-soft/60 p-4" role="alertdialog">
+      <p className="text-[15px] leading-normal">{question}</p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="danger" onClick={confirm} disabled={busy} data-testid={testId && `${testId}-confirm`}>
+        <Button variant="record" className="rounded-full" onClick={confirm} disabled={busy} data-testid={testId && `${testId}-confirm`}>
           {confirmLabel}
         </Button>
         <Button variant="secondary" onClick={() => setAsking(false)} disabled={busy}>

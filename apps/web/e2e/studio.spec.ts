@@ -5,7 +5,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { createStudio, expect, fileNames, mediaLinks, signInHost, test } from "./fixtures";
 
 // The storage the test server writes to (started by scripts/with-seaweedfs.mjs).
 const s3 = new S3Client({
@@ -60,7 +61,6 @@ async function readObject(key: string) {
 
 // Fixed, because Playwright re-evaluates this file for each repeat while the server (and its
 // admin account) lives for the whole run. The database is a fresh temp dir per run.
-const password = "e2e-only-throwaway-password";
 
 /** The <video> element's live stream, inspected in the page. */
 const streamInfo = (page: Page) =>
@@ -77,7 +77,7 @@ const meterValue = async (page: Page) =>
   Number(await page.getByRole("meter", { name: "Microphone level" }).getAttribute("aria-valuenow"));
 
 async function expectWorkingGreenRoom(page: Page) {
-  await expect(page.getByText("Check your camera and microphone before you go in.")).toBeVisible();
+  await expect(page.getByText("Check how you look and sound before you go in.")).toBeVisible();
   // Camera: the fake device's test pattern is playing at the studio's 1080p setting.
   await expect.poll(async () => (await streamInfo(page)).width).toBeGreaterThan(0);
   const { video } = await streamInfo(page);
@@ -95,27 +95,11 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
 
   const studioName = `E2E Show ${randomBytes(3).toString("hex")}`;
 
-  await test.step("host creates the admin account (or signs in to it) and a studio", async () => {
-    await host.goto("/");
-    // The first run on a fresh server creates the admin; repeats sign in (sign-up is closed by then).
-    const fresh = await host.getByRole("link", { name: "Create admin account" }).isVisible();
-    if (fresh) {
-      await host.getByRole("link", { name: "Create admin account" }).click();
-      await host.getByLabel("Your name").fill("Dev Host");
-    } else {
-      await host.getByRole("link", { name: "Sign in" }).click();
-    }
-    await host.getByLabel("Email").fill("host@opentake.test");
-    await host.getByLabel("Password").fill(password);
-    await host.getByRole("button", { name: fresh ? "Create account" : "Sign in" }).click();
-    await expect(host).toHaveURL(/\/studios$/);
-
-    await host.getByLabel("New studio").fill(studioName);
-    await host.getByRole("button", { name: "Create studio" }).click();
-    await expect(host.getByRole("heading", { name: studioName })).toBeVisible();
+  await test.step("host creates the admin account (or logs in to it) and a show", async () => {
+    // The first run on a fresh server creates the admin; repeats log in (sign-up is closed by then).
+    await signInHost(host);
+    ({ studioUrl, inviteUrl } = await createStudio(host, studioName));
     await expect(host).toHaveTitle(new RegExp(studioName));
-    inviteUrl = await host.getByLabel("Guest invite link").inputValue();
-    studioUrl = host.url();
     expect(inviteUrl).toMatch(/\/join\/[\w-]{22}$/);
   });
 
@@ -168,7 +152,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
 
     await expectWorkingGreenRoom(guest);
     await guest.getByLabel("Camera").selectOption("off");
-    await expect(guest.getByText("Camera off", { exact: true })).toBeVisible();
+    await expect(guest.getByText(/^Camera off\./)).toBeVisible();
     await expect.poll(async () => (await streamInfo(guest)).video.length).toBe(0);
     await expect.poll(() => meterValue(guest), { timeout: 15_000 }).toBeGreaterThan(-60);
 
@@ -234,7 +218,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await expect(host.getByTestId("local-upload")).toContainText("All of your recording is uploaded", { timeout: 30_000 });
     await expect(guest.getByTestId("local-upload")).toContainText("All of your recording is uploaded", { timeout: 30_000 });
     // The host sees both participants finished: host has audio + camera, guest audio only.
-    await expect(host.getByTestId("participant-upload")).toHaveText([/✓ uploaded/, /✓ uploaded/], { timeout: 15_000 });
+    await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /✓ Uploaded/], { timeout: 15_000 });
 
     if (!canReadStorage) return; // deployed stack: storage isn't reachable from the test runner
     const objects = await listChunks(sessionId);
@@ -255,17 +239,14 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const recording = studioPage.getByTestId("recording").first();
     await expect(recording.getByTestId("recording-status")).toHaveText(/Ready/, { timeout: 90_000 });
 
-    const links = recording.getByTestId("download").filter({ hasNotText: /^Transcript\./ });
-    await expect(links).toHaveText([
-      /^Combined\.mp4/,
-      /^Dev Host - audio\.wav/,
-      /^Dev Host - video\.mp4/,
-      /^Sam Guest - audio\.wav/,
-    ]);
+    const links = mediaLinks(studioPage);
+    expect(await fileNames(links)).toEqual(["Combined.mp4", "Dev Host - audio.wav", "Dev Host - video.mp4", "Sam Guest - audio.wav"]);
+    // Shown with friendly titles.
+    await expect(links).toHaveText([/Side-by-side video/, /Dev Host's audio/, /Dev Host's video/, /Sam Guest's audio/]);
 
     const durations: number[] = [];
     const files = await links.evaluateAll((as) =>
-      as.map((a) => ({ href: (a as HTMLAnchorElement).href, name: a.querySelector("span")!.textContent! })),
+      as.map((a) => ({ href: (a as HTMLAnchorElement).href, name: a.getAttribute("data-file-name")! })),
     );
     for (const { href, name } of files) {
       // Fetched by the browser, following the redirect to signed storage like a real download
@@ -307,8 +288,9 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     if (!process.env.WHISPER_MODEL) return;
     const studioPage = await host.context().newPage();
     await studioPage.goto(studioUrl);
-    const transcripts = studioPage.getByTestId("recording").first().getByTestId("download").filter({ hasText: /^Transcript\./ });
-    await expect(transcripts).toHaveText([/^Transcript\.srt/, /^Transcript\.txt/, /^Transcript\.vtt/], { timeout: 120_000 });
+    const transcripts = studioPage.getByTestId("recording").first().locator('[data-testid="download"][data-file-name^="Transcript."]');
+    await expect(transcripts).toHaveCount(3, { timeout: 120_000 });
+    expect(await fileNames(transcripts)).toEqual(["Transcript.srt", "Transcript.txt", "Transcript.vtt"]);
     await studioPage.close();
   });
 
@@ -316,7 +298,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const studioPage = await host.context().newPage();
     await studioPage.goto(studioUrl);
     const recording = studioPage.getByTestId("recording").first();
-    const names = await recording.getByTestId("download").evaluateAll((as) => as.map((a) => a.querySelector("span")!.textContent!));
+    const names = await fileNames(recording.getByTestId("download"));
     const [download] = await Promise.all([studioPage.waitForEvent("download"), recording.getByTestId("download-zip").click()]);
     expect(download.suggestedFilename()).toMatch(/^E2E Show \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
     const file = join(mkdtempSync(join(tmpdir(), "opentake-zip-")), "all.zip");
@@ -344,7 +326,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await host.getByRole("button", { name: "Stop recording" }).click();
     // While the guest is gone, their part stays unfinished (not silently marked done).
     await host.waitForTimeout(3_000);
-    await expect(host.getByTestId("participant-upload")).toHaveText([/✓ uploaded/, /uploading/]);
+    await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /Offline|Uploading/]);
 
     // Back online, the guest reopens the session page: leftovers upload on their own,
     // and the cut-off track is completed as interrupted.
@@ -352,7 +334,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const back = await guestContext.newPage();
     await back.goto(`/session/${sessionId}`);
     await expect(back.getByRole("button", { name: "Join the studio" })).toBeVisible();
-    await expect(host.getByTestId("participant-upload")).toHaveText([/✓ uploaded/, /✓ uploaded/], { timeout: 30_000 });
+    await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /✓ Uploaded/], { timeout: 30_000 });
 
     // The recovered upload completes the recording, which then processes by itself.
     const studioPage = await host.context().newPage();
@@ -372,7 +354,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
   await test.step("ending the session tells everyone", async () => {
     host.once("dialog", (d) => d.accept());
     await host.getByRole("button", { name: "End session" }).click();
-    await expect(host.getByText("The host has ended this session.")).toBeVisible();
+    await expect(host.getByTestId("session-ended")).toContainText("That's a wrap");
     await expect(host.getByRole("button", { name: "Record", exact: true })).toHaveCount(0);
   });
 
@@ -394,11 +376,11 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
       expect((await listChunks(sessionId)).length).toBeGreaterThan(0);
     }
 
+    await studioPage.getByRole("tab", { name: "Settings" }).click();
     await studioPage.getByTestId("delete-studio").click();
     await studioPage.getByTestId("delete-studio-confirm").click();
-    await expect(studioPage).toHaveURL(/\/studios$/);
-    await expect(studioPage.getByRole("heading", { name: "Studios" })).toBeVisible();
-    await expect(studioPage.getByRole("link", { name: new RegExp(studioName) })).toHaveCount(0);
+    await expect(studioPage).not.toHaveURL(studioUrl);
+    await expect(studioPage.getByTestId("show-link").filter({ hasText: studioName })).toHaveCount(0);
     if (canReadStorage) await expect.poll(async () => listChunks(sessionId), { timeout: 15_000 }).toEqual([]);
     await studioPage.close();
   });
