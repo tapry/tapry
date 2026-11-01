@@ -22,6 +22,9 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 ### Sync
 - Measured: tracks line up within 1–5 ms between people over 5 minutes, with no drift, including a
   guest whose clock is 3.7 s off (`e2e/sync.spec.ts`, results in docs/browser-support.md).
+- Gate A (Chromium): a 60-minute two-person recording lost nothing (all 3,601 beeps in both files,
+  every file the full length) and stayed within 4.3 ms between people, no drift.
+  `E2E_SYNC_SECONDS=3600` runs it; the test now waits for processing in proportion to the length.
 - Recording timestamps now use the same steady clock as the clock-offset estimate. They used the
   wall clock, which jumps when the system clock is adjusted mid-session (NTP, waking from sleep).
 - The "upload is behind" note compared server time with the device clock without the offset; a

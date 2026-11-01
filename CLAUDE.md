@@ -31,7 +31,7 @@ docs/               plan (v2), decisions, self-hosting, browser support, costs
 Not yet: `packages/sync`, `packages/exports`, `ee/`.
 
 ## Status against plan v3 (1 Nov 2026)
-Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (not echo or too-quiet yet), live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync. Open for v1: Gate A (60-min two-person run, real Safari), talk balance, echo and too-quiet alerts, audio-only mode, guest tech-check link, guest end screen + recap email, free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, the Tapry rename, release 0.2.0.
+Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (not echo or too-quiet yet), live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync, Gate A's 60-minute two-person run in Chromium. Open for v1: Gate A in real Safari, talk balance, echo and too-quiet alerts, audio-only mode, guest tech-check link, guest end screen + recap email, free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, the Tapry rename, release 0.2.0.
 
 ## UI
 - Users see **shows** and **episodes**; the API, database and code say studios and recordings. Pages live under `/shows`.
@@ -40,7 +40,7 @@ Done for v1: studios ("shows"), invite links, green room with consent checkbox, 
 
 ## Sync
 - Every timestamp a device sends is `localNow()` (`src/lib/client/clock.ts`: performance.timeOrigin + performance.now(), rounded) plus the green room's offset estimate. Never Date.now() for anything compared with the server: it jumps when the system clock is adjusted.
-- Measured by `e2e/sync.spec.ts` (beeps on the real clock, skewed guest clock): ~1–5 ms between people, no drift over 5 min. Device input latency (Bluetooth) isn't covered.
+- Measured by `e2e/sync.spec.ts` (beeps on the real clock, skewed guest clock): ~1–5 ms between people, no drift over 60 min, nothing lost (Gate A: `E2E_SYNC_SECONDS=3600`). Device input latency (Bluetooth) isn't covered.
 
 ## Quality alerts
 - Computed on each device (`src/lib/client/quality.ts`: mic peaks from the recorder's stream, upload lag, `storage.estimate`, visibility, recorder errors) and POSTed as codes to `/sessions/:id/telemetry` on change and every 3 s. Kept in memory in `LiveHub.health` and pushed in `SessionState.health`; stale after `STALE_REPORT_MS` (15 s). Metadata only: never audio, video or transcript text.
