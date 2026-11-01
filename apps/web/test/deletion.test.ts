@@ -1,4 +1,4 @@
-import { chunkStorageKey } from "@opentake/shared";
+import { chunkStorageKey } from "@tapry/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { JobRunner } from "../src/server/jobs";
 import { hashPassword } from "../src/server/passwords";

@@ -2,7 +2,7 @@
 
 Read `docs/plan/00-README.md` → `02-product-spec.md` → `03-recording-architecture.md` → `04-system-architecture.md` (plan v3, 1 Nov 2026), then `docs/decisions/`, before writing code. `10-design-inspiration.md` before UI, `12-ai-features.md` before AI work, `13-growth-features.md` before growth features, `14-riverside-parity.md` before adding any "Riverside has it" feature (check it isn't in Skip).
 
-The product is being renamed **Tapry** (plan v3). Until the rename lands, code, packages and the UI still say OpenTake; browser storage names (IndexedDB, localStorage keys) must keep working across the rename, or unsent recordings would be orphaned.
+The product was renamed from OpenTake to **Tapry** (plan v3). Some names deliberately stay `opentake`, because data lives under them: browser storage (IndexedDB `opentake-recorder`, localStorage `opentake:ticket:` / `opentake:invite:` / `opentake:devices`, Web Locks `opentake:track:`) and the Compose project, Postgres user/database and bucket. Renaming those would orphan unsent recordings or existing installs' data. `OPENTAKE_IMAGES` / `OPENTAKE_VERSION` still work as fallbacks, and releases also publish `opentake-web` / `opentake-caddy` images for older Compose files. GitHub links wait for the repo move.
 
 ## What we're building
 "The remote recording studio you own." A self-hostable, open-source remote recording studio: guests join by link in the browser; each participant is recorded locally at full quality, chunks are buffered in the browser (IndexedDB) and uploaded one object per chunk during the session (our storage or, later, the customer's own bucket); the host sees live per-guest upload status and quality alerts; a worker syncs and packages per-track files, a combined video and transcripts (speaker = track). AI runs on our/the customer's servers by default. Live call via LiveKit.
@@ -31,7 +31,7 @@ docs/               plan (v2), decisions, self-hosting, browser support, costs
 Not yet: `packages/sync`, `packages/exports`, `ee/`.
 
 ## Status against plan v3 (1 Nov 2026)
-Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (not echo or too-quiet yet), live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync, Gate A's 60-minute two-person run in Chromium. Open for v1: Gate A in real Safari, talk balance, echo and too-quiet alerts, audio-only mode, guest tech-check link, guest end screen + recap email, free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, the Tapry rename, release 0.2.0.
+Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (not echo or too-quiet yet), live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync, Gate A's 60-minute two-person run in Chromium. Open for v1: Gate A in real Safari, talk balance, echo and too-quiet alerts, audio-only mode, guest tech-check link, guest end screen + recap email, free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, release 0.2.0.
 
 ## UI
 - Users see **shows** and **episodes**; the API, database and code say studios and recordings. Pages live under `/shows`.
@@ -78,6 +78,6 @@ Done for v1: studios ("shows"), invite links, green room with consent checkbox, 
 - `pnpm dev` — web + worker
 - `pnpm test` — unit tests
 - `FFMPEG_PATH=… FFPROBE_PATH=… pnpm test` — ffmpeg-backed worker/processing tests run only when ffmpeg is found
-- `WEED_BIN=… LIVEKIT_BIN=… pnpm --filter @opentake/web test:e2e` (LIVEKIT_BIN optional: without it the call step is skipped, recording still tested) — Playwright, full Chromium with fake camera/mic, host + guest flow (throttled network: not yet)
-- `WEED_BIN=/path/to/weed pnpm --filter @opentake/web test:s3` — upload API against a real S3 server (SeaweedFS)
+- `WEED_BIN=… LIVEKIT_BIN=… pnpm --filter @tapry/web test:e2e` (LIVEKIT_BIN optional: without it the call step is skipped, recording still tested) — Playwright, full Chromium with fake camera/mic, host + guest flow (throttled network: not yet)
+- `WEED_BIN=/path/to/weed pnpm --filter @tapry/web test:s3` — upload API against a real S3 server (SeaweedFS)
 - `cd deploy/compose && ./setup.sh localhost && docker compose up -d` — full self-host stack at http://localhost (docs/self-hosting.md)

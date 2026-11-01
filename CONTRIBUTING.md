@@ -28,7 +28,7 @@ bug this project can have.
 ## Contributor License Agreement
 
 Before your first pull request is merged, you accept the [CLA](CLA.md) once. You keep the
-copyright in your work. The CLA lets the project license OpenTake as a whole, including under
+copyright in your work. The CLA lets the project license Tapry as a whole, including under
 commercial terms that fund its development, and promises that every contribution stays
 available as open source.
 
@@ -36,7 +36,7 @@ To sign, comment this on your pull request (a check called **CLA** explains it w
 one):
 
 ```
-I have read the OpenTake CLA and I agree to it.
+I have read the Tapry CLA and I agree to it.
 ```
 
 It covers all your future contributions. Commits must use an email that is on your GitHub

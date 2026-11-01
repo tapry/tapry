@@ -1,6 +1,6 @@
 "use client";
 
-import type { SessionState, SessionTicket } from "@opentake/shared";
+import type { SessionState, SessionTicket } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, cn, Field, Input, Notice, StatusDot } from "@/components/ui";

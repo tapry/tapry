@@ -5,6 +5,17 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+### Renamed to Tapry
+- OpenTake is now **Tapry**: the app, website, docs, packages (`@tapry/*`) and images
+  (`tapry-web`, `tapry-caddy`). Releases also publish the old `opentake-web` / `opentake-caddy`
+  names for now, so an existing install updates as before.
+- In `deploy/compose/.env`, `TAPRY_IMAGES` / `TAPRY_VERSION` replace `OPENTAKE_IMAGES` /
+  `OPENTAKE_VERSION`; the old names still work.
+- Versions before 0.2.0 were only published as `opentake-web` / `opentake-caddy`: to go back to
+  one, use the Compose file from that version too.
+- Nothing to migrate: browser storage, the Compose project, the database and the bucket keep their
+  old names, so unsent recordings and existing data carry over.
+
 ### New look
 - The app is redesigned (Onest, coral and ink; light and dark): log in, the dashboard, the guest
   invite, check-in, the studio and the end of a session.
@@ -46,7 +57,7 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   `apps/worker/scripts/cost-benchmark.sh` re-runs the measurement.
 
 ### Website
-- `apps/site`: the OpenTake landing page, a static site separate from the app (self-hosted servers
+- `apps/site`: the Tapry landing page, a static site separate from the app (self-hosted servers
   don't show it). `NEXT_PUBLIC_WAITLIST_URL` turns on the cloud waitlist form.
 
 ### Tests

@@ -15,8 +15,8 @@ import {
   type TrackInfo,
   type TrackKind,
   type UploadProgress,
-} from "@opentake/recorder";
-import type { SessionTicket } from "@opentake/shared";
+} from "@tapry/recorder";
+import type { SessionTicket } from "@tapry/shared";
 import { loadTicket } from "./api";
 import { localNow } from "./clock";
 

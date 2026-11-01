@@ -19,6 +19,7 @@ const CHUNK_DATA = "chunkData";
 export class IndexedDBChunkStore implements ChunkStore {
   private constructor(private db: IDBDatabase) {}
 
+  // The database is named from before the rename to Tapry: renaming it would orphan unsent chunks.
   static async open(name = "opentake-recorder", idb: IDBFactory = indexedDB): Promise<IndexedDBChunkStore> {
     const req = idb.open(name, DB_VERSION);
     req.onupgradeneeded = () => {

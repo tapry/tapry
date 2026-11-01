@@ -1,6 +1,6 @@
 "use client";
 
-import type { CallToken, SessionTicket } from "@opentake/shared";
+import type { CallToken, SessionTicket } from "@tapry/shared";
 import {
   ConnectionState,
   LocalAudioTrack,

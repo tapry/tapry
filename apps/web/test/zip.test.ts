@@ -17,7 +17,7 @@ const hasPython = (() => {
 
 /** Names, sizes and contents of a zip, as Python's zipfile reads them (after testzip() passes). */
 function readZip(data: Buffer): Array<{ name: string; size: number; text: string }> {
-  const file = join(mkdtempSync(join(tmpdir(), "opentake-zip-")), "x.zip");
+  const file = join(mkdtempSync(join(tmpdir(), "tapry-zip-")), "x.zip");
   writeFileSync(file, data);
   const script = `
 import json, sys, zipfile

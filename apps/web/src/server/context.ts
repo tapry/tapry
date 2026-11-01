@@ -21,7 +21,7 @@ interface Shared {
   runner?: JobRunner;
 }
 
-const shared = ((globalThis as typeof globalThis & { __opentake?: Shared }).__opentake ??= {});
+const shared = ((globalThis as typeof globalThis & { __tapry?: Shared }).__tapry ??= {});
 
 let services: Promise<Services> | undefined;
 

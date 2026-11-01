@@ -15,7 +15,7 @@ SECONDS_LEN=${1:-180}
 PEOPLE=${2:-2}
 FFMPEG=${FFMPEG_PATH:-ffmpeg}
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-DIR=$(mktemp -d "${TMPDIR:-/tmp}/opentake-cost-XXXXXX")
+DIR=$(mktemp -d "${TMPDIR:-/tmp}/tapry-cost-XXXXXX")
 trap 'rm -rf "$DIR"' EXIT
 
 echo "Synthetic episode: $PEOPLE people × $SECONDS_LEN s in $DIR"

@@ -32,15 +32,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: opentake-web
+      - name: tapry-web
         uses: docker/build-push-action@v7
         with:
           context: .
           file: deploy/docker/web.Dockerfile
           platforms: linux/amd64,linux/arm64
-          build-args: OPENTAKE_VERSION=${{ env.VERSION }}
+          build-args: TAPRY_VERSION=${{ env.VERSION }}
           push: true
           tags: |
+            ${{ env.IMAGES }}/tapry-web:${{ env.VERSION }}
+            ${{ env.IMAGES }}/tapry-web:latest
             ${{ env.IMAGES }}/opentake-web:${{ env.VERSION }}
             ${{ env.IMAGES }}/opentake-web:latest
           labels: |
@@ -50,7 +52,7 @@ jobs:
           cache-from: type=gha,scope=release-web
           cache-to: type=gha,scope=release-web,mode=max
 
-      - name: opentake-caddy
+      - name: tapry-caddy
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -58,6 +60,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
+            ${{ env.IMAGES }}/tapry-caddy:${{ env.VERSION }}
+            ${{ env.IMAGES }}/tapry-caddy:latest
             ${{ env.IMAGES }}/opentake-caddy:${{ env.VERSION }}
             ${{ env.IMAGES }}/opentake-caddy:latest
           labels: |
@@ -78,10 +82,10 @@ jobs:
           In \`deploy/compose/.env\` (after \`./setup.sh\`, see docs/self-hosting.md):
 
           \`\`\`
-          OPENTAKE_IMAGES=${IMAGES}
-          OPENTAKE_VERSION=${VERSION}
+          TAPRY_IMAGES=${IMAGES}
+          TAPRY_VERSION=${VERSION}
           \`\`\`
 
           then \`docker compose pull && docker compose up -d --no-build\`.
           NOTES
-          gh release create "$GITHUB_REF_NAME" --title "OpenTake $VERSION" --notes-file notes.md
+          gh release create "$GITHUB_REF_NAME" --title "Tapry $VERSION" --notes-file notes.md

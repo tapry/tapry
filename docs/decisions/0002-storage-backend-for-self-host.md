@@ -15,7 +15,7 @@ supports those works. Verified so far:
 
 | Backend | License | Verified | Notes |
 |---|---|---|---|
-| SeaweedFS 4.51 | Apache-2.0 | ✅ `pnpm --filter @opentake/web test:s3` | Rejects tampered content (400), wrong size (403), missing checksum header (403) |
+| SeaweedFS 4.51 | Apache-2.0 | ✅ `pnpm --filter @tapry/web test:s3` | Rejects tampered content (400), wrong size (403), missing checksum header (403) |
 | Garage | AGPL-3.0 | not yet | Small single binary, built for self-hosting |
 | RustFS | Apache-2.0 | not yet | MinIO-compatible, younger project |
 | Cloudflare R2 | — | not yet | Cloud target; check `x-amz-checksum-sha256` support on presigned PUT |

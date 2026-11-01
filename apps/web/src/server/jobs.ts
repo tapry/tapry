@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { studioSettings } from "@opentake/shared";
+import { studioSettings } from "@tapry/shared";
 import {
   concatChunks,
   FfmpegError,
@@ -15,7 +15,7 @@ import {
   type SpeakerTranscript,
   type TrackInput,
   type WhisperOptions,
-} from "@opentake/worker";
+} from "@tapry/worker";
 import type { Db, Queryable } from "./db";
 import { newId } from "./ids";
 import { UPLOAD_URL_TTL_S, type Storage } from "./storage";
@@ -207,7 +207,7 @@ export class JobRunner {
         )
         .catch((err) => console.error(`[worker] could not renew the lock on ${job.id}`, err));
     }, Math.min(60_000, (this.lockSeconds() * 1000) / 3));
-    const work = await mkdtemp(join(tmpdir(), "opentake-job-"));
+    const work = await mkdtemp(join(tmpdir(), "tapry-job-"));
     const started = Date.now();
     try {
       if (job.type === "process_recording") await this.processRecording(rec, work, job);

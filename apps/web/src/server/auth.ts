@@ -1,4 +1,4 @@
-import type { loginBody, signupBody } from "@opentake/shared";
+import type { loginBody, signupBody } from "@tapry/shared";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";

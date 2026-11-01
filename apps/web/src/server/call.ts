@@ -1,4 +1,4 @@
-import type { CallToken } from "@opentake/shared";
+import type { CallToken } from "@tapry/shared";
 import { AccessToken } from "livekit-server-sdk";
 import type { Db } from "./db";
 import { ApiError } from "./errors";

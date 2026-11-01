@@ -3,8 +3,8 @@
 // In-call quality alerts, worked out on each person's own device from what it can measure:
 // the mic's level, the upload queue, browser storage and the tab. Only the alert codes and the
 // upload lag leave the device (POST .../telemetry); never audio, video or text.
-import { checkStorage, type UploadProgress } from "@opentake/recorder";
-import type { QualityAlert, SessionTicket } from "@opentake/shared";
+import { checkStorage, type UploadProgress } from "@tapry/recorder";
+import type { QualityAlert, SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
 import { localNow } from "./clock";
 

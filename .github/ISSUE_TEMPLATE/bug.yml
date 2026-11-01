@@ -19,7 +19,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: OpenTake version
+      label: Tapry version
       description: The `version` from https://your-studio/api/health, or the git commit.
   - type: dropdown
     id: install

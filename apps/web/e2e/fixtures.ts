@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 export const PASSWORD = "e2e-only-throwaway-password";
-export const HOST_EMAIL = "host@opentake.test";
+export const HOST_EMAIL = "host@tapry.test";
 
 export const test = base.extend<{
   /** Hide WebM from MediaRecorder.isTypeSupported, like Safari before 18.4 / iOS. */
@@ -97,7 +97,7 @@ export async function downloadOutputs(page: Page) {
     }, href);
     expect(got.status, name).toBe(200);
     const body = Buffer.from(got.base64, "base64");
-    const path = join(mkdtempSync(join(tmpdir(), "opentake-dl-")), name);
+    const path = join(mkdtempSync(join(tmpdir(), "tapry-dl-")), name);
     writeFileSync(path, body);
     files.push({ name, type: got.type, body, path, duration: probeDuration(path) });
   }

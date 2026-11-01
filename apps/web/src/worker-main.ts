@@ -7,7 +7,7 @@ import { openDb } from "./server/db";
 import { JobRunner } from "./server/jobs";
 import { S3Storage } from "./server/storage";
 
-const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE ?? "/tmp/opentake-worker-heartbeat";
+const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE ?? "/tmp/tapry-worker-heartbeat";
 
 async function main() {
   const config = loadConfig();

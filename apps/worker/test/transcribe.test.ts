@@ -85,7 +85,7 @@ describe.skipIf(!canRun)("whisper.cpp on real speech", () => {
   }
 
   beforeAll(() => {
-    dir = mkdtempSync(join(tmpdir(), "opentake-whisper-test-"));
+    dir = mkdtempSync(join(tmpdir(), "tapry-whisper-test-"));
   });
 
   it("transcribes English", async () => {

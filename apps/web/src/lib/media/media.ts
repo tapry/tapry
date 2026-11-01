@@ -1,6 +1,6 @@
 // Pure green-room logic: no React, no live devices. Unit-tested in test/media.test.ts.
-import { pickMimeType } from "@opentake/recorder";
-import type { StudioSettings } from "@opentake/shared";
+import { pickMimeType } from "@tapry/recorder";
+import type { StudioSettings } from "@tapry/shared";
 
 // ── Capture constraints ──────────────────────────────────────────────────────
 

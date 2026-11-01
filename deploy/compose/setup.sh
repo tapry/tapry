@@ -26,9 +26,9 @@ LIVEKIT_NODE_IP=$NODE_IP
 LIVEKIT_TURN_ALLOW_PEERS=$TURN_ALLOW
 ACME_EMAIL=$EMAIL
 POSTGRES_PASSWORD=$(secret 24)
-S3_ACCESS_KEY=opentake
+S3_ACCESS_KEY=tapry
 S3_SECRET_KEY=$(secret 24)
-LIVEKIT_API_KEY=opentake
+LIVEKIT_API_KEY=tapry
 LIVEKIT_API_SECRET=$(secret 32)
 # The first account becomes admin; after that sign-up is closed unless this is true.
 ALLOW_SIGNUP=false
