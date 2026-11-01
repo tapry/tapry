@@ -7,7 +7,7 @@ import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
-import { alertAdvice, alertLabel, useQualityAlerts } from "@/lib/client/quality";
+import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid } from "./call-grid";
 import { followSession, type ConnectionStatus } from "@/lib/client/session-events";
@@ -116,9 +116,12 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     headphones: ready.choice.headphones,
     recorderError,
     clockOffsetMs: ready.clock?.offsetMs ?? 0,
+    recordingId: recording?.id ?? null,
     active: !ended,
   });
   const advice = quality.alerts.map((a) => alertAdvice(a, quality.uploadBehindS)).filter((x): x is string => !!x);
+  const shares = isHost && state?.recording ? talkShares(state.health, state.recording.id) : null;
+  const nudge = isHost && recording && state ? talkNudge(state.health, recording.id, ticket.participantId) : null;
 
   const [panelOpen, setPanelOpen] = useState(true);
   const [flash, setFlash] = useState<string | null>(null);
@@ -218,13 +221,18 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                 recording={!!recording}
               />
             </div>
-            {advice.length > 0 && (
+            {(advice.length > 0 || nudge) && (
               <div className="mx-[clamp(14px,2.4vw,28px)] mb-3 flex flex-col gap-1.5" data-testid="own-alerts">
                 {advice.map((text) => (
                   <Notice key={text} tone="warn">
                     {text}
                   </Notice>
                 ))}
+                {nudge && (
+                  <div data-testid="talk-nudge">
+                    <Notice tone="info">{nudge}</Notice>
+                  </div>
+                )}
               </div>
             )}
             <div className="mx-[clamp(14px,2.4vw,28px)] border-t border-border" />
@@ -325,6 +333,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                           {p.id === ticket.participantId && <span className="font-normal text-muted"> (you)</span>}
                           {p.role === "host" && <span className="text-xs font-normal text-muted"> · host</span>}
                         </span>
+                        {shares && <TalkShare share={shares.get(p.id) ?? 0} />}
                         {isHost && (
                           <HealthChips
                             health={state.health.find((h) => h.participantId === p.id)}
@@ -420,6 +429,19 @@ function ToolButton({
       )}
       {label}
     </button>
+  );
+}
+
+/** One person's share of the talking in this episode (talk balance, host only). */
+function TalkShare({ share }: { share: number }) {
+  const percent = Math.round(share * 100);
+  return (
+    <span className="flex items-center gap-2 text-xs text-muted" data-testid="talk-share" data-share={percent}>
+      <span className="h-1 w-16 overflow-hidden rounded-full bg-border" aria-hidden>
+        <span className="block h-full rounded-full bg-text-2" style={{ width: `${percent}%` }} />
+      </span>
+      {percent}% of the talking
+    </span>
   );
 }
 

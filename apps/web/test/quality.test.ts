@@ -4,7 +4,11 @@ import {
   alertLabel,
   CLIP_WINDOW_MS,
   MicAlerts,
+  QUIET_MIN_TALK_MS,
   SILENT_AFTER_MS,
+  TALK_NUDGE_AFTER_MS,
+  talkNudge,
+  talkShares,
   uploadBehindS,
 } from "../src/lib/client/quality";
 import { expectOk, setup } from "./harness";
@@ -12,25 +16,25 @@ import { expectOk, setup } from "./harness";
 describe("mic alerts (on the device)", () => {
   it("flags clipping after more than 3 clips within 10 s, and lets it go once they stop", () => {
     const mic = new MicAlerts(0);
-    for (const t of [100, 200, 300]) mic.addPeak(0.99, t);
+    for (const t of [100, 200, 300]) mic.addLevel(0.99, -100, t);
     expect(mic.alerts(400, false)).toEqual([]); // 3 is a loud laugh, not a problem
-    mic.addPeak(0.95, 500);
+    mic.addLevel(0.95, -100, 500);
     expect(mic.alerts(600, false)).toEqual(["clipping"]);
     expect(mic.alerts(500 + CLIP_WINDOW_MS + 1, false)).toEqual([]);
   });
 
   it("doesn't count loud but clean speech as clipping", () => {
     const mic = new MicAlerts(0);
-    for (let t = 0; t < 5000; t += 100) mic.addPeak(0.8, t); // about -2 dBFS
+    for (let t = 0; t < 5000; t += 100) mic.addLevel(0.8, -100, t); // about -2 dBFS
     expect(mic.alerts(5000, false)).toEqual([]);
   });
 
   it("flags a silent mic after 30 s unmuted, never while muted, and clears when sound returns", () => {
     const mic = new MicAlerts(0);
-    for (let t = 0; t <= SILENT_AFTER_MS; t += 100) mic.addPeak(0.0005, t);
+    for (let t = 0; t <= SILENT_AFTER_MS; t += 100) mic.addLevel(0.0005, -100, t);
     expect(mic.alerts(SILENT_AFTER_MS, false)).toEqual(["mic_silent"]);
     expect(mic.alerts(SILENT_AFTER_MS, true)).toEqual([]);
-    mic.addPeak(0.1, SILENT_AFTER_MS + 100);
+    mic.addLevel(0.1, -100, SILENT_AFTER_MS + 100);
     expect(mic.alerts(SILENT_AFTER_MS + 200, false)).toEqual([]);
   });
 
@@ -38,6 +42,96 @@ describe("mic alerts (on the device)", () => {
     const mic = new MicAlerts(0);
     mic.reset(SILENT_AFTER_MS + 5000); // unmuted just now after a long mute
     expect(mic.alerts(SILENT_AFTER_MS + 6000, false)).toEqual([]);
+  });
+});
+
+/** Feed readings every 100 ms: `talking(t)` decides speech (at speechDb) or room noise (-58 dBFS). */
+function feed(mic: MicAlerts, from: number, to: number, talking: (t: number) => boolean, speechDb = -20, countTalk = true) {
+  for (let t = from; t < to; t += 100) {
+    const rmsDb = talking(t) ? speechDb : -58;
+    mic.addLevel(10 ** ((rmsDb + 6) / 20), rmsDb, t, countTalk);
+  }
+}
+// Speech with gaps: 1.5 s of words, then 1 s of pause.
+const conversational = (t: number) => t % 2500 < 1500;
+
+describe("voice activity and talk time (on the device)", () => {
+  it("counts talking, not room noise, and bridges the gaps between words", () => {
+    const mic = new MicAlerts(0);
+    feed(mic, 0, 20_000, () => false); // listening
+    expect(mic.talkMs).toBe(0);
+    feed(mic, 20_000, 40_000, (t) => t % 500 < 300); // words with 200 ms gaps: all of it is talking
+    expect(mic.talkMs).toBeGreaterThan(19_000);
+    expect(mic.talkMs).toBeLessThanOrEqual(20_000);
+  });
+
+  it("adapts to a noisy room instead of calling the noise talk", () => {
+    const mic = new MicAlerts(0);
+    for (let t = 0; t < 60_000; t += 100) mic.addLevel(0.03, -40, t, true); // a loud fan, steady
+    expect(mic.talkMs).toBeLessThan(500);
+  });
+
+  it("counts only while counting is on, and from zero after resetTalk", () => {
+    const mic = new MicAlerts(0);
+    feed(mic, 0, 10_000, conversational, -20, false);
+    expect(mic.talkMs).toBe(0);
+    feed(mic, 10_000, 20_000, conversational);
+    // Four stretches of 1.5 s, each carried on by the 400 ms hangover: 7.6 s.
+    expect(mic.talkMs).toBeGreaterThanOrEqual(7_400);
+    expect(mic.talkMs).toBeLessThanOrEqual(7_600);
+    mic.resetTalk();
+    expect(mic.talkMs).toBe(0);
+  });
+});
+
+describe("too quiet (on the device)", () => {
+  it("flags someone who talks but stays below -38 dBFS, and clears once they're louder", () => {
+    const mic = new MicAlerts(0);
+    feed(mic, 0, 30_000, conversational, -45);
+    expect(mic.alerts(30_000, false)).toContain("too_quiet");
+    expect(mic.alerts(30_000, true)).not.toContain("too_quiet"); // muted: nothing to fix
+    feed(mic, 30_000, 33_000, () => true, -25);
+    expect(mic.alerts(33_000, false)).not.toContain("too_quiet");
+  });
+
+  it("leaves a good level, a listener and a short quiet remark alone", () => {
+    const good = new MicAlerts(0);
+    feed(good, 0, 30_000, conversational, -22);
+    expect(good.alerts(30_000, false)).toEqual([]);
+    const listener = new MicAlerts(0);
+    feed(listener, 0, 30_000, () => false);
+    expect(listener.alerts(30_000, false)).toEqual([]);
+    const brief = new MicAlerts(0);
+    feed(brief, 0, 30_000, (t) => t >= 20_000 && t < 20_000 + QUIET_MIN_TALK_MS - 1000, -45);
+    expect(brief.alerts(30_000, false)).toEqual([]);
+  });
+});
+
+describe("talk balance (host)", () => {
+  const report = (participantId: string, recordingId: string, ms: number) => ({
+    participantId,
+    alerts: [],
+    uploadBehindS: null,
+    talk: { recordingId, ms },
+    reportedAt: 0,
+  });
+
+  it("splits the talking of this recording between people, once there is enough of it", () => {
+    expect(talkShares([report("host", "rec_1", 10_000), report("guest", "rec_1", 5_000)], "rec_1")).toBeNull();
+    const shares = talkShares(
+      [report("host", "rec_1", 30_000), report("guest", "rec_1", 90_000), report("old", "rec_0", 500_000)],
+      "rec_1",
+    );
+    expect(shares).toEqual(new Map([["host", 0.25], ["guest", 0.75]]));
+  });
+
+  it("nudges the host at 70% after two minutes of talking, not before", () => {
+    const early = [report("host", "rec_1", 80_000), report("guest", "rec_1", 10_000)];
+    expect(talkNudge(early, "rec_1", "host")).toBeNull();
+    const later = [report("host", "rec_1", TALK_NUDGE_AFTER_MS), report("guest", "rec_1", 30_000)];
+    expect(talkNudge(later, "rec_1", "host")).toMatch(/80% of the talking/);
+    expect(talkNudge(later, "rec_1", "guest")).toBeNull();
+    expect(talkNudge([report("host", "rec_1", 500_000)], "rec_1", "host")).toBeNull(); // alone: nobody to leave room for
   });
 });
 
@@ -65,7 +159,7 @@ describe("quality reports (server)", () => {
     await expectOk(t.call(`/sessions/${t.sessionId}/telemetry`, { alerts: ["tab_hidden", "clipping"], uploadBehindS: null }));
     const state = (await expectOk(t.client({ token: t.host.token }).get(`/sessions/${t.sessionId}/state`))).body;
     expect(state.health).toEqual([
-      { participantId: t.guest.participantId, alerts: ["clipping", "tab_hidden"], uploadBehindS: null, reportedAt: t.now() },
+      { participantId: t.guest.participantId, alerts: ["clipping", "tab_hidden"], uploadBehindS: null, talk: null, reportedAt: t.now() },
     ]);
   });
 
@@ -95,6 +189,27 @@ describe("quality reports (server)", () => {
     await report(["no_headphones", "upload_behind"], 70);
     await settle();
     expect(snapshots.length).toBe(afterFirst + 1);
+    unsubscribe();
+  });
+
+  it("carries talk time, pushing it in 5-second steps", async () => {
+    const t = await setup();
+    const snapshots: unknown[] = [];
+    const unsubscribe = await t.services.live.subscribe(t.sessionId, (s) => snapshots.push(s));
+    const report = (ms: number) =>
+      expectOk(t.call(`/sessions/${t.sessionId}/telemetry`, { alerts: [], uploadBehindS: null, talk: { recordingId: "rec_x", ms } }));
+    const settle = () => new Promise((r) => setTimeout(r, 400));
+    await report(1_000);
+    await settle();
+    const afterFirst = snapshots.length;
+    await report(3_000); // same 5-s step
+    await settle();
+    expect(snapshots.length).toBe(afterFirst);
+    await report(6_000);
+    await settle();
+    expect(snapshots.length).toBe(afterFirst + 1);
+    const state = (await expectOk(t.client({ token: t.host.token }).get(`/sessions/${t.sessionId}/state`))).body;
+    expect(state.health[0].talk).toEqual({ recordingId: "rec_x", ms: 6_000 });
     unsubscribe();
   });
 });

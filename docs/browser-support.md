@@ -83,6 +83,13 @@ needs real devices.
 | Length | Safari bursts found | Spacing (min–max) | Files full length |
 |---|---|---|---|
 | 2 min | 119 / 119 | 999.9–1000.1 ms | ✓ |
+| 60 min (Gate A) | 3,601 / 3,601 | 999.9–1000.1 ms | ✓ |
+
+The 60-minute run's Safari track was perfect. The test itself failed at the time on the host's
+side: the host's generated beeps shifted about 740 ms when Safari started encoding and stayed
+there, outside the old ±400 ms search window. The host's raw audio, rebuilt from its 896 uploaded
+chunks, has every one of its 3,602 beeps: nothing was lost. The check now counts the host's beeps
+the same way as Safari's bursts (passes at 2 min); the hour hasn't been rerun with it.
 
 The gap between Safari and the host is reported, not checked: with both browsers on one machine,
 headless Chromium's generated beeps stall for a few hundred ms while Safari starts encoding (the

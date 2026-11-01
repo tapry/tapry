@@ -79,6 +79,8 @@ export const qualityAlert = z.enum([
   "clipping",
   /** Unmuted, yet the mic has picked up nothing for a while. */
   "mic_silent",
+  /** The person is talking, but their level stays low: hard to hear once mixed. */
+  "too_quiet",
   /** The oldest chunk not yet uploaded is more than a minute old. */
   "upload_behind",
   /** Too little browser storage left to keep buffering the recording. */
@@ -95,10 +97,19 @@ export type QualityAlert = z.infer<typeof qualityAlert>;
 /** A device that hasn't reported for this long shows as "not reporting" to the host. */
 export const STALE_REPORT_MS = 15_000;
 
+/** How long one person has talked during one recording (voice activity on their own device). */
+export const talkTime = z.object({
+  recordingId: z.string().min(1).max(64),
+  ms: z.number().int().min(0).max(7 * 86_400_000),
+});
+export type TalkTime = z.infer<typeof talkTime>;
+
 export const telemetryBody = z.object({
   alerts: z.array(qualityAlert).max(10),
   /** How far the upload is behind, in seconds; null when caught up. */
   uploadBehindS: z.number().int().min(0).max(7 * 86_400).nullable(),
+  /** Talk time in the current recording; null when not recording. Optional for older clients. */
+  talk: talkTime.nullable().optional(),
 });
 
 // ── Live session state (pushed over SSE, also returned by GET .../state) ─────
@@ -121,6 +132,8 @@ export interface SessionState {
     participantId: string;
     alerts: QualityAlert[];
     uploadBehindS: number | null;
+    /** Talk time in the recording the device last reported for (talk balance). */
+    talk: TalkTime | null;
     /** Server time of the report. A device that stops reporting (offline, asleep) goes stale. */
     reportedAt: number;
   }>;

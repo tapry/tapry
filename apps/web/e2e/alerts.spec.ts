@@ -42,6 +42,17 @@ test("the host sees a guest's alerts, and when their device stops reporting", as
     await expect(guestRow.locator('[data-alert="tab_hidden"]')).toHaveCount(0, { timeout: 5_000 });
   });
 
+  await test.step("talk balance: while recording, the host sees each person's share of the talking", async () => {
+    // Both fake mics beep every second, which counts as a little talking.
+    await host.getByRole("button", { name: "Record", exact: true }).click();
+    const shares = host.getByTestId("talk-share");
+    await expect(shares).toHaveCount(2, { timeout: 90_000 });
+    const percents = await shares.evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-share"))));
+    expect(percents.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(99);
+    expect(percents.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(101);
+    await host.getByRole("button", { name: "Stop recording" }).click();
+  });
+
   await test.step("the guest's device goes quiet (tab closed): the host sees it stop reporting", async () => {
     await guest.close({ runBeforeUnload: false });
     await expect(guestRow.locator('[data-alert="stale"]')).toBeVisible({ timeout: 30_000 });
