@@ -62,7 +62,7 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
 
 export function ShowSettingsForm({ studioId, name, settings }: { studioId: string; name: string; settings: StudioSettings }) {
   const router = useRouter();
-  const [quality, setQuality] = useState(settings.videoQuality);
+  const [quality, setQuality] = useState<StudioSettings["videoQuality"] | "audio">(settings.audioOnly ? "audio" : settings.videoQuality);
   const [guests, setGuests] = useState(settings.maxGuests);
   const [status, setStatus] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
 
@@ -75,7 +75,9 @@ export function ShowSettingsForm({ studioId, name, settings }: { studioId: strin
         body: {
           name: f.get("name"),
           settings: {
-            videoQuality: quality,
+            // Audio only keeps the video quality as it was, for switching back.
+            videoQuality: quality === "audio" ? settings.videoQuality : quality,
+            audioOnly: quality === "audio",
             maxGuests: guests,
             echoCancellation: f.get("echoCancellation") === "on",
             levelLoudness: f.get("levelLoudness") === "on",
@@ -96,12 +98,13 @@ export function ShowSettingsForm({ studioId, name, settings }: { studioId: strin
         <Input name="name" defaultValue={name} required maxLength={100} />
       </Field>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-[15px] font-medium">Video quality</legend>
-        <div className="grid grid-cols-2 gap-2">
+        <legend className="mb-2 text-[15px] font-medium">Recording</legend>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {(
             [
               ["1080p", "Full HD", "Best quality, larger files"],
               ["720p", "Standard", "Smaller files, still sharp"],
+              ["audio", "Audio only", "Sound only, no cameras"],
             ] as const
           ).map(([value, label, sub]) => (
             <label

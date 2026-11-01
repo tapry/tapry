@@ -124,12 +124,12 @@ describe("studios", () => {
       id: expect.stringMatching(/^std_/),
       name: "Weekly Show",
       inviteCode: expect.stringMatching(/^[\w-]{22}$/),
-      settings: { videoQuality: "1080p", maxGuests: 2, echoCancellation: true, levelLoudness: true },
+      settings: { videoQuality: "1080p", maxGuests: 2, echoCancellation: true, levelLoudness: true, audioOnly: false },
     });
     const id = created.body.id;
 
     const updated = await browser.patch(`/studios/${id}`, { settings: { echoCancellation: false, levelLoudness: false } });
-    expect(updated.body.settings).toEqual({ videoQuality: "1080p", maxGuests: 2, echoCancellation: false, levelLoudness: false });
+    expect(updated.body.settings).toEqual({ videoQuality: "1080p", maxGuests: 2, echoCancellation: false, levelLoudness: false, audioOnly: false });
     expect(updated.body.name).toBe("Weekly Show");
 
     expect((await browser.patch(`/studios/${id}`, { settings: { maxGuests: 50 } })).status).toBe(400);

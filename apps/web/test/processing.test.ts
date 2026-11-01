@@ -203,7 +203,7 @@ describe("recording processing", () => {
     };
     const runner = (maxAttempts = 3) => new JobRunner(t.db, storage, { ffmpeg, ffprobe, maxAttempts });
 
-    it("turns uploaded chunks into a downloadable WAV and combined video", async () => {
+    it("turns uploaded chunks into a downloadable WAV and, with no camera, a mixed WAV", async () => {
       await uploadTrack(split(media, 3));
       t.tick(2000);
       await stop();
@@ -212,7 +212,7 @@ describe("recording processing", () => {
       expect(await processing()).toBe("ready");
       const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
       const outputs = recordings[0].outputs;
-      expect(outputs.map((o: { fileName: string }) => o.fileName)).toEqual(["Combined.mp4", "Guest - audio.wav"]);
+      expect(outputs.map((o: { fileName: string }) => o.fileName)).toEqual(["Combined.wav", "Guest - audio.wav"]);
       expect(outputs[1].durationMs).toBe(2000);
 
       // The WAV really is in storage...
@@ -302,7 +302,7 @@ describe("recording processing", () => {
       const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
       expect(recordings[0].transcript).toBe("ready");
       expect(recordings[0].outputs.map((o: { fileName: string }) => o.fileName)).toEqual([
-        "Combined.mp4",
+        "Combined.wav",
         "Guest - audio.wav",
         "Transcript.srt",
         "Transcript.txt",

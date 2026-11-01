@@ -40,6 +40,8 @@ const settingsFields = {
   echoCancellation: z.boolean(),
   /** Bring each person's audio, and the combined mix, to podcast loudness (-16 LUFS) after recording. */
   levelLoudness: z.boolean(),
+  /** Sound only: nobody's camera is asked for, the call is voice only, episodes have no video. */
+  audioOnly: z.boolean(),
 };
 
 /** Full settings, with defaults filled in. */
@@ -48,6 +50,7 @@ export const studioSettings = z.object({
   maxGuests: settingsFields.maxGuests.default(3),
   echoCancellation: settingsFields.echoCancellation.default(true),
   levelLoudness: settingsFields.levelLoudness.default(true),
+  audioOnly: settingsFields.audioOnly.default(false),
 });
 export type StudioSettings = z.infer<typeof studioSettings>;
 

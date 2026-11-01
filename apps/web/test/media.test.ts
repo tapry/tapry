@@ -26,6 +26,10 @@ describe("buildConstraints", () => {
     expect(c.audio).toMatchObject({ sampleRate: { ideal: 48_000 }, autoGainControl: false });
   });
 
+  it("asks for no camera at all in an audio-only show", () => {
+    expect(buildConstraints({ ...defaults, audioOnly: true }, { headphones: false }).video).toBe(false);
+  });
+
   it("uses 720p when the studio says so", () => {
     const c = buildConstraints({ ...defaults, videoQuality: "720p" }, { headphones: false });
     expect(c.video).toMatchObject({ width: { ideal: 1280 }, height: { ideal: 720 } });

@@ -21,6 +21,12 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Audio-only shows
+- New **Audio only** choice next to Full HD and Standard (when creating a show, and in its
+  settings). Nobody is asked for a camera; the invite and green room say it's sound only.
+- Episodes with no video at all (an audio-only show, or everyone with their camera off) now get
+  **Combined.wav**, everyone mixed and levelled together, instead of a video of empty tiles.
+
 ### AI producer: too quiet, echo and talk balance
 - An **echo** alert: someone's microphone picks up the call from their speakers, so the others
   are in their recording too. Each device compares its own recorded sound with what the call

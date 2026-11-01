@@ -57,7 +57,7 @@ describe("dashboard data", () => {
 
   it("shows guests the show and who invited them, and nothing for a dead link", async () => {
     const t = await setup();
-    expect(await t.services.studios.invitePreview(t.studio.inviteCode)).toEqual({ showName: "My Podcast", hostName: "Host" });
+    expect(await t.services.studios.invitePreview(t.studio.inviteCode)).toEqual({ showName: "My Podcast", hostName: "Host", audioOnly: false });
     expect(await t.services.studios.invitePreview("not-a-real-code")).toBeNull();
     await expectOk(t.client({ token: t.host.token }).post(`/sessions/${t.sessionId}/recordings/${t.recordingId}/stop`));
     await expectOk(t.hostBrowser.del(`/studios/${t.studio.id}`));

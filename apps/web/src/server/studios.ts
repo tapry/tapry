@@ -147,13 +147,13 @@ export class StudioService {
    * What a guest sees before joining: the show's name and who invited them. Null for a link
    * that is wrong, replaced or deleted. Anyone with the link may see this, like the link itself.
    */
-  async invitePreview(inviteCode: string): Promise<{ showName: string; hostName: string } | null> {
-    const [row] = await this.db.query<{ name: string; host: string }>(
-      `SELECT st.name, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
+  async invitePreview(inviteCode: string): Promise<{ showName: string; hostName: string; audioOnly: boolean } | null> {
+    const [row] = await this.db.query<{ name: string; host: string; settings: unknown }>(
+      `SELECT st.name, st.settings, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
       [inviteCode],
     );
-    return row ? { showName: row.name, hostName: row.host } : null;
+    return row ? { showName: row.name, hostName: row.host, audioOnly: studioSettings.parse(row.settings).audioOnly } : null;
   }
 
   /** Guest opens the invite link. No account; consent to recording is required by the schema. */

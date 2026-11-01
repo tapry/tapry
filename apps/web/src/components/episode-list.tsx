@@ -228,7 +228,11 @@ const FILE_ICON: Record<string, string> = { audio: "∿", video: "▶", combined
 /** What a downloaded file is, in words: "Ines's audio", "Side-by-side video", "Captions (.srt)". */
 function describe(o: Episode["outputs"][number]) {
   const ext = o.fileName.split(".").pop()?.toUpperCase() ?? "";
-  if (o.kind === "combined") return { title: "Side-by-side video", icon: FILE_ICON.combined!, format: ext };
+  if (o.kind === "combined") {
+    return o.fileName.endsWith(".wav")
+      ? { title: "Everyone, mixed", icon: FILE_ICON.audio!, format: ext }
+      : { title: "Side-by-side video", icon: FILE_ICON.combined!, format: ext };
+  }
   if (o.kind === "transcript") {
     return o.fileName.endsWith(".txt")
       ? { title: "Transcript", icon: FILE_ICON.transcript!, format: "Text" }

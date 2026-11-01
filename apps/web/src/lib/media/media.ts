@@ -25,7 +25,7 @@ export function buildConstraints(settings: StudioSettings, choice: DeviceChoice)
       noiseSuppression: processing,
       autoGainControl: false, // AGC pumps levels up and down mid-sentence
     },
-    video: choice.cameraOff
+    video: choice.cameraOff || settings.audioOnly
       ? false
       : {
           ...(choice.videoDeviceId ? { deviceId: { exact: choice.videoDeviceId } } : {}),

@@ -9,7 +9,7 @@ import { getPipeline } from "@/lib/client/recording";
 
 const RETRY_MS = 5_000;
 
-export function JoinForm({ inviteCode, hostName }: { inviteCode: string; hostName: string }) {
+export function JoinForm({ inviteCode, hostName, audioOnly }: { inviteCode: string; hostName: string; audioOnly: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [waitingForHost, setWaitingForHost] = useState(false);
@@ -94,7 +94,7 @@ export function JoinForm({ inviteCode, hostName }: { inviteCode: string; hostNam
             className="mt-[3px] size-[18px] shrink-0"
           />
           <span>
-            I&apos;m happy to be recorded. My camera and microphone are recorded on this computer and sent to {hostName}.
+            I&apos;m happy to be recorded. My {audioOnly ? "microphone is" : "camera and microphone are"} recorded on this computer and sent to {hostName}.
           </span>
         </label>
         {error && <Notice tone="danger">{error}</Notice>}

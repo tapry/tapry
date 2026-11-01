@@ -52,7 +52,7 @@ export function ShowView({
           <Eyebrow>Show</Eyebrow>
           <h1 className="text-[clamp(30px,3.4vw,42px)] leading-[1.05] font-medium tracking-[-.02em]">{show.name}</h1>
           <span className="text-[15px] text-pretty text-muted">
-            {show.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {show.settings.maxGuests}{" "}
+            {show.settings.audioOnly ? "Audio only" : show.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {show.settings.maxGuests}{" "}
             guest{show.settings.maxGuests === 1 ? "" : "s"} · started{" "}
             {new Date(show.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </span>

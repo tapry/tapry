@@ -62,9 +62,10 @@ export async function signInHost(page: Page) {
 }
 
 /** A new show (a "studio" in the API), through the New show page. */
-export async function createStudio(page: Page, name: string) {
+export async function createStudio(page: Page, name: string, opts: { audioOnly?: boolean } = {}) {
   await page.goto("/shows/new");
   await page.getByLabel("What's it called?").fill(name);
+  if (opts.audioOnly) await page.getByRole("radio", { name: "Audio only" }).click();
   await page.getByRole("button", { name: "Create show" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
   const invite = page.getByLabel("Guest invite link");
