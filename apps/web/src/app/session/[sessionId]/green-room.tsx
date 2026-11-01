@@ -1,7 +1,7 @@
 "use client";
 
-import { checkStorage, requestPersistentStorage } from "@opentake/recorder";
-import type { SessionTicket } from "@opentake/shared";
+import { checkStorage, requestPersistentStorage } from "@tapry/recorder";
+import type { SessionTicket } from "@tapry/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, CheckboxRow, cn, Field, Notice, RecDot, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/client/api";
@@ -32,6 +32,7 @@ export interface ReadyToJoin {
  */
 export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (ready: ReadyToJoin) => void }) {
   const settings = ticket.studio.settings;
+  // Key named before the rename to Tapry, so saved device choices carry over.
   const [choice, setChoice] = useStoredState<DeviceChoice>("opentake:devices", { headphones: false });
   const constraints = useMemo(() => buildConstraints(settings, choice), [settings, choice]);
   const { stream, status, problem, retry, handOff } = useLocalMedia(constraints);

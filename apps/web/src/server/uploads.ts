@@ -5,7 +5,7 @@ import {
   type createTrackBody,
   type UploadUrlResponse,
   type uploadUrlBody,
-} from "@opentake/shared";
+} from "@tapry/shared";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";

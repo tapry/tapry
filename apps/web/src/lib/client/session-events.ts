@@ -1,4 +1,4 @@
-import type { SessionState } from "@opentake/shared";
+import type { SessionState } from "@tapry/shared";
 
 export interface SseMessage {
   event: string;

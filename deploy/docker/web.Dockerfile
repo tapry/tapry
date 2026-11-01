@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# OpenTake web app (studio UI, API) and worker (`node worker.cjs`: recording processing + transcripts).
-# Build from the repo root:  docker build -f deploy/docker/web.Dockerfile -t opentake/web .
+# Tapry web app (studio UI, API) and worker (`node worker.cjs`: recording processing + transcripts).
+# Build from the repo root:  docker build -f deploy/docker/web.Dockerfile -t tapry/web .
 
 FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NEXT_TELEMETRY_DISABLED=1
@@ -17,9 +17,9 @@ COPY apps/web/package.json apps/web/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 COPY packages packages
 COPY apps apps
-RUN pnpm --filter @opentake/shared --filter @opentake/recorder --filter @opentake/worker build \
- && pnpm --filter @opentake/web build \
- && pnpm --filter @opentake/web build:worker
+RUN pnpm --filter @tapry/shared --filter @tapry/recorder --filter @tapry/worker build \
+ && pnpm --filter @tapry/web build \
+ && pnpm --filter @tapry/web build:worker
 
 # whisper.cpp for transcripts, built for the image's CPU family (not -march=native, so the
 # image runs on any x86-64 / arm64 host), plus the model and the voice-activity model.
@@ -48,7 +48,7 @@ RUN curl -fsSL -o "/out/ggml-${WHISPER_MODEL}.bin" "https://huggingface.co/ggerg
 FROM node:22-bookworm-slim AS runtime
 ARG WHISPER_MODEL=base
 # Set by the release workflow; shown by /api/health.
-ARG OPENTAKE_VERSION=dev
+ARG TAPRY_VERSION=dev
 ARG VAD_MODEL=ggml-silero-v6.2.0.bin
 # ffmpeg from Debian (5.1: libx264, libopus, libvpx); DejaVu for names on the combined video;
 # libgomp1 for whisper.cpp; curl for the health check.
@@ -57,18 +57,18 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=whisper /out/whisper-cli /usr/local/bin/whisper-cli
 COPY --from=whisper /out/*.bin /opt/whisper/
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 OPENTAKE_VERSION=${OPENTAKE_VERSION} \
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 TAPRY_VERSION=${TAPRY_VERSION} \
     FFMPEG_PATH=ffmpeg FFPROBE_PATH=ffprobe \
     WHISPER_PATH=/usr/local/bin/whisper-cli \
     WHISPER_MODEL=/opt/whisper/ggml-${WHISPER_MODEL}.bin \
     WHISPER_VAD_MODEL=/opt/whisper/${VAD_MODEL}
-RUN useradd --system --uid 1001 --home-dir /app opentake
+RUN useradd --system --uid 1001 --home-dir /app tapry
 WORKDIR /app
-COPY --from=build --chown=opentake /repo/apps/web/.next/standalone ./
-COPY --from=build --chown=opentake /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=tapry /repo/apps/web/.next/standalone ./
+COPY --from=build --chown=tapry /repo/apps/web/.next/static ./apps/web/.next/static
 # The standalone worker (docker-compose `worker` service): one bundled file.
-COPY --from=build --chown=opentake /repo/apps/web/dist-worker/worker.cjs ./worker.cjs
-USER opentake
+COPY --from=build --chown=tapry /repo/apps/web/dist-worker/worker.cjs ./worker.cjs
+USER tapry
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=6 \
   CMD curl -fsS http://127.0.0.1:3000/api/health || exit 1

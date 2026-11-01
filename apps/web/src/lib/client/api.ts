@@ -1,4 +1,4 @@
-import type { SessionTicket } from "@opentake/shared";
+import type { SessionTicket } from "@tapry/shared";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -46,6 +46,7 @@ export async function apiFetch<T = unknown>(
 // the same participant (and doesn't use up another seat). Storage can be missing or
 // throw (private mode, blocked site data), so every access is guarded.
 
+// Named before the rename to Tapry; kept so data saved by older versions is still found.
 const ticketKey = (sessionId: string) => `opentake:ticket:${sessionId}`;
 const inviteKey = (inviteCode: string) => `opentake:invite:${inviteCode}`;
 

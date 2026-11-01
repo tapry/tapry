@@ -18,7 +18,7 @@ export class HttpError extends Error {
 }
 
 /**
- * Talks to the OpenTake API (see docs/decisions/0001-one-object-per-chunk.md):
+ * Talks to the Tapry API (see docs/decisions/0001-one-object-per-chunk.md):
  *
  *   POST {base}/sessions/:s/tracks/:t/chunks/:seq/upload-url  → { url, headers } | { committed: true }
  *   PUT  <presigned url>                                       ← chunk bytes

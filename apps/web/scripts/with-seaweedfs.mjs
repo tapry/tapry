@@ -15,11 +15,11 @@ import { join } from "node:path";
 
 // SeaweedFS also listens on port+10000 for gRPC; 18433 avoids a dev instance on 8333 (gRPC 18333).
 const S3_PORT = 18433;
-const ACCESS_KEY = "opentake";
-const SECRET_KEY = "opentake-e2e-secret";
+const ACCESS_KEY = "tapry";
+const SECRET_KEY = "tapry-e2e-secret";
 const weed = process.env.WEED_BIN ?? "weed";
 
-const dir = mkdtempSync(join(tmpdir(), "opentake-seaweedfs-"));
+const dir = mkdtempSync(join(tmpdir(), "tapry-seaweedfs-"));
 mkdirSync(join(dir, "data"));
 const s3Config = join(dir, "s3.json");
 writeFileSync(
@@ -27,7 +27,7 @@ writeFileSync(
   JSON.stringify({
     identities: [
       {
-        name: "opentake",
+        name: "tapry",
         credentials: [{ accessKey: ACCESS_KEY, secretKey: SECRET_KEY }],
         actions: ["Admin", "Read", "List", "Tagging", "Write"],
       },

@@ -2,7 +2,7 @@
 
 // Host-side forms around a show (a "studio" in the API): invite link, settings, enter,
 // delete, and logging out. Creating a show has its own page (new-show-form.tsx).
-import type { SessionTicket, StudioSettings } from "@opentake/shared";
+import type { SessionTicket, StudioSettings } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";

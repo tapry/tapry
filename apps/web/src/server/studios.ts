@@ -5,7 +5,7 @@ import {
   type SessionTicket,
   type StudioSettings,
   type updateStudioBody,
-} from "@opentake/shared";
+} from "@tapry/shared";
 import type { z } from "zod";
 import type { User } from "./auth";
 import type { Db, Queryable } from "./db";

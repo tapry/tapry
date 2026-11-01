@@ -1,4 +1,6 @@
-# OpenTake
+# Tapry
+
+_Formerly OpenTake._
 
 Studio-quality remote recording you can host yourself. Guests join from a link in their
 browser; everyone is recorded **on their own device** at full quality, uploaded while you talk,
@@ -32,7 +34,7 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
 
 ## Compared to
 
-| | OpenTake | Riverside | Zoom recording |
+| | Tapry | Riverside | Zoom recording |
 |---|---|---|---|
 | Records each person locally at full quality | ✅ | ✅ | ❌ (records the call) |
 | Separate track per person | ✅ | ✅ | audio only, call quality |
@@ -47,7 +49,7 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
 On a server with Docker and a domain pointing at it:
 
 ```bash
-git clone <this repository> opentake && cd opentake/deploy/compose
+git clone <this repository> tapry && cd tapry/deploy/compose
 ./setup.sh studio.example.com you@example.com
 docker compose up -d
 ```
@@ -97,9 +99,9 @@ Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Contributors sign
 
 ## License
 
-Copyright © 2026 OpenTake contributors.
+Copyright © 2026 Tapry contributors.
 
-OpenTake is free software under the [GNU Affero General Public License v3.0](LICENSE). If you
+Tapry is free software under the [GNU Affero General Public License v3.0](LICENSE). If you
 run a modified version as a service for others, you must offer them its source.
 `packages/recorder` is [MIT](packages/recorder/LICENSE), so it can be used in any project.
 Third-party software in the Docker images: [NOTICE.md](NOTICE.md).

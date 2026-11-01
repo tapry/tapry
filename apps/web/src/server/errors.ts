@@ -1,7 +1,7 @@
 // Branded with a global symbol rather than checked with `instanceof`: in `next dev` the shared
 // services (see context.ts) can outlive a module reload, so an error may come from an older
 // copy of this class than the one the handler imported.
-const BRAND = Symbol.for("opentake.ApiError");
+const BRAND = Symbol.for("tapry.ApiError");
 
 export class ApiError extends Error {
   readonly [BRAND] = true;

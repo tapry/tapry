@@ -1,5 +1,5 @@
 // Small set of UI primitives in the shadcn style, without the Radix dependency tree.
-// Look and feel: the "OpenTake Dashboard / Pages" mock-ups (coral, ink, soft grey panels, Onest).
+// Look and feel: the "Tapry Dashboard / Pages" mock-ups (coral, ink, soft grey panels, Onest).
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
 export function cn(...classes: Array<string | false | null | undefined>) {
@@ -201,7 +201,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
   );
 }
 
-/** The OpenTake mark: a coral dot with a soft offset shadow. */
+/** The Tapry mark: a coral dot with a soft offset shadow. */
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("flex items-center gap-2.5 text-[19px] font-bold tracking-[-.02em]", className)}>
@@ -209,7 +209,7 @@ export function Logo({ className }: { className?: string }) {
         <span className="absolute inset-0 translate-x-1 translate-y-[3px] rounded-full bg-accent-line" />
         <span className="absolute inset-0 rounded-full bg-accent" />
       </span>
-      OpenTake
+      Tapry
     </span>
   );
 }

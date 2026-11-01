@@ -9,7 +9,7 @@ const ENGINES = /(matrix|call)\.spec\.ts/;
 
 // Run through `pnpm test:e2e`, which starts a throwaway SeaweedFS and sets S3_E2E_*.
 const PORT = 3100;
-const dbDir = mkdtempSync(join(tmpdir(), "opentake-e2e-db-"));
+const dbDir = mkdtempSync(join(tmpdir(), "tapry-e2e-db-"));
 
 export default defineConfig<{ forceMp4: boolean }>({
   testDir: "e2e",
@@ -83,7 +83,7 @@ export default defineConfig<{ forceMp4: boolean }>({
       NEXT_DIST_DIR: ".next-e2e",
       DATABASE_URL: `pglite://${dbDir}`,
       S3_ENDPOINT: process.env.S3_E2E_ENDPOINT ?? "",
-      S3_BUCKET: "opentake-e2e",
+      S3_BUCKET: "tapry-e2e",
       S3_ACCESS_KEY_ID: process.env.S3_E2E_ACCESS_KEY_ID ?? "",
       S3_SECRET_ACCESS_KEY: process.env.S3_E2E_SECRET_ACCESS_KEY ?? "",
       // Recordings are processed in-process; pass FFMPEG_PATH / FFPROBE_PATH if they are not on PATH.

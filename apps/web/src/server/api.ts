@@ -11,7 +11,7 @@ import {
   updateStudioBody,
   uploadUrlBody,
   type SessionState,
-} from "@opentake/shared";
+} from "@tapry/shared";
 import { downloadZip } from "client-zip";
 import { z } from "zod";
 import type { User } from "./auth";
@@ -155,7 +155,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     /** Liveness for Docker / load balancers: services built, migrations applied, database answering. */
     health: handler(async (svc) => {
       await svc.db.query("SELECT 1");
-      return json(200, { ok: true, version: process.env.OPENTAKE_VERSION ?? "dev" });
+      return json(200, { ok: true, version: process.env.TAPRY_VERSION ?? process.env.OPENTAKE_VERSION ?? "dev" });
     }),
     sessionState: asParticipant(async (svc, p) => json(200, await svc.live.state(p.sessionId))),
     sessionEvents: asParticipant(async (svc, p, req) => sseResponse(req, (send) => svc.live.subscribe(p.sessionId, send))),

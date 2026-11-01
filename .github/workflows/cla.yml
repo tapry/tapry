@@ -1,7 +1,7 @@
 # Contributor License Agreement check (CLA.md).
 #
 # Every pull request gets a "CLA" commit status. It passes once the PR's author and every
-# commit author have signed, by commenting the phrase below on any OpenTake pull request.
+# commit author have signed, by commenting the phrase below on any Tapry pull request.
 # Signatures are kept in cla-signatures.json on the `cla-signatures` branch: who, when, and a
 # link to the comment. The repository owner and bots don't need to sign.
 #
@@ -36,10 +36,10 @@ jobs:
           EXEMPT_OWNER: ${{ vars.CLA_EXEMPT_OWNER != 'false' }}
         with:
           script: |
-            const PHRASE = "I have read the OpenTake CLA and I agree to it.";
+            const PHRASE = "I have read the Tapry CLA and I agree to it.";
             const BRANCH = "cla-signatures";
             const FILE = "cla-signatures.json";
-            const MARKER = "<!-- opentake-cla -->";
+            const MARKER = "<!-- tapry-cla -->";
             const { owner, repo } = context.repo;
             const number = (context.payload.pull_request ?? context.payload.issue).number;
             const claUrl = `${context.serverUrl}/${owner}/${repo}/blob/${context.payload.repository.default_branch}/CLA.md`;
@@ -124,7 +124,7 @@ jobs:
             } else {
               body = [
                 MARKER,
-                `Thanks for contributing to OpenTake! Before this can be merged, everyone who wrote a commit here needs to accept the [Contributor License Agreement](${claUrl}) once. You keep the copyright in your work; the CLA lets the project license OpenTake as a whole, and promises it stays open source.`,
+                `Thanks for contributing to Tapry! Before this can be merged, everyone who wrote a commit here needs to accept the [Contributor License Agreement](${claUrl}) once. You keep the copyright in your work; the CLA lets the project license Tapry as a whole, and promises it stays open source.`,
                 "",
                 "To sign, read it and post this comment exactly:",
                 "",

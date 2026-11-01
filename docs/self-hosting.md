@@ -1,4 +1,4 @@
-# Self-hosting OpenTake
+# Self-hosting Tapry
 
 One server, Docker, four DNS names. Everything (app, database, storage, live call, HTTPS)
 runs from `deploy/compose`.
@@ -39,7 +39,7 @@ own stats show the connection as a TLS relay through `turn.<domain>:443`.
 ## Install
 
 ```bash
-git clone <repo> opentake && cd opentake/deploy/compose
+git clone <repo> tapry && cd tapry/deploy/compose
 ./setup.sh studio.example.com you@example.com   # writes .env with random secrets
 docker compose up -d                            # first run builds the image (a few minutes)
 ```
@@ -51,7 +51,7 @@ that sign-up is closed (set `ALLOW_SIGNUP=true` in `.env` to let others register
 
 Every release publishes ready-made images (amd64 and arm64), which skips the few-minute build.
 After `./setup.sh`, add to `.env` the two lines from the
-[release notes](../../../releases) (`OPENTAKE_IMAGES=ghcr.io/…` and `OPENTAKE_VERSION=…`), then:
+[release notes](../../../releases) (`TAPRY_IMAGES=ghcr.io/…` and `TAPRY_VERSION=…`), then:
 
 ```bash
 docker compose pull && docker compose up -d --no-build
@@ -118,13 +118,13 @@ Delete the `seaweedfs` service, then in the `x-app-env` block at the top of
 `docker-compose.yml` (shared by `web` and `worker`) set `S3_ENDPOINT` (your provider's
 endpoint), `S3_PUBLIC_ENDPOINT` (remove it if it's the same), `S3_REGION`, `S3_BUCKET` and the
 keys. Your provider must accept presigned `PUT`s with a signed `x-amz-checksum-sha256` header;
-check with `pnpm --filter @opentake/web test:s3` pointed at it (`S3_E2E_*` variables).
+check with `pnpm --filter @tapry/web test:s3` pointed at it (`S3_E2E_*` variables).
 The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 
 ## Operating
 
 - **Update:** `git pull && docker compose up -d --build` (or, with release images, set the new
-  `OPENTAKE_VERSION` in `.env` and `docker compose pull && docker compose up -d --no-build`).
+  `TAPRY_VERSION` in `.env` and `docker compose pull && docker compose up -d --no-build`).
   Database migrations run on start. Read the [changelog](../CHANGELOG.md) first.
 - **Logs:** `docker compose logs -f web worker`. Logs never contain media, only ids and errors.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your

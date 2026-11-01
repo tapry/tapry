@@ -31,7 +31,7 @@ export interface SpeakerTranscript {
 
 /** Transcribe one person's audio (any format ffmpeg reads). */
 export async function transcribeAudio(audioPath: string, opts: WhisperOptions): Promise<{ language: string | null; segments: Segment[] }> {
-  const work = await mkdtemp(join(tmpdir(), "opentake-whisper-"));
+  const work = await mkdtemp(join(tmpdir(), "tapry-whisper-"));
   try {
     // whisper.cpp wants 16 kHz mono PCM.
     const wav16 = join(work, "in.wav");

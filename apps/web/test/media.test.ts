@@ -1,4 +1,4 @@
-import { studioSettings } from "@opentake/shared";
+import { studioSettings } from "@tapry/shared";
 import { describe, expect, it } from "vitest";
 import { estimateClock } from "../src/lib/client/clock";
 import { parseSse } from "../src/lib/client/session-events";

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chunkStorageKey } from "@opentake/shared";
+import { chunkStorageKey } from "@tapry/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { JobRunner } from "../src/server/jobs";
 import { FakeStorage, setup, sha256 } from "./harness";
@@ -126,7 +126,7 @@ describe("recording processing", () => {
   describe("job runner lifecycle (separate workers)", () => {
     /** A stand-in for ffmpeg that just takes its time, so a job stays running. */
     function slowFfmpeg(seconds: number) {
-      const path = join(mkdtempSync(join(tmpdir(), "opentake-slow-")), "ffmpeg");
+      const path = join(mkdtempSync(join(tmpdir(), "tapry-slow-")), "ffmpeg");
       writeFileSync(path, `#!/bin/sh\nsleep ${seconds}\nexit 1\n`);
       chmodSync(path, 0o755);
       return path;
@@ -190,7 +190,7 @@ describe("recording processing", () => {
     let media: Buffer;
 
     beforeEach(() => {
-      const dir = mkdtempSync(join(tmpdir(), "opentake-proc-test-"));
+      const dir = mkdtempSync(join(tmpdir(), "tapry-proc-test-"));
       const file = join(dir, "a.webm");
       execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
         "-af", "volume=4", "-c:a", "libopus", file]);
@@ -285,7 +285,7 @@ describe("recording processing", () => {
     })();
 
     it.skipIf(!whisper || !model || !canSay)("transcribes after processing, labelled by speaker", async () => {
-      const dir = mkdtempSync(join(tmpdir(), "opentake-speech-"));
+      const dir = mkdtempSync(join(tmpdir(), "tapry-speech-"));
       execFileSync("say", ["-v", "Samantha", "-o", join(dir, "s.aiff"), "Thanks for having me on the show today."]);
       execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-i", join(dir, "s.aiff"), "-ar", "48000", "-c:a", "libopus", join(dir, "s.webm")]);
       await uploadTrack(split(readFileSync(join(dir, "s.webm")), 3));

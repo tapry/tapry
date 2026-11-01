@@ -18,7 +18,7 @@ const s3 = new S3Client({
     secretAccessKey: process.env.S3_E2E_SECRET_ACCESS_KEY ?? "",
   },
 });
-const BUCKET = process.env.S3_E2E_BUCKET ?? "opentake-e2e";
+const BUCKET = process.env.S3_E2E_BUCKET ?? "tapry-e2e";
 /** Direct storage access for extra checks; absent when testing a deployed stack via E2E_BASE_URL. */
 const canReadStorage = !!process.env.S3_E2E_ENDPOINT;
 
@@ -261,7 +261,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
       }, href);
       expect(got.status, name).toBe(200);
       const body = Buffer.from(got.base64, "base64");
-      const file = join(mkdtempSync(join(tmpdir(), "opentake-dl-")), name);
+      const file = join(mkdtempSync(join(tmpdir(), "tapry-dl-")), name);
       writeFileSync(file, body);
       if (name.endsWith(".wav")) {
         expect(got.type).toBe("audio/wav");
@@ -301,7 +301,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const names = await fileNames(recording.getByTestId("download"));
     const [download] = await Promise.all([studioPage.waitForEvent("download"), recording.getByTestId("download-zip").click()]);
     expect(download.suggestedFilename()).toMatch(/^E2E Show \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
-    const file = join(mkdtempSync(join(tmpdir(), "opentake-zip-")), "all.zip");
+    const file = join(mkdtempSync(join(tmpdir(), "tapry-zip-")), "all.zip");
     await download.saveAs(file);
     // Python's zipfile checks every CRC and lists what's inside.
     const listed = execFileSync("python3", [

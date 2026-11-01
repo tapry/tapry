@@ -7,7 +7,7 @@ const onest = Onest({ subsets: ["latin", "latin-ext"], variable: "--font-onest",
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "OpenTake", template: "%s · OpenTake" },
+  title: { default: "Tapry", template: "%s · Tapry" },
   description: "The remote recording studio you own.",
 };
 

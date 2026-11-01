@@ -1,5 +1,5 @@
-import { MemoryChunkStore, UploadQueue, createHttpTransport, type ChunkMeta } from "@opentake/recorder";
-import { chunkStorageKey, type SessionState } from "@opentake/shared";
+import { MemoryChunkStore, UploadQueue, createHttpTransport, type ChunkMeta } from "@tapry/recorder";
+import { chunkStorageKey, type SessionState } from "@tapry/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FakeStorage, setup, sha256 } from "./harness";
 

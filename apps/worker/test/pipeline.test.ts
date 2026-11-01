@@ -91,7 +91,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
 
   /** Stand-ins for MediaRecorder output: Opus WebM (tone at ~1/4 full scale), and VP8 + Opus WebM. */
   beforeAll(async () => {
-    dir = mkdtempSync(join(tmpdir(), "opentake-worker-test-"));
+    dir = mkdtempSync(join(tmpdir(), "tapry-worker-test-"));
     audioWebm = join(dir, "audio.webm");
     videoWebm = join(dir, "video.webm");
     await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=3",

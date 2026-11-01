@@ -1,6 +1,6 @@
 "use client";
 
-// The OpenTake landing page, from the "OpenTake Landing v9" design. Everything on it describes
+// The Tapry landing page, from the "Tapry Landing v9" design. Everything on it describes
 // what the open-source app does today; the hosted cloud is labelled "coming soon".
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 
@@ -260,7 +260,7 @@ export function Landing() {
       <section id="features" style={{ borderTop: "1px solid #efeff1", padding: "120px 28px" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <SectionHead eyebrow="FOR SHOWS, NOT MEETINGS" title="Built for recording, not for meetings" eyebrowColor="#e8553d">
-            Video-call apps squeeze everyone down to save bandwidth. OpenTake records every person in full quality, right on their own computer.
+            Video-call apps squeeze everyone down to save bandwidth. Tapry records every person in full quality, right on their own computer.
           </SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,520px),1fr))", gap: 20 }}>
             <div style={{ background: "#f7f7f8", borderRadius: 26, padding: "clamp(24px,3.4vw,44px)", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,240px),1fr))", gap: 28, alignItems: "center" }}>
@@ -333,7 +333,7 @@ export function Landing() {
       <section id="after" style={{ background: "#0b0b0d", color: "#f5f5f7", padding: "110px 28px 60px" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
           <SectionHead eyebrow="AFTER YOU PRESS STOP" title="Your episode, ready before your coffee" eyebrowColor="#ff7a5f" dark>
-            OpenTake lines everyone up, evens out the volume and writes a transcript, then hands you a tidy folder.
+            Tapry lines everyone up, evens out the volume and writes a transcript, then hands you a tidy folder.
           </SectionHead>
           <div style={{ position: "relative", borderRadius: 30, background: "#1c1c1f", overflow: "hidden", padding: "clamp(28px,5vw,72px) clamp(18px,4vw,56px)" }}>
             <div style={{ position: "absolute", left: "50%", top: "50%", width: 1300, height: 1300, transform: "translate(-50%,-50%)", borderRadius: "50%", background: "repeating-radial-gradient(circle,transparent 0 120px,rgba(255,255,255,.035) 120px 121px)" }} />
@@ -439,7 +439,7 @@ export function Landing() {
             </a>
           </div>
           <div style={{ borderRadius: 26, background: "#e8553d", color: "#ffffff", padding: 40, display: "flex", flexDirection: "column", gap: 16 }}>
-            <span style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".12em", color: "#ffe3d6" }}>OPENTAKE CLOUD · COMING SOON</span>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".12em", color: "#ffe3d6" }}>TAPRY CLOUD · COMING SOON</span>
             <span style={{ fontSize: 60, fontWeight: 700, letterSpacing: "-.04em", lineHeight: 1 }}>We host it</span>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#fff1eb" }}>
               No setup and nothing to maintain. Just sign in and record. Join the waitlist and we’ll let you know when it opens.
@@ -451,7 +451,7 @@ export function Landing() {
 
       <footer style={{ background: "#0b0b0d", color: "#8e8e93", borderTop: "1px solid #1f1f22" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 28px", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 14 }}>
-          <span>© 2026 OpenTake · Free and open source (AGPL-3.0)</span>
+          <span>© 2026 Tapry · Free and open source (AGPL-3.0)</span>
           <span style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
             <a href={SETUP_GUIDE} style={{ color: "#8e8e93" }}>Setup guide</a>
             <a href={BROWSERS} style={{ color: "#8e8e93" }}>Tested browsers</a>
@@ -515,7 +515,7 @@ function Logo() {
         <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#fbd5cc", transform: "translate(4px,3px)" }} />
         <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#e8553d" }} />
       </span>
-      OpenTake
+      Tapry
     </span>
   );
 }

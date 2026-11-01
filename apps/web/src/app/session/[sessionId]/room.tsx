@@ -1,7 +1,7 @@
 "use client";
 
-import type { UploadProgress } from "@opentake/recorder";
-import { STALE_REPORT_MS, type SessionState, type SessionTicket } from "@opentake/shared";
+import type { UploadProgress } from "@tapry/recorder";
+import { STALE_REPORT_MS, type SessionState, type SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";

@@ -1,6 +1,6 @@
 "use client";
 
-import type { SessionTicket } from "@opentake/shared";
+import type { SessionTicket } from "@tapry/shared";
 import { useEffect, useState } from "react";
 import { Eyebrow, Notice } from "@/components/ui";
 import { loadTicket } from "@/lib/client/api";

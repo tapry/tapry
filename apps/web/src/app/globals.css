@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Design tokens (docs/plan/10-design-inspiration.md; the "OpenTake Dashboard/Pages" mock-ups).
+ * Design tokens (docs/plan/10-design-inspiration.md; the "Tapry Dashboard/Pages" mock-ups).
  * Components use the Tailwind names below (bg-surface-2, text-muted, …), never raw colors.
  */
 :root {

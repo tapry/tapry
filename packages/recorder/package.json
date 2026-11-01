@@ -1,5 +1,5 @@
 {
-  "name": "@opentake/recorder",
+  "name": "@tapry/recorder",
   "version": "0.1.1",
   "description": "Browser recording core: capture, durable local chunks, resumable upload.",
   "license": "MIT",

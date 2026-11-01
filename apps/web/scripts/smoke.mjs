@@ -2,7 +2,7 @@
 // Smoke test of a production build: starts `next start` against real S3 storage and a fresh
 // embedded database, then walks the whole flow over HTTP the way the browser will.
 //
-//   pnpm --filter @opentake/web build
+//   pnpm --filter @tapry/web build
 //   WEED_BIN=/path/to/weed node scripts/with-seaweedfs.mjs node scripts/smoke.mjs
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 const PORT = 3123;
 const BASE = `http://127.0.0.1:${PORT}`;
-const dataDir = mkdtempSync(join(tmpdir(), "opentake-smoke-"));
+const dataDir = mkdtempSync(join(tmpdir(), "tapry-smoke-"));
 
 const server = spawn("pnpm", ["exec", "next", "start", "-p", String(PORT), "-H", "127.0.0.1"], {
   stdio: ["ignore", "pipe", "pipe"],
@@ -20,7 +20,7 @@ const server = spawn("pnpm", ["exec", "next", "start", "-p", String(PORT), "-H",
     ...process.env,
     DATABASE_URL: `pglite://${join(dataDir, "db")}`,
     S3_ENDPOINT: process.env.S3_E2E_ENDPOINT,
-    S3_BUCKET: "opentake-smoke",
+    S3_BUCKET: "tapry-smoke",
     S3_ACCESS_KEY_ID: process.env.S3_E2E_ACCESS_KEY_ID,
     S3_SECRET_ACCESS_KEY: process.env.S3_E2E_SECRET_ACCESS_KEY,
   },

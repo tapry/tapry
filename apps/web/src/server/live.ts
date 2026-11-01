@@ -1,4 +1,4 @@
-import { STALE_REPORT_MS, type QualityAlert, type SessionState, type telemetryBody } from "@opentake/shared";
+import { STALE_REPORT_MS, type QualityAlert, type SessionState, type telemetryBody } from "@tapry/shared";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";

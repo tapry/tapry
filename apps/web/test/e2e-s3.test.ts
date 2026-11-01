@@ -1,11 +1,11 @@
-// Runs only against a real S3-compatible server: `pnpm --filter @opentake/web test:s3`.
+// Runs only against a real S3-compatible server: `pnpm --filter @tapry/web test:s3`.
 // Proves the parts a fake can't: presigned URLs work from a plain fetch, and storage
 // itself refuses uploads whose size or content differ from what was signed, and deletes
 // really remove objects.
 import { randomBytes } from "node:crypto";
 import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { createHttpTransport, MemoryChunkStore, UploadQueue, type ChunkMeta } from "@opentake/recorder";
-import { chunkStorageKey } from "@opentake/shared";
+import { createHttpTransport, MemoryChunkStore, UploadQueue, type ChunkMeta } from "@tapry/recorder";
+import { chunkStorageKey } from "@tapry/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import { S3Storage } from "../src/server/storage";
 import { setup, sha256 } from "./harness";
@@ -14,7 +14,7 @@ const endpoint = process.env.S3_E2E_ENDPOINT;
 const MIME = "video/webm;codecs=vp9,opus";
 
 describe.skipIf(!endpoint)("upload API against real S3 storage", () => {
-  const bucket = `opentake-e2e-${randomBytes(4).toString("hex")}`;
+  const bucket = `tapry-e2e-${randomBytes(4).toString("hex")}`;
   const config = {
     endpoint,
     region: "us-east-1",
