@@ -3,6 +3,8 @@ import {
   alertAdvice,
   alertLabel,
   CLIP_WINDOW_MS,
+  ECHO_WINDOW_MS,
+  EchoDetector,
   MicAlerts,
   QUIET_MIN_TALK_MS,
   SILENT_AFTER_MS,
@@ -104,6 +106,61 @@ describe("too quiet (on the device)", () => {
     const brief = new MicAlerts(0);
     feed(brief, 0, 30_000, (t) => t >= 20_000 && t < 20_000 + QUIET_MIN_TALK_MS - 1000, -45);
     expect(brief.alerts(30_000, false)).toEqual([]);
+  });
+});
+
+/** Speech-like levels, one per 100 ms: words and pauses of random length (seeded). */
+function speechLevels(n: number, seed: number, loudDb = -20) {
+  let x = seed;
+  const rand = () => ((x = (x * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const out: number[] = [];
+  while (out.length < n) {
+    const talking = rand() < 0.5;
+    for (let i = 0, len = 2 + Math.floor(rand() * 15); i < len; i++) out.push(talking ? loudDb - rand() * 10 : -60 - rand() * 3);
+  }
+  return out.slice(0, n);
+}
+
+describe("echo (on the device)", () => {
+  const run = (far: number[], near: number[]) => {
+    const echo = new EchoDetector();
+    far.forEach((f, i) => echo.add(f, near[i]!, i * 100));
+    return echo.echo();
+  };
+  const N = ECHO_WINDOW_MS / 100;
+
+  it("flags a mic that records the call from the speakers, a little later and quieter", () => {
+    const far = speechLevels(N, 1);
+    const noise = speechLevels(N, 9).map(() => -58);
+    const near = far.map((f, i) => Math.max(noise[i]!, (far[i - 1] ?? -60) - 20)); // 100 ms later, 20 dB down
+    expect(run(far, near)).toBe(true);
+  });
+
+  it("leaves a normal conversation alone: people take turns", () => {
+    const far = speechLevels(N, 2);
+    const near = far.map((f) => (f > -40 ? -60 : -22)); // talks when the others don't
+    expect(run(far, near)).toBe(false);
+  });
+
+  it("leaves people talking over each other alone, and a call where the others barely speak", () => {
+    expect(run(speechLevels(N, 3), speechLevels(N, 4))).toBe(false);
+    const quietFar = speechLevels(N, 5).map((f, i) => (i < 30 ? f : -60));
+    expect(run(quietFar, quietFar.map((f) => f - 20))).toBe(false);
+  });
+
+  it("doesn't blame the person whose own voice comes back from someone else's speakers", () => {
+    const near = speechLevels(N, 7); // they talk...
+    const far = near.map((_, i) => Math.max(-62, (near[i - 4] ?? -60) - 15)); // ...and hear it back 400 ms later
+    expect(run(far, near)).toBe(false);
+    // The other end, whose speakers leak: their mic follows what the call plays them.
+    expect(run(near, near.map((_, i) => Math.max(-58, (near[i - 1] ?? -60) - 20)))).toBe(true);
+  });
+
+  it("forgets echo once it stops (headphones on)", () => {
+    const echo = new EchoDetector();
+    const far = speechLevels(2 * N, 6);
+    far.forEach((f, i) => echo.add(f, i < N ? f - 20 : -60, i * 100));
+    expect(echo.echo()).toBe(false);
   });
 });
 

@@ -21,7 +21,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
-### AI producer: too quiet and talk balance
+### AI producer: too quiet, echo and talk balance
+- An **echo** alert: someone's microphone picks up the call from their speakers, so the others
+  are in their recording too. Each device compares its own recorded sound with what the call
+  plays it; the person who only hears their own voice come back isn't flagged.
 - A **too quiet** alert: someone who talks but stays below -38 dBFS for at least 5 s of the last
   30 s. They're told how to fix it, and the host sees it next to their name.
 - **Talk balance**: while recording, the host sees each person's share of the talking, and a

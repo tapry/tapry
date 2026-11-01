@@ -116,6 +116,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     headphones: ready.choice.headphones,
     recorderError,
     clockOffsetMs: ready.clock?.offsetMs ?? 0,
+    callAudio: call.peers.flatMap((p) => (p.audio ? [p.audio.mediaStreamTrack] : [])),
     recordingId: recording?.id ?? null,
     active: !ended,
   });
