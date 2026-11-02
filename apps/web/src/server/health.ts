@@ -26,6 +26,8 @@ export interface HealthReport {
   checkedAt: number;
   checks: HealthCheck[];
   workers: Array<{ id: string; kind: "inprocess" | "worker"; version: string; seenAt: number; startedAt: number; info: WorkerInfo; ageMs: number }>;
+  /** LiveKit's address, for the page to test from the browser; null without a call. */
+  callUrl: string | null;
   /** Recent failed jobs: the reason only (ffmpeg's last lines), never media. */
   failures: Array<{ type: string; recordingId: string; error: string | null; at: number }>;
 }
@@ -77,7 +79,8 @@ export class HealthService {
     return {
       version: this.appVersion,
       checkedAt: Date.now(),
-      checks: [database, storage, this.workersCheck(alive, runners), queue, this.transcripts(alive), this.disk(alive), await this.call(), version],
+      checks: [database, storage, this.workersCheck(alive, runners), queue, this.transcripts(alive), this.disk(alive), this.call(), version],
+      callUrl: this.opts.call?.url ?? null,
       workers: runners,
       failures,
     };
@@ -243,24 +246,15 @@ export class HealthService {
     };
   }
 
-  private async call(): Promise<HealthCheck> {
+  /**
+   * Whether the call is set up. Reaching LiveKit is tested from the admin's browser on the page
+   * (the way guests reach it): the server never talks to LiveKit itself, only signs tokens, and
+   * from inside a container its public address often doesn't lead back to it.
+   */
+  private call(): HealthCheck {
     const call = this.opts.call;
     if (!call) return { id: "call", label: "Live call", tone: "off", summary: "Off: recording works without a call (set LIVEKIT_URL)", details: [] };
-    const url = call.url.replace(/^ws/, "http");
-    const t0 = performance.now();
-    try {
-      const res = await (this.opts.fetch ?? fetch)(url, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return { id: "call", label: "Live call", tone: "ok", summary: `LiveKit answering (${Math.round(performance.now() - t0)} ms)`, details: [call.url] };
-    } catch (err) {
-      return {
-        id: "call",
-        label: "Live call",
-        tone: "danger",
-        summary: "LiveKit isn't answering: calls won't connect (recording still works)",
-        details: [call.url, String(err).slice(0, 200)],
-      };
-    }
+    return { id: "call", label: "Live call", tone: "ok", summary: "On", details: [call.url] };
   }
 
   /** The running version, and (only when UPDATE_CHECK_REPO is set) whether a newer one is out. */
