@@ -65,6 +65,11 @@ export function DashboardShell({
           <span className="text-[13px] text-subtle">
             across {shows.length} show{shows.length === 1 ? "" : "s"}
           </span>
+          {user.isAdmin && (
+            <Link href="/admin/health" className="mt-1 text-[13px] text-muted hover:text-text">
+              Server health →
+            </Link>
+          )}
         </div>
       </aside>
 

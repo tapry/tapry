@@ -64,6 +64,8 @@ services:
       GUEST_PROMO_URL: ${GUEST_PROMO_URL:-}
       # Other sites allowed to use the public upload-speed test (comma-separated origins).
       SPEED_TEST_ORIGINS: ${SPEED_TEST_ORIGINS:-}
+      # GitHub "owner/name" whose latest release the health page compares with; empty: no check.
+      UPDATE_CHECK_REPO: ${UPDATE_CHECK_REPO:-}
       LIVEKIT_URL: ${LIVEKIT_WS_SCHEME:-wss}://livekit.${DOMAIN}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?}

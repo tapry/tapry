@@ -37,13 +37,20 @@ export function getServices(): Promise<Services> {
       call: config.call,
       guestPromoUrl: config.guestPromoUrl,
       speedTestOrigins: config.speedTestOrigins,
+      health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
     });
     if (config.worker.inProcess) {
       // Replace the runner too, so worker code edits apply. The old one finishes its current job.
       shared.runner?.stop();
-      const runner = new JobRunner(db, storage, { ...config.worker, onChange: (sessionId) => svc.live.publishSoon(sessionId) });
+      const runner = new JobRunner(db, storage, {
+        ...config.worker,
+        kind: "inprocess",
+        onChange: (sessionId) => svc.live.publishSoon(sessionId),
+      });
       svc.processing.onEnqueue = () => runner.kick();
       shared.runner = runner;
+      // Be on record before the first page asks (the health page would say no worker runs).
+      await runner.heartbeat();
       runner.start();
     }
     // Otherwise a separate worker (worker-main.ts) polls the jobs table.
