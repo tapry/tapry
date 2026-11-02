@@ -94,6 +94,8 @@ export default defineConfig<{ forceMp4: boolean }>({
       WHISPER_MODEL: process.env.WHISPER_MODEL ?? "",
       // The guests' end screen shows this link; e2e/studio.spec.ts checks it.
       GUEST_PROMO_URL: "https://tapry.test/",
+      // The website's origin in e2e/upload-speed.spec.ts, calling the public speed test cross-site.
+      SPEED_TEST_ORIGINS: "https://tapry.test",
       WHISPER_VAD_MODEL: process.env.WHISPER_VAD_MODEL ?? "",
       // Live call when scripts/with-seaweedfs.mjs started LiveKit (LIVEKIT_BIN set); otherwise
       // explicitly off, so a LIVEKIT_URL in .env.local (which next dev also reads) can't leak in.

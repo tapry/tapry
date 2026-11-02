@@ -42,7 +42,7 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
       const clock = await estimateClock(async () => (await apiFetch<{ serverTime: number }>("/time")).serverTime).catch(() => null);
       if (cancelled) return;
       setBackground([...base, storageCheck(disk?.freeBytes ?? null, disk?.ok ?? true), networkCheck(clock?.rttMs ?? null)]);
-      const mbps = await measureUpload(inviteCode);
+      const mbps = await measureUpload(`/api/check/${encodeURIComponent(inviteCode)}/upload`);
       if (cancelled) return;
       setBackground([...base, storageCheck(disk?.freeBytes ?? null, disk?.ok ?? true), networkCheck(clock?.rttMs ?? null), uploadCheck(mbps, settings)]);
       setTesting(false);

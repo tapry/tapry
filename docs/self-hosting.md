@@ -139,6 +139,10 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   (0: right away). That saves 40–50% of the space ([costs.md](costs.md)). Once they're gone,
   the episode can't be processed again, and a guest's upload arriving after that is turned away.
   The originals are the best-quality copies: keep them if you edit from the raw video.
+- **Upload-speed check:** `/tools/upload-speed` is a free, public page on your server that tells
+  anyone (no account) whether their upload keeps up with recording. Its test data is read and
+  thrown away, at most 64 MB a minute per address. Set `SPEED_TEST_ORIGINS` only to let another
+  site's pages use it too.
 - **Guests' end screen:** guests can download their own recording once it's processed (a show
   setting, on by default). Set `GUEST_PROMO_URL` in `.env` to also show them a "Record your own,
   free" link; unset, there is none.

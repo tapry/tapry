@@ -1,6 +1,6 @@
 // The guest tech check (/join/<code>/check): the pieces that aren't React, kept apart so they
 // can be tested. Nothing here records or uploads media; the speed test sends throwaway bytes.
-import type { StudioSettings, TechCheckResult } from "@tapry/shared";
+import { studioSettings, type StudioSettings, type TechCheckResult } from "@tapry/shared";
 import { AUDIO_BITRATE, VIDEO_BITRATE } from "./recording";
 
 /** The live call on top of the recording: a 360p camera and the voice. */
@@ -38,6 +38,16 @@ export function uploadCheck(mbps: number | null, settings: StudioSettings): Tech
   };
 }
 
+/** What each kind of show needs, for the upload-speed tool: ok when the line keeps up with it. */
+export function uploadVerdicts(mbps: number) {
+  const base = studioSettings.parse({});
+  return [
+    { kind: "Sound only", settings: { ...base, audioOnly: true } },
+    { kind: "Standard video (720p)", settings: { ...base, videoQuality: "720p" as const } },
+    { kind: "Full HD video (1080p)", settings: base },
+  ].map(({ kind, settings }) => ({ kind, needed: neededMbps(settings), ok: mbps >= neededMbps(settings) * 1.2 }));
+}
+
 /** "Chrome on macOS", for the host's list. */
 export function describeBrowser(ua: string): string {
   const browser = /Edg\//.test(ua)
@@ -64,27 +74,39 @@ export function describeBrowser(ua: string): string {
 }
 
 /**
- * Measure the upload: send 1 MB pieces of throwaway data for about `forMs`, at most `maxBytes`,
- * and return Mbit/s. Null when nothing got through.
+ * Measure the upload to `url` (an endpoint that reads and drops POSTed bytes): pieces start at
+ * 256 KB and double while each takes under 0.75 s, so a fast line isn't judged by its round
+ * trips. The first piece warms the connection up and isn't counted (unless it's all there is).
+ * Runs for about `forMs`, sends at most `maxBytes`. Mbit/s, or null when nothing got through.
  */
-export async function measureUpload(inviteCode: string, { forMs = 4_000, maxBytes = 8 * 1024 * 1024 } = {}) {
-  const piece = new Uint8Array(1024 * 1024);
-  crypto.getRandomValues(piece.subarray(0, 65_536)); // not all zeros, in case anything compresses
-  const start = performance.now();
+export async function measureUpload(url: string, { forMs = 5_000, maxBytes = 32 * 1024 * 1024 } = {}) {
+  const MAX_PIECE = 8 * 1024 * 1024;
+  const data = new Uint8Array(MAX_PIECE);
+  crypto.getRandomValues(data.subarray(0, 65_536)); // not all zeros, in case anything compresses
+  let size = 256 * 1024;
   let sent = 0;
+  let bytes = 0;
+  let seconds = 0;
+  let first: { bytes: number; seconds: number } | null = null;
+  const start = performance.now();
   try {
     while (sent < maxBytes && (sent === 0 || performance.now() - start < forMs)) {
-      const res = await fetch(`/api/check/${encodeURIComponent(inviteCode)}/upload`, {
-        method: "POST",
-        body: piece,
-        signal: AbortSignal.timeout(30_000),
-      });
+      const t0 = performance.now();
+      const res = await fetch(url, { method: "POST", body: data.subarray(0, size), signal: AbortSignal.timeout(30_000) });
+      const dt = (performance.now() - t0) / 1000;
       if (!res.ok) break;
-      sent += piece.byteLength;
+      sent += size;
+      if (first) {
+        bytes += size;
+        seconds += dt;
+      } else {
+        first = { bytes: size, seconds: dt };
+      }
+      if (dt < 0.75) size = Math.min(size * 2, MAX_PIECE);
     }
   } catch {
-    // Offline or timed out: report what got through.
+    // Offline, limited or timed out: report what got through.
   }
-  const seconds = (performance.now() - start) / 1000;
-  return sent > 0 ? (sent * 8) / seconds / 1_000_000 : null;
+  if (seconds === 0) return first ? (first.bytes * 8) / first.seconds / 1_000_000 : null;
+  return (bytes * 8) / seconds / 1_000_000;
 }

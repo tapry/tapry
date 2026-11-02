@@ -20,6 +20,7 @@ import type { User } from "./auth";
 import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
+import { clientAddress, drainBody, speedTestCors } from "./speed-test";
 import { contentDisposition } from "./storage";
 
 type Params = Record<string, string>;
@@ -155,6 +156,29 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     speedTest: handler(async (svc, req, params) =>
       json(200, await svc.studios.speedTest(params.inviteCode!, req.body, SPEED_TEST_MAX_BYTES)),
     ),
+    /**
+     * Public upload-speed test (no account): throwaway bytes, read and dropped, limited per
+     * address. The project website may call it from its origin (SPEED_TEST_ORIGINS).
+     */
+    publicSpeedTest: handler(async (svc, req) => {
+      const cors = speedTestCors(req, svc.speedTest.origins);
+      const key = clientAddress(req);
+      const allowed = Math.min(SPEED_TEST_MAX_BYTES, svc.speedTest.limiter.remaining(key));
+      if (allowed === 0) {
+        await req.body?.cancel().catch(() => {});
+        return json(429, { error: "slow_down", message: "Too many speed tests from your address. Try again in a minute." }, cors);
+      }
+      try {
+        const bytes = await drainBody(req.body, allowed);
+        svc.speedTest.limiter.record(key, bytes);
+        return json(200, { bytes }, cors);
+      } catch (err) {
+        svc.speedTest.limiter.record(key, allowed);
+        if (!isApiError(err)) throw err;
+        return json(err.status, { error: err.code, message: err.message }, cors); // readable by the website too
+      }
+    }),
+    publicSpeedTestPreflight: handler(async (svc, req) => new Response(null, { status: 204, headers: speedTestCors(req, svc.speedTest.origins) })),
     /** Tech check: the guest sends their results to the host. */
     reportTechCheck: handler(async (svc, req, params) => {
       await svc.studios.reportTechCheck(params.inviteCode!, await parseBody(req, techCheckReport));
@@ -313,8 +337,8 @@ function parseSeq(params: Params) {
   return seq.data;
 }
 
-function json(status: number, body: unknown) {
-  return Response.json(body, { status });
+function json(status: number, body: unknown, headers?: Record<string, string>) {
+  return Response.json(body, { status, headers });
 }
 
 function errorResponse(err: unknown) {

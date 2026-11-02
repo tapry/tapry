@@ -82,10 +82,14 @@ const ROUTE_PATTERNS = ROUTES.map(([method, path, name]) => {
 });
 
 /** A fresh in-memory server: services, handlers, and a fetch that routes like Next.js. */
-export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean } = {}) {
+export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; speedTestOrigins?: string[] } = {}) {
   const db = await openDb("pglite://memory");
   let clock = 1_000_000;
-  const services = createServices(db, storage, { auth: { allowSignup: opts.allowSignup ?? false }, now: () => clock });
+  const services = createServices(db, storage, {
+    auth: { allowSignup: opts.allowSignup ?? false },
+    now: () => clock,
+    speedTestOrigins: opts.speedTestOrigins,
+  });
   const api = createApiHandlers(async () => services);
 
   /** Routes /api/* to handlers; everything else goes to `fallback` (fake storage by default). */
