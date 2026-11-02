@@ -47,7 +47,7 @@ Done for v1: studios ("shows"), invite links, green room, consent text per show 
 - Results reach the host only when the guest presses Send (`POST /api/check/:code/report`: name, "Chrome on macOS", check codes and labels; no media). Table `tech_checks`, newest 50 per show, 30 days shown, deleted with the show.
 
 ## Admin health
-- `/admin/health` (admins; `GET /api/admin/health` gives the JSON): `src/server/health.ts` checks the database (and pending migrations), storage (writes, heads and deletes `health/check-*.txt`), workers, job queue and failures (reasons only), transcripts, working space, LiveKit and the version.
+- `/admin/health` (admins; `GET /api/admin/health` gives the JSON): `src/server/health.ts` checks the database (and pending migrations), storage (writes, heads and deletes `health/check-*.txt`), workers, job queue and failures (reasons only), transcripts, working space, the call (the server only reports whether it's set up; the page tests LiveKit from the admin's browser, since the server never talks to LiveKit and inside a container its public address often doesn't lead back) and the version.
 - Workers are known from heartbeats: every JobRunner (`kind` inprocess or worker) upserts a `workers` row every 30 s with its version and `WorkerInfo` (ffmpeg/ffprobe version lines, whisper model found, free tmp space); gone after 3 missed beats; rows idle a day are removed. Ages are computed with the database's clock. The web server records its runner's first beat before serving.
 - Update check only with `UPDATE_CHECK_REPO` (GitHub releases/latest, cached 6 h): privacy by default.
 
