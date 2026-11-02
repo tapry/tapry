@@ -180,6 +180,8 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       svc.live.reportHealth(p, await parseBody(req, telemetryBody));
       return new Response(null, { status: 204 });
     }),
+    /** The end screen: this participant's own files from the session, and the promo link. */
+    ownRecordings: asParticipant(async (svc, p) => json(200, await svc.processing.ownRecordings(p, svc.guestPromoUrl))),
     /** LiveKit token for the live call (or enabled: false when no LiveKit is configured). */
     callToken: asParticipant(async (svc, p) => json(200, await svc.call.token(p))),
 

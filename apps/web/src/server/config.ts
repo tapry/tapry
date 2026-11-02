@@ -45,6 +45,8 @@ const env = z.object({
   WHISPER_THREADS: z.coerce.number().int().min(1).max(64).default(4),
   /** Font for names on the combined video's tiles; found automatically when unset. */
   TILE_FONT: unsetIfEmpty(z.string()),
+  /** Guests' end screen links here ("Record your own, free"). Unset (default): no such link. */
+  GUEST_PROMO_URL: unsetIfEmpty(z.string().url()),
   /** Live call. All three set: call on. LIVEKIT_URL unset: recording works without a call. */
   LIVEKIT_URL: unsetIfEmpty(z.string().url()),
   LIVEKIT_API_KEY: unsetIfEmpty(z.string()),
@@ -69,6 +71,7 @@ export interface Config {
   /** How recordings get processed; `inProcess` false when a separate worker does it. */
   worker: WorkerConfig & { inProcess: boolean };
   call: CallConfig | null;
+  guestPromoUrl: string | null;
 }
 
 export function loadConfig(source: Record<string, string | undefined> = process.env): Config {
@@ -106,5 +109,6 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       rawRetentionMs: cfg.RAW_RETENTION_DAYS === undefined ? undefined : cfg.RAW_RETENTION_DAYS * 86_400_000,
     },
     call: cfg.LIVEKIT_URL ? { url: cfg.LIVEKIT_URL, apiKey: cfg.LIVEKIT_API_KEY!, apiSecret: cfg.LIVEKIT_API_SECRET! } : null,
+    guestPromoUrl: cfg.GUEST_PROMO_URL ?? null,
   };
 }

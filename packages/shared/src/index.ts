@@ -42,6 +42,8 @@ const settingsFields = {
   levelLoudness: z.boolean(),
   /** Sound only: nobody's camera is asked for, the call is voice only, episodes have no video. */
   audioOnly: z.boolean(),
+  /** Guests can download their own recording (their WAV, and MP4 with a camera) from the end screen. */
+  guestDownloads: z.boolean(),
 };
 
 /** Full settings, with defaults filled in. */
@@ -51,6 +53,7 @@ export const studioSettings = z.object({
   echoCancellation: settingsFields.echoCancellation.default(true),
   levelLoudness: settingsFields.levelLoudness.default(true),
   audioOnly: settingsFields.audioOnly.default(false),
+  guestDownloads: settingsFields.guestDownloads.default(true),
 });
 export type StudioSettings = z.infer<typeof studioSettings>;
 
@@ -165,6 +168,21 @@ export interface SessionState {
   }>;
   /** Server clock when this snapshot was made. */
   serverTime: number;
+}
+
+/** What a participant's end screen shows: their own files from this session, and the promo link. */
+export interface OwnRecordings {
+  /** False when the host doesn't let guests download their own recording. */
+  downloads: boolean;
+  /** Each episode of this session they recorded in, oldest first. */
+  recordings: Array<{
+    number: number;
+    processing: "pending" | "queued" | "processing" | "ready" | "failed";
+    /** Signed, short-lived download links; empty until processing is ready. */
+    files: Array<{ kind: "audio" | "video"; fileName: string; bytes: number; url: string }>;
+  }>;
+  /** "Record your own" link (GUEST_PROMO_URL), or null when the server doesn't set one. */
+  promoUrl: string | null;
 }
 
 // ── Uploads ───────────────────────────────────────────────────────────────────

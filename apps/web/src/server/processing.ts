@@ -1,7 +1,9 @@
+import { studioSettings, type OwnRecordings } from "@tapry/shared";
 import type { User } from "./auth";
 import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
 import { newId } from "./ids";
+import type { Participant } from "./live";
 import type { Storage } from "./storage";
 
 export type ProcessingStatus = "pending" | "queued" | "processing" | "ready" | "failed";
@@ -232,6 +234,50 @@ export class ProcessingService {
     );
     if (!o) throw new ApiError(404, "output_not_found", "File not found");
     return this.storage.presignGet(o.storage_key, { fileName: o.file_name, contentType: o.content_type });
+  }
+
+  /**
+   * A participant's own files from their session, for the end screen: only theirs (never the
+   * combined video or anyone else's), only when the show allows it, as links valid for an hour.
+   */
+  async ownRecordings(p: Participant, promoUrl: string | null): Promise<OwnRecordings> {
+    const [studio] = await this.db.query<{ settings: unknown }>(
+      "SELECT st.settings FROM sessions s JOIN studios st ON st.id = s.studio_id WHERE s.id = $1 AND st.deleted_at IS NULL",
+      [p.sessionId],
+    );
+    const downloads = !!studio && studioSettings.parse(studio.settings).guestDownloads;
+    if (!downloads) return { downloads: false, recordings: [], promoUrl };
+    const recordings = await this.db.query<{ id: string; number: number; processing: OwnRecordings["recordings"][number]["processing"] }>(
+      `SELECT r.id, r.number, r.processing FROM recordings r
+       WHERE r.session_id = $1 AND r.deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.participant_id = $2)
+       ORDER BY r.started_at`,
+      [p.sessionId, p.id],
+    );
+    const out: OwnRecordings["recordings"] = [];
+    for (const r of recordings) {
+      const files =
+        r.processing !== "ready"
+          ? []
+          : await this.db.query<{ kind: "audio" | "video"; file_name: string; content_type: string; storage_key: string; bytes: string }>(
+              `SELECT kind, file_name, content_type, storage_key, bytes FROM outputs
+               WHERE recording_id = $1 AND participant_id = $2 AND kind IN ('audio', 'video') ORDER BY kind`,
+              [r.id, p.id],
+            );
+      out.push({
+        number: r.number,
+        processing: r.processing,
+        files: await Promise.all(
+          files.map(async (f) => ({
+            kind: f.kind,
+            fileName: f.file_name,
+            bytes: Number(f.bytes),
+            url: await this.storage.presignGet(f.storage_key, { fileName: f.file_name, contentType: f.content_type, ttlSeconds: 3600 }),
+          })),
+        ),
+      });
+    }
+    return { downloads, recordings: out, promoUrl };
   }
 
   private async ownedRecording(owner: User, studioId: string, recordingId: string) {

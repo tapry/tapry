@@ -95,6 +95,7 @@ export function ShowSettingsForm({ studioId, name, settings }: { studioId: strin
             maxGuests: guests,
             echoCancellation: f.get("echoCancellation") === "on",
             levelLoudness: f.get("levelLoudness") === "on",
+            guestDownloads: f.get("guestDownloads") === "on",
           },
         },
       });
@@ -182,6 +183,12 @@ export function ShowSettingsForm({ studioId, name, settings }: { studioId: strin
         defaultChecked={settings.levelLoudness}
         label="Even out everyone's volume"
         description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, podcast loudness). Only the volume changes, never how anyone sounds. Applies to episodes processed from now on."
+      />
+      <CheckboxRow
+        name="guestDownloads"
+        defaultChecked={settings.guestDownloads}
+        label="Guests can download their own recording"
+        description="Once an episode is ready, each guest can download their own audio (and video) from the page they recorded on. Only their own, never anyone else's."
       />
       <div className="flex items-center gap-3.5">
         <Button type="submit">Save changes</Button>

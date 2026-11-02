@@ -31,7 +31,7 @@ docs/               plan (v2), decisions, self-hosting, browser support, costs
 Not yet: `packages/sync`, `packages/exports`, `ee/`.
 
 ## Status against plan v3 (1 Nov 2026)
-Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (including too quiet and echo) and talk balance, audio-only shows, guest tech-check link, live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync, Gate A's 60-minute two-person run in Chromium, and with real Safari as the guest (automated, mock mic: nothing lost, no drift; the absolute Safari-to-host gap needs real devices). Open for v1: guest end screen + recap email, free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, release 0.2.0.
+Done for v1: studios ("shows"), invite links, green room with consent checkbox, local recording with crash recovery, live per-guest upload status, AI producer quality alerts (including too quiet and echo) and talk balance, audio-only shows, guest tech-check link, guest end screen (own recording + "record your own"), live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync, Gate A's 60-minute two-person run in Chromium, and with real Safari as the guest (automated, mock mic: nothing lost, no drift; the absolute Safari-to-host gap needs real devices). Open for v1: guest recap email (needs email sending), free mic/camera test and upload-speed check, consent text per show with a hash, processing timeline, admin health page, FLAC/DOCX exports, release 0.2.0.
 
 ## UI
 - Users see **shows** and **episodes**; the API, database and code say studios and recordings. Pages live under `/shows`.
@@ -45,6 +45,10 @@ Done for v1: studios ("shows"), invite links, green room with consent checkbox, 
 ## Guest tech check
 - `/join/<inviteCode>/check`: the host sends it before the session (show page, under the invite link; the invite page links it too). Same secret as the invite, so a new invite link retires it. The green room's checks plus the camera, mic and headphones, a measured upload speed (throwaway bytes to `POST /api/check/:code/upload`, max 8 MB per request, live invite codes only) against what the show sends (recording + call; slow is a warning, never a blocker), and a 5-s test recording played back locally (never uploaded).
 - Results reach the host only when the guest presses Send (`POST /api/check/:code/report`: name, "Chrome on macOS", check codes and labels; no media). Table `tech_checks`, newest 50 per show, 30 days shown, deleted with the show.
+
+## Guest end screen
+- After the session, a guest sees their upload until it's done, then (`GuestAfterwards` in room.tsx) their own files from each episode once processed, from `GET /sessions/:id/my-recordings` (participant token; only their own audio/video outputs, never the combined video or anyone else's; signed links for 1 h, refreshed every 30 min). Show setting `guestDownloads`, on by default.
+- "Record your own, free" link only when `GUEST_PROMO_URL` is set (unset by default, so self-hosted installs don't advertise). E2E sets it to https://tapry.test/.
 
 ## Quality alerts
 - Computed on each device (`src/lib/client/quality.ts`: mic peaks and RMS from the recorder's stream, the call's incoming sound for echo, upload lag, `storage.estimate`, visibility, recorder errors) and POSTed as codes to `/sessions/:id/telemetry` on change and every 3 s. Kept in memory in `LiveHub.health` and pushed in `SessionState.health`; stale after `STALE_REPORT_MS` (15 s). Metadata only: never audio, video or transcript text.
