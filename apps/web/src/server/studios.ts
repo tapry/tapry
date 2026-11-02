@@ -4,6 +4,8 @@ import {
   type joinBody,
   type SessionTicket,
   type StudioSettings,
+  type TechCheckResult,
+  type techCheckReport,
   type updateStudioBody,
 } from "@tapry/shared";
 import type { z } from "zod";
@@ -20,6 +22,14 @@ export interface Studio {
   inviteCode: string;
   settings: StudioSettings;
   createdAt: string;
+}
+
+export interface TechCheck {
+  id: string;
+  name: string;
+  browser: string;
+  checks: TechCheckResult[];
+  checkedAt: number;
 }
 
 export interface StudioWithUsage extends Studio {
@@ -84,6 +94,7 @@ export class StudioService {
         "UPDATE sessions SET status = 'ended', ended_at = now() WHERE studio_id = $1 AND status = 'open' RETURNING id",
         [studioId],
       );
+      await tx.query("DELETE FROM tech_checks WHERE studio_id = $1", [studioId]);
       // A fresh random code frees the old one and keeps the row from matching any link.
       await tx.query("UPDATE studios SET deleted_at = now(), invite_code = $2 WHERE id = $1", [studioId, newInviteCode()]);
       return open.map((s) => s.id);
@@ -147,13 +158,70 @@ export class StudioService {
    * What a guest sees before joining: the show's name and who invited them. Null for a link
    * that is wrong, replaced or deleted. Anyone with the link may see this, like the link itself.
    */
-  async invitePreview(inviteCode: string): Promise<{ showName: string; hostName: string; audioOnly: boolean } | null> {
+  async invitePreview(inviteCode: string): Promise<{ showName: string; hostName: string; settings: StudioSettings } | null> {
     const [row] = await this.db.query<{ name: string; host: string; settings: unknown }>(
       `SELECT st.name, st.settings, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
       [inviteCode],
     );
-    return row ? { showName: row.name, hostName: row.host, audioOnly: studioSettings.parse(row.settings).audioOnly } : null;
+    return row ? { showName: row.name, hostName: row.host, settings: studioSettings.parse(row.settings) } : null;
+  }
+
+  /** The show an invite code belongs to, for the tech check; 404 for a dead link. */
+  private async studioForInvite(inviteCode: string) {
+    const [row] = await this.db.query<{ id: string }>("SELECT id FROM studios WHERE invite_code = $1 AND deleted_at IS NULL", [inviteCode]);
+    if (!row) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
+    return row.id;
+  }
+
+  /** Upload-speed test: read and drop the body, up to `maxBytes`. Only for a live invite code. */
+  async speedTest(inviteCode: string, body: ReadableStream<Uint8Array> | null, maxBytes: number) {
+    await this.studioForInvite(inviteCode);
+    let bytes = 0;
+    if (body) {
+      const reader = body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > maxBytes) {
+          await reader.cancel();
+          throw new ApiError(413, "too_large", "Too much test data");
+        }
+      }
+    }
+    return { bytes };
+  }
+
+  /** A guest sends their tech-check results to the host. Sending again updates the same report. */
+  async reportTechCheck(inviteCode: string, body: z.infer<typeof techCheckReport>) {
+    const studioId = await this.studioForInvite(inviteCode);
+    await this.db.transaction(async (tx) => {
+      const [taken] = await tx.query<{ studio_id: string }>("SELECT studio_id FROM tech_checks WHERE id = $1", [body.reportId]);
+      if (taken && taken.studio_id !== studioId) throw new ApiError(409, "report_id_taken", "This report id is already in use");
+      await tx.query(
+        `INSERT INTO tech_checks (id, studio_id, name, browser, checks) VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (id) DO UPDATE SET name = $3, browser = $4, checks = $5, created_at = now()`,
+        [body.reportId, studioId, body.name, body.browser, JSON.stringify(body.checks)],
+      );
+      // Keep the newest 50 per show: enough for any real schedule, bounded for a leaked link.
+      await tx.query(
+        `DELETE FROM tech_checks WHERE studio_id = $1 AND id NOT IN (
+           SELECT id FROM tech_checks WHERE studio_id = $1 ORDER BY created_at DESC, id LIMIT 50)`,
+        [studioId],
+      );
+    });
+  }
+
+  /** The show's tech checks from the last 30 days, newest first (for the host). */
+  async techChecks(owner: User, studioId: string): Promise<TechCheck[]> {
+    await this.owned(owner, studioId);
+    const rows = await this.db.query<{ id: string; name: string; browser: string; checks: TechCheckResult[]; created_at: Date }>(
+      `SELECT id, name, browser, checks, created_at FROM tech_checks
+       WHERE studio_id = $1 AND created_at > now() - interval '30 days' ORDER BY created_at DESC, id LIMIT 20`,
+      [studioId],
+    );
+    return rows.map((r) => ({ id: r.id, name: r.name, browser: r.browser, checks: r.checks, checkedAt: new Date(r.created_at).getTime() }));
   }
 
   /** Guest opens the invite link. No account; consent to recording is required by the schema. */

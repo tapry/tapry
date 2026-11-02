@@ -186,4 +186,17 @@ ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
 ALTER TABLE jobs ADD CONSTRAINT jobs_type_check
   CHECK (type IN ('process_recording', 'transcribe_recording', 'purge_recording', 'purge_raw'));
 `,
+  `
+-- Guest tech checks: what a guest's browser, devices and connection looked like when they tested
+-- before the session, sent to the host by the guest. No media; the newest 50 per show are kept.
+CREATE TABLE tech_checks (
+  id text PRIMARY KEY,
+  studio_id text NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  browser text NOT NULL,
+  checks jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX tech_checks_studio ON tech_checks (studio_id, created_at DESC);
+`,
 ];

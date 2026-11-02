@@ -23,10 +23,19 @@ export async function generateMetadata({ params }: { params: Promise<{ showId: s
 
 export default async function ShowPage({ params }: { params: Promise<{ showId: string }> }) {
   const { user, show, services } = await load((await params).showId);
-  const [shows, episodes] = await Promise.all([services.studios.list(user), services.processing.listForStudio(user, show.id)]);
+  const [shows, episodes, checks] = await Promise.all([
+    services.studios.list(user),
+    services.processing.listForStudio(user, show.id),
+    services.studios.techChecks(user, show.id),
+  ]);
   return (
     <DashboardShell user={user} shows={shows} currentId={show.id} title={show.name}>
-      <ShowView show={show} episodes={episodes} shows={shows.map((s) => ({ id: s.id, name: s.name, bytes: s.bytes }))} />
+      <ShowView
+        show={show}
+        episodes={episodes}
+        checks={checks}
+        shows={shows.map((s) => ({ id: s.id, name: s.name, bytes: s.bytes }))}
+      />
     </DashboardShell>
   );
 }

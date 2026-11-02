@@ -21,6 +21,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Guest tech check
+- A **tech-check link** to send guests before the session (on the show page, under the invite
+  link). Guests test their browser, camera, microphone, headphones, free space, connection and
+  upload speed, and can record a few seconds and listen back. Nothing is recorded for the show.
+- When they press Send, the host sees the results on the show page: "All good", or what to sort
+  out before the session.
+
 ### Audio-only shows
 - New **Audio only** choice next to Full HD and Standard (when creating a show, and in its
   settings). Nobody is asked for a camera; the invite and green room say it's sound only.

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client/api";
 import { formatBytes, formatClock } from "@/lib/format";
 import type { RecordingSummary } from "@/server/processing";
-import type { Studio } from "@/server/studios";
+import type { Studio, TechCheck } from "@/server/studios";
 import { EpisodeList, settled } from "./episode-list";
 import { DeleteShowButton, InviteLink, OpenStudioButton, ShowSettingsForm } from "./studio-forms";
 import { Card, cn, Eyebrow } from "./ui";
@@ -15,10 +15,12 @@ type Tab = "episodes" | "settings" | "space";
 export function ShowView({
   show,
   episodes: initial,
+  checks,
   shows,
 }: {
   show: Studio;
   episodes: RecordingSummary[];
+  checks: TechCheck[];
   shows: Array<{ id: string; name: string; bytes: number }>;
 }) {
   const [tab, setTab] = useState<Tab>("episodes");
@@ -107,6 +109,7 @@ export function ShowView({
             </div>
             <InviteLink studioId={show.id} inviteCode={show.inviteCode} />
           </Card>
+          {checks.length > 0 && <TechChecks checks={checks} />}
           <EpisodeList
             showId={show.id}
             episodes={episodes}
@@ -196,4 +199,49 @@ function useNow(ms: number | null) {
     return () => clearInterval(id);
   }, [ms]);
   return now;
+}
+
+/** What guests' tech checks found, newest first: "All good", or what to sort out before the session. */
+function TechChecks({ checks }: { checks: TechCheck[] }) {
+  return (
+    <Card className="flex flex-col gap-3.5">
+      <h2 className="text-[19px] font-semibold">Tech checks</h2>
+      <ul className="flex flex-col divide-y divide-border">
+        {checks.map((c) => {
+          const issues = c.checks.filter((x) => x.tone !== "ok");
+          return (
+            <li key={c.id} className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0" data-testid="tech-check">
+              <span className="flex flex-wrap items-baseline justify-between gap-x-3 text-[15px]">
+                <span>
+                  <span className="font-medium">{c.name}</span>
+                  <span className="text-muted"> · {c.browser}</span>
+                </span>
+                <span className="text-[13px] text-subtle">{timeAgo(c.checkedAt)}</span>
+              </span>
+              {issues.length === 0 ? (
+                <span className="text-sm text-ok-strong">✓ All good</span>
+              ) : (
+                <ul className="flex flex-col gap-1 text-sm">
+                  {issues.map((x) => (
+                    <li key={x.id} className={x.tone === "danger" ? "text-danger" : "text-warn-strong"}>
+                      ! {x.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+function timeAgo(ms: number) {
+  const minutes = Math.round((Date.now() - ms) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

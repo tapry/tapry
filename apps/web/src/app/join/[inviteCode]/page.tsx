@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Avatar, Logo } from "@/components/ui";
 import { getServices } from "@/server/context";
 import { JoinForm } from "./join-form";
@@ -21,10 +22,17 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
               </span>
             </div>
             <p className="text-[15px] leading-relaxed text-text-2">
-              You&apos;ll be recorded {preview.audioOnly ? "(sound only, no camera)" : "in full quality"} right here in your browser. There&apos;s nothing to install and no
+              You&apos;ll be recorded {preview.settings.audioOnly ? "(sound only, no camera)" : "in full quality"} right here in your browser. There&apos;s nothing to install and no
               account to make.
             </p>
-            <JoinForm inviteCode={inviteCode} hostName={preview.hostName} audioOnly={preview.audioOnly} />
+            <JoinForm inviteCode={inviteCode} hostName={preview.hostName} audioOnly={preview.settings.audioOnly} />
+            <p className="text-sm text-muted">
+              Early?{" "}
+              <Link href={`/join/${inviteCode}/check`} className="underline">
+                Test your setup first
+              </Link>
+              .
+            </p>
           </>
         ) : (
           <>

@@ -75,6 +75,27 @@ export const joinBody = z.object({
   consent: z.literal(true, { error: "Consent to recording is required" }),
 });
 
+// ── Guest tech check (before the session; results go to the host only if the guest sends them) ──
+
+export const techCheckResult = z.object({
+  id: z.string().min(1).max(30),
+  tone: z.enum(["ok", "warn", "danger"]),
+  label: z.string().min(1).max(200),
+});
+export type TechCheckResult = z.infer<typeof techCheckResult>;
+
+export const techCheckReport = z.object({
+  /** Chosen by the page, so sending again (after another try) updates the same report. */
+  reportId: z.string().regex(/^chk_[A-Za-z0-9_-]{8,40}$/),
+  name: z.string().trim().min(1).max(60),
+  /** "Chrome on macOS": worked out by the page from its user agent. */
+  browser: z.string().max(60),
+  checks: z.array(techCheckResult).min(1).max(12),
+});
+
+/** Most test data one upload-speed request may carry. */
+export const SPEED_TEST_MAX_BYTES = 8 * 1024 * 1024;
+
 // ── Quality alerts (each device reports metadata about itself; never media) ──
 
 export const qualityAlert = z.enum([

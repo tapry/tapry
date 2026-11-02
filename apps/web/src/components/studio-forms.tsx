@@ -14,16 +14,17 @@ const message = (err: unknown) => (err instanceof ApiRequestError ? err.message 
 export function InviteLink({ studioId, inviteCode: initial }: { studioId: string; inviteCode: string }) {
   const [code, setCode] = useState(initial);
   const [origin, setOrigin] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"invite" | "check" | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
   const link = `${origin}/join/${code}`;
+  const checkLink = `${link}/check`;
 
-  async function copy() {
+  async function copy(which: "invite" | "check") {
     try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(which === "invite" ? link : checkLink);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 2000);
     } catch {
       setError("Couldn't copy. Select the link and copy it by hand.");
     }
@@ -48,12 +49,25 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
           onFocus={(e) => e.currentTarget.select()}
           className="h-12 min-w-60 flex-1 truncate rounded-full border border-dashed border-border-strong bg-transparent px-5 font-mono text-sm text-text-2 focus:outline-none"
         />
-        <Button onClick={copy} className="h-12 px-[22px]">
-          {copied ? "✓ Copied" : "Copy link"}
+        <Button onClick={() => copy("invite")} className="h-12 px-[22px]">
+          {copied === "invite" ? "✓ Copied" : "Copy link"}
         </Button>
         <Button variant="secondary" onClick={rotate} className="h-12 px-5 font-medium">
           Make a new link
         </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
+        <span>Before the session, guests can test their setup:</span>
+        <input
+          readOnly
+          value={checkLink}
+          aria-label="Tech-check link"
+          onFocus={(e) => e.currentTarget.select()}
+          className="min-w-0 flex-1 truncate bg-transparent font-mono text-[13px] text-text-2 focus:outline-none"
+        />
+        <button type="button" onClick={() => copy("check")} className="cursor-pointer font-medium text-text underline-offset-2 hover:underline">
+          {copied === "check" ? "✓ Copied" : "Copy tech-check link"}
+        </button>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
     </div>
