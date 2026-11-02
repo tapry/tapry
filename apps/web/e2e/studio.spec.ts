@@ -240,11 +240,10 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await expect(recording.getByTestId("recording-status")).toHaveText(/Ready/, { timeout: 90_000 });
     // The timeline: every step done, with when.
     const timeline = recording.getByTestId("timeline");
-    expect(await timeline.locator("[data-step]").evaluateAll((els) => els.map((el) => `${el.getAttribute("data-step")}:${el.getAttribute("data-state")}`))).toEqual([
-      "recorded:done",
-      "uploaded:done",
-      "files:done",
-    ]);
+    const steps = await timeline.locator("[data-step]").evaluateAll((els) => els.map((el) => `${el.getAttribute("data-step")}:${el.getAttribute("data-state")}`));
+    expect(steps.slice(0, 3)).toEqual(["recorded:done", "uploaded:done", "files:done"]);
+    // With Whisper, the transcript follows as a fourth step (queued, running or done by now).
+    expect(steps.slice(3)).toEqual(process.env.WHISPER_MODEL ? [expect.stringMatching(/^transcript:(current|done)$/)] : []);
     await expect(timeline.locator('[data-step="files"]')).toContainText(/Files ready\s*\d/);
 
     const links = mediaLinks(studioPage);
@@ -297,8 +296,8 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const studioPage = await host.context().newPage();
     await studioPage.goto(studioUrl);
     const transcripts = studioPage.getByTestId("recording").first().locator('[data-testid="download"][data-file-name^="Transcript."]');
-    await expect(transcripts).toHaveCount(3, { timeout: 120_000 });
-    expect(await fileNames(transcripts)).toEqual(["Transcript.srt", "Transcript.txt", "Transcript.vtt"]);
+    await expect(transcripts).toHaveCount(4, { timeout: 120_000 });
+    expect(await fileNames(transcripts)).toEqual(["Transcript.docx", "Transcript.srt", "Transcript.txt", "Transcript.vtt"]);
     await studioPage.close();
   });
 

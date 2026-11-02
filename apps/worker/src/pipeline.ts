@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, mkdir, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import { probeDurationMs, probeStreams, run } from "./ffmpeg.js";
@@ -29,6 +29,8 @@ export interface PipelineOptions {
   font?: string | null;
   /** Level every person's audio, and the combined mix, to this target. Unset or null: left as recorded. */
   loudness?: LoudnessTarget | null;
+  /** Audio files as WAV (default) or FLAC (lossless, about half the size). */
+  audioFormat?: "wav" | "flac";
   /** Told before each file is rendered: how many are done, of how many, and which one is next. */
   onProgress?: (p: { done: number; total: number; current: string }) => void;
 }
@@ -240,7 +242,22 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   opts.onProgress?.({ done: groups.length, total: groups.length + 1, current: hasVideo ? "Side-by-side video" : "Everyone, mixed" });
   const combined = await renderCombined(tracks, outputs, opts, timeoutMs);
   if (combined) outputs.push(combined);
+  // FLAC last, from the finished WAVs: alignment and levelling are done once, the same either way.
+  if (opts.audioFormat === "flac") {
+    for (const o of outputs) if (o.contentType === "audio/wav") await toFlac(o, opts, timeoutMs);
+  }
   return outputs;
+}
+
+/** Replace a finished WAV output with the same sound as FLAC (lossless). */
+async function toFlac(o: OutputFile, opts: PipelineOptions, timeoutMs: number) {
+  const path = o.path.replace(/\.wav$/, ".flac");
+  await run(opts.ffmpeg, ["-y", "-hide_banner", "-nostdin", "-i", o.path, "-c:a", "flac", "-compression_level", "8", path], { timeoutMs });
+  await rm(o.path, { force: true });
+  o.path = path;
+  o.fileName = o.fileName.replace(/\.wav$/, ".flac");
+  o.contentType = "audio/flac";
+  o.durationMs = await probeDurationMs(opts.ffprobe, path);
 }
 
 interface RenderContext {

@@ -21,6 +21,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### FLAC audio and Word transcripts
+- **Audio files** setting per show: WAV (default) or **FLAC**, the same sound at about half the
+  size. Applies to each person's audio and to the mix of an episode without video.
+- Transcripts now also come as a **Word document** (Transcript.docx): a title, then one
+  paragraph per turn with its time and the speaker in bold. Opens in Word, Pages, LibreOffice
+  and Google Docs, and imports into NVivo, ATLAS.ti and MAXQDA.
+
 ### Server health page
 - Admins have a **Server health** page (bottom of the sidebar): database, storage (really writes
   and deletes a test file), workers and their ffmpeg, the job queue and recent failures with

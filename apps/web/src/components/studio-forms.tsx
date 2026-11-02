@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
 import { ConfirmAction } from "./confirm-action";
-import { Button, CheckboxRow, cn, Field, Input, Notice, RecDot, Textarea } from "./ui";
+import { Button, CheckboxRow, cn, Field, Input, Notice, RecDot, Select, Textarea } from "./ui";
 
 const message = (err: unknown) => (err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
 
@@ -107,6 +107,7 @@ export function ShowSettingsForm({
             levelLoudness: f.get("levelLoudness") === "on",
             guestDownloads: f.get("guestDownloads") === "on",
             consentText: String(f.get("consentText") ?? ""),
+            audioFormat: f.get("audioFormat") === "flac" ? "flac" : "wav",
           },
         },
       });
@@ -195,6 +196,12 @@ export function ShowSettingsForm({
         label="Even out everyone's volume"
         description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, podcast loudness). Only the volume changes, never how anyone sounds. Applies to episodes processed from now on."
       />
+      <Field label="Audio files" hint="For each person's audio. FLAC is the same sound at about half the size; a few older editors only open WAV. Applies to episodes processed from now on.">
+        <Select name="audioFormat" defaultValue={settings.audioFormat}>
+          <option value="wav">WAV (opens anywhere)</option>
+          <option value="flac">FLAC (lossless, about half the size)</option>
+        </Select>
+      </Field>
       <Field
         label="What guests agree to"
         hint="Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each guest's agreement is kept with the exact text and when they agreed (the episode's consent record). A change applies to guests who join from now on."

@@ -8,6 +8,7 @@ import {
   mergeSpeakers,
   PODCAST_LOUDNESS,
   renderRecording,
+  toDocx,
   toSrt,
   toTxt,
   toVtt,
@@ -20,6 +21,9 @@ import type { Db, Queryable } from "./db";
 import { newId } from "./ids";
 import type { RecordingProgress } from "./processing";
 import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
+
+/** "Sam - audio.wav" or "Sam - audio.flac" → the speaker. */
+const AUDIO_SUFFIX = / - audio\.(wav|flac)$/;
 
 /** How often a runner says it's alive (the health page calls it gone after 3 missed beats). */
 export const HEARTBEAT_MS = 30_000;
@@ -406,7 +410,7 @@ export class JobRunner {
     if (this.opts.whisper) this.kicked = true; // pick the transcript up right after
   }
 
-  /** Transcribe each person's WAV separately (each track is one speaker), then merge by time. */
+  /** Transcribe each person's audio separately (each track is one speaker), then merge by time. */
   private async transcribeRecording(rec: RecordingRow, work: string, job: JobRow) {
     if (!this.opts.whisper) throw new Error("Transcription is not configured on this worker");
     const audio = await this.db.query<{ storage_key: string; file_name: string }>(
@@ -416,16 +420,30 @@ export class JobRunner {
     );
     const speakers: SpeakerTranscript[] = [];
     for (const [i, a] of audio.entries()) {
-      await this.progress(rec, { stage: "transcribing", done: i, total: audio.length, current: a.file_name.replace(/ - audio\.wav$/, "") });
-      const path = join(work, `speaker-${i}.wav`);
+      const speaker = a.file_name.replace(AUDIO_SUFFIX, "");
+      await this.progress(rec, { stage: "transcribing", done: i, total: audio.length, current: speaker });
+      const path = join(work, `speaker-${i}.${a.file_name.split(".").pop()}`);
       await this.storage.downloadTo(a.storage_key, path);
       const { language, segments } = await transcribeAudio(path, { ...this.opts.whisper, ffmpeg: this.opts.ffmpeg });
       // The file name already holds the unique display name ("Sam (2) - audio.wav").
-      speakers.push({ speaker: a.file_name.replace(/ - audio\.wav$/, ""), language, segments });
+      speakers.push({ speaker, language, segments });
     }
     const lines = mergeSpeakers(speakers);
-    const files = [
+    const [show] = await this.db.query<{ name: string; number: number | null }>(
+      "SELECT st.name, r.number FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id WHERE r.id = $1",
+      [rec.id],
+    );
+    const recorded = new Date(rec.started_at).toISOString().slice(0, 10);
+    const files: Array<{ name: string; type: string; body: string | Uint8Array }> = [
       { name: "Transcript.txt", type: "text/plain; charset=utf-8", body: toTxt(lines) },
+      {
+        name: "Transcript.docx",
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        body: toDocx(lines, {
+          title: `Transcript: ${show?.name ?? "Episode"}${show?.number ? `, Episode ${show.number}` : ""}`,
+          subtitle: `Recorded ${recorded} · ${speakers.map((s) => s.speaker).join(", ")}`,
+        }),
+      },
       { name: "Transcript.srt", type: "application/x-subrip; charset=utf-8", body: toSrt(lines) },
       { name: "Transcript.vtt", type: "text/vtt; charset=utf-8", body: toVtt(lines) },
     ];
@@ -514,6 +532,7 @@ export class JobRunner {
       videoHeight: settings.videoQuality === "720p" ? 720 : 1080,
       font: this.opts.font,
       loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
+      audioFormat: settings.audioFormat,
       onProgress: (p) => void this.progress(rec, { stage: "rendering", ...p }),
     });
 

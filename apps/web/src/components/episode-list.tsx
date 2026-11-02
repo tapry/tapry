@@ -238,14 +238,15 @@ const FILE_ICON: Record<string, string> = { audio: "∿", video: "▶", combined
 function describe(o: Episode["outputs"][number]) {
   const ext = o.fileName.split(".").pop()?.toUpperCase() ?? "";
   if (o.kind === "combined") {
-    return o.fileName.endsWith(".wav")
-      ? { title: "Everyone, mixed", icon: FILE_ICON.audio!, format: ext }
-      : { title: "Side-by-side video", icon: FILE_ICON.combined!, format: ext };
+    // The mix of an episode without video is audio (WAV or FLAC); otherwise it's the grid video.
+    return o.fileName.endsWith(".mp4")
+      ? { title: "Side-by-side video", icon: FILE_ICON.combined!, format: ext }
+      : { title: "Everyone, mixed", icon: FILE_ICON.audio!, format: ext };
   }
   if (o.kind === "transcript") {
-    return o.fileName.endsWith(".txt")
-      ? { title: "Transcript", icon: FILE_ICON.transcript!, format: "Text" }
-      : { title: `Captions (.${ext.toLowerCase()})`, icon: "cc", format: ext };
+    if (o.fileName.endsWith(".txt")) return { title: "Transcript", icon: FILE_ICON.transcript!, format: "Text" };
+    if (o.fileName.endsWith(".docx")) return { title: "Transcript (Word)", icon: FILE_ICON.transcript!, format: "DOCX" };
+    return { title: `Captions (.${ext.toLowerCase()})`, icon: "cc", format: ext };
   }
   const who = o.fileName.replace(/ - (audio|video)\.\w+$/, "");
   return { title: `${who}'s ${o.kind}`, icon: FILE_ICON[o.kind]!, format: ext };

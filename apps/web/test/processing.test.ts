@@ -310,10 +310,16 @@ describe("recording processing", () => {
       expect(recordings[0].outputs.map((o: { fileName: string }) => o.fileName)).toEqual([
         "Combined.wav",
         "Guest - audio.wav",
+        "Transcript.docx",
         "Transcript.srt",
         "Transcript.txt",
         "Transcript.vtt",
       ]);
+      // The Word file holds the same words (its parts are stored uncompressed, so they're readable here).
+      const [docx] = await t.db.query<{ storage_key: string }>("SELECT storage_key FROM outputs WHERE file_name = 'Transcript.docx'");
+      const word = storage.objects.get(docx!.storage_key)!.data;
+      expect(word.subarray(0, 2).toString()).toBe("PK");
+      expect(word.toString().toLowerCase()).toContain("thanks for having me");
       const [txt] = await t.db.query<{ storage_key: string }>("SELECT storage_key FROM outputs WHERE file_name = 'Transcript.txt'");
       const text = storage.objects.get(txt!.storage_key)!.data.toString();
       expect(text).toMatch(/^\[00:00:0\d\] Guest: /);

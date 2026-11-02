@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "./ffmpeg.js";
+import { zipStored } from "./zip.js";
 
 export interface WhisperOptions {
   /** whisper.cpp's `whisper-cli`. */
@@ -117,8 +118,8 @@ export function toVtt(lines: Line[]) {
   );
 }
 
-/** Readable transcript: one paragraph per turn, consecutive lines of the same speaker joined. */
-export function toTxt(lines: Line[]) {
+/** Turns: consecutive lines of one speaker less than 3 s apart, joined into one paragraph. */
+function toTurns(lines: Line[]) {
   const turns: Line[] = [];
   for (const l of lines) {
     const last = turns.at(-1);
@@ -129,5 +130,69 @@ export function toTxt(lines: Line[]) {
       turns.push({ ...l });
     }
   }
-  return turns.map((t) => `[${stamp(t.startMs, ".").slice(0, 8)}] ${t.speaker}: ${t.text}`).join("\n\n") + "\n";
+  return turns;
+}
+
+/** Readable transcript: one paragraph per turn, consecutive lines of the same speaker joined. */
+export function toTxt(lines: Line[]) {
+  return toTurns(lines).map((t) => `[${stamp(t.startMs, ".").slice(0, 8)}] ${t.speaker}: ${t.text}`).join("\n\n") + "\n";
+}
+
+/**
+ * Word document (.docx) for reading, quoting and coding: a title, then one paragraph per turn
+ * with its time and the speaker in bold. A minimal package that Word, Pages, LibreOffice and
+ * Google Docs open; qualitative-analysis tools (NVivo, ATLAS.ti, MAXQDA) import it.
+ */
+export function toDocx(lines: Line[], meta: { title: string; subtitle?: string }): Uint8Array {
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const run = (text: string, props = "") => `<w:r>${props ? `<w:rPr>${props}</w:rPr>` : ""}<w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
+  const paragraphs = [
+    `<w:p><w:pPr><w:spacing w:after="120"/></w:pPr>${run(meta.title, '<w:b/><w:sz w:val="36"/>')}</w:p>`,
+    ...(meta.subtitle ? [`<w:p><w:pPr><w:spacing w:after="360"/></w:pPr>${run(meta.subtitle, '<w:color w:val="6E6E73"/>')}</w:p>`] : []),
+    ...toTurns(lines).map(
+      (t) =>
+        `<w:p><w:pPr><w:spacing w:after="200"/></w:pPr>` +
+        run(`[${stamp(t.startMs, ".").slice(0, 8)}] `, '<w:color w:val="8E8E93"/>') +
+        run(t.speaker, "<w:b/>") +
+        run(`: ${t.text}`) +
+        `</w:p>`,
+    ),
+  ];
+  const xml = (body: string) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n${body}`;
+  const enc = new TextEncoder();
+  return zipStored([
+    {
+      name: "[Content_Types].xml",
+      data: enc.encode(
+        xml(
+          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+            '<Default Extension="xml" ContentType="application/xml"/>' +
+            '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+            "</Types>",
+        ),
+      ),
+    },
+    {
+      name: "_rels/.rels",
+      data: enc.encode(
+        xml(
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+            "</Relationships>",
+        ),
+      ),
+    },
+    {
+      name: "word/document.xml",
+      data: enc.encode(
+        xml(
+          '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
+            paragraphs.join("") +
+            '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>' +
+            "</w:body></w:document>",
+        ),
+      ),
+    },
+  ]);
 }
