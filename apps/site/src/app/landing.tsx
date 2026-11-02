@@ -453,6 +453,7 @@ export function Landing() {
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: "32px 28px", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 14 }}>
           <span>© 2026 Tapry · Free and open source (AGPL-3.0)</span>
           <span style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
+            <a href="/mic-test" style={{ color: "#8e8e93" }}>Free mic test</a>
             <a href={SETUP_GUIDE} style={{ color: "#8e8e93" }}>Setup guide</a>
             <a href={BROWSERS} style={{ color: "#8e8e93" }}>Tested browsers</a>
             <a href={GITHUB} style={{ color: "#8e8e93" }}>GitHub</a>

@@ -75,3 +75,10 @@ button {
     display: none !important;
   }
 }
+
+/* Mic test: camera and microphone side by side, stacked on narrow screens. */
+@media (max-width: 860px) {
+  .mic-test-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
