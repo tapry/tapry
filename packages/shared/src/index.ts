@@ -44,6 +44,8 @@ const settingsFields = {
   audioOnly: z.boolean(),
   /** Guests can download their own recording (their WAV, and MP4 with a camera) from the end screen. */
   guestDownloads: z.boolean(),
+  /** What guests agree to before joining. Empty: the default text (defaultConsentText). */
+  consentText: z.string().trim().max(4000),
 };
 
 /** Full settings, with defaults filled in. */
@@ -54,7 +56,18 @@ export const studioSettings = z.object({
   levelLoudness: settingsFields.levelLoudness.default(true),
   audioOnly: settingsFields.audioOnly.default(false),
   guestDownloads: settingsFields.guestDownloads.default(true),
+  consentText: settingsFields.consentText.default(""),
 });
+
+/** The consent text when a show sets none. */
+export function defaultConsentText(hostName: string, audioOnly: boolean) {
+  return `I'm happy to be recorded. My ${audioOnly ? "microphone is" : "camera and microphone are"} recorded on this computer and sent to ${hostName}.`;
+}
+
+/** The exact text a guest of this show agrees to (what's hashed and kept with their consent). */
+export function consentTextFor(settings: StudioSettings, hostName: string) {
+  return settings.consentText || defaultConsentText(hostName, settings.audioOnly);
+}
 export type StudioSettings = z.infer<typeof studioSettings>;
 
 // No defaults here: in zod 4 `.partial()` still applies `.default()`, which would make
@@ -76,6 +89,12 @@ export const joinBody = z.object({
   displayName: z.string().trim().min(1).max(60),
   /** The guest ticked "I agree to be recorded". */
   consent: z.literal(true, { error: "Consent to recording is required" }),
+  /**
+   * SHA-256 (hex) of the consent text the guest was shown. When it isn't the show's current
+   * text (the host changed it meanwhile), joining is refused so they read the new one.
+   * Optional for pages loaded before this existed.
+   */
+  consentHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });
 
 // ── Guest tech check (before the session; results go to the host only if the guest sends them) ──

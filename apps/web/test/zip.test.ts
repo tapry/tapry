@@ -69,11 +69,15 @@ describe("zip download", () => {
     // The announced length is exact, so browsers show real progress.
     expect(Number(res.headers.get("content-length"))).toBe(body.length);
 
-    expect(readZip(body)).toEqual([
+    const entries = readZip(body);
+    expect(entries.slice(0, 3)).toEqual([
       { name: "Combined.mp4", size: 20, text: "combined video bytes" },
       { name: "Zoë - audio.wav", size: 18, text: "RIFF audio of Zoë" },
       { name: "Transcript.txt", size: 19, text: "[00:00] Zoë: hello" },
     ]);
+    // Last, the consent record, made on the spot (not from storage).
+    expect(entries[3]).toMatchObject({ name: "Consent record - Episode 1.txt", text: expect.stringMatching(/^Consent record: My Podcast, Episode 1/) });
+    expect(entries).toHaveLength(4);
     expect(storage.reads).toHaveLength(3);
   });
 

@@ -34,6 +34,7 @@ export default async function ShowPage({ params }: { params: Promise<{ showId: s
         show={show}
         episodes={episodes}
         checks={checks}
+        hostName={user.name}
         shows={shows.map((s) => ({ id: s.id, name: s.name, bytes: s.bytes }))}
       />
     </DashboardShell>

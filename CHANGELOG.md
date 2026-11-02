@@ -21,6 +21,15 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Consent text per show
+- **What guests agree to** is now a show setting (Settings tab): research teams can put their
+  study's consent wording there. Empty, guests see the usual sentence.
+- Each guest's agreement is kept with the exact text (by its SHA-256) and when they agreed. If
+  the host changes the text while a guest has the invite open, the guest is shown the new text
+  and asked again.
+- Every episode has a **consent record** (a .txt: who was recorded, when each guest agreed, to
+  which text), downloadable on its own and included in "Download everything".
+
 ### Processing timeline
 - Each episode shows its way to the files: recorded → everyone's upload arrived → files ready →
   transcript, with when each step finished and how long it took. While it works, the running

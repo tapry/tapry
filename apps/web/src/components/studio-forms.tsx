@@ -2,12 +2,12 @@
 
 // Host-side forms around a show (a "studio" in the API): invite link, settings, enter,
 // delete, and logging out. Creating a show has its own page (new-show-form.tsx).
-import type { SessionTicket, StudioSettings } from "@tapry/shared";
+import { defaultConsentText, type SessionTicket, type StudioSettings } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
 import { ConfirmAction } from "./confirm-action";
-import { Button, CheckboxRow, cn, Field, Input, Notice, RecDot } from "./ui";
+import { Button, CheckboxRow, cn, Field, Input, Notice, RecDot, Textarea } from "./ui";
 
 const message = (err: unknown) => (err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
 
@@ -74,7 +74,17 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   );
 }
 
-export function ShowSettingsForm({ studioId, name, settings }: { studioId: string; name: string; settings: StudioSettings }) {
+export function ShowSettingsForm({
+  studioId,
+  name,
+  settings,
+  hostName,
+}: {
+  studioId: string;
+  name: string;
+  settings: StudioSettings;
+  hostName: string;
+}) {
   const router = useRouter();
   const [quality, setQuality] = useState<StudioSettings["videoQuality"] | "audio">(settings.audioOnly ? "audio" : settings.videoQuality);
   const [guests, setGuests] = useState(settings.maxGuests);
@@ -96,6 +106,7 @@ export function ShowSettingsForm({ studioId, name, settings }: { studioId: strin
             echoCancellation: f.get("echoCancellation") === "on",
             levelLoudness: f.get("levelLoudness") === "on",
             guestDownloads: f.get("guestDownloads") === "on",
+            consentText: String(f.get("consentText") ?? ""),
           },
         },
       });
@@ -184,6 +195,18 @@ export function ShowSettingsForm({ studioId, name, settings }: { studioId: strin
         label="Even out everyone's volume"
         description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, podcast loudness). Only the volume changes, never how anyone sounds. Applies to episodes processed from now on."
       />
+      <Field
+        label="What guests agree to"
+        hint="Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each guest's agreement is kept with the exact text and when they agreed (the episode's consent record). A change applies to guests who join from now on."
+      >
+        <Textarea
+          name="consentText"
+          defaultValue={settings.consentText}
+          maxLength={4000}
+          rows={4}
+          placeholder={defaultConsentText(hostName, quality === "audio")}
+        />
+      </Field>
       <CheckboxRow
         name="guestDownloads"
         defaultChecked={settings.guestDownloads}

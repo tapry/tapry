@@ -136,6 +136,7 @@ describe("studios", () => {
       levelLoudness: false,
       audioOnly: false,
       guestDownloads: true,
+      consentText: "",
     });
     expect(updated.body.name).toBe("Weekly Show");
 

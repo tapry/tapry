@@ -207,4 +207,14 @@ ALTER TABLE recordings ADD COLUMN processing_started_at timestamptz;
 ALTER TABLE recordings ADD COLUMN transcribed_at timestamptz;
 ALTER TABLE recordings ADD COLUMN progress jsonb;
 `,
+  `
+-- Consent: the exact text each guest agreed to, kept once per distinct text and pointed to by
+-- its SHA-256 (hex), next to when they agreed (participants.consented_at).
+CREATE TABLE consent_texts (
+  hash text PRIMARY KEY,
+  text text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE participants ADD COLUMN consent_hash text REFERENCES consent_texts(hash);
+`,
 ];

@@ -25,7 +25,7 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
               You&apos;ll be recorded {preview.settings.audioOnly ? "(sound only, no camera)" : "in full quality"} right here in your browser. There&apos;s nothing to install and no
               account to make.
             </p>
-            <JoinForm inviteCode={inviteCode} hostName={preview.hostName} audioOnly={preview.settings.audioOnly} />
+            <JoinForm inviteCode={inviteCode} hostName={preview.hostName} consentText={preview.consentText} consentHash={preview.consentHash} />
             <p className="text-sm text-muted">
               Early?{" "}
               <Link href={`/join/${inviteCode}/check`} className="underline">

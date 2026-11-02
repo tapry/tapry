@@ -233,6 +233,50 @@ export class ProcessingService {
    * Everything a processed recording produced, for one zip: file names, sizes and storage
    * keys, plus a name for the zip ("My Podcast - 2026-10-30 19.59 UTC.zip").
    */
+  /**
+   * Who agreed to be recorded in this episode, when, and to which text (with its SHA-256), as a
+   * plain-text file the host can keep with the recording (an ethics board asks for exactly this).
+   */
+  async consentRecord(owner: User, studioId: string, recordingId: string) {
+    const [rec] = await this.db.query<{ number: number | null; started_at: number; stopped_at: number | null; studio_name: string; host: string }>(
+      `SELECT r.number, r.started_at, r.stopped_at, st.name AS studio_name, u.name AS host FROM recordings r
+       JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id JOIN users u ON u.id = st.owner_id
+       WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
+      [recordingId, studioId, owner.id],
+    );
+    if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
+    // Everyone recorded in this episode.
+    const people = await this.db.query<{ display_name: string; role: "host" | "guest"; consented_at: Date | null; consent_hash: string | null; text: string | null }>(
+      `SELECT p.display_name, p.role, p.consented_at, p.consent_hash, c.text
+       FROM participants p LEFT JOIN consent_texts c ON c.hash = p.consent_hash
+       WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = $1 AND t.participant_id = p.id)
+       ORDER BY (p.role = 'host') DESC, p.created_at`,
+      [recordingId],
+    );
+    const iso = (ms: number) => `${new Date(ms).toISOString().slice(0, 19)}Z`; // to the second
+    const lines = [
+      `Consent record: ${rec.studio_name}, Episode ${rec.number ?? "?"}`,
+      `Recorded ${iso(rec.started_at)} to ${rec.stopped_at ? iso(rec.stopped_at) : "(still recording)"} (UTC)`,
+      `Host: ${rec.host}`,
+      "",
+    ];
+    const texts = new Map<string, string>();
+    for (const p of people) {
+      if (p.role === "host") {
+        lines.push(`${p.display_name} (host): runs the recording.`);
+      } else if (p.consent_hash && p.text !== null) {
+        texts.set(p.consent_hash, p.text);
+        lines.push(`${p.display_name} (guest): agreed ${iso(new Date(p.consented_at!).getTime())}, to text SHA-256 ${p.consent_hash}`);
+      } else {
+        // Joined before consent texts were kept: the checkbox was required, the text wasn't stored.
+        lines.push(`${p.display_name} (guest): agreed ${p.consented_at ? iso(new Date(p.consented_at).getTime()) : "(time not recorded)"}, to the default text of the time (not kept)`);
+      }
+    }
+    for (const [hash, text] of texts) lines.push("", `Text SHA-256 ${hash}:`, text);
+    const body = `${lines.join("\n")}\n`;
+    return { fileName: `Consent record - Episode ${rec.number ?? "?"}.txt`, body };
+  }
+
   async zipContents(owner: User, studioId: string, recordingId: string) {
     const [rec] = await this.db.query<{ processing: ProcessingStatus; started_at: number; studio_name: string }>(
       `SELECT r.processing, r.started_at, st.name AS studio_name FROM recordings r
@@ -253,6 +297,7 @@ export class ProcessingService {
     return {
       fileName: `${rec.studio_name} - ${started.slice(0, 10)} ${started.slice(11, 13)}.${started.slice(14, 16)} UTC.zip`,
       files: files.map((f) => ({ name: f.file_name, size: f.bytes, key: f.storage_key, lastModified: new Date(f.created_at) })),
+      consent: await this.consentRecord(owner, studioId, recordingId),
     };
   }
 
