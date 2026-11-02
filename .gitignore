@@ -19,3 +19,11 @@ dist-worker/
 
 # Static website export (apps/site)
 apps/site/out/
+
+# Compiled output belongs in dist/: a bare `tsc` in a package writes it next to the sources.
+apps/worker/src/**/*.js
+apps/worker/src/**/*.js.map
+apps/worker/src/**/*.d.ts
+apps/worker/test/**/*.js
+apps/worker/test/**/*.js.map
+apps/worker/test/**/*.d.ts
