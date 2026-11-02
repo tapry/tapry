@@ -21,6 +21,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Free mic and camera test
+- The website has a **mic and camera test** at `/mic-test`, no sign-up: a level meter with the
+  same "sounds good" as the green room, a 5-second recording to play back, the camera's real
+  resolution and frame rate, and a warning for Bluetooth headset mics. It all runs in the
+  browser; nothing is sent anywhere. `NEXT_PUBLIC_SITE_URL` makes the site's canonical links
+  absolute.
+
 ### Guest end screen
 - Once their upload is done, guests can **download their own recording** (their audio, and their
   video with a camera) from the end screen as soon as the episode is processed. Only their own.
