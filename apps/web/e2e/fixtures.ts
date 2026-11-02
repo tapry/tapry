@@ -58,7 +58,9 @@ export async function signInHost(page: Page) {
   await page.getByLabel("Email").fill(HOST_EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: fresh ? "Create account" : "Log in" }).click();
-  await expect(page).toHaveURL(/\/shows/);
+  // /shows redirects on to the newest show (or New show): wait for that, or the test's next
+  // navigation races it ("interrupted by another navigation").
+  await expect(page).toHaveURL(/\/shows\/(new|std_[\w-]+)$/);
 }
 
 /** A new show (a "studio" in the API), through the New show page. */

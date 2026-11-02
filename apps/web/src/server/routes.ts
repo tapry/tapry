@@ -4,7 +4,7 @@ import type { ApiHandlers } from "./api";
  * Every API route. Next.js needs a physical route.ts per path under src/app/api;
  * test/routes.test.ts checks that each entry here has one, bound to the right handler.
  */
-export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE", string, keyof ApiHandlers]> = [
+export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE" | "OPTIONS", string, keyof ApiHandlers]> = [
   ["POST", "/api/auth/signup", "signup"],
   ["POST", "/api/auth/login", "login"],
   ["POST", "/api/auth/logout", "logout"],
@@ -25,6 +25,8 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE"
 
   ["POST", "/api/join", "join"],
   ["POST", "/api/check/[inviteCode]/upload", "speedTest"],
+  ["POST", "/api/speed-test", "publicSpeedTest"],
+  ["OPTIONS", "/api/speed-test", "publicSpeedTestPreflight"],
   ["POST", "/api/check/[inviteCode]/report", "reportTechCheck"],
   ["GET", "/api/time", "time"],
   ["GET", "/api/health", "health"],

@@ -21,6 +21,14 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Free upload-speed check
+- **Is your internet good enough to record?** `/tools/upload-speed` on every server (no account)
+  measures your upload and says whether it keeps up with sound only, 720p and 1080p shows. The
+  website has the same page (`/upload-speed-test`), testing against the server in
+  `NEXT_PUBLIC_SPEED_TEST_URL`; that server lists the website in `SPEED_TEST_ORIGINS`.
+- The public test endpoint takes at most 64 MB a minute from one address.
+- The guest tech check measures upload more accurately on fast lines (growing test pieces).
+
 ### Free mic and camera test
 - The website has a **mic and camera test** at `/mic-test`, no sign-up: a level meter with the
   same "sounds good" as the green room, a 5-second recording to play back, the camera's real

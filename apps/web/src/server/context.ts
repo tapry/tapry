@@ -36,6 +36,7 @@ export function getServices(): Promise<Services> {
       hub: (shared.hub ??= new LiveHub()),
       call: config.call,
       guestPromoUrl: config.guestPromoUrl,
+      speedTestOrigins: config.speedTestOrigins,
     });
     if (config.worker.inProcess) {
       // Replace the runner too, so worker code edits apply. The old one finishes its current job.

@@ -15,6 +15,7 @@ import { ApiError } from "./errors";
 import { hashToken, newId, newInviteCode, newToken } from "./ids";
 import type { LiveService } from "./live";
 import { deleteRecordingIn, RECORDING_BYTES } from "./processing";
+import { drainBody } from "./speed-test";
 
 export interface Studio {
   id: string;
@@ -174,23 +175,10 @@ export class StudioService {
     return row.id;
   }
 
-  /** Upload-speed test: read and drop the body, up to `maxBytes`. Only for a live invite code. */
+  /** Upload-speed test for the tech check: read and drop the body. Only for a live invite code. */
   async speedTest(inviteCode: string, body: ReadableStream<Uint8Array> | null, maxBytes: number) {
     await this.studioForInvite(inviteCode);
-    let bytes = 0;
-    if (body) {
-      const reader = body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.byteLength;
-        if (bytes > maxBytes) {
-          await reader.cancel();
-          throw new ApiError(413, "too_large", "Too much test data");
-        }
-      }
-    }
-    return { bytes };
+    return { bytes: await drainBody(body, maxBytes) };
   }
 
   /** A guest sends their tech-check results to the host. Sending again updates the same report. */
