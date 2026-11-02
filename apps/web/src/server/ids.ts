@@ -18,3 +18,8 @@ export function newInviteCode() {
 export function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
+
+/** SHA-256 of a text (UTF-8), hex: how a consent text is identified. */
+export function sha256Hex(text: string) {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}

@@ -9,7 +9,18 @@ import { getPipeline } from "@/lib/client/recording";
 
 const RETRY_MS = 5_000;
 
-export function JoinForm({ inviteCode, hostName, audioOnly }: { inviteCode: string; hostName: string; audioOnly: boolean }) {
+export function JoinForm({
+  inviteCode,
+  hostName,
+  consentText,
+  consentHash,
+}: {
+  inviteCode: string;
+  hostName: string;
+  /** The show's consent text, exactly as agreed to, and its SHA-256 (sent along, checked by the server). */
+  consentText: string;
+  consentHash: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [waitingForHost, setWaitingForHost] = useState(false);
@@ -47,13 +58,19 @@ export function JoinForm({ inviteCode, hostName, audioOnly }: { inviteCode: stri
     setError(null);
     try {
       const ticket = await apiFetch<SessionTicket>("/join", {
-        body: { inviteCode, displayName: data.get("displayName"), consent: data.get("consent") === "on" },
+        body: { inviteCode, displayName: data.get("displayName"), consent: data.get("consent") === "on", consentHash },
       });
       saveTicket(ticket, inviteCode);
       router.push(`/session/${ticket.sessionId}`);
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "host_not_here") setWaitingForHost(true);
-      else {
+      else if (err instanceof ApiRequestError && err.code === "consent_changed") {
+        // Show the new text (the page renders it on the server) and ask again.
+        setWaitingForHost(false);
+        setConsent(false);
+        setError(err.message);
+        router.refresh();
+      } else {
         setWaitingForHost(false);
         setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
       }
@@ -93,8 +110,8 @@ export function JoinForm({ inviteCode, hostName, audioOnly }: { inviteCode: stri
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-[3px] size-[18px] shrink-0"
           />
-          <span>
-            I&apos;m happy to be recorded. My {audioOnly ? "microphone is" : "camera and microphone are"} recorded on this computer and sent to {hostName}.
+          <span className="whitespace-pre-line" data-testid="consent-text">
+            {consentText}
           </span>
         </label>
         {error && <Notice tone="danger">{error}</Notice>}

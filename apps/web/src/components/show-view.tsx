@@ -17,8 +17,10 @@ export function ShowView({
   episodes: initial,
   checks,
   shows,
+  hostName,
 }: {
   show: Studio;
+  hostName: string;
   episodes: RecordingSummary[];
   checks: TechCheck[];
   shows: Array<{ id: string; name: string; bytes: number }>;
@@ -124,7 +126,7 @@ export function ShowView({
         <>
           <Card className="flex max-w-[760px] flex-col gap-6 p-7">
             <h2 className="text-[19px] font-semibold">Show settings</h2>
-            <ShowSettingsForm studioId={show.id} name={show.name} settings={show.settings} />
+            <ShowSettingsForm studioId={show.id} name={show.name} settings={show.settings} hostName={hostName} />
           </Card>
           <section className="flex max-w-[760px] flex-wrap items-center justify-between gap-4 rounded-xl border border-dashed border-accent-line px-7 py-6">
             <span className="flex flex-col gap-1">

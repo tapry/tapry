@@ -180,7 +180,14 @@ function EpisodeRow({
           {e.processing === "ready" && <Downloads showId={showId} episode={e} />}
 
           {e.status === "stopped" && (
-            <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <a
+                href={`/api/studios/${showId}/recordings/${e.id}/consent`}
+                className="text-sm text-muted underline-offset-2 hover:text-text hover:underline"
+                data-testid="consent-record"
+              >
+                Consent record: who agreed, when, to what (.txt)
+              </a>
               <ConfirmAction
                 label="Delete this episode…"
                 testId="delete-recording"

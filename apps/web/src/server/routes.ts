@@ -22,6 +22,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE"
   ["POST", "/api/studios/[studioId]/recordings/[recordingId]/process", "processRecording"],
   ["GET", "/api/studios/[studioId]/recordings/[recordingId]/outputs/[outputId]", "downloadOutput"],
   ["GET", "/api/studios/[studioId]/recordings/[recordingId]/zip", "downloadZip"],
+  ["GET", "/api/studios/[studioId]/recordings/[recordingId]/consent", "consentRecord"],
 
   ["POST", "/api/join", "join"],
   ["POST", "/api/check/[inviteCode]/upload", "speedTest"],

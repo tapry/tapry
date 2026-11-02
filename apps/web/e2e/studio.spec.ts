@@ -318,7 +318,8 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
       "import json,sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print(json.dumps(z.namelist()))",
       file,
     ]).toString();
-    expect(JSON.parse(listed)).toEqual(names);
+    // Every file, then the consent record (who agreed, when, to what).
+    expect(JSON.parse(listed)).toEqual([...names, "Consent record - Episode 1.txt"]);
     await studioPage.close();
   });
 

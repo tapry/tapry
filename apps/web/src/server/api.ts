@@ -130,16 +130,26 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
      * stored, not compressed (video and audio don't shrink), so the size is known up front
      * and browsers show real progress. ZIP64, so files over 4 GB are fine.
      */
+    /** Who agreed to be recorded in an episode, when, and to which text: a plain-text file. */
+    consentRecord: asUser(async (svc, user, _req, params) => {
+      const { fileName, body } = await svc.processing.consentRecord(user, params.studioId!, params.recordingId!);
+      return new Response(body, {
+        headers: { "content-type": "text/plain; charset=utf-8", "content-disposition": contentDisposition(fileName), "cache-control": "no-store" },
+      });
+    }),
     downloadZip: asUser(async (svc, user, req, params) => {
-      const { fileName, files } = await svc.processing.zipContents(user, params.studioId!, params.recordingId!);
+      const { fileName, files, consent } = await svc.processing.zipContents(user, params.studioId!, params.recordingId!);
       const storage = svc.storage;
-      // Opened one at a time, when the zip reaches each file.
+      const consentBytes = new TextEncoder().encode(consent.body);
+      // Opened one at a time, when the zip reaches each file; the consent record goes last.
       async function* entries() {
         for (const f of files) {
           yield { name: f.name, size: f.size, lastModified: f.lastModified, input: await storage.openRead(f.key, req.signal) };
         }
+        yield { name: consent.fileName, size: consentBytes.byteLength, lastModified: new Date(), input: consentBytes };
       }
-      const zip = downloadZip(entries(), { metadata: files.map((f) => ({ name: f.name, size: f.size })) });
+      const metadata = [...files.map((f) => ({ name: f.name, size: f.size })), { name: consent.fileName, size: consentBytes.byteLength }];
+      const zip = downloadZip(entries(), { metadata });
       return new Response(zip.body, {
         headers: {
           "content-type": "application/zip",

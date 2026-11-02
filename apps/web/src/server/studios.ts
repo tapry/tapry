@@ -1,4 +1,5 @@
 import {
+  consentTextFor,
   studioSettings,
   type createStudioBody,
   type joinBody,
@@ -12,7 +13,7 @@ import type { z } from "zod";
 import type { User } from "./auth";
 import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
-import { hashToken, newId, newInviteCode, newToken } from "./ids";
+import { hashToken, newId, newInviteCode, newToken, sha256Hex } from "./ids";
 import type { LiveService } from "./live";
 import { deleteRecordingIn, RECORDING_BYTES } from "./processing";
 import { drainBody } from "./speed-test";
@@ -159,13 +160,18 @@ export class StudioService {
    * What a guest sees before joining: the show's name and who invited them. Null for a link
    * that is wrong, replaced or deleted. Anyone with the link may see this, like the link itself.
    */
-  async invitePreview(inviteCode: string): Promise<{ showName: string; hostName: string; settings: StudioSettings } | null> {
+  async invitePreview(
+    inviteCode: string,
+  ): Promise<{ showName: string; hostName: string; settings: StudioSettings; consentText: string; consentHash: string } | null> {
     const [row] = await this.db.query<{ name: string; host: string; settings: unknown }>(
       `SELECT st.name, st.settings, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
       [inviteCode],
     );
-    return row ? { showName: row.name, hostName: row.host, settings: studioSettings.parse(row.settings) } : null;
+    if (!row) return null;
+    const settings = studioSettings.parse(row.settings);
+    const consentText = consentTextFor(settings, row.host);
+    return { showName: row.name, hostName: row.host, settings, consentText, consentHash: sha256Hex(consentText) };
   }
 
   /** The show an invite code belongs to, for the tech check; 404 for a dead link. */
@@ -214,9 +220,19 @@ export class StudioService {
 
   /** Guest opens the invite link. No account; consent to recording is required by the schema. */
   async join(body: z.infer<typeof joinBody>): Promise<SessionTicket> {
-    const [studio] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE invite_code = $1 AND deleted_at IS NULL", [body.inviteCode]);
+    const [studio] = await this.db.query<StudioRow & { host: string }>(
+      `SELECT st.*, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
+       WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
+      [body.inviteCode],
+    );
     if (!studio) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
     const settings = studioSettings.parse(studio.settings);
+    // What they agree to is the show's text as of now; the page tells us which text it showed.
+    const consentText = consentTextFor(settings, studio.host);
+    const consentHash = sha256Hex(consentText);
+    if (body.consentHash && body.consentHash !== consentHash) {
+      throw new ApiError(409, "consent_changed", "The host has just changed what you're agreeing to. Read it again, then join.");
+    }
 
     const ticket = await this.db.transaction(async (tx) => {
       const [session] = await tx.query<{ id: string }>(
@@ -236,10 +252,11 @@ export class StudioService {
 
       const participantId = newId("par");
       const token = newToken();
+      await tx.query("INSERT INTO consent_texts (hash, text) VALUES ($1, $2) ON CONFLICT (hash) DO NOTHING", [consentHash, consentText]);
       await tx.query(
-        `INSERT INTO participants (id, session_id, display_name, role, token_hash, consented_at)
-         VALUES ($1, $2, $3, 'guest', $4, now())`,
-        [participantId, session.id, body.displayName, hashToken(token)],
+        `INSERT INTO participants (id, session_id, display_name, role, token_hash, consented_at, consent_hash)
+         VALUES ($1, $2, $3, 'guest', $4, now(), $5)`,
+        [participantId, session.id, body.displayName, hashToken(token), consentHash],
       );
       return { sessionId: session.id, participantId, token, role: "guest" as const };
     });

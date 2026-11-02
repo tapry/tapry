@@ -1,6 +1,6 @@
 // Small set of UI primitives in the shadcn style, without the Radix dependency tree.
 // Look and feel: the "Tapry Dashboard / Pages" mock-ups (coral, ink, soft grey panels, Onest).
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -47,6 +47,23 @@ export const Button = forwardRef<
 export function RecDot({ className }: { className?: string }) {
   return <span aria-hidden className={cn("size-2.5 rounded-full bg-current", className)} />;
 }
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
+  { className, ...props },
+  ref,
+) {
+  return (
+    <textarea
+      ref={ref}
+      className={cn(
+        "min-h-[120px] w-full rounded-xl border border-border-strong bg-surface px-4 py-3 text-[15px] leading-normal placeholder:text-subtle",
+        "focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
