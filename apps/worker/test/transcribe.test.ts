@@ -5,7 +5,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { mergeSpeakers, toSrt, toTxt, toVtt, transcribeAudio, type SpeakerTranscript } from "../src/transcribe.js";
+import { mergeSpeakers, toDocx, toSrt, toTxt, toVtt, transcribeAudio, type SpeakerTranscript } from "../src/transcribe.js";
+import { crc32 } from "../src/zip.js";
 
 describe("transcript formats", () => {
   const speakers: SpeakerTranscript[] = [
@@ -48,6 +49,21 @@ describe("transcript formats", () => {
     expect(toTxt(lines)).toBe(
       "[00:00:00] Host <&>: Welcome to the show, Sam.\n\n[00:00:04] Sam: Thanks for having me. It's great to be here.\n",
     );
+  });
+
+  it("writes a Word document: one paragraph per turn, speaker in bold, text escaped", () => {
+    const docx = Buffer.from(toDocx(lines, { title: "Transcript: The Long Table, Episode 41", subtitle: "Recorded 2026-11-02 · Host, Sam" }));
+    expect(docx.subarray(0, 4).toString("hex")).toBe("504b0304"); // a zip
+    const text = docx.toString("utf8");
+    for (const part of ["[Content_Types].xml", "_rels/.rels", "word/document.xml"]) expect(text).toContain(part);
+    expect(text).toContain('<w:t xml:space="preserve">Transcript: The Long Table, Episode 41</w:t>');
+    expect(text).toContain('<w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Host &lt;&amp;&gt;</w:t>');
+    expect(text).toContain(`<w:t xml:space="preserve">: Thanks for having me. It's great to be here.</w:t>`);
+    expect(text.match(/<w:p>/g)).toHaveLength(2 + 2); // title, subtitle, two turns
+  });
+
+  it("checks zip entries with the standard CRC-32", () => {
+    expect(crc32(new TextEncoder().encode("123456789"))).toBe(0xcbf43926);
   });
 
   it("formats hours", () => {

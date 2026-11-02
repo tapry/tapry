@@ -44,6 +44,8 @@ const settingsFields = {
   audioOnly: z.boolean(),
   /** Guests can download their own recording (their WAV, and MP4 with a camera) from the end screen. */
   guestDownloads: z.boolean(),
+  /** Per-person audio (and the mix of an audio-only episode): WAV opens anywhere, FLAC is lossless at about half the size. */
+  audioFormat: z.enum(["wav", "flac"]),
   /** What guests agree to before joining. Empty: the default text (defaultConsentText). */
   consentText: z.string().trim().max(4000),
 };
@@ -57,6 +59,7 @@ export const studioSettings = z.object({
   audioOnly: settingsFields.audioOnly.default(false),
   guestDownloads: settingsFields.guestDownloads.default(true),
   consentText: settingsFields.consentText.default(""),
+  audioFormat: settingsFields.audioFormat.default("wav"),
 });
 
 /** The consent text when a show sets none. */

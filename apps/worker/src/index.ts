@@ -19,6 +19,7 @@ export {
 } from "./pipeline.js";
 export {
   mergeSpeakers,
+  toDocx,
   toSrt,
   toTxt,
   toVtt,

@@ -206,6 +206,28 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     expect(outputs[2]!.gainDb).toBeTypeOf("number");
   });
 
+  it("writes FLAC instead of WAV when asked: the same samples, losslessly", async () => {
+    const tracks: TrackInput[] = [
+      { trackId: "trk_a", participantId: "par_a", participantName: "Ana", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_b", participantId: "par_b", participantName: "Ben", kind: "audio", rawPath: audioWebm, offsetMs: 500 },
+    ];
+    const opts = { ffmpeg, ffprobe, durationMs: 3000, videoHeight: 720 as const, loudness: PODCAST_LOUDNESS };
+    const wav = await renderRecording(tracks, { ...opts, workDir: join(dir, "as-wav") });
+    const flac = await renderRecording(tracks, { ...opts, workDir: join(dir, "as-flac"), audioFormat: "flac" });
+    expect(flac.map((o) => [o.fileName, o.contentType])).toEqual([
+      ["Ana - audio.flac", "audio/flac"],
+      ["Ben - audio.flac", "audio/flac"],
+      ["Combined.flac", "audio/flac"],
+    ]);
+    for (const [i, f] of flac.entries()) {
+      expect(probe(f.path, "stream=codec_name")).toBe("flac");
+      const decoded = join(dir, `decoded-${i}.wav`);
+      execFileSync(ffmpeg, ["-y", "-loglevel", "error", "-i", f.path, "-c:a", "pcm_s16le", decoded]);
+      expect(Buffer.from(samples(decoded).buffer).equals(Buffer.from(samples(wav[i]!.path).buffer)), f.fileName).toBe(true);
+      expect(f.gainDb).toBe(wav[i]!.gainDb); // levelled the same
+    }
+  });
+
   it("levels everyone to podcast loudness, the video's sound and the combined mix too", async () => {
     // A quiet guest (about -32 LUFS), a louder host, and a guest whose mic was muted throughout.
     const quiet = join(dir, "quiet.webm");
