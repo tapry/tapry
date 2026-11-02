@@ -1,12 +1,12 @@
 "use client";
 
 import { checkStorage, requestPersistentStorage } from "@tapry/recorder";
-import type { SessionTicket } from "@tapry/shared";
+import type { SessionTicket, StudioSettings } from "@tapry/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, CheckboxRow, cn, Field, Notice, RecDot, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/client/api";
 import { estimateClock, type ClockEstimate } from "@/lib/client/clock";
-import { useDevices, useLocalMedia, useMicLevel, useStoredState } from "@/lib/media/hooks";
+import { useDevices, useLocalMedia, useMicLevel, useStoredState, type Devices } from "@/lib/media/hooks";
 import {
   browserChecks,
   buildConstraints,
@@ -100,43 +100,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
       </div>
 
       <div className="flex flex-col gap-[18px] rounded-[20px] bg-surface p-6">
-        <Field label="Microphone">
-          <Select
-            value={choice.audioDeviceId ?? ""}
-            onChange={(e) => setChoice({ ...choice, audioDeviceId: e.target.value || undefined })}
-          >
-            <option value="">System default</option>
-            {devices.audioInputs
-              .filter((d) => d.deviceId !== "default")
-              .map((d, i) => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || `Microphone ${i + 1}`}
-                </option>
-              ))}
-          </Select>
-        </Field>
-        {!settings.audioOnly && (
-          <Field label="Camera">
-            <Select
-              value={choice.cameraOff ? "off" : (choice.videoDeviceId ?? "")}
-              onChange={(e) =>
-                setChoice({
-                  ...choice,
-                  cameraOff: e.target.value === "off",
-                  videoDeviceId: e.target.value && e.target.value !== "off" ? e.target.value : undefined,
-                })
-              }
-            >
-              <option value="">System default</option>
-              {devices.videoInputs.map((d, i) => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || `Camera ${i + 1}`}
-                </option>
-              ))}
-              <option value="off">Camera off (audio only)</option>
-            </Select>
-          </Field>
-        )}
+        <DevicePickers settings={settings} devices={devices} choice={choice} setChoice={setChoice} />
 
         <CheckboxRow
           checked={choice.headphones}
@@ -145,23 +109,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
           description="Highly recommended. Without them, other people's voices can leak into your microphone."
         />
 
-        <ul className="flex flex-col gap-2.5 border-t border-border pt-4 text-sm" aria-label="Checks">
-          {checks.length === 0 && <li className="text-muted">Checking your browser…</li>}
-          {checks.map((c) => (
-            <li key={c.id} className={cn("flex items-start gap-2.5", c.tone === "ok" ? "text-text-2" : "text-warn-strong")}>
-              <span
-                aria-hidden
-                className={cn(
-                  "mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px]",
-                  c.tone === "ok" ? "bg-ok-soft text-ok-strong" : c.tone === "warn" ? "bg-warn-soft" : "bg-accent-soft text-accent-strong",
-                )}
-              >
-                {c.tone === "ok" ? "✓" : "!"}
-              </span>
-              {c.label}
-            </li>
-          ))}
-        </ul>
+        <CheckList checks={checks} />
 
         <Button variant="record" size="lg" className="w-full text-[17px]" disabled={!canJoin} onClick={join}>
           <RecDot />
@@ -175,7 +123,90 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   );
 }
 
-function Preview({
+/** Microphone and camera pickers (no camera in an audio-only show). Also used by the tech check. */
+export function DevicePickers({
+  settings,
+  devices,
+  choice,
+  setChoice,
+}: {
+  settings: StudioSettings;
+  devices: Devices;
+  choice: DeviceChoice;
+  setChoice: (c: DeviceChoice) => void;
+}) {
+  return (
+    <>
+      <Field label="Microphone">
+        <Select
+          value={choice.audioDeviceId ?? ""}
+          onChange={(e) => setChoice({ ...choice, audioDeviceId: e.target.value || undefined })}
+        >
+          <option value="">System default</option>
+          {devices.audioInputs
+            .filter((d) => d.deviceId !== "default")
+            .map((d, i) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label || `Microphone ${i + 1}`}
+              </option>
+            ))}
+        </Select>
+      </Field>
+      {!settings.audioOnly && (
+        <Field label="Camera">
+          <Select
+            value={choice.cameraOff ? "off" : (choice.videoDeviceId ?? "")}
+            onChange={(e) =>
+              setChoice({
+                ...choice,
+                cameraOff: e.target.value === "off",
+                videoDeviceId: e.target.value && e.target.value !== "off" ? e.target.value : undefined,
+              })
+            }
+          >
+            <option value="">System default</option>
+            {devices.videoInputs.map((d, i) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label || `Camera ${i + 1}`}
+              </option>
+            ))}
+            <option value="off">Camera off (audio only)</option>
+          </Select>
+        </Field>
+      )}
+    </>
+  );
+}
+
+/** The list of checks with a ✓ or ! each ("Checking your browser…" while empty). */
+export function CheckList({ checks }: { checks: Array<{ id: string; tone: "ok" | "warn" | "danger"; label: string }> }) {
+  return (
+    <ul className="flex flex-col gap-2.5 border-t border-border pt-4 text-sm" aria-label="Checks">
+      {checks.length === 0 && <li className="text-muted">Checking your browser…</li>}
+      {checks.map((c) => (
+        <li
+          key={c.id}
+          data-check={c.id}
+          data-tone={c.tone}
+          className={cn("flex items-start gap-2.5", c.tone === "ok" ? "text-text-2" : "text-warn-strong")}
+        >
+          <span
+            aria-hidden
+            className={cn(
+              "mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px]",
+              c.tone === "ok" ? "bg-ok-soft text-ok-strong" : c.tone === "warn" ? "bg-warn-soft" : "bg-accent-soft text-accent-strong",
+            )}
+          >
+            {c.tone === "ok" ? "✓" : "!"}
+          </span>
+          {c.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function Preview({
   stream,
   cameraOff,
   audioOnly,
@@ -218,7 +249,7 @@ function Preview({
   );
 }
 
-function MicMeter({
+export function MicMeter({
   db,
   state,
   live,

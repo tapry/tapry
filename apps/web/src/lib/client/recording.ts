@@ -150,8 +150,8 @@ export interface RecordingOptions {
   onLocalActive?: (active: boolean) => void;
 }
 
-const VIDEO_BITRATE = { "1080p": 8_000_000, "720p": 4_000_000 } as const;
-const AUDIO_BITRATE = 128_000;
+export const VIDEO_BITRATE = { "1080p": 8_000_000, "720p": 4_000_000 } as const;
+export const AUDIO_BITRATE = 128_000;
 
 /** Starts and stops this participant's local recorders as the host presses Record and Stop. */
 export class RecordingController {

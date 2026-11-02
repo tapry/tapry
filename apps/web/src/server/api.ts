@@ -7,6 +7,8 @@ import {
   loginBody,
   seqParam,
   telemetryBody,
+  techCheckReport,
+  SPEED_TEST_MAX_BYTES,
   signupBody,
   updateStudioBody,
   uploadUrlBody,
@@ -149,6 +151,15 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
 
     // ── Guests ─────────────────────────────────────────────────────────────────
     join: handler(async (svc, req) => json(201, await svc.studios.join(await parseBody(req, joinBody)))),
+    /** Tech check: test data for the upload-speed check, read and thrown away. */
+    speedTest: handler(async (svc, req, params) =>
+      json(200, await svc.studios.speedTest(params.inviteCode!, req.body, SPEED_TEST_MAX_BYTES)),
+    ),
+    /** Tech check: the guest sends their results to the host. */
+    reportTechCheck: handler(async (svc, req, params) => {
+      await svc.studios.reportTechCheck(params.inviteCode!, await parseBody(req, techCheckReport));
+      return new Response(null, { status: 204 });
+    }),
 
     // ── Live session ───────────────────────────────────────────────────────────
     time: handler(async (svc) => json(200, { serverTime: svc.live.serverTime() })),
