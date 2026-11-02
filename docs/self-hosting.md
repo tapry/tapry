@@ -139,6 +139,9 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   (0: right away). That saves 40–50% of the space ([costs.md](costs.md)). Once they're gone,
   the episode can't be processed again, and a guest's upload arriving after that is turned away.
   The originals are the best-quality copies: keep them if you edit from the raw video.
+- **Guests' end screen:** guests can download their own recording once it's processed (a show
+  setting, on by default). Set `GUEST_PROMO_URL` in `.env` to also show them a "Record your own,
+  free" link; unset, there is none.
 - **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
   processed files). Deleting a recording or a studio removes its files from storage within
   seconds, and once more about 16 minutes later to catch uploads that were already on their way.

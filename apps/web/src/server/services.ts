@@ -16,12 +16,16 @@ export interface Services {
   uploads: UploadService;
   processing: ProcessingService;
   call: CallService;
+  /** Where guests' end screen points ("Record your own, free"); null for none. */
+  guestPromoUrl: string | null;
 }
 
 export function createServices(
   db: Db,
   storage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null } = { auth: { allowSignup: false } },
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null } = {
+    auth: { allowSignup: false },
+  },
 ): Services {
   let processing: ProcessingService;
   // Processing is queued when the last track finishes uploading or the host presses Stop,
@@ -39,5 +43,6 @@ export function createServices(
     uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess),
     processing,
     call: new CallService(db, opts.call ?? null),
+    guestPromoUrl: opts.guestPromoUrl ?? null,
   };
 }

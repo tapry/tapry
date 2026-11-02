@@ -92,6 +92,8 @@ export default defineConfig<{ forceMp4: boolean }>({
       // Transcripts only when a model is given; empty keeps .env.local's settings out.
       WHISPER_PATH: process.env.WHISPER_PATH ?? "whisper-cli",
       WHISPER_MODEL: process.env.WHISPER_MODEL ?? "",
+      // The guests' end screen shows this link; e2e/studio.spec.ts checks it.
+      GUEST_PROMO_URL: "https://tapry.test/",
       WHISPER_VAD_MODEL: process.env.WHISPER_VAD_MODEL ?? "",
       // Live call when scripts/with-seaweedfs.mjs started LiveKit (LIVEKIT_BIN set); otherwise
       // explicitly off, so a LIVEKIT_URL in .env.local (which next dev also reads) can't leak in.

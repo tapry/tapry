@@ -21,6 +21,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Guest end screen
+- Once their upload is done, guests can **download their own recording** (their audio, and their
+  video with a camera) from the end screen as soon as the episode is processed. Only their own.
+  A show setting, on by default.
+- Set `GUEST_PROMO_URL` to show guests a "Record your own, free" link there; unset (the default),
+  there is none.
+
 ### Guest tech check
 - A **tech-check link** to send guests before the session (on the show page, under the invite
   link). Guests test their browser, camera, microphone, headphones, free space, connection and

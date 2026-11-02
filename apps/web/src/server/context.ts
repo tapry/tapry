@@ -35,6 +35,7 @@ export function getServices(): Promise<Services> {
       auth: { allowSignup: config.allowSignup },
       hub: (shared.hub ??= new LiveHub()),
       call: config.call,
+      guestPromoUrl: config.guestPromoUrl,
     });
     if (config.worker.inProcess) {
       // Replace the runner too, so worker code edits apply. The old one finishes its current job.

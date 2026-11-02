@@ -352,10 +352,29 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
   });
 
   await test.step("ending the session tells everyone", async () => {
+    // The guest goes back into the room first.
+    const guestPage = guestContext.pages().at(-1)!;
+    await guestPage.getByRole("button", { name: "Continue as Sam Guest" }).click();
+    await guestPage.getByRole("button", { name: "Join the studio" }).click({ timeout: 20_000 });
+    await expect(guestPage.getByText("Waiting for the host to start recording.")).toBeVisible();
+
     host.once("dialog", (d) => d.accept());
     await host.getByRole("button", { name: "End session" }).click();
     await expect(host.getByTestId("session-ended")).toContainText("That's a wrap");
     await expect(host.getByRole("button", { name: "Record", exact: true })).toHaveCount(0);
+
+    // The guest, whose upload is done: their own files from both (processed) episodes, and the
+    // "record your own" link. Never anyone else's.
+    await expect(guestPage.getByTestId("session-ended")).toContainText("Thanks, Sam Guest. All done!", { timeout: 30_000 });
+    const own = guestPage.getByTestId("own-recording");
+    await expect(own.locator("a[data-file-name]")).toHaveCount(2, { timeout: 15_000 });
+    expect(await own.locator("a[data-file-name]").evaluateAll((as) => as.map((a) => a.getAttribute("data-file-name")))).toEqual([
+      "Sam Guest - audio.wav",
+      "Sam Guest - audio.wav",
+    ]);
+    const href = await own.locator("a[data-file-name]").first().getAttribute("href");
+    expect(await guestPage.evaluate(async (url) => (await fetch(url!)).status, href)).toBe(200);
+    await expect(guestPage.getByTestId("promo")).toHaveAttribute("href", "https://tapry.test/");
   });
 
   await test.step("host deletes a recording, then the studio; their files leave storage", async () => {

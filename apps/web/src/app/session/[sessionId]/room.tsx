@@ -1,7 +1,7 @@
 "use client";
 
 import type { UploadProgress } from "@tapry/recorder";
-import { STALE_REPORT_MS, type SessionState, type SessionTicket } from "@tapry/shared";
+import { STALE_REPORT_MS, type OwnRecordings, type SessionState, type SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
@@ -200,6 +200,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
 
       {ended ? (
         <EndedView
+          ticket={ticket}
           isHost={isHost}
           selfName={selfName}
           studioId={state?.session.studioId ?? null}
@@ -513,6 +514,7 @@ function InviteButton({ studioId }: { studioId: string }) {
 
 /** After the session: everyone's recording still arriving, then "that's a wrap". */
 function EndedView({
+  ticket,
   isHost,
   selfName,
   studioId,
@@ -521,6 +523,7 @@ function EndedView({
   upload,
   finishing,
 }: {
+  ticket: SessionTicket;
   isHost: boolean;
   selfName: string;
   studioId: string | null;
@@ -609,8 +612,99 @@ function EndedView({
               : "Closed it by accident? Just open the invite link again and the rest will be sent."}
           </Notice>
         )}
+        {/* Only once their upload is done: nothing should compete with "keep this tab open". */}
+        {!isHost && allDone && <GuestAfterwards ticket={ticket} />}
       </div>
     </div>
+  );
+}
+
+const READY_POLL_MS = 5_000;
+/** Download links are signed for an hour: fetch fresh ones well before that. */
+const LINKS_REFRESH_MS = 30 * 60_000;
+
+/**
+ * The guest's own recording once it's processed (if the show allows it), and the "record your
+ * own" link (if the server sets one).
+ */
+function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
+  const [own, setOwn] = useState<OwnRecordings | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const load = async () => {
+      let next = READY_POLL_MS;
+      try {
+        const got = await apiFetch<OwnRecordings>(`/sessions/${ticket.sessionId}/my-recordings`, { token: ticket.token });
+        if (cancelled) return;
+        setOwn(got);
+        if (got.recordings.every((r) => r.processing === "ready" || r.processing === "failed")) next = LINKS_REFRESH_MS;
+      } catch {
+        // Offline for a moment: try again on the next round.
+      }
+      if (!cancelled) timer = setTimeout(load, next);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [ticket]);
+  if (!own) return null;
+  const several = own.recordings.length > 1;
+
+  return (
+    <>
+      {own.downloads && own.recordings.length > 0 && (
+        <div className="flex flex-col gap-3 border-t border-border pt-5" data-testid="own-recording">
+          <h2 className="text-[17px] font-semibold">Your recording</h2>
+          {own.recordings.map((r) => (
+            <div key={r.number} className="flex flex-col gap-2">
+              {several && <span className="text-sm text-muted">Episode {r.number}</span>}
+              {r.processing === "ready" && r.files.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {r.files.map((f) => (
+                    <a
+                      key={f.url}
+                      href={f.url}
+                      data-file-name={f.fileName}
+                      className="inline-flex h-11 items-center gap-2 rounded-full border border-border-strong px-4 text-sm font-medium hover:border-muted"
+                    >
+                      {f.kind === "audio" ? "∿ Your audio" : "▶ Your video"}
+                      <span className="font-normal text-muted">
+                        {f.fileName.split(".").pop()!.toUpperCase()} · {mb(f.bytes)}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              ) : r.processing === "failed" ? (
+                <p className="text-sm text-muted">Your file couldn&apos;t be prepared here. The host has your recording.</p>
+              ) : (
+                <p className="flex items-center gap-2 text-sm text-muted">
+                  <StatusDot tone="warn" className="animate-rec-pulse" />
+                  Getting your file ready. Takes a few minutes; keep this page open to download it.
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {own.promoUrl && (
+        <a
+          href={own.promoUrl}
+          target="_blank"
+          rel="noopener"
+          className="flex flex-col gap-1 rounded-2xl bg-accent-soft px-5 py-4 hover:opacity-90"
+          data-testid="promo"
+        >
+          <span className="text-[15px] font-semibold text-accent-strong">Record your own, free →</span>
+          <span className="text-sm text-text-2">
+            Podcasts and interviews in full quality, everyone recorded on their own computer. Open source, and you can run it
+            yourself.
+          </span>
+        </a>
+      )}
+    </>
   );
 }
 
