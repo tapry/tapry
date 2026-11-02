@@ -5,6 +5,25 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+## 0.2.0 (2 November 2026)
+
+Tapry (formerly OpenTake) 0.2.0: the AI producer (live alerts for distorting, silent, too quiet
+and echoing mics, plus talk balance), a guest tech check and end screen, consent text per show
+with a consent record, audio-only shows, FLAC and Word exports, a processing timeline, a server
+health page, and an hour-long Gate A run with nothing lost.
+
+### Upgrading from 0.1.x
+- **Back up first** (the `postgres-data` volume, or `pg_dump`). The database updates itself when
+  the new version starts: new tables for consent texts, tech checks and workers, and new columns
+  for the processing timeline. Nothing to run by hand.
+- Use this version's Compose file (`git pull`), then `docker compose up -d --build`, or with
+  release images set `TAPRY_VERSION=0.2.0` in `.env` and `docker compose pull && docker compose
+  up -d --no-build`. Images are now `tapry-web` and `tapry-caddy` (the `opentake-*` names are
+  still published); `OPENTAKE_IMAGES` / `OPENTAKE_VERSION` keep working.
+- New settings, all optional and off by default: `GUEST_PROMO_URL`, `SPEED_TEST_ORIGINS`,
+  `UPDATE_CHECK_REPO` (see `docs/self-hosting.md`).
+- Guests in the middle of uploading when you update carry on: browser storage keeps its names.
+
 ### Renamed to Tapry
 - OpenTake is now **Tapry**: the app, website, docs, packages (`@tapry/*`) and images
   (`tapry-web`, `tapry-caddy`). Releases also publish the old `opentake-web` / `opentake-caddy`
@@ -16,26 +35,29 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - Nothing to migrate: browser storage, the Compose project, the database and the bucket keep their
   old names, so unsent recordings and existing data carry over.
 
-### Gate A: an hour, two people, nothing lost
-- 60-minute two-person runs: Chromium + Chromium (every beep in both files, 4.3 ms between
-  people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
-  a second apart). Details and how to run them: `docs/browser-support.md`.
+### AI producer: too quiet, echo and talk balance
+- An **echo** alert: someone's microphone picks up the call from their speakers, so the others
+  are in their recording too. Each device compares its own recorded sound with what the call
+  plays it; the person who only hears their own voice come back isn't flagged.
+- A **too quiet** alert: someone who talks but stays below -38 dBFS for at least 5 s of the last
+  30 s. They're told how to fix it, and the host sees it next to their name.
+- **Talk balance**: while recording, the host sees each person's share of the talking, and a
+  nudge once they've done 70% of it (after two minutes of talking in all). Each device counts its
+  own talking (voice activity on its own mic) and reports only the number.
 
-### FLAC audio and Word transcripts
-- **Audio files** setting per show: WAV (default) or **FLAC**, the same sound at about half the
-  size. Applies to each person's audio and to the mix of an episode without video.
-- Transcripts now also come as a **Word document** (Transcript.docx): a title, then one
-  paragraph per turn with its time and the speaker in bold. Opens in Word, Pages, LibreOffice
-  and Google Docs, and imports into NVivo, ATLAS.ti and MAXQDA.
+### Guest tech check
+- A **tech-check link** to send guests before the session (on the show page, under the invite
+  link). Guests test their browser, camera, microphone, headphones, free space, connection and
+  upload speed, and can record a few seconds and listen back. Nothing is recorded for the show.
+- When they press Send, the host sees the results on the show page: "All good", or what to sort
+  out before the session.
 
-### Server health page
-- Admins have a **Server health** page (bottom of the sidebar): database, storage (really writes
-  and deletes a test file), workers and their ffmpeg, the job queue and recent failures with
-  their reason, transcripts, free working space, the live call and the version. Each problem
-  says what to do.
-- Every worker, including the one inside the web server, now reports in every 30 seconds, so
-  a stopped worker container shows up.
-- `UPDATE_CHECK_REPO` turns on a check for newer releases; off by default.
+### Guest end screen
+- Once their upload is done, guests can **download their own recording** (their audio, and their
+  video with a camera) from the end screen as soon as the episode is processed. Only their own.
+  A show setting, on by default.
+- Set `GUEST_PROMO_URL` to show guests a "Record your own, free" link there; unset (the default),
+  there is none.
 
 ### Consent text per show
 - **What guests agree to** is now a show setting (Settings tab): research teams can put their
@@ -46,55 +68,45 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - Every episode has a **consent record** (a .txt: who was recorded, when each guest agreed, to
   which text), downloadable on its own and included in "Download everything".
 
-### Processing timeline
-- Each episode shows its way to the files: recorded → everyone's upload arrived → files ready →
-  transcript, with when each step finished and how long it took. While it works, the running
-  step says what it's doing ("Making Sam's audio (3 of 5)") with a progress bar.
-
-### Free upload-speed check
-- **Is your internet good enough to record?** `/tools/upload-speed` on every server (no account)
-  measures your upload and says whether it keeps up with sound only, 720p and 1080p shows. The
-  website has the same page (`/upload-speed-test`), testing against the server in
-  `NEXT_PUBLIC_SPEED_TEST_URL`; that server lists the website in `SPEED_TEST_ORIGINS`.
-- The public test endpoint takes at most 64 MB a minute from one address.
-- The guest tech check measures upload more accurately on fast lines (growing test pieces).
-
-### Free mic and camera test
-- The website has a **mic and camera test** at `/mic-test`, no sign-up: a level meter with the
-  same "sounds good" as the green room, a 5-second recording to play back, the camera's real
-  resolution and frame rate, and a warning for Bluetooth headset mics. It all runs in the
-  browser; nothing is sent anywhere. `NEXT_PUBLIC_SITE_URL` makes the site's canonical links
-  absolute.
-
-### Guest end screen
-- Once their upload is done, guests can **download their own recording** (their audio, and their
-  video with a camera) from the end screen as soon as the episode is processed. Only their own.
-  A show setting, on by default.
-- Set `GUEST_PROMO_URL` to show guests a "Record your own, free" link there; unset (the default),
-  there is none.
-
-### Guest tech check
-- A **tech-check link** to send guests before the session (on the show page, under the invite
-  link). Guests test their browser, camera, microphone, headphones, free space, connection and
-  upload speed, and can record a few seconds and listen back. Nothing is recorded for the show.
-- When they press Send, the host sees the results on the show page: "All good", or what to sort
-  out before the session.
-
 ### Audio-only shows
 - New **Audio only** choice next to Full HD and Standard (when creating a show, and in its
   settings). Nobody is asked for a camera; the invite and green room say it's sound only.
 - Episodes with no video at all (an audio-only show, or everyone with their camera off) now get
   **Combined.wav**, everyone mixed and levelled together, instead of a video of empty tiles.
 
-### AI producer: too quiet, echo and talk balance
-- An **echo** alert: someone's microphone picks up the call from their speakers, so the others
-  are in their recording too. Each device compares its own recorded sound with what the call
-  plays it; the person who only hears their own voice come back isn't flagged.
-- A **too quiet** alert: someone who talks but stays below -38 dBFS for at least 5 s of the last
-  30 s. They're told how to fix it, and the host sees it next to their name.
-- **Talk balance**: while recording, the host sees each person's share of the talking, and a
-  nudge once they've done 70% of it (after two minutes of talking in all). Each device counts its
-  own talking (voice activity on its own mic) and reports only the number.
+### FLAC audio and Word transcripts
+- **Audio files** setting per show: WAV (default) or **FLAC**, the same sound at about half the
+  size. Applies to each person's audio and to the mix of an episode without video.
+- Transcripts now also come as a **Word document** (Transcript.docx): a title, then one
+  paragraph per turn with its time and the speaker in bold. Opens in Word, Pages, LibreOffice
+  and Google Docs, and imports into NVivo, ATLAS.ti and MAXQDA.
+
+### Processing timeline
+- Each episode shows its way to the files: recorded → everyone's upload arrived → files ready →
+  transcript, with when each step finished and how long it took. While it works, the running
+  step says what it's doing ("Making Sam's audio (3 of 5)") with a progress bar.
+
+### Server health page
+- Admins have a **Server health** page (bottom of the sidebar): database, storage (really writes
+  and deletes a test file), workers and their ffmpeg, the job queue and recent failures with
+  their reason, transcripts, free working space, the live call (whether your browser reaches
+  LiveKit, the way guests' browsers do) and the version. Each problem says what to do.
+- Every worker, including the one inside the web server, now reports in every 30 seconds, so
+  a stopped worker container shows up.
+- `UPDATE_CHECK_REPO` turns on a check for newer releases; off by default.
+
+### Free tools: upload speed and mic test
+- **Is your internet good enough to record?** `/tools/upload-speed` on every server (no account)
+  measures your upload and says whether it keeps up with sound only, 720p and 1080p shows. The
+  website has the same page (`/upload-speed-test`), testing against the server in
+  `NEXT_PUBLIC_SPEED_TEST_URL`; that server lists the website in `SPEED_TEST_ORIGINS`.
+- The public test endpoint takes at most 64 MB a minute from one address.
+- The guest tech check measures upload more accurately on fast lines (growing test pieces).
+- The website has a **mic and camera test** at `/mic-test`, no sign-up: a level meter with the
+  same "sounds good" as the green room, a 5-second recording to play back, the camera's real
+  resolution and frame rate, and a warning for Bluetooth headset mics. It all runs in the
+  browser; nothing is sent anywhere. `NEXT_PUBLIC_SITE_URL` makes the site's canonical links
+  absolute.
 
 ### New look
 - The app is redesigned (Onest, coral and ink; light and dark): log in, the dashboard, the guest
@@ -110,12 +122,14 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 - When a session ends, everyone sees their recording arriving, then "That's a wrap".
 - Studio keyboard shortcuts: ⌘/Ctrl+Shift+R start or stop recording, M mute, L copy the invite link.
 
-### Sync
+### Sync and Gate A
 - Measured: tracks line up within 1–5 ms between people over 5 minutes, with no drift, including a
   guest whose clock is 3.7 s off (`e2e/sync.spec.ts`, results in docs/browser-support.md).
-- Gate A (Chromium): a 60-minute two-person recording lost nothing (all 3,601 beeps in both files,
-  every file the full length) and stayed within 4.3 ms between people, no drift.
-  `E2E_SYNC_SECONDS=3600` runs it; the test now waits for processing in proportion to the length.
+- **Gate A**, an hour with two people: Chromium + Chromium lost nothing (all 3,601 beeps in both
+  files, every file the full length) and stayed within 4.3 ms between people, no drift. With a
+  real Safari guest (`E2E_SYNC_GUEST=safari`, driven by safaridriver), every one of Safari's 3,601
+  bursts is in its file, exactly a second apart. `E2E_SYNC_SECONDS=3600` runs it; details in
+  `docs/browser-support.md`.
 - Recording timestamps now use the same steady clock as the clock-offset estimate. They used the
   wall clock, which jumps when the system clock is adjusted mid-session (NTP, waking from sleep).
 - The "upload is behind" note compared server time with the device clock without the offset; a
@@ -126,7 +140,7 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   (more than a minute behind), storage, tab (in the background) and recorders, and reports only
   the alert codes. The host sees them next to each name in the studio, plus "Not reporting" when a
   device goes quiet for 15 s (offline, asleep, tab closed). Each person sees advice for their own.
-- "No headphones" shows as a note: it's the main cause of echo. Echo itself isn't measured yet.
+- "No headphones" shows as a note: it's the main cause of echo (now also measured, above).
 
 ### Storage
 - `RAW_RETENTION_DAYS` (off by default): remove each episode's original uploads that many days

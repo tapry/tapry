@@ -6,8 +6,9 @@ Studio-quality remote recording you can host yourself. Guests join from a link i
 browser; everyone is recorded **on their own device** at full quality, uploaded while you talk,
 and turned into separate tracks you can edit. Open source, with recordings in your own storage.
 
-> **Status: 0.1.0, first release.** The full recording flow works and is tested end to end
-> (see [what's tested](docs/browser-support.md)). Expect rough edges; please
+> **Status: 0.2.0.** The full recording flow works and is tested end to end, including an
+> hour-long two-person recording in Chromium and with Safari as the guest: nothing lost, no
+> drift (see [what's tested](docs/browser-support.md)). Expect rough edges; please
 > [report them](../../issues).
 
 ## What it does
@@ -17,18 +18,24 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
 - **Nothing lost.** Recordings are saved in the browser as they happen and uploaded in small
   pieces while you talk. A dropped connection, closed tab or crashed browser picks up where it
   left off when the guest comes back.
-- **Problems shown while you record.** The host sees, per guest, a distorting or silent mic, an
-  upload falling behind, low disk space or a tab sent to the background, and each guest gets
-  advice for their own.
+- **Problems shown while you record.** The host sees, per guest, a distorting, silent or too
+  quiet mic, echo from speakers, an upload falling behind, low disk space or a tab sent to the
+  background, and each guest gets advice for their own. Plus each person's share of the talking.
 - **Guests need nothing.** A link, a browser (Chrome, Edge, Firefox, Safari), no account, no
-  install. A green room checks their camera, microphone and storage first.
+  install. A green room checks their camera, microphone and storage first; a tech-check link
+  lets them test their setup days before, and the host sees how it went.
+- **Consent kept properly:** each show sets what guests agree to; every guest's agreement is
+  stored with the exact text (SHA-256) and time, in a consent record per episode.
 - **Live call** alongside the recording (LiveKit), including guests behind strict firewalls
   (TURN over TLS on port 443).
-- **Files ready to edit:** per person a WAV and an MP4, a combined grid video with names on the
-  tiles, all aligned to the moment you pressed Record and cut to the same length. Audio levelled
-  to podcast loudness (−16 LUFS) without compression. Download one by one or all as a zip.
-- **Transcripts** (whisper.cpp, runs on your server, 99 languages) as TXT, SRT and VTT, labelled
-  by speaker.
+- **Files ready to edit:** per person a WAV (or FLAC) and an MP4, a combined grid video with names
+  on the tiles (or one mixed audio file for audio-only shows), all aligned to the moment you
+  pressed Record and cut to the same length. Audio levelled to podcast loudness (−16 LUFS)
+  without compression. Download one by one or all as a zip; guests can download their own.
+- **Transcripts** (whisper.cpp, runs on your server, 99 languages) as TXT, Word, SRT and VTT,
+  labelled by speaker.
+- **Easy to run:** a server health page for the admin, and an episode timeline that shows what's
+  happening from Stop to files.
 - **Yours:** recordings live in your S3-compatible storage (SeaweedFS included; R2, AWS,
   Backblaze work). Storage usage per studio; deleting removes the files.
 

@@ -1,6 +1,6 @@
 {
   "name": "@tapry/worker",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "description": "Media pipeline: recorded chunks → aligned per-person WAV/MP4 and a combined video, via ffmpeg.",
