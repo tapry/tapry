@@ -18,6 +18,7 @@ import {
 } from "@tapry/worker";
 import type { Db, Queryable } from "./db";
 import { newId } from "./ids";
+import type { RecordingProgress } from "./processing";
 import { UPLOAD_URL_TTL_S, type Storage } from "./storage";
 
 export interface JobRunnerOptions {
@@ -194,7 +195,12 @@ export class JobRunner {
       return;
     }
     const column = STATUS_COLUMN[job.type as MediaJobType];
-    await this.db.query(`UPDATE recordings SET ${column} = 'processing' WHERE id = $1`, [rec.id]);
+    await this.db.query(
+      job.type === "process_recording"
+        ? `UPDATE recordings SET ${column} = 'processing', processing_started_at = now(), progress = NULL WHERE id = $1`
+        : `UPDATE recordings SET ${column} = 'processing', progress = NULL WHERE id = $1`,
+      [rec.id],
+    );
     this.opts.onChange?.(rec.session_id);
 
     // Keep the claim alive for as long as the work takes (transcribing a long episode on a
@@ -235,6 +241,7 @@ export class JobRunner {
       }
     } finally {
       clearInterval(renew);
+      await this.db.query("UPDATE recordings SET progress = NULL WHERE id = $1", [rec.id]).catch(() => {});
       await rm(work, { recursive: true, force: true });
       this.opts.onChange?.(rec.session_id);
     }
@@ -378,6 +385,7 @@ export class JobRunner {
     );
     const speakers: SpeakerTranscript[] = [];
     for (const [i, a] of audio.entries()) {
+      await this.progress(rec, { stage: "transcribing", done: i, total: audio.length, current: a.file_name.replace(/ - audio\.wav$/, "") });
       const path = join(work, `speaker-${i}.wav`);
       await this.storage.downloadTo(a.storage_key, path);
       const { language, segments } = await transcribeAudio(path, { ...this.opts.whisper, ffmpeg: this.opts.ffmpeg });
@@ -405,11 +413,19 @@ export class JobRunner {
         [rec.id],
       );
       for (const o of uploaded) await insertOutput(tx, rec.id, o);
-      await tx.query("UPDATE recordings SET transcript = 'ready' WHERE id = $1", [rec.id]);
+      await tx.query("UPDATE recordings SET transcript = 'ready', transcribed_at = now() WHERE id = $1", [rec.id]);
       await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
       return old.map((o) => o.storage_key);
     });
     await this.removeReplaced(replaced);
+  }
+
+  /** What the job is doing now, for the host's timeline. Best effort: progress never fails a job. */
+  private async progress(rec: RecordingRow, p: RecordingProgress) {
+    await this.db
+      .query("UPDATE recordings SET progress = $2 WHERE id = $1", [rec.id, JSON.stringify(p)])
+      .catch((err) => console.error("[worker] could not save progress:", String(err)));
+    this.opts.onChange?.(rec.session_id);
   }
 
   /** Files of an earlier run, no longer listed anywhere. Best effort: the job itself succeeded. */
@@ -430,7 +446,8 @@ export class JobRunner {
 
     const inputs: TrackInput[] = [];
     let lastEnd = rec.started_at;
-    for (const t of tracks) {
+    for (const [i, t] of tracks.entries()) {
+      await this.progress(rec, { stage: "collecting", done: i, total: tracks.length, current: t.display_name });
       const chunks = await this.db.query<{ seq: number; storage_key: string; end_ts: number }>(
         "SELECT seq, storage_key, end_ts FROM chunks WHERE track_id = $1 ORDER BY seq",
         [t.id],
@@ -466,10 +483,12 @@ export class JobRunner {
       videoHeight: settings.videoQuality === "720p" ? 720 : 1080,
       font: this.opts.font,
       loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
+      onProgress: (p) => void this.progress(rec, { stage: "rendering", ...p }),
     });
 
     const uploaded = [];
-    for (const f of files) {
+    for (const [i, f] of files.entries()) {
+      await this.progress(rec, { stage: "saving", done: i, total: files.length, current: null });
       const id = newId("out");
       const ext = f.path.split(".").pop();
       const key = `outputs/${rec.session_id}/${rec.id}/${id}.${ext}`;

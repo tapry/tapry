@@ -21,6 +21,11 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Processing timeline
+- Each episode shows its way to the files: recorded → everyone's upload arrived → files ready →
+  transcript, with when each step finished and how long it took. While it works, the running
+  step says what it's doing ("Making Sam's audio (3 of 5)") with a progress bar.
+
 ### Free upload-speed check
 - **Is your internet good enough to record?** `/tools/upload-speed` on every server (no account)
   measures your upload and says whether it keeps up with sound only, 720p and 1080p shows. The

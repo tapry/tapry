@@ -186,9 +186,13 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_a", participantId: "par_a", participantName: "Ana", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
       { trackId: "trk_b", participantId: "par_b", participantName: "Ben", kind: "audio", rawPath: audioWebm, offsetMs: 1000 },
     ];
+    const progress: string[] = [];
     const outputs = await renderRecording(tracks, {
       ffmpeg, ffprobe, workDir: join(dir, "audio-only"), durationMs: 3000, videoHeight: 720, loudness: PODCAST_LOUDNESS,
+      onProgress: (p) => progress.push(`${p.done}/${p.total} ${p.current}`),
     });
+    // Told before each file, so the host can see which one it's on.
+    expect(progress).toEqual(["0/3 Ana's audio", "1/3 Ben's audio", "2/3 Everyone, mixed"]);
     expect(outputs.map((o) => [o.kind, o.fileName, o.contentType])).toEqual([
       ["audio", "Ana - audio.wav", "audio/wav"],
       ["audio", "Ben - audio.wav", "audio/wav"],

@@ -8,6 +8,15 @@ import type { Storage } from "./storage";
 
 export type ProcessingStatus = "pending" | "queued" | "processing" | "ready" | "failed";
 
+/** A running job's step: collecting the uploads, rendering file `done + 1` of `total`, saving, transcribing. */
+export interface RecordingProgress {
+  stage: "collecting" | "rendering" | "saving" | "transcribing";
+  done: number;
+  total: number;
+  /** "Sam's audio": the file or person being worked on. */
+  current: string | null;
+}
+
 export interface RecordingSummary {
   id: string;
   /** "Episode 41": numbered per show, in the order they were recorded. */
@@ -23,6 +32,13 @@ export interface RecordingSummary {
   tracks: number;
   /** Tracks whose upload isn't confirmed yet (a guest may still be uploading, or gone). */
   incompleteTracks: number;
+  /** The processing timeline (ms since 1970): when each step finished, null until it has. */
+  uploadedAt: number | null;
+  processingStartedAt: number | null;
+  processedAt: number | null;
+  transcribedAt: number | null;
+  /** What the running job is doing now, for a progress bar; null when no job runs. */
+  progress: RecordingProgress | null;
   /** Space used in storage: uploaded chunks plus processed files. */
   bytes: number;
   /** The original uploads were removed after the retention period; only the processed files remain. */
@@ -66,7 +82,11 @@ export class ProcessingService {
        FROM recordings r WHERE r.id = $1 AND r.deleted_at IS NULL AND r.raw_deleted_at IS NULL`,
       [recordingId],
     );
-    if (r?.status === "stopped" && r.tracks > 0 && r.open === 0) await this.enqueue(recordingId);
+    if (r?.status === "stopped" && r.tracks > 0 && r.open === 0) {
+      // Everyone's upload is in (the first time only: a late re-upload doesn't move it).
+      await this.db.query("UPDATE recordings SET uploaded_at = coalesce(uploaded_at, now()) WHERE id = $1", [recordingId]);
+      await this.enqueue(recordingId);
+    }
   }
 
   /** Queue (or re-queue) processing with whatever has arrived. A no-op while a job is open. */
@@ -118,11 +138,17 @@ export class ProcessingService {
       transcript: RecordingSummary["transcript"];
       started_at: number;
       stopped_at: number | null;
+      uploaded_at: Date | null;
+      processing_started_at: Date | null;
+      processed_at: Date | null;
+      transcribed_at: Date | null;
+      progress: RecordingProgress | null;
       tracks: number;
       incomplete: number;
       bytes: number;
     }>(
       `SELECT r.id, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
+              r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
               ${RECORDING_BYTES} AS bytes
@@ -189,6 +215,11 @@ export class ProcessingService {
       transcript: r.transcript,
       startedAt: r.started_at,
       stoppedAt: r.stopped_at,
+      uploadedAt: ms(r.uploaded_at),
+      processingStartedAt: ms(r.processing_started_at),
+      processedAt: ms(r.processed_at),
+      transcribedAt: ms(r.transcribed_at),
+      progress: r.progress,
       tracks: r.tracks,
       incompleteTracks: r.incomplete,
       bytes: r.bytes,
@@ -291,6 +322,8 @@ export class ProcessingService {
     return rec;
   }
 }
+
+const ms = (d: Date | null) => (d ? new Date(d).getTime() : null);
 
 /** Bytes a recording (alias r) takes in storage: its uploaded chunks plus its processed files. */
 export const RECORDING_BYTES = `(
