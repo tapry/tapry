@@ -238,6 +238,14 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await studioPage.goto(studioUrl);
     const recording = studioPage.getByTestId("recording").first();
     await expect(recording.getByTestId("recording-status")).toHaveText(/Ready/, { timeout: 90_000 });
+    // The timeline: every step done, with when.
+    const timeline = recording.getByTestId("timeline");
+    expect(await timeline.locator("[data-step]").evaluateAll((els) => els.map((el) => `${el.getAttribute("data-step")}:${el.getAttribute("data-state")}`))).toEqual([
+      "recorded:done",
+      "uploaded:done",
+      "files:done",
+    ]);
+    await expect(timeline.locator('[data-step="files"]')).toContainText(/Files ready\s*\d/);
 
     const links = mediaLinks(studioPage);
     expect(await fileNames(links)).toEqual(["Combined.mp4", "Dev Host - audio.wav", "Dev Host - video.mp4", "Sam Guest - audio.wav"]);

@@ -6,6 +6,7 @@ import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { formatBytes, formatClock, formatDuration, formatWhen } from "@/lib/format";
 import type { RecordingSummary } from "@/server/processing";
 import { ConfirmAction } from "./confirm-action";
+import { EpisodeTimeline } from "./episode-timeline";
 import { Button, Card, cn, Notice, StatusDot, StatusPill } from "./ui";
 
 type Episode = RecordingSummary;
@@ -124,8 +125,6 @@ function EpisodeRow({
       text: `${listNames(missing)}'s recording is still on its way from their computer. It finishes by itself as soon as they're back online. If they won't be back, you can finish without them.`,
       tone: "warn",
     };
-  else if (e.processing === "queued" || e.processing === "processing")
-    note = { text: levelLoudness ? "Lining up everyone's recordings and evening out the volume…" : "Lining up everyone's recordings…", tone: "warn" };
   else if (e.processing === "failed")
     note = { text: e.processingError ?? "We couldn't finish the files for this episode. Your recordings are safe; try again.", tone: "danger" };
 
@@ -173,7 +172,10 @@ function EpisodeRow({
             </div>
           )}
 
-          {e.processing !== "ready" && e.people.length > 0 && <PeopleProgress episode={e} />}
+          {e.status === "stopped" && <EpisodeTimeline episode={e} now={now} levelLoudness={levelLoudness} />}
+
+          {/* Who is still sending: while recording, and until processing starts. */}
+          {e.processing === "pending" && e.people.length > 0 && <PeopleProgress episode={e} />}
 
           {e.processing === "ready" && <Downloads showId={showId} episode={e} />}
 
@@ -252,16 +254,6 @@ function Downloads({ showId, episode: e }: { showId: string; episode: Episode })
           {transcribing && (
             <>
               <StatusDot tone="warn" /> Writing the transcript… you can download everything else now.
-            </>
-          )}
-          {e.transcript === "ready" && (
-            <>
-              <StatusDot tone="ok" /> Transcript ready
-            </>
-          )}
-          {e.transcript === "failed" && (
-            <>
-              <StatusDot tone="danger" /> The transcript couldn&apos;t be made. The recording itself is fine.
             </>
           )}
         </span>

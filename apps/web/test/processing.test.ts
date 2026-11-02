@@ -211,6 +211,12 @@ describe("recording processing", () => {
 
       expect(await processing()).toBe("ready");
       const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
+      // The timeline: every step has its time, in order, and no job is left half-way.
+      const r = recordings[0];
+      expect(r.uploadedAt).toEqual(expect.any(Number));
+      expect(r.processingStartedAt).toBeGreaterThanOrEqual(r.uploadedAt);
+      expect(r.processedAt).toBeGreaterThanOrEqual(r.processingStartedAt);
+      expect(r.progress).toBeNull();
       const outputs = recordings[0].outputs;
       expect(outputs.map((o: { fileName: string }) => o.fileName)).toEqual(["Combined.wav", "Guest - audio.wav"]);
       expect(outputs[1].durationMs).toBe(2000);

@@ -29,6 +29,8 @@ export interface PipelineOptions {
   font?: string | null;
   /** Level every person's audio, and the combined mix, to this target. Unset or null: left as recorded. */
   loudness?: LoudnessTarget | null;
+  /** Told before each file is rendered: how many are done, of how many, and which one is next. */
+  onProgress?: (p: { done: number; total: number; current: string }) => void;
 }
 
 export interface LoudnessTarget {
@@ -196,9 +198,10 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
 
   // One file per person per kind. A person can have several tracks of a kind when they
   // rejoined during the recording (tab crash, reload): those pieces are merged in place.
-  for (const pieces of audioFirst) {
+  for (const [i, pieces] of audioFirst.entries()) {
     const first = pieces[0]!;
     const base = names.get(first.trackId)!;
+    opts.onProgress?.({ done: i, total: groups.length + 1, current: `${base}'s ${first.kind}` });
     const ext = first.kind === "audio" ? "wav" : "mp4";
     const path = join(opts.workDir, `${first.trackId}.${ext}`);
     const gainDb = first.kind === "video" ? gains.get(first.participantId) : undefined;
@@ -233,6 +236,8 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   }
   const outputs = groups.map((g) => byGroup.get(g)!);
 
+  const hasVideo = outputs.some((o) => o.kind === "video");
+  opts.onProgress?.({ done: groups.length, total: groups.length + 1, current: hasVideo ? "Side-by-side video" : "Everyone, mixed" });
   const combined = await renderCombined(tracks, outputs, opts, timeoutMs);
   if (combined) outputs.push(combined);
   return outputs;

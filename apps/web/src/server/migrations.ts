@@ -199,4 +199,12 @@ CREATE TABLE tech_checks (
 );
 CREATE INDEX tech_checks_studio ON tech_checks (studio_id, created_at DESC);
 `,
+  `
+-- The processing timeline: when each step finished, and what the running job is doing now
+-- ({ "stage": "collecting" | "rendering" | "saving" | "transcribing", "done", "total", "current" }).
+ALTER TABLE recordings ADD COLUMN uploaded_at timestamptz;
+ALTER TABLE recordings ADD COLUMN processing_started_at timestamptz;
+ALTER TABLE recordings ADD COLUMN transcribed_at timestamptz;
+ALTER TABLE recordings ADD COLUMN progress jsonb;
+`,
 ];
