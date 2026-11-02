@@ -83,35 +83,27 @@ describe("admin health checks", () => {
     expect(check(report.checks, "disk")).toMatchObject({ tone: "warn", summary: expect.stringMatching(/^Only 2\.0 GB free/) });
   });
 
-  it("checks the live call and, only when asked to, for a newer release", async () => {
+  it("says whether the call is set up and, only when asked to, checks for a newer release", async () => {
     const s = await server();
     expect(check((await s.services.health.report()).checks, "call").tone).toBe("off");
     expect(check((await s.services.health.report()).checks, "version").details[0]).toMatch(/Update check off/);
 
     const calls: string[] = [];
-    const fakeFetch = (async (url: string) => {
-      calls.push(String(url));
-      if (String(url).startsWith("http://livekit.test")) return new Response("OK");
-      return Response.json({ tag_name: "v99.0.0" });
-    }) as typeof fetch;
     const health = new HealthService(s.db, s.storage, {
-      call: { url: "ws://livekit.test:7880", apiKey: "k", apiSecret: "s" },
+      call: { url: "wss://livekit.example.com", apiKey: "k", apiSecret: "s" },
       updateRepo: "tapry/tapry",
-      fetch: fakeFetch,
+      fetch: (async (url: string) => {
+        calls.push(String(url));
+        return Response.json({ tag_name: "v99.0.0" });
+      }) as typeof fetch,
       version: "0.2.0",
     });
-    const { checks } = await health.report();
-    expect(check(checks, "call")).toMatchObject({ tone: "ok", summary: expect.stringMatching(/LiveKit answering/) });
-    expect(check(checks, "version")).toMatchObject({ tone: "warn", summary: "0.2.0: version 99.0.0 is out" });
-    expect(calls).toContain("https://api.github.com/repos/tapry/tapry/releases/latest");
-
-    const down = new HealthService(s.db, s.storage, {
-      call: { url: "ws://livekit.test:7880", apiKey: "k", apiSecret: "s" },
-      fetch: (async () => {
-        throw new Error("ECONNREFUSED");
-      }) as typeof fetch,
-    });
-    expect(check((await down.report()).checks, "call")).toMatchObject({ tone: "danger", summary: expect.stringMatching(/isn't answering/) });
+    const report = await health.report();
+    // Reaching LiveKit is tested by the page, from the browser; the server only reports the setup.
+    expect(check(report.checks, "call")).toMatchObject({ tone: "ok", summary: "On", details: ["wss://livekit.example.com"] });
+    expect(report.callUrl).toBe("wss://livekit.example.com");
+    expect(check(report.checks, "version")).toMatchObject({ tone: "warn", summary: "0.2.0: version 99.0.0 is out" });
+    expect(calls).toEqual(["https://api.github.com/repos/tapry/tapry/releases/latest"]);
   });
 
   it("compares versions part by part", () => {

@@ -5,7 +5,7 @@ import { formatBytes, formatWhen } from "@/lib/format";
 import { getServices } from "@/server/context";
 import type { Tone } from "@/server/health";
 import { requireUser } from "@/server/page-auth";
-import { CheckAgain } from "./check-again";
+import { CallProbe, CheckAgain } from "./check-again";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Server health" };
@@ -59,6 +59,7 @@ export default async function HealthPage() {
                     {d}
                   </span>
                 ))}
+                {c.id === "call" && report.callUrl && <CallProbe url={report.callUrl} />}
               </span>
             </li>
           ))}
