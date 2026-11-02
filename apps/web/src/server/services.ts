@@ -1,3 +1,4 @@
+import { HealthService, type HealthOptions } from "./health";
 import { SpeedTestLimiter } from "./speed-test";
 import { AuthService, type AuthOptions } from "./auth";
 import { CallService, type CallConfig } from "./call";
@@ -21,12 +22,14 @@ export interface Services {
   guestPromoUrl: string | null;
   /** The public upload-speed test: per-address limits, and other sites allowed to use it. */
   speedTest: { limiter: SpeedTestLimiter; origins: string[] };
+  /** The admin health page's checks. */
+  health: HealthService;
 }
 
 export function createServices(
   db: Db,
   storage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; speedTestOrigins?: string[] } = {
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call"> } = {
     auth: { allowSignup: false },
   },
 ): Services {
@@ -48,5 +51,6 @@ export function createServices(
     call: new CallService(db, opts.call ?? null),
     guestPromoUrl: opts.guestPromoUrl ?? null,
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
+    health: new HealthService(db, storage, { ...opts.health, call: opts.call ?? null }),
   };
 }

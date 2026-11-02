@@ -130,6 +130,11 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
   storage provider's replication). Recordings are useless without the database that indexes them.
 - **Health:** `GET /api/health` returns `{"ok":true,"version":"0.1.0"}` when the app and its database are up.
+  Signed in as the admin, **Server health** (link at the bottom of the sidebar, `/admin/health`)
+  checks everything else: storage (it writes, reads and deletes a test file), the workers and
+  their ffmpeg, the job queue and recent failures, transcripts, the live call, free working
+  space and the version. Set `UPDATE_CHECK_REPO` to also compare with the latest release;
+  unset, the server fetches nothing.
 - **Downloads:** single files come straight from storage through short-lived signed links.
   "Download all (.zip)" is put together on the fly by the web container as it streams, so
   it uses no extra disk but does pass through the web container: a 5 GB zip is 5 GB of its

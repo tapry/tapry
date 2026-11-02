@@ -19,6 +19,10 @@ import {
 import type { Db, Queryable } from "./db";
 import { newId } from "./ids";
 import type { RecordingProgress } from "./processing";
+import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
+
+/** How often a runner says it's alive (the health page calls it gone after 3 missed beats). */
+export const HEARTBEAT_MS = 30_000;
 import { UPLOAD_URL_TTL_S, type Storage } from "./storage";
 
 export interface JobRunnerOptions {
@@ -34,6 +38,8 @@ export interface JobRunnerOptions {
   lockMs?: number;
   /** Delete an episode's original uploads this long after it's processed. Unset: keep them. */
   rawRetentionMs?: number;
+  /** Inside the web server, or a separate worker process (shown on the admin health page). */
+  kind?: "inprocess" | "worker";
   /** Called after every poll; the standalone worker uses it as its health heartbeat. */
   onPoll?: () => void;
   /** Something changed for this session (status shown to the host). */
@@ -84,6 +90,10 @@ export class JobRunner {
   private stopped = false;
   private kicked = false;
   private current: JobRow | null = null;
+  private beat: ReturnType<typeof setInterval> | undefined;
+  private info: Promise<WorkerInfo> | undefined;
+  /** This runner in the `workers` table. */
+  readonly id = newId("wrk");
 
   constructor(
     private db: Db,
@@ -94,12 +104,33 @@ export class JobRunner {
   start() {
     this.stopped = false;
     this.schedule(0);
+    void this.heartbeat();
+    clearInterval(this.beat);
+    this.beat = setInterval(() => void this.heartbeat(), HEARTBEAT_MS);
   }
 
   /** Stop taking new jobs. A job already running finishes. */
   stop() {
     this.stopped = true;
     clearTimeout(this.timer);
+    clearInterval(this.beat);
+    void this.db.query("DELETE FROM workers WHERE id = $1", [this.id]).catch(() => {});
+  }
+
+  /** "Alive, and this is what I can do": read by the admin health page. Best effort. */
+  async heartbeat() {
+    try {
+      const info = await (this.info ??= gatherWorkerInfo({ ffmpeg: this.opts.ffmpeg, ffprobe: this.opts.ffprobe, whisper: this.opts.whisper }));
+      const current = { ...info, tmpFreeBytes: await freeBytes() };
+      await this.db.query(
+        `INSERT INTO workers (id, kind, version, info) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (id) DO UPDATE SET info = EXCLUDED.info, version = EXCLUDED.version, seen_at = now()`,
+        [this.id, this.opts.kind ?? "worker", APP_VERSION, JSON.stringify(current)],
+      );
+      await this.db.query("DELETE FROM workers WHERE seen_at < now() - interval '1 day'");
+    } catch (err) {
+      console.error("[worker] heartbeat failed:", String(err));
+    }
   }
 
   /**

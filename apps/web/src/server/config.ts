@@ -45,6 +45,8 @@ const env = z.object({
   WHISPER_THREADS: z.coerce.number().int().min(1).max(64).default(4),
   /** Font for names on the combined video's tiles; found automatically when unset. */
   TILE_FONT: unsetIfEmpty(z.string()),
+  /** GitHub repo ("owner/name") whose latest release the admin health page compares with. Unset: no check. */
+  UPDATE_CHECK_REPO: unsetIfEmpty(z.string().regex(/^[\w.-]+\/[\w.-]+$/)),
   /** Other sites (comma-separated origins) whose pages may use this server's public upload-speed test. */
   SPEED_TEST_ORIGINS: z.string().default(""),
   /** Guests' end screen links here ("Record your own, free"). Unset (default): no such link. */
@@ -75,6 +77,7 @@ export interface Config {
   call: CallConfig | null;
   guestPromoUrl: string | null;
   speedTestOrigins: string[];
+  updateRepo: string | null;
 }
 
 export function loadConfig(source: Record<string, string | undefined> = process.env): Config {
@@ -114,5 +117,6 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     call: cfg.LIVEKIT_URL ? { url: cfg.LIVEKIT_URL, apiKey: cfg.LIVEKIT_API_KEY!, apiSecret: cfg.LIVEKIT_API_SECRET! } : null,
     guestPromoUrl: cfg.GUEST_PROMO_URL ?? null,
     speedTestOrigins: cfg.SPEED_TEST_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
+    updateRepo: cfg.UPDATE_CHECK_REPO ?? null,
   };
 }

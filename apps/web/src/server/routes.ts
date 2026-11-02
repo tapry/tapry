@@ -31,6 +31,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PATCH" | "DELETE"
   ["POST", "/api/check/[inviteCode]/report", "reportTechCheck"],
   ["GET", "/api/time", "time"],
   ["GET", "/api/health", "health"],
+  ["GET", "/api/admin/health", "adminHealth"],
 
   ["GET", "/api/sessions/[sessionId]/state", "sessionState"],
   ["GET", "/api/sessions/[sessionId]/events", "sessionEvents"],

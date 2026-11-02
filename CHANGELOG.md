@@ -21,6 +21,15 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   people, no drift) and Chromium host + real Safari guest (every burst in Safari's file, exactly
   a second apart). Details and how to run them: `docs/browser-support.md`.
 
+### Server health page
+- Admins have a **Server health** page (bottom of the sidebar): database, storage (really writes
+  and deletes a test file), workers and their ffmpeg, the job queue and recent failures with
+  their reason, transcripts, free working space, the live call and the version. Each problem
+  says what to do.
+- Every worker, including the one inside the web server, now reports in every 30 seconds, so
+  a stopped worker container shows up.
+- `UPDATE_CHECK_REPO` turns on a check for newer releases; off by default.
+
 ### Consent text per show
 - **What guests agree to** is now a show setting (Settings tab): research teams can put their
   study's consent wording there. Empty, guests see the usual sentence.

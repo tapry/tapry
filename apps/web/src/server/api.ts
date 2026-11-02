@@ -21,6 +21,7 @@ import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
 import { clientAddress, drainBody, speedTestCors } from "./speed-test";
+import { APP_VERSION } from "./worker-info";
 import { contentDisposition } from "./storage";
 
 type Params = Record<string, string>;
@@ -130,6 +131,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
      * stored, not compressed (video and audio don't shrink), so the size is known up front
      * and browsers show real progress. ZIP64, so files over 4 GB are fine.
      */
+    /** The admin health page's checks, as JSON (admins only; others get 404). */
+    adminHealth: asUser(async (svc, user) => {
+      if (!user.isAdmin) throw new ApiError(404, "not_found", "Not found");
+      return json(200, await svc.health.report());
+    }),
     /** Who agreed to be recorded in an episode, when, and to which text: a plain-text file. */
     consentRecord: asUser(async (svc, user, _req, params) => {
       const { fileName, body } = await svc.processing.consentRecord(user, params.studioId!, params.recordingId!);
@@ -200,7 +206,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     /** Liveness for Docker / load balancers: services built, migrations applied, database answering. */
     health: handler(async (svc) => {
       await svc.db.query("SELECT 1");
-      return json(200, { ok: true, version: process.env.TAPRY_VERSION ?? process.env.OPENTAKE_VERSION ?? "dev" });
+      return json(200, { ok: true, version: APP_VERSION });
     }),
     sessionState: asParticipant(async (svc, p) => json(200, await svc.live.state(p.sessionId))),
     sessionEvents: asParticipant(async (svc, p, req) => sseResponse(req, (send) => svc.live.subscribe(p.sessionId, send))),

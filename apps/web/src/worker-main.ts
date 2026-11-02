@@ -23,6 +23,7 @@ async function main() {
 
   const runner = new JobRunner(db, storage, {
     ...config.worker,
+    kind: "worker",
     // Proof of life for the container health check: written after every poll.
     onPoll: () => writeFileSync(HEARTBEAT_FILE, String(Date.now())),
   });

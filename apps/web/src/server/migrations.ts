@@ -217,4 +217,17 @@ CREATE TABLE consent_texts (
 );
 ALTER TABLE participants ADD COLUMN consent_hash text REFERENCES consent_texts(hash);
 `,
+  `
+-- Every job runner (inside the web server, or a separate worker) says it's alive every 30 s,
+-- with what it can do: the admin health page reads this. Rows idle for a day are removed.
+CREATE TABLE workers (
+  id text PRIMARY KEY,
+  kind text NOT NULL CHECK (kind IN ('inprocess', 'worker')),
+  version text NOT NULL,
+  -- { ffmpeg, ffprobe (version lines or null), whisper: { model, modelFound } | null, tmpFreeBytes }
+  info jsonb NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  seen_at timestamptz NOT NULL DEFAULT now()
+);
+`,
 ];
