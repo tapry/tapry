@@ -20,6 +20,16 @@ x-app-env: &app-env
   WHISPER_THREADS: ${WHISPER_THREADS:-4}
   # Remove each episode's original uploads this many days after its files are ready (empty: keep).
   RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS-}
+  # A "Record your own, free" link on guests' end screen and recap email; empty: none.
+  GUEST_PROMO_URL: ${GUEST_PROMO_URL:-}
+  # Guests can ask for an email with a link to their recording. Empty SMTP_HOST: off.
+  APP_URL: ${PUBLIC_SCHEME:-https}://${DOMAIN}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  SMTP_INSECURE: ${SMTP_INSECURE:-false}
 
 services:
   # HTTPS for the public names (app, storage, LiveKit, TURN), certificates from Let's Encrypt.
@@ -60,8 +70,6 @@ services:
     environment:
       <<: *app-env
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
-      # A "Record your own, free" link on guests' end screen; empty: none.
-      GUEST_PROMO_URL: ${GUEST_PROMO_URL:-}
       # Other sites allowed to use the public upload-speed test (comma-separated origins).
       SPEED_TEST_ORIGINS: ${SPEED_TEST_ORIGINS:-}
       # GitHub "owner/name" whose latest release the health page compares with; empty: no check.

@@ -5,6 +5,7 @@ import { writeFileSync } from "node:fs";
 import { loadConfig } from "./server/config";
 import { openDb } from "./server/db";
 import { JobRunner } from "./server/jobs";
+import { SmtpMailer } from "./server/mail";
 import { S3Storage } from "./server/storage";
 
 const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE ?? "/tmp/tapry-worker-heartbeat";
@@ -24,6 +25,7 @@ async function main() {
   const runner = new JobRunner(db, storage, {
     ...config.worker,
     kind: "worker",
+    mail: config.mail && { mailer: new SmtpMailer(config.mail.smtp), appUrl: config.mail.appUrl, promoUrl: config.guestPromoUrl },
     // Proof of life for the container health check: written after every poll.
     onPoll: () => writeFileSync(HEARTBEAT_FILE, String(Date.now())),
   });

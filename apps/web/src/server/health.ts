@@ -7,6 +7,7 @@ import { join } from "node:path";
 import type { CallConfig } from "./call";
 import type { Db } from "./db";
 import { HEARTBEAT_MS } from "./jobs";
+import { mailFailureReason, type Mailer } from "./mail";
 import { MIGRATIONS } from "./migrations";
 import type { Storage } from "./storage";
 import { APP_VERSION, type WorkerInfo } from "./worker-info";
@@ -14,7 +15,7 @@ import { APP_VERSION, type WorkerInfo } from "./worker-info";
 export type Tone = "ok" | "warn" | "danger" | "off";
 
 export interface HealthCheck {
-  id: "database" | "storage" | "workers" | "queue" | "transcripts" | "call" | "disk" | "version";
+  id: "database" | "storage" | "workers" | "queue" | "transcripts" | "call" | "email" | "disk" | "version";
   label: string;
   tone: Tone;
   summary: string;
@@ -34,6 +35,7 @@ export interface HealthReport {
 
 export interface HealthOptions {
   call?: CallConfig | null;
+  mailer?: Mailer | null;
   /** "owner/name" of the GitHub repo to compare the version with; unset: no update check. */
   updateRepo?: string | null;
   /** Web server runs jobs itself (WORKER=inprocess) or leaves them to separate workers. */
@@ -66,12 +68,13 @@ export class HealthService {
   }
 
   async report(): Promise<HealthReport> {
-    const [database, storage, runners, failures, version] = await Promise.all([
+    const [database, storage, runners, failures, version, email] = await Promise.all([
       this.database(),
       this.storageCheck(),
       this.runners(),
       this.failures(),
       this.version(),
+      this.email(),
     ]);
     // Ages come from the database's clock, like the times they're measured from.
     const alive = runners.filter((w) => w.ageMs < GONE_AFTER_MS);
@@ -79,7 +82,7 @@ export class HealthService {
     return {
       version: this.appVersion,
       checkedAt: Date.now(),
-      checks: [database, storage, this.workersCheck(alive, runners), queue, this.transcripts(alive), this.disk(alive), this.call(), version],
+      checks: [database, storage, this.workersCheck(alive, runners), queue, this.transcripts(alive), this.disk(alive), this.call(), email, version],
       callUrl: this.opts.call?.url ?? null,
       workers: runners,
       failures,
@@ -258,6 +261,28 @@ export class HealthService {
   }
 
   /** The running version, and (only when UPDATE_CHECK_REPO is set) whether a newer one is out. */
+  /** Logs in to the mail server, sending nothing. Says how many recaps gave up, never to whom. */
+  private async email(): Promise<HealthCheck> {
+    const base = { id: "email" as const, label: "Email" };
+    const { mailer } = this.opts;
+    if (!mailer) return { ...base, tone: "off", summary: "Off: guests aren't offered a recap email (set SMTP_HOST)", details: [] };
+    try {
+      await mailer.verify();
+    } catch (err) {
+      return { ...base, tone: "danger", summary: "Can't reach the mail server", details: [mailFailureReason(err), "Check SMTP_HOST, SMTP_PORT and the login. Recording works without it."] };
+    }
+    const failed = await this.db.query<{ error: string }>(
+      "SELECT error FROM recap_requests WHERE status = 'failed' AND error <> 'NO_FILES' AND finished_at > now() - interval '7 days'",
+    );
+    if (failed.length === 0) return { ...base, tone: "ok", summary: "On", details: [] };
+    return {
+      ...base,
+      tone: "warn",
+      summary: `${failed.length} recap email${failed.length === 1 ? "" : "s"} couldn't be sent in the last 7 days`,
+      details: [...new Set(failed.map((f) => f.error))],
+    };
+  }
+
   private async version(): Promise<HealthCheck> {
     const repo = this.opts.updateRepo;
     const base = { id: "version" as const, label: "Version" };

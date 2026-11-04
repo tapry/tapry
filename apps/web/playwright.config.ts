@@ -97,6 +97,12 @@ export default defineConfig<{ forceMp4: boolean }>({
       // The website's origin in e2e/upload-speed.spec.ts, calling the public speed test cross-site.
       SPEED_TEST_ORIGINS: "https://tapry.test",
       WHISPER_VAD_MODEL: process.env.WHISPER_VAD_MODEL ?? "",
+      // Recap email to the small SMTP server in e2e/recap.spec.ts (which listens only during that test).
+      SMTP_HOST: "127.0.0.1",
+      SMTP_PORT: "2525",
+      SMTP_FROM: "Tapry <studio@tapry.test>",
+      SMTP_INSECURE: "true",
+      APP_URL: `http://localhost:${PORT}`,
       // Live call when scripts/with-seaweedfs.mjs started LiveKit (LIVEKIT_BIN set); otherwise
       // explicitly off, so a LIVEKIT_URL in .env.local (which next dev also reads) can't leak in.
       LIVEKIT_URL: process.env.LIVEKIT_E2E_URL ?? "",

@@ -2,6 +2,7 @@
 // standalone worker (worker-main.ts), so both read the same variables the same way.
 import { z } from "zod";
 import type { CallConfig } from "./call";
+import type { SmtpConfig } from "./mail";
 import type { S3StorageConfig } from "./storage";
 
 /** An empty variable (`LIVEKIT_URL=` in a compose file) means "not set". */
@@ -51,6 +52,17 @@ const env = z.object({
   SPEED_TEST_ORIGINS: z.string().default(""),
   /** Guests' end screen links here ("Record your own, free"). Unset (default): no such link. */
   GUEST_PROMO_URL: unsetIfEmpty(z.string().url()),
+  /** This server's public address, for links in email. Needed with SMTP_HOST. */
+  APP_URL: unsetIfEmpty(z.string().url()),
+  /** Email (guests' recap). SMTP_HOST set: on. Unset (default): nothing is ever emailed. */
+  SMTP_HOST: unsetIfEmpty(z.string()),
+  SMTP_PORT: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(1).max(65535).default(587)),
+  SMTP_USER: unsetIfEmpty(z.string()),
+  SMTP_PASSWORD: unsetIfEmpty(z.string()),
+  /** Who the email is from: "Studio <studio@example.com>". Needed with SMTP_HOST. */
+  SMTP_FROM: unsetIfEmpty(z.string()),
+  /** Allow an unencrypted connection (a mail server on this machine or private network). */
+  SMTP_INSECURE: bool("false"),
   /** Live call. All three set: call on. LIVEKIT_URL unset: recording works without a call. */
   LIVEKIT_URL: unsetIfEmpty(z.string().url()),
   LIVEKIT_API_KEY: unsetIfEmpty(z.string()),
@@ -76,6 +88,7 @@ export interface Config {
   worker: WorkerConfig & { inProcess: boolean };
   call: CallConfig | null;
   guestPromoUrl: string | null;
+  mail: { smtp: SmtpConfig; appUrl: string } | null;
   speedTestOrigins: string[];
   updateRepo: string | null;
 }
@@ -89,6 +102,9 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   const cfg = parsed.data;
   if (cfg.LIVEKIT_URL && !(cfg.LIVEKIT_API_KEY && cfg.LIVEKIT_API_SECRET)) {
     throw new Error("LIVEKIT_URL is set but LIVEKIT_API_KEY / LIVEKIT_API_SECRET are missing");
+  }
+  if (cfg.SMTP_HOST && !(cfg.SMTP_FROM && cfg.APP_URL)) {
+    throw new Error("SMTP_HOST is set but SMTP_FROM / APP_URL are missing");
   }
   return {
     databaseUrl: cfg.DATABASE_URL,
@@ -116,6 +132,12 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     },
     call: cfg.LIVEKIT_URL ? { url: cfg.LIVEKIT_URL, apiKey: cfg.LIVEKIT_API_KEY!, apiSecret: cfg.LIVEKIT_API_SECRET! } : null,
     guestPromoUrl: cfg.GUEST_PROMO_URL ?? null,
+    mail: cfg.SMTP_HOST
+      ? {
+          smtp: { host: cfg.SMTP_HOST, port: cfg.SMTP_PORT, user: cfg.SMTP_USER, password: cfg.SMTP_PASSWORD, from: cfg.SMTP_FROM!, insecure: cfg.SMTP_INSECURE },
+          appUrl: cfg.APP_URL!,
+        }
+      : null,
     speedTestOrigins: cfg.SPEED_TEST_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
     updateRepo: cfg.UPDATE_CHECK_REPO ?? null,
   };

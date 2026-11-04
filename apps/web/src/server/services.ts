@@ -4,7 +4,9 @@ import { AuthService, type AuthOptions } from "./auth";
 import { CallService, type CallConfig } from "./call";
 import type { Db } from "./db";
 import { LiveHub, LiveService } from "./live";
+import type { Mailer } from "./mail";
 import { ProcessingService } from "./processing";
+import { RecapService } from "./recap";
 import type { Storage } from "./storage";
 import { StudioService } from "./studios";
 import { UploadService } from "./uploads";
@@ -18,6 +20,8 @@ export interface Services {
   uploads: UploadService;
   processing: ProcessingService;
   call: CallService;
+  /** Guests' recap email, asked for on the end screen. */
+  recaps: RecapService;
   /** Where guests' end screen points ("Record your own, free"); null for none. */
   guestPromoUrl: string | null;
   /** The public upload-speed test: per-address limits, and other sites allowed to use it. */
@@ -29,7 +33,7 @@ export interface Services {
 export function createServices(
   db: Db,
   storage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call"> } = {
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call"> } = {
     auth: { allowSignup: false },
   },
 ): Services {
@@ -49,8 +53,9 @@ export function createServices(
     uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess),
     processing,
     call: new CallService(db, opts.call ?? null),
+    recaps: new RecapService(db, !!opts.mailer, () => processing.onEnqueue()),
     guestPromoUrl: opts.guestPromoUrl ?? null,
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
-    health: new HealthService(db, storage, { ...opts.health, call: opts.call ?? null }),
+    health: new HealthService(db, storage, { ...opts.health, call: opts.call ?? null, mailer: opts.mailer ?? null }),
   };
 }
