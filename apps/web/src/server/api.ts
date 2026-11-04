@@ -6,6 +6,7 @@ import {
   joinBody,
   loginBody,
   seqParam,
+  recapBody,
   telemetryBody,
   techCheckReport,
   SPEED_TEST_MAX_BYTES,
@@ -222,6 +223,9 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     }),
     /** The end screen: this participant's own files from the session, and the promo link. */
     ownRecordings: asParticipant(async (svc, p) => json(200, await svc.processing.ownRecordings(p, svc.guestPromoUrl))),
+    /** The end screen's recap email: whether it's offered and how it's going; asking for one. */
+    recapStatus: asParticipant(async (svc, p) => json(200, await svc.recaps.status(p))),
+    requestRecap: asParticipant(async (svc, p, req) => json(200, await svc.recaps.request(p, (await parseBody(req, recapBody)).email))),
     /** LiveKit token for the live call (or enabled: false when no LiveKit is configured). */
     callToken: asParticipant(async (svc, p) => json(200, await svc.call.token(p))),
 

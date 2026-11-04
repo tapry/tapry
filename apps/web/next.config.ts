@@ -9,7 +9,7 @@ const config: NextConfig = {
   // Lets the Playwright server build into its own folder instead of clobbering `next dev`'s .next/.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // pg and PGlite load native/wasm files at runtime; keep them out of the bundle.
-  serverExternalPackages: ["pg", "@electric-sql/pglite"],
+  serverExternalPackages: ["pg", "@electric-sql/pglite", "nodemailer"],
 };
 
 export default config;

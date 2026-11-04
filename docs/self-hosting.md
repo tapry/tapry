@@ -151,6 +151,13 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Guests' end screen:** guests can download their own recording once it's processed (a show
   setting, on by default). Set `GUEST_PROMO_URL` in `.env` to also show them a "Record your own,
   free" link; unset, there is none.
+- **Recap email:** set `SMTP_HOST`, `SMTP_FROM` and, if needed, `SMTP_PORT`, `SMTP_USER` and
+  `SMTP_PASSWORD` in `.env`, then `docker compose up -d`, and guests can ask on their end screen for
+  an email with a link to their own recording. Any SMTP server or sending service works. Unset, it
+  isn't offered and nothing is ever emailed. Addresses are deleted once the email is sent, and the
+  connection must be encrypted unless you set `SMTP_INSECURE=true` (a mail server on your own
+  network). Outside Docker, also set `APP_URL`, your server's public address. The health page says
+  whether the mail server answers.
 - **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
   processed files). Deleting a recording or a studio removes its files from storage within
   seconds, and once more about 16 minutes later to catch uploads that were already on their way.

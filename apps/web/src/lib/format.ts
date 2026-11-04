@@ -35,3 +35,5 @@ export function formatWhen(ms: number, now = Date.now()) {
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) })}, ${time}`;
 }
+
+export const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;

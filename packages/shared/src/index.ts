@@ -207,6 +207,19 @@ export interface OwnRecordings {
   promoUrl: string | null;
 }
 
+/** The end screen's "email me my recording": state for this participant. */
+export interface RecapStatus {
+  /** The server sends email, the show lets guests have their files, and they recorded something. */
+  enabled: boolean;
+  status: "none" | "pending" | "sent" | "failed";
+  /** Only until it's sent: the address isn't kept after that. */
+  email: string | null;
+  /** False once this recording has been emailed the maximum number of times. */
+  canSend: boolean;
+}
+
+export const recapBody = z.object({ email });
+
 // ── Uploads ───────────────────────────────────────────────────────────────────
 
 /** Track ids are chosen by the client so recording can start before the server is reachable. */

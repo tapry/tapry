@@ -3,6 +3,7 @@ import { loadConfig, type Config } from "./config";
 import { migrate, openDb, type Db } from "./db";
 import { JobRunner } from "./jobs";
 import { LiveHub } from "./live";
+import { SmtpMailer } from "./mail";
 import { createServices, type Services } from "./services";
 import { S3Storage } from "./storage";
 
@@ -31,11 +32,13 @@ export function getServices(): Promise<Services> {
     const storage = new S3Storage(config.storage);
     // The connection outlives code edits in dev; a pulled or new migration applies on the next reload.
     await migrate(db);
+    const mailer = config.mail && new SmtpMailer(config.mail.smtp);
     const svc = createServices(db, storage, {
       auth: { allowSignup: config.allowSignup },
       hub: (shared.hub ??= new LiveHub()),
       call: config.call,
       guestPromoUrl: config.guestPromoUrl,
+      mailer,
       speedTestOrigins: config.speedTestOrigins,
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
     });
@@ -45,6 +48,7 @@ export function getServices(): Promise<Services> {
       const runner = new JobRunner(db, storage, {
         ...config.worker,
         kind: "inprocess",
+        mail: mailer && { mailer, appUrl: config.mail!.appUrl, promoUrl: config.guestPromoUrl },
         onChange: (sessionId) => svc.live.publishSoon(sessionId),
       });
       svc.processing.onEnqueue = () => runner.kick();

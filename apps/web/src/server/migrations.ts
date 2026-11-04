@@ -230,4 +230,26 @@ CREATE TABLE workers (
   seen_at timestamptz NOT NULL DEFAULT now()
 );
 `,
+  `
+-- A guest asked to be emailed their recording. The address is removed once sent or given up on.
+CREATE TABLE recap_requests (
+  participant_id text PRIMARY KEY REFERENCES participants(id) ON DELETE CASCADE,
+  session_id text NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  email text,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  sends integer NOT NULL DEFAULT 1,
+  attempts integer NOT NULL DEFAULT 0,
+  run_after timestamptz NOT NULL DEFAULT now(),
+  locked_until timestamptz,
+  -- The emailed link's token, hashed. A new request replaces it, so the old link stops working.
+  token_hash text UNIQUE,
+  expires_at timestamptz,
+  -- The failure's code, never the server's message.
+  error text,
+  finished_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX recap_requests_session ON recap_requests (session_id);
+CREATE INDEX recap_requests_pending ON recap_requests (created_at) WHERE status = 'pending';
+`,
 ];

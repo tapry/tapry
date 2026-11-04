@@ -407,6 +407,13 @@ export async function deleteRecordingIn(tx: Queryable, recordingId: string): Pro
   await tx.query("DELETE FROM chunks WHERE track_id IN (SELECT id FROM tracks WHERE recording_id = $1)", [recordingId]);
   await tx.query("DELETE FROM outputs WHERE recording_id = $1", [recordingId]);
   await tx.query("UPDATE recordings SET deleted_at = now() WHERE id = $1", [recordingId]);
+  // Nothing of theirs left to send: their address and link go too.
+  await tx.query(
+    `DELETE FROM recap_requests q WHERE q.session_id = $1 AND NOT EXISTS (
+       SELECT 1 FROM tracks t JOIN recordings r ON r.id = t.recording_id
+       WHERE t.participant_id = q.participant_id AND r.deleted_at IS NULL)`,
+    [rec.session_id],
+  );
   await tx.query(
     `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'purge_recording', $2)
      ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running') DO NOTHING`,

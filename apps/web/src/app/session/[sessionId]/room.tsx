@@ -1,15 +1,18 @@
 "use client";
 
 import type { UploadProgress } from "@tapry/recorder";
-import { STALE_REPORT_MS, type OwnRecordings, type SessionState, type SessionTicket } from "@tapry/shared";
+import { STALE_REPORT_MS, type OwnRecordings, type RecapStatus, type SessionState, type SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
+import { OwnFiles } from "@/components/own-files";
 import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
+import { mb } from "@/lib/format";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
 import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid } from "./call-grid";
+import { RecapEmail } from "./recap-email";
 import { followSession, type ConnectionStatus } from "@/lib/client/session-events";
 import type { ReadyToJoin } from "./green-room";
 
@@ -629,16 +632,23 @@ const LINKS_REFRESH_MS = 30 * 60_000;
  */
 function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
   const [own, setOwn] = useState<OwnRecordings | null>(null);
+  const [recap, setRecap] = useState<RecapStatus | null>(null);
+  // Bumped when the guest asks for the email: look again soon, even if the files were already ready.
+  const [asked, setAsked] = useState(0);
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const load = async () => {
       let next = READY_POLL_MS;
       try {
-        const got = await apiFetch<OwnRecordings>(`/sessions/${ticket.sessionId}/my-recordings`, { token: ticket.token });
+        const [got, mail] = await Promise.all([
+          apiFetch<OwnRecordings>(`/sessions/${ticket.sessionId}/my-recordings`, { token: ticket.token }),
+          apiFetch<RecapStatus>(`/sessions/${ticket.sessionId}/recap`, { token: ticket.token }),
+        ]);
         if (cancelled) return;
         setOwn(got);
-        if (got.recordings.every((r) => r.processing === "ready" || r.processing === "failed")) next = LINKS_REFRESH_MS;
+        setRecap(mail);
+        if (got.recordings.every((r) => r.processing === "ready" || r.processing === "failed") && mail.status !== "pending") next = LINKS_REFRESH_MS;
       } catch {
         // Offline for a moment: try again on the next round.
       }
@@ -649,44 +659,23 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [ticket]);
+  }, [ticket, asked]);
   if (!own) return null;
-  const several = own.recordings.length > 1;
 
   return (
     <>
       {own.downloads && own.recordings.length > 0 && (
         <div className="flex flex-col gap-3 border-t border-border pt-5" data-testid="own-recording">
           <h2 className="text-[17px] font-semibold">Your recording</h2>
-          {own.recordings.map((r) => (
-            <div key={r.number} className="flex flex-col gap-2">
-              {several && <span className="text-sm text-muted">Episode {r.number}</span>}
-              {r.processing === "ready" && r.files.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {r.files.map((f) => (
-                    <a
-                      key={f.url}
-                      href={f.url}
-                      data-file-name={f.fileName}
-                      className="inline-flex h-11 items-center gap-2 rounded-full border border-border-strong px-4 text-sm font-medium hover:border-muted"
-                    >
-                      {f.kind === "audio" ? "∿ Your audio" : "▶ Your video"}
-                      <span className="font-normal text-muted">
-                        {f.fileName.split(".").pop()!.toUpperCase()} · {mb(f.bytes)}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              ) : r.processing === "failed" ? (
-                <p className="text-sm text-muted">Your file couldn&apos;t be prepared here. The host has your recording.</p>
-              ) : (
-                <p className="flex items-center gap-2 text-sm text-muted">
-                  <StatusDot tone="warn" className="animate-rec-pulse" />
-                  Getting your file ready. Takes a few minutes; keep this page open to download it.
-                </p>
-              )}
-            </div>
-          ))}
+          <OwnFiles recordings={own.recordings} waiting="Getting your file ready. Takes a few minutes; keep this page open to download it." />
+          {recap?.enabled && <RecapEmail
+              ticket={ticket}
+              recap={recap}
+              onChange={(next) => {
+                setRecap(next);
+                setAsked((n) => n + 1);
+              }}
+            />}
         </div>
       )}
       {own.promoUrl && (
@@ -707,8 +696,6 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
     </>
   );
 }
-
-const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 
 function LocalUploadStatus({
   recording,

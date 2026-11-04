@@ -20,7 +20,7 @@
 - [ ] Transcripts (whisper.cpp CPU) with speaker = track.
 - [ ] Processing timeline UI (uploading → syncing → processing → ready).
 - [ ] AI producer alerts + talk balance; audio-only mode.
-- [ ] Guest tech-check link; guest end screen + recap email.
+- [x] Guest tech-check link; guest end screen + recap email.
 - [ ] Free pages: mic & camera test, upload-speed check (SEO from day one).
 - [ ] Docker Compose self-host + docs + admin health page.
 - [ ] Landing page + waitlist; start building in public.

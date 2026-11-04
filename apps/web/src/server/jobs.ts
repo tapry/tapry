@@ -20,6 +20,7 @@ import {
 import type { Db, Queryable } from "./db";
 import { newId } from "./ids";
 import type { RecordingProgress } from "./processing";
+import { sendDueRecaps, sweepRecaps, type RecapMail } from "./recap";
 import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
 
 /** "Sam - audio.wav" or "Sam - audio.flac" → the speaker. */
@@ -57,6 +58,8 @@ export interface JobRunnerOptions {
    * upload URL signed before the delete has expired. Default: upload URL lifetime + 1 min.
    */
   purgeRepeatMs?: number;
+  /** Guests' recap emails; leave out when the server doesn't send email. */
+  mail?: RecapMail | null;
 }
 
 type JobType = "process_recording" | "transcribe_recording" | "purge_recording" | "purge_raw";
@@ -96,6 +99,7 @@ export class JobRunner {
   private current: JobRow | null = null;
   private beat: ReturnType<typeof setInterval> | undefined;
   private info: Promise<WorkerInfo> | undefined;
+  private nextRecapSweep = 0;
   /** This runner in the `workers` table. */
   readonly id = newId("wrk");
 
@@ -178,9 +182,23 @@ export class JobRunner {
             this.current = null;
           }
         }
+        if (!this.stopped) await this.recaps();
       } while (this.kicked && !this.stopped);
     } finally {
       this.busy = false;
+    }
+  }
+
+  /** Email is never why a recording's work stops: a problem here waits for the next poll. */
+  private async recaps() {
+    try {
+      if (this.opts.mail) await sendDueRecaps(this.db, this.opts.mail);
+      if (Date.now() >= this.nextRecapSweep) {
+        this.nextRecapSweep = Date.now() + 3_600_000;
+        await sweepRecaps(this.db);
+      }
+    } catch (err) {
+      console.error("[recap] failed:", err instanceof Error ? err.name : "unknown");
     }
   }
 

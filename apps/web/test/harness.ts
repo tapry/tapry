@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { createApiHandlers } from "../src/server/api";
 import { openDb } from "../src/server/db";
+import type { Mailer } from "../src/server/mail";
 import { ROUTES } from "../src/server/routes";
 import { createServices } from "../src/server/services";
 import type { PresignedPut, Storage, StoredObject } from "../src/server/storage";
@@ -82,13 +83,14 @@ const ROUTE_PATTERNS = ROUTES.map(([method, path, name]) => {
 });
 
 /** A fresh in-memory server: services, handlers, and a fetch that routes like Next.js. */
-export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; speedTestOrigins?: string[] } = {}) {
+export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; speedTestOrigins?: string[]; mailer?: Mailer } = {}) {
   const db = await openDb("pglite://memory");
   let clock = 1_000_000;
   const services = createServices(db, storage, {
     auth: { allowSignup: opts.allowSignup ?? false },
     now: () => clock,
     speedTestOrigins: opts.speedTestOrigins,
+    mailer: opts.mailer,
   });
   const api = createApiHandlers(async () => services);
 
@@ -162,8 +164,8 @@ export async function createServer(storage: Storage = new FakeStorage(), opts: {
  * The usual scene: an admin host with a studio open, one guest joined, a recording running.
  * `call` POSTs as the guest by default (pass a token, or null for none).
  */
-export async function setup(storage: Storage = new FakeStorage()) {
-  const server = await createServer(storage);
+export async function setup(storage: Storage = new FakeStorage(), opts: { mailer?: Mailer } = {}) {
+  const server = await createServer(storage, opts);
   const hostBrowser = server.client();
   await expectOk(hostBrowser.post("/auth/signup", { email: "host@example.com", name: "Host", password: "correct horse battery" }));
   const studio = (await expectOk(hostBrowser.post("/studios", { name: "My Podcast" }))).body;

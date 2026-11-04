@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- Recap email: guests can ask on their end screen for an email with a link to their own recording,
+  sent once it's processed. Off unless you set `SMTP_HOST`, `SMTP_FROM` and `APP_URL` (Docker Compose
+  sets `APP_URL` itself); see docs/self-hosting.md. Addresses are deleted once the email is sent.
+
 ## 0.2.0 (2 November 2026)
 
 Tapry (formerly OpenTake) 0.2.0: the AI producer (live alerts for distorting, silent, too quiet
