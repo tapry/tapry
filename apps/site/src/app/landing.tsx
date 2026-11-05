@@ -4,7 +4,7 @@
 // what the open-source app does today; the hosted cloud is labelled "coming soon".
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 
-const GITHUB = process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com/Mithrandiirr/opentake";
+const GITHUB = process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com/tapry/tapry";
 const SETUP_GUIDE = `${GITHUB}/blob/main/docs/self-hosting.md`;
 const BROWSERS = `${GITHUB}/blob/main/docs/browser-support.md`;
 /** Where the waitlist form posts (a form service that takes an `email` field). Unset: link to GitHub instead. */
