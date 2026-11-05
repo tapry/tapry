@@ -437,7 +437,7 @@ function ToolButton({
   );
 }
 
-/** One person's share of the talking in this episode (talk balance, host only). */
+/** One person's share of the talking in this recording (talk balance, host only). */
 function TalkShare({ share }: { share: number }) {
   const percent = Math.round(share * 100);
   return (
@@ -481,7 +481,7 @@ function HealthChips({ health, offsetMs }: { health: SessionState["health"][numb
   );
 }
 
-/** Copies the show's guest link; the room doesn't know it until asked. */
+/** Copies the studio's guest link; the room doesn't know it until asked. */
 async function copyInviteLink(studioId: string) {
   try {
     const { inviteCode } = await apiFetch<{ inviteCode: string }>(`/studios/${studioId}`);
@@ -499,7 +499,7 @@ function InviteButton({ studioId }: { studioId: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } else {
-      window.open(`/shows/${studioId}`, "_blank");
+      window.open(`/studios/${studioId}`, "_blank");
     }
   }
   return (
@@ -602,10 +602,10 @@ function EndedView({
         )}
         {isHost && studioId && (
           <a
-            href={`/shows/${studioId}`}
+            href={`/studios/${studioId}`}
             className={cn("flex h-[54px] items-center justify-center rounded-xl text-[17px] font-semibold text-white hover:opacity-90", allDone ? "bg-accent" : "bg-[#2b2424]")}
           >
-            Go to your show
+            Go to your studio
           </a>
         )}
         {!isHost && (
@@ -627,7 +627,7 @@ const READY_POLL_MS = 5_000;
 const LINKS_REFRESH_MS = 30 * 60_000;
 
 /**
- * The guest's own recording once it's processed (if the show allows it), and the "record your
+ * The guest's own recording once it's processed (if the studio allows it), and the "record your
  * own" link (if the server sets one).
  */
 function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
@@ -688,7 +688,7 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
         >
           <span className="text-[15px] font-semibold text-accent-strong">Record your own, free →</span>
           <span className="text-sm text-text-2">
-            Podcasts and interviews in full quality, everyone recorded on their own computer. Open source, and you can run it
+            Podcasts, interviews and video in full quality, everyone recorded on their own computer. Open source, and you can run it
             yourself.
           </span>
         </a>

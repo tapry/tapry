@@ -1,4 +1,4 @@
-// Consent per show: the host writes what guests agree to, guests see exactly that, and each
+// Consent per studio: the host writes what guests agree to, guests see exactly that, and each
 // guest's agreement is kept with the text (by its SHA-256) and the time, in the consent record.
 import { createHash } from "node:crypto";
 import { randomBytes } from "node:crypto";
@@ -8,7 +8,7 @@ test.skip(({ browserName }) => browserName !== "chromium", "the same in every en
 
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 
-test("guests agree to the show's own consent text, and the record says who agreed to what", async ({ page: host, browser }) => {
+test("guests agree to the studio's own consent text, and the record says who agreed to what", async ({ page: host, browser }) => {
   await signInHost(host);
   const { studioUrl, inviteUrl } = await createStudio(host, `Consent ${randomBytes(2).toString("hex")}`);
 
@@ -55,7 +55,7 @@ test("guests agree to the show's own consent text, and the record says who agree
   const href = await host.getByTestId("consent-record").first().getAttribute("href");
   const record = await host.evaluate(async (url) => (await fetch(url!)).text(), href);
   const second = "I agree to take part in this interview.\nQuotes may be used without my name.";
-  expect(record).toMatch(/^Consent record: Consent [0-9a-f]{4}, Episode 1\n/);
+  expect(record).toMatch(/^Consent record: Consent [0-9a-f]{4}, Recording 1\n/);
   expect(record).toMatch(new RegExp(`Ana Guest \\(guest\\): agreed \\d{4}-[\\d-]+T[\\d:]+Z, to text SHA-256 ${sha256(second)}`));
   expect(record).toContain(`Text SHA-256 ${sha256(second)}:\n${second}`);
   expect(record).not.toContain(first);

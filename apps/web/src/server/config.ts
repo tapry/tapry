@@ -33,7 +33,7 @@ const env = z.object({
   /** A crashed worker's job is picked up again after this long (running jobs renew it). */
   WORKER_LOCK_SECONDS: z.coerce.number().int().min(10).max(86_400).default(600),
   /**
-   * Delete each episode's original uploads this many days after its files are ready (0: right
+   * Delete each recording's original uploads this many days after its files are ready (0: right
    * away). The processed files stay. Unset (default): keep the originals.
    */
   RAW_RETENTION_DAYS: unsetIfEmpty(z.coerce.number().min(0).max(3650)),

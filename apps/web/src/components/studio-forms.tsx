@@ -1,7 +1,7 @@
 "use client";
 
-// Host-side forms around a show (a "studio" in the API): invite link, settings, enter,
-// delete, and logging out. Creating a show has its own page (new-show-form.tsx).
+// Host-side forms around a studio (a "studio" in the API): invite link, settings, enter,
+// delete, and logging out. Creating a studio has its own page (new-studio-form.tsx).
 import { defaultConsentText, type SessionTicket, type StudioSettings } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -74,7 +74,7 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   );
 }
 
-export function ShowSettingsForm({
+export function StudioSettingsForm({
   studioId,
   name,
   settings,
@@ -121,7 +121,7 @@ export function ShowSettingsForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6">
-      <Field label="Show name">
+      <Field label="Studio name">
         <Input name="name" defaultValue={name} required maxLength={100} />
       </Field>
       <fieldset className="flex flex-col gap-2">
@@ -194,9 +194,9 @@ export function ShowSettingsForm({
         name="levelLoudness"
         defaultChecked={settings.levelLoudness}
         label="Even out everyone's volume"
-        description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, podcast loudness). Only the volume changes, never how anyone sounds. Applies to episodes processed from now on."
+        description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, a common level for spoken audio). Only the volume changes, never how anyone sounds. Applies to recordings processed from now on."
       />
-      <Field label="Audio files" hint="For each person's audio. FLAC is the same sound at about half the size; a few older editors only open WAV. Applies to episodes processed from now on.">
+      <Field label="Audio files" hint="For each person's audio. FLAC is the same sound at about half the size; a few older editors only open WAV. Applies to recordings processed from now on.">
         <Select name="audioFormat" defaultValue={settings.audioFormat}>
           <option value="wav">WAV (opens anywhere)</option>
           <option value="flac">FLAC (lossless, about half the size)</option>
@@ -204,7 +204,7 @@ export function ShowSettingsForm({
       </Field>
       <Field
         label="What guests agree to"
-        hint="Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each guest's agreement is kept with the exact text and when they agreed (the episode's consent record). A change applies to guests who join from now on."
+        hint="Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each guest's agreement is kept with the exact text and when they agreed (the recording's consent record). A change applies to guests who join from now on."
       >
         <Textarea
           name="consentText"
@@ -218,7 +218,7 @@ export function ShowSettingsForm({
         name="guestDownloads"
         defaultChecked={settings.guestDownloads}
         label="Guests can download their own recording"
-        description="Once an episode is ready, each guest can download their own audio (and video) from the page they recorded on. Only their own, never anyone else's."
+        description="Once a recording is ready, each guest can download their own audio (and video) from the page they recorded on. Only their own, never anyone else's."
       />
       <div className="flex items-center gap-3.5">
         <Button type="submit">Save changes</Button>
@@ -257,24 +257,24 @@ export function OpenStudioButton({ studioId, live = false }: { studioId: string;
   );
 }
 
-export function DeleteShowButton({ studioId, name, episodes }: { studioId: string; name: string; episodes: number }) {
+export function DeleteStudioButton({ studioId, name, recordings }: { studioId: string; name: string; recordings: number }) {
   const router = useRouter();
   return (
     <ConfirmAction
-      label="Delete show…"
+      label="Delete studio…"
       trigger="button"
       testId="delete-studio"
       question={
         <>
           Delete “{name}”
-          {episodes > 0 && ` and its ${episodes} episode${episodes === 1 ? "" : "s"}`}? Guests in it are disconnected and
+          {recordings > 0 && ` and its ${recordings} recording${recordings === 1 ? "" : "s"}`}? Guests in it are disconnected and
           the files are removed from the server. This can&apos;t be undone.
         </>
       }
-      confirmLabel="Delete show"
+      confirmLabel="Delete studio"
       action={async () => {
         await apiFetch(`/studios/${studioId}`, { method: "DELETE" });
-        router.replace("/shows");
+        router.replace("/studios");
         router.refresh();
       }}
     />

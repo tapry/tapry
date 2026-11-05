@@ -5,69 +5,69 @@ import { apiFetch } from "@/lib/client/api";
 import { formatBytes, formatClock } from "@/lib/format";
 import type { RecordingSummary } from "@/server/processing";
 import type { Studio, TechCheck } from "@/server/studios";
-import { EpisodeList, settled } from "./episode-list";
-import { DeleteShowButton, InviteLink, OpenStudioButton, ShowSettingsForm } from "./studio-forms";
+import { RecordingList, settled } from "./recording-list";
+import { DeleteStudioButton, InviteLink, OpenStudioButton, StudioSettingsForm } from "./studio-forms";
 import { Card, cn, Eyebrow } from "./ui";
 
-type Tab = "episodes" | "settings" | "space";
+type Tab = "recordings" | "settings" | "space";
 
-/** One show: its header, numbers, and the Episodes / Settings / Space used tabs. */
-export function ShowView({
-  show,
-  episodes: initial,
+/** One studio: its header, numbers, and the Recordings / Settings / Space used tabs. */
+export function StudioView({
+  studio,
+  recordings: initial,
   checks,
-  shows,
+  studios,
   hostName,
 }: {
-  show: Studio;
+  studio: Studio;
   hostName: string;
-  episodes: RecordingSummary[];
+  recordings: RecordingSummary[];
   checks: TechCheck[];
-  shows: Array<{ id: string; name: string; bytes: number }>;
+  studios: Array<{ id: string; name: string; bytes: number }>;
 }) {
-  const [tab, setTab] = useState<Tab>("episodes");
-  const [episodes, setEpisodes] = useState(initial);
-  useEffect(() => setEpisodes(initial), [initial]);
-  const now = useNow(episodes.some((e) => e.status === "recording") ? 1000 : null);
+  const [tab, setTab] = useState<Tab>("recordings");
+  const [recordings, setRecordings] = useState(initial);
+  useEffect(() => setRecordings(initial), [initial]);
+  const now = useNow(recordings.some((e) => e.status === "recording") ? 1000 : null);
 
   // Keep the list fresh while anything is recording, uploading or processing.
-  const inFlight = episodes.some((e) => !settled(e));
+  const inFlight = recordings.some((e) => !settled(e));
   useEffect(() => {
     if (!inFlight) return;
     const id = setInterval(async () => {
       try {
-        setEpisodes((await apiFetch<{ recordings: RecordingSummary[] }>(`/studios/${show.id}/recordings`)).recordings);
+        setRecordings((await apiFetch<{ recordings: RecordingSummary[] }>(`/studios/${studio.id}/recordings`)).recordings);
       } catch {
         // Keep showing the last known state; the next poll retries.
       }
     }, 3000);
     return () => clearInterval(id);
-  }, [show.id, inFlight]);
+  }, [studio.id, inFlight]);
 
-  const live = episodes.find((e) => e.status === "recording");
-  const ready = episodes.filter((e) => e.processing === "ready").length;
-  const recordedMs = episodes.reduce((n, e) => n + ((e.stoppedAt ?? now) - e.startedAt), 0);
-  const bytes = episodes.reduce((n, e) => n + e.bytes, 0);
+  const live = recordings.find((e) => e.status === "recording");
+  const ready = recordings.filter((e) => e.processing === "ready").length;
+  const recordedMs = recordings.reduce((n, e) => n + ((e.stoppedAt ?? now) - e.startedAt), 0);
+  const bytes = recordings.reduce((n, e) => n + e.bytes, 0);
 
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="flex flex-col gap-2">
-          <Eyebrow>Show</Eyebrow>
-          <h1 className="text-[clamp(30px,3.4vw,42px)] leading-[1.05] font-medium tracking-[-.02em]">{show.name}</h1>
+          <Eyebrow>Studio</Eyebrow>
+          <h1 className="text-[clamp(30px,3.4vw,42px)] leading-[1.05] font-medium tracking-[-.02em]">{studio.name}</h1>
           <span className="text-[15px] text-pretty text-muted">
-            {show.settings.audioOnly ? "Audio only" : show.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {show.settings.maxGuests}{" "}
-            guest{show.settings.maxGuests === 1 ? "" : "s"} · started{" "}
-            {new Date(show.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+            {studio.settings.audioOnly ? "Audio only" : studio.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {studio.settings.maxGuests}{" "}
+            guest{studio.settings.maxGuests === 1 ? "" : "s"} · started{" "}
+            {new Date(studio.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </span>
         </div>
-        <OpenStudioButton studioId={show.id} live={!!live} />
+        <OpenStudioButton studioId={studio.id} live={!!live} />
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,135px),1fr))] gap-3">
-        <Stat label="Episodes" value={String(episodes.length)} sub={`${ready} ready to download`} />
+        <Stat label="Recordings" value={String(recordings.length)} sub={`${ready} ready to download`} />
         <Stat label="Time recorded" value={`${(recordedMs / 3_600_000).toFixed(1)} h`} sub="no limits on hours" />
-        <Stat label="Space used" value={formatBytes(bytes)} sub="by this show" testId="studio-bytes" />
+        <Stat label="Space used" value={formatBytes(bytes)} sub="by this studio" testId="studio-bytes" />
         <Stat
           label="Live now"
           value={live ? formatClock(now - live.startedAt) : "—"}
@@ -76,10 +76,10 @@ export function ShowView({
         />
       </div>
 
-      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Show sections">
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Studio sections">
         {(
           [
-            ["episodes", "Episodes"],
+            ["recordings", "Recordings"],
             ["settings", "Settings"],
             ["space", "Space used"],
           ] as const
@@ -99,7 +99,7 @@ export function ShowView({
         ))}
       </div>
 
-      {tab === "episodes" && (
+      {tab === "recordings" && (
         <>
           <Card className="flex flex-col gap-3.5">
             <div className="flex flex-col gap-1">
@@ -109,15 +109,15 @@ export function ShowView({
                 They can join once you&apos;ve entered the studio.
               </p>
             </div>
-            <InviteLink studioId={show.id} inviteCode={show.inviteCode} />
+            <InviteLink studioId={studio.id} inviteCode={studio.inviteCode} />
           </Card>
           {checks.length > 0 && <TechChecks checks={checks} />}
-          <EpisodeList
-            showId={show.id}
-            episodes={episodes}
+          <RecordingList
+            studioId={studio.id}
+            recordings={recordings}
             now={now}
-            levelLoudness={show.settings.levelLoudness}
-            onChange={setEpisodes}
+            levelLoudness={studio.settings.levelLoudness}
+            onChange={setRecordings}
           />
         </>
       )}
@@ -125,20 +125,20 @@ export function ShowView({
       {tab === "settings" && (
         <>
           <Card className="flex max-w-[760px] flex-col gap-6 p-7">
-            <h2 className="text-[19px] font-semibold">Show settings</h2>
-            <ShowSettingsForm studioId={show.id} name={show.name} settings={show.settings} hostName={hostName} />
+            <h2 className="text-[19px] font-semibold">Studio settings</h2>
+            <StudioSettingsForm studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} />
           </Card>
           <section className="flex max-w-[760px] flex-wrap items-center justify-between gap-4 rounded-xl border border-dashed border-accent-line px-7 py-6">
             <span className="flex flex-col gap-1">
-              <span className="text-[17px] font-semibold">Delete this show</span>
-              <span className="text-sm text-muted">Removes the show, its invite link and every episode in it, including the files.</span>
+              <span className="text-[17px] font-semibold">Delete this studio</span>
+              <span className="text-sm text-muted">Removes the studio, its invite link and every recording in it, including the files.</span>
             </span>
-            <DeleteShowButton studioId={show.id} name={show.name} episodes={episodes.length} />
+            <DeleteStudioButton studioId={studio.id} name={studio.name} recordings={recordings.length} />
           </section>
         </>
       )}
 
-      {tab === "space" && <SpaceUsed shows={shows} />}
+      {tab === "space" && <SpaceUsed studios={studios} />}
     </>
   );
 }
@@ -160,21 +160,21 @@ function Stat({ label, value, sub, live, testId }: { label: string; value: strin
 
 const BAR_COLORS = ["bg-accent", "bg-ink", "bg-muted", "bg-warn", "bg-ok"];
 
-function SpaceUsed({ shows }: { shows: Array<{ id: string; name: string; bytes: number }> }) {
-  const total = shows.reduce((n, s) => n + s.bytes, 0);
+function SpaceUsed({ studios }: { studios: Array<{ id: string; name: string; bytes: number }> }) {
+  const total = studios.reduce((n, s) => n + s.bytes, 0);
   return (
     <Card className="flex flex-col gap-5 p-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-[19px] font-semibold">Space used by your shows</h2>
+        <h2 className="text-[19px] font-semibold">Space used by your studios</h2>
         <span className="text-[15px] text-muted">{formatBytes(total)} in total</span>
       </div>
       <div className="flex h-3.5 overflow-hidden rounded-full bg-border" aria-hidden>
-        {shows.map((s, i) => (
+        {studios.map((s, i) => (
           <div key={s.id} className={BAR_COLORS[i % BAR_COLORS.length]} style={{ width: `${total ? (s.bytes / total) * 100 : 0}%` }} />
         ))}
       </div>
       <ul className="flex flex-col">
-        {shows.map((s, i) => (
+        {studios.map((s, i) => (
           <li key={s.id} className="flex justify-between gap-3 border-b border-border py-3.5 text-[15px] last:border-0">
             <span className="flex items-center gap-2.5">
               <span className={cn("size-2.5 rounded-[3px]", BAR_COLORS[i % BAR_COLORS.length])} />
@@ -186,7 +186,7 @@ function SpaceUsed({ shows }: { shows: Array<{ id: string; name: string; bytes: 
       </ul>
       <p className="text-sm text-muted">
         Tip: each person recorded in Full HD adds about 3.6 GB per hour (1.8 GB in Standard), plus the processed files.
-        Deleting an episode frees its space right away.
+        Deleting a recording frees its space right away.
       </p>
     </Card>
   );

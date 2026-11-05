@@ -1,6 +1,6 @@
 // The guest tech check: the host sends the link before the session, the guest tests their setup
 // (devices, browser, upload speed, a test recording played back) and sends the results, which
-// the host then sees on the show page.
+// the host then sees on the studio page.
 import { randomBytes } from "node:crypto";
 import { createStudio, expect, signInHost, test } from "./fixtures";
 

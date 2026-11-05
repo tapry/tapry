@@ -24,7 +24,7 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
         <>
           <div className="flex flex-col gap-1.5">
             <h1 className="text-[clamp(28px,3.4vw,38px)] leading-[1.08] font-bold tracking-[-.02em]">Your recording</h1>
-            <p className="text-[15px] text-text-2">From {participant.showName}. These are your files only, recorded on your own device.</p>
+            <p className="text-[15px] text-text-2">From {participant.studioName}. These are your files only, recorded on your own device.</p>
           </div>
           <div className="flex flex-col gap-3" data-testid="own-recording">
             <OwnFiles recordings={own.recordings} waiting="Getting your file ready. Takes a few minutes; reload this page to check." />

@@ -23,7 +23,7 @@ export function SessionClient({ sessionId }: { sessionId: string }) {
       <div className="mx-auto max-w-xl px-5 py-16">
         <Notice tone="warn">
           This browser isn&apos;t part of this session. Guests: open the invite link your host sent you. Hosts: enter the
-          studio from your show&apos;s page.
+          studio from your studio&apos;s page.
         </Notice>
       </div>
     );

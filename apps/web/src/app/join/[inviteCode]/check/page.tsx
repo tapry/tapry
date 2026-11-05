@@ -16,10 +16,10 @@ export default async function TechCheckPage({ params }: { params: Promise<{ invi
       {preview ? (
         <>
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-[clamp(26px,3vw,34px)] leading-[1.1] font-bold tracking-[-.02em]">Test your setup for {preview.showName}</h1>
+            <h1 className="text-[clamp(26px,3vw,34px)] leading-[1.1] font-bold tracking-[-.02em]">Test your setup for {preview.studioName}</h1>
             <p className="max-w-[640px] text-[15px] text-text-2">
               {preview.hostName} asked you to check your browser, {preview.settings.audioOnly ? "microphone" : "camera, microphone"} and
-              connection before the session. Nothing here is recorded for the show.
+              connection before the session. Nothing here is recorded for the studio.
             </p>
           </div>
           <TechCheck inviteCode={inviteCode} hostName={preview.hostName} settings={preview.settings} />

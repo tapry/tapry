@@ -60,7 +60,7 @@ const PREVIEWS: Record<FileKey, { title: string; size: string; lines: Array<[str
 };
 
 const TREE: Array<{ kind: "folder" | "item"; label: string; depth: number; icon: string; file: FileKey | null }> = [
-  { kind: "folder", label: "Episode 41", depth: 0, icon: "▾", file: null },
+  { kind: "folder", label: "Recording 41", depth: 0, icon: "▾", file: null },
   { kind: "folder", label: "Audio", depth: 1, icon: "▾", file: null },
   { kind: "item", label: "Yasmine", depth: 2, icon: "∿", file: "audio" },
   { kind: "item", label: "Tom", depth: 2, icon: "∿", file: "audio" },
@@ -164,15 +164,16 @@ export function Landing() {
       {/* Hero */}
       <section style={{ padding: "84px 28px 0", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 30 }}>
         <h1 style={{ margin: 0, fontWeight: 700, fontSize: "clamp(44px,6.8vw,92px)", lineHeight: 1.02, letterSpacing: "-.04em", maxWidth: 1080, textWrap: "balance" }}>
-          Podcast recording for people who’d rather be talking.
+          Remote recording for people who’d rather be talking.
         </h1>
         <p style={{ margin: 0, fontSize: "clamp(19px,1.9vw,25px)", color: "#6e6e73", maxWidth: 760, textWrap: "pretty" }}>
-          Because great conversations make great <em style={{ fontStyle: "italic", color: "#1d1d1f" }}>episodes</em>, and nobody should
+          Because great conversations make great <em style={{ fontStyle: "italic", color: "#1d1d1f" }}>recordings</em>, and nobody should
           lose one to bad Wi-Fi.
         </p>
+        <p style={{ margin: 0, fontSize: 16, color: "#6e6e73" }}>Podcasts · Interviews · Research · Video content · Transcripts</p>
         <a href="#pricing" className="cta" style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: "20px 34px", borderRadius: 14, background: "#e8553d", color: "#ffffff", fontWeight: 600, fontSize: 19, boxShadow: "0 10px 24px -10px rgba(232,85,61,.7)" }}>
           <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffffff", boxShadow: "0 0 0 4px rgba(255,255,255,.3)" }} />
-          Start your first episode
+          Start your first recording
         </a>
         <span style={{ fontSize: 14, color: "#8e8e93", marginTop: -12 }}>
           Free and open source · Works in Chrome, Safari, Edge and Firefox (<a href={BROWSERS} style={{ color: "#8e8e93", textDecoration: "underline" }}>what we test</a>)
@@ -259,7 +260,7 @@ export function Landing() {
       {/* Light features */}
       <section id="features" style={{ borderTop: "1px solid #efeff1", padding: "120px 28px" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
-          <SectionHead eyebrow="FOR SHOWS, NOT MEETINGS" title="Built for recording, not for meetings" eyebrowColor="#e8553d">
+          <SectionHead eyebrow="NOT ANOTHER MEETING APP" title="Built for recording, not for meetings" eyebrowColor="#e8553d">
             Video-call apps squeeze everyone down to save bandwidth. Tapry records every person in full quality, right on their own computer.
           </SectionHead>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,520px),1fr))", gap: 20 }}>
@@ -332,7 +333,7 @@ export function Landing() {
       {/* Dark: after you press Stop */}
       <section id="after" style={{ background: "#0b0b0d", color: "#f5f5f7", padding: "110px 28px 60px" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
-          <SectionHead eyebrow="AFTER YOU PRESS STOP" title="Your episode, ready before your coffee" eyebrowColor="#ff7a5f" dark>
+          <SectionHead eyebrow="AFTER YOU PRESS STOP" title="Your recording, ready before your coffee" eyebrowColor="#ff7a5f" dark>
             Tapry lines everyone up, evens out the volume and writes a transcript, then hands you a tidy folder.
           </SectionHead>
           <div style={{ position: "relative", borderRadius: 30, background: "#1c1c1f", overflow: "hidden", padding: "clamp(28px,5vw,72px) clamp(18px,4vw,56px)" }}>
@@ -351,7 +352,7 @@ export function Landing() {
                   and we take it from there
                 </span>
               </div>
-              <Window title="Episode 41">
+              <Window title="Recording 41">
                 <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 2, fontSize: 16 }}>
                   {TREE.map((n) => {
                     const on = n.file !== null && file === n.file && (n.file !== "audio" || n.label === "Ines");
@@ -432,7 +433,7 @@ export function Landing() {
             <span style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".12em", color: "#d4472f" }}>ON YOUR OWN SERVER</span>
             <span style={{ fontSize: 60, fontWeight: 700, letterSpacing: "-.04em", lineHeight: 1 }}>Free</span>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: "#55555a" }}>
-              Unlimited episodes, hours and guests. Your recordings stay on hardware you control. You’ll need someone technical to set it up once.
+              Unlimited recordings, hours and guests. Your recordings stay on hardware you control. You’ll need someone technical to set it up once.
             </p>
             <a href={SETUP_GUIDE} className="dark-btn" style={{ alignSelf: "flex-start", marginTop: 8, padding: "14px 24px", borderRadius: 12, background: "#1d1d1f", color: "#ffffff", fontWeight: 600 }}>
               Read the setup guide

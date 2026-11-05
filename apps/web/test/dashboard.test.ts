@@ -4,7 +4,7 @@ import { expectOk, setup } from "./harness";
 const MIME = "audio/webm;codecs=opus";
 
 describe("dashboard data", () => {
-  it("numbers episodes per show, in order, and never reuses a deleted episode's number", async () => {
+  it("numbers recordings per studio, in order, and never reuses a deleted recording's number", async () => {
     const t = await setup();
     const host = t.client({ token: t.host.token });
     const record = async () => {
@@ -12,7 +12,7 @@ describe("dashboard data", () => {
       await expectOk(host.post(`/sessions/${t.sessionId}/recordings/${id}/stop`));
       return id;
     };
-    await expectOk(host.post(`/sessions/${t.sessionId}/recordings/${t.recordingId}/stop`)); // episode 1
+    await expectOk(host.post(`/sessions/${t.sessionId}/recordings/${t.recordingId}/stop`)); // recording 1
     const second = await record();
     await expectOk(t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${second}`));
     await record();
@@ -21,14 +21,14 @@ describe("dashboard data", () => {
     expect(recordings.map((r: { number: number }) => r.number)).toEqual([3, 1]);
 
     // Another show starts at 1.
-    const other = (await expectOk(t.hostBrowser.post("/studios", { name: "Other show" }))).body;
+    const other = (await expectOk(t.hostBrowser.post("/studios", { name: "Other studio" }))).body;
     const otherHost = (await expectOk(t.hostBrowser.post(`/studios/${other.id}/open`))).body;
     await expectOk(t.client({ token: otherHost.token }).post(`/sessions/${otherHost.sessionId}/recordings`));
     const { recordings: otherList } = (await expectOk(t.hostBrowser.get(`/studios/${other.id}/recordings`))).body;
     expect(otherList.map((r: { number: number }) => r.number)).toEqual([1]);
   });
 
-  it("lists who recorded in each episode, host first, with how far their upload got", async () => {
+  it("lists who recorded in each recording, host first, with how far their upload got", async () => {
     const t = await setup();
     const register = async (token: string) =>
       (
@@ -47,7 +47,7 @@ describe("dashboard data", () => {
     ]);
   });
 
-  it("marks a show live while it records", async () => {
+  it("marks a studio live while it records", async () => {
     const t = await setup();
     const live = async () => (await expectOk(t.hostBrowser.get("/studios"))).body.studios[0].live;
     expect(await live()).toBe(true);
@@ -55,9 +55,9 @@ describe("dashboard data", () => {
     expect(await live()).toBe(false);
   });
 
-  it("shows guests the show and who invited them, and nothing for a dead link", async () => {
+  it("shows guests the studio and who invited them, and nothing for a dead link", async () => {
     const t = await setup();
-    expect(await t.services.studios.invitePreview(t.studio.inviteCode)).toMatchObject({ showName: "My Podcast", hostName: "Host", settings: { audioOnly: false } });
+    expect(await t.services.studios.invitePreview(t.studio.inviteCode)).toMatchObject({ studioName: "My Podcast", hostName: "Host", settings: { audioOnly: false } });
     expect(await t.services.studios.invitePreview("not-a-real-code")).toBeNull();
     await expectOk(t.client({ token: t.host.token }).post(`/sessions/${t.sessionId}/recordings/${t.recordingId}/stop`));
     await expectOk(t.hostBrowser.del(`/studios/${t.studio.id}`));

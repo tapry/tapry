@@ -76,7 +76,7 @@ describe("zip download", () => {
       { name: "Transcript.txt", size: 19, text: "[00:00] Zoë: hello" },
     ]);
     // Last, the consent record, made on the spot (not from storage).
-    expect(entries[3]).toMatchObject({ name: "Consent record - Episode 1.txt", text: expect.stringMatching(/^Consent record: My Podcast, Episode 1/) });
+    expect(entries[3]).toMatchObject({ name: "Consent record - Recording 1.txt", text: expect.stringMatching(/^Consent record: My Podcast, Recording 1/) });
     expect(entries).toHaveLength(4);
     expect(storage.reads).toHaveLength(3);
   });

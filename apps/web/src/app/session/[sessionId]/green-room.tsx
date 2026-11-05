@@ -123,7 +123,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   );
 }
 
-/** Microphone and camera pickers (no camera in an audio-only show). Also used by the tech check. */
+/** Microphone and camera pickers (no camera in an audio-only studio). Also used by the tech check. */
 export function DevicePickers({
   settings,
   devices,
@@ -234,7 +234,7 @@ export function Preview({
       {!hasVideo && (
         <div className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-text-2">
           {audioOnly
-            ? "This show is sound only: just your microphone is recorded"
+            ? "This studio is sound only: just your microphone is recorded"
             : cameraOff
               ? "Camera off. You'll be recorded with audio only"
               : stream

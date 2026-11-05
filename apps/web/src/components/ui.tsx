@@ -184,7 +184,7 @@ export function StatusPill({
   );
 }
 
-/** Small mono uppercase label above headings ("SHOW", "BEFORE YOU GO IN"). */
+/** Small mono uppercase label above headings ("STUDIO", "BEFORE YOU GO IN"). */
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return <span className={cn("font-mono text-xs tracking-[.12em] text-accent-strong uppercase", className)}>{children}</span>;
 }

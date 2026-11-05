@@ -17,7 +17,7 @@ export function JoinForm({
 }: {
   inviteCode: string;
   hostName: string;
-  /** The show's consent text, exactly as agreed to, and its SHA-256 (sent along, checked by the server). */
+  /** The studio's consent text, exactly as agreed to, and its SHA-256 (sent along, checked by the server). */
   consentText: string;
   consentHash: string;
 }) {

@@ -6,37 +6,37 @@ import type { StudioWithUsage } from "@/server/studios";
 import { LogOutButton } from "./studio-forms";
 import { Avatar, cn, Logo, StatusDot } from "./ui";
 
-/** The host's dashboard frame: shows in a sidebar, breadcrumb and account in the header. */
+/** The host's dashboard frame: studios in a sidebar, breadcrumb and account in the header. */
 export function DashboardShell({
   user,
-  shows,
+  studios,
   currentId,
   title,
   children,
 }: {
   user: User;
-  shows: StudioWithUsage[];
+  studios: StudioWithUsage[];
   currentId?: string;
   title?: string;
   children: ReactNode;
 }) {
-  const total = shows.reduce((n, s) => n + s.bytes, 0);
+  const total = studios.reduce((n, s) => n + s.bytes, 0);
   return (
     <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[minmax(210px,248px)_minmax(0,1fr)]">
       <aside className="flex flex-col border-b border-border bg-surface-2 lg:sticky lg:top-0 lg:h-dvh lg:border-r lg:border-b-0">
-        <Link href="/shows" className="flex h-[68px] shrink-0 items-center border-b border-border px-[22px] text-text">
+        <Link href="/studios" className="flex h-[68px] shrink-0 items-center border-b border-border px-[22px] text-text">
           <Logo />
         </Link>
-        <div className="px-[22px] pt-[22px] pb-2 font-mono text-[11px] tracking-[.08em] text-subtle">YOUR SHOWS</div>
-        <nav className="flex flex-col gap-0.5 overflow-y-auto px-3 pb-3" aria-label="Shows">
-          {shows.map((s) => {
+        <div className="px-[22px] pt-[22px] pb-2 font-mono text-[11px] tracking-[.08em] text-subtle">YOUR STUDIOS</div>
+        <nav className="flex flex-col gap-0.5 overflow-y-auto px-3 pb-3" aria-label="Studios">
+          {studios.map((s) => {
             const on = s.id === currentId;
             return (
               <Link
                 key={s.id}
-                href={`/shows/${s.id}`}
+                href={`/studios/${s.id}`}
                 aria-current={on ? "page" : undefined}
-                data-testid="show-link"
+                data-testid="studio-link"
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-[15px] text-text",
                   on ? "border-border-strong bg-surface font-semibold" : "border-transparent hover:bg-surface",
@@ -49,10 +49,10 @@ export function DashboardShell({
             );
           })}
           <Link
-            href="/shows/new"
+            href="/studios/new"
             className="mt-1.5 rounded-lg border border-dashed border-border-strong px-3 py-2.5 text-[15px] font-medium text-muted hover:border-muted hover:text-text"
           >
-            + New show
+            + New studio
           </Link>
         </nav>
         <div className="mt-auto hidden flex-col gap-2.5 border-t border-border px-[22px] py-5 text-sm lg:flex">
@@ -63,7 +63,7 @@ export function DashboardShell({
             </span>
           </span>
           <span className="text-[13px] text-subtle">
-            across {shows.length} show{shows.length === 1 ? "" : "s"}
+            across {studios.length} studio{studios.length === 1 ? "" : "s"}
           </span>
           {user.isAdmin && (
             <Link href="/admin/health" className="mt-1 text-[13px] text-muted hover:text-text">
@@ -76,7 +76,7 @@ export function DashboardShell({
       <div className="flex min-w-0 flex-col">
         <header className="flex h-[68px] items-center justify-between gap-4 border-b border-border px-5 sm:px-8">
           <span className="min-w-0 flex-1 truncate text-[15px] text-muted">
-            Shows
+            Studios
             {title && (
               <>
                 <span className="mx-1.5">/</span>

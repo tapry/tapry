@@ -2,13 +2,13 @@
 
 // The free upload-speed check. Test data goes to a Tapry server's public speed test
 // (NEXT_PUBLIC_SPEED_TEST_URL, whose SPEED_TEST_ORIGINS must include this site) and is thrown
-// away there. The measuring and the per-show needs are copied from the app
+// away there. The measuring and the per-studio needs are copied from the app
 // (apps/web/src/lib/client/tech-check.ts: measureUpload, neededMbps); keep them in step.
 import { useState, type CSSProperties } from "react";
 
 export const SPEED_TEST_URL = process.env.NEXT_PUBLIC_SPEED_TEST_URL;
 
-/** Mbit/s each kind of show sends while recording: the recording plus the live call. */
+/** Mbit/s each kind of studio sends while recording: the recording plus the live call. */
 const NEEDS = [
   { kind: "Sound only", mbps: 0.18 },
   { kind: "Standard video (720p)", mbps: 5.0 },

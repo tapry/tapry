@@ -137,7 +137,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       if (!user.isAdmin) throw new ApiError(404, "not_found", "Not found");
       return json(200, await svc.health.report());
     }),
-    /** Who agreed to be recorded in an episode, when, and to which text: a plain-text file. */
+    /** Who agreed to be recorded in a recording, when, and to which text: a plain-text file. */
     consentRecord: asUser(async (svc, user, _req, params) => {
       const { fileName, body } = await svc.processing.consentRecord(user, params.studioId!, params.recordingId!);
       return new Response(body, {

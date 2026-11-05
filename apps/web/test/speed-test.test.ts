@@ -68,7 +68,7 @@ describe("speed-test pieces", () => {
     expect(clientAddress(req())).toBe("direct");
   });
 
-  it("says which kinds of show a line keeps up with", () => {
+  it("says which kinds of studio a line keeps up with", () => {
     expect(uploadVerdicts(3).map((v) => [v.kind, v.ok])).toEqual([
       ["Sound only", true],
       ["Standard video (720p)", false],

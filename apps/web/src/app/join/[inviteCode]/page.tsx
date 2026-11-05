@@ -18,7 +18,7 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
               <Avatar name={preview.hostName} className="size-14 text-lg ring-[3px] ring-accent-line ring-offset-2 ring-offset-surface" />
               <span className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted">{preview.hostName} invited you to</span>
-                <h1 className="text-2xl font-bold tracking-[-.02em]">{preview.showName}</h1>
+                <h1 className="text-2xl font-bold tracking-[-.02em]">{preview.studioName}</h1>
               </span>
             </div>
             <p className="text-[15px] leading-relaxed text-text-2">
@@ -38,7 +38,7 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
           <>
             <h1 className="text-2xl font-bold tracking-[-.02em]">This invite link doesn&apos;t work</h1>
             <p className="text-[15px] leading-relaxed text-text-2">
-              It may have been replaced with a new one, or the show was deleted. Ask your host to send you the current link.
+              It may have been replaced with a new one, or the studio was deleted. Ask your host to send you the current link.
             </p>
           </>
         )}

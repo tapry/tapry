@@ -6,16 +6,16 @@ import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { formatBytes, formatClock, formatDuration, formatWhen } from "@/lib/format";
 import type { RecordingSummary } from "@/server/processing";
 import { ConfirmAction } from "./confirm-action";
-import { EpisodeTimeline } from "./episode-timeline";
+import { RecordingTimeline } from "./recording-timeline";
 import { Button, Card, cn, Notice, StatusDot, StatusPill } from "./ui";
 
-type Episode = RecordingSummary;
+type Recording = RecordingSummary;
 
 /** Nothing more will change without someone acting: no polling needed. */
-export const settled = (e: Episode) =>
+export const settled = (e: Recording) =>
   (e.processing === "ready" || e.processing === "failed") && e.transcript !== "queued" && e.transcript !== "processing";
 
-function phase(e: Episode) {
+function phase(e: Recording) {
   if (e.status === "recording") return { tone: "live", label: "Recording now" } as const;
   if (e.processing === "ready") return { tone: "ok", label: "Ready to download" } as const;
   if (e.processing === "failed") return { tone: "danger", label: "Something went wrong" } as const;
@@ -23,62 +23,62 @@ function phase(e: Episode) {
   return { tone: "warn", label: e.incompleteTracks ? "Waiting for a guest" : "Finishing uploads" } as const;
 }
 
-/** A show's episodes, newest first. The newest is open; click a row to open or close it. */
-export function EpisodeList({
-  showId,
-  episodes,
+/** A studio's recordings, newest first. The newest is open; click a row to open or close it. */
+export function RecordingList({
+  studioId,
+  recordings,
   now,
   levelLoudness,
   onChange,
 }: {
-  showId: string;
-  episodes: Episode[];
+  studioId: string;
+  recordings: Recording[];
   now: number;
   levelLoudness: boolean;
-  onChange: (update: (list: Episode[]) => Episode[]) => void;
+  onChange: (update: (list: Recording[]) => Recording[]) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState<string | null>(episodes[0]?.id ?? null);
+  const [open, setOpen] = useState<string | null>(recordings[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
 
-  async function processNow(e: Episode) {
+  async function processNow(e: Recording) {
     setError(null);
     try {
-      await apiFetch(`/studios/${showId}/recordings/${e.id}/process`, { body: {} });
+      await apiFetch(`/studios/${studioId}/recordings/${e.id}/process`, { body: {} });
       onChange((list) => list.map((x) => (x.id === e.id ? { ...x, processing: "queued" } : x)));
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Couldn't start processing.");
     }
   }
 
-  async function remove(e: Episode) {
-    await apiFetch(`/studios/${showId}/recordings/${e.id}`, { method: "DELETE" });
+  async function remove(e: Recording) {
+    await apiFetch(`/studios/${studioId}/recordings/${e.id}`, { method: "DELETE" });
     onChange((list) => list.filter((x) => x.id !== e.id));
-    router.refresh(); // the show's space used and the sidebar
+    router.refresh(); // the studio's space used and the sidebar
   }
 
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border px-6 py-5">
-        <h2 className="text-[19px] font-semibold">Episodes</h2>
-        <span className="text-sm text-muted">{formatBytes(episodes.reduce((n, e) => n + e.bytes, 0))} used</span>
+        <h2 className="text-[19px] font-semibold">Recordings</h2>
+        <span className="text-sm text-muted">{formatBytes(recordings.reduce((n, e) => n + e.bytes, 0))} used</span>
       </div>
       {error && <Notice tone="danger" className="m-4">{error}</Notice>}
-      {episodes.length === 0 ? (
+      {recordings.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
           <span className="grid size-14 place-items-center rounded-[10px] border border-dashed border-border-strong">
             <span className="size-3.5 rounded-full bg-accent" />
           </span>
-          <span className="text-[17px] font-semibold">No episodes yet</span>
-          <span className="text-[15px] text-muted">Enter the studio and press Record. Your episode will appear here.</span>
+          <span className="text-[17px] font-semibold">No recordings yet</span>
+          <span className="text-[15px] text-muted">Enter the studio and press Record. Your recording will appear here.</span>
         </div>
       ) : (
         <ul>
-          {episodes.map((e) => (
-            <EpisodeRow
+          {recordings.map((e) => (
+            <RecordingRow
               key={e.id}
-              showId={showId}
-              episode={e}
+              studioId={studioId}
+              recording={e}
               now={now}
               open={open === e.id}
               levelLoudness={levelLoudness}
@@ -93,9 +93,9 @@ export function EpisodeList({
   );
 }
 
-function EpisodeRow({
-  showId,
-  episode: e,
+function RecordingRow({
+  studioId,
+  recording: e,
   now,
   open,
   levelLoudness,
@@ -103,8 +103,8 @@ function EpisodeRow({
   onProcessNow,
   onRemove,
 }: {
-  showId: string;
-  episode: Episode;
+  studioId: string;
+  recording: Recording;
   now: number;
   open: boolean;
   levelLoudness: boolean;
@@ -126,7 +126,7 @@ function EpisodeRow({
       tone: "warn",
     };
   else if (e.processing === "failed")
-    note = { text: e.processingError ?? "We couldn't finish the files for this episode. Your recordings are safe; try again.", tone: "danger" };
+    note = { text: e.processingError ?? "We couldn't finish the files for this recording. Your recordings are safe; try again.", tone: "danger" };
 
   return (
     <li className="border-b border-border last:border-0" data-testid="recording">
@@ -140,7 +140,7 @@ function EpisodeRow({
         )}
       >
         <span className="flex min-w-[200px] flex-1 flex-col gap-[3px]">
-          <span className="text-base font-semibold">Episode {e.number}</span>
+          <span className="text-base font-semibold">Recording {e.number}</span>
           <span className="text-sm text-muted">
             {formatWhen(e.startedAt, now)} · {length} · {guests} guest{guests === 1 ? "" : "s"} ·{" "}
             <span data-testid="recording-bytes">{formatBytes(e.bytes)}</span>
@@ -172,32 +172,32 @@ function EpisodeRow({
             </div>
           )}
 
-          {e.status === "stopped" && <EpisodeTimeline episode={e} now={now} levelLoudness={levelLoudness} />}
+          {e.status === "stopped" && <RecordingTimeline recording={e} now={now} levelLoudness={levelLoudness} />}
 
           {/* Who is still sending: while recording, and until processing starts. */}
-          {e.processing === "pending" && e.people.length > 0 && <PeopleProgress episode={e} />}
+          {e.processing === "pending" && e.people.length > 0 && <PeopleProgress recording={e} />}
 
-          {e.processing === "ready" && <Downloads showId={showId} episode={e} />}
+          {e.processing === "ready" && <Downloads studioId={studioId} recording={e} />}
 
           {e.status === "stopped" && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <a
-                href={`/api/studios/${showId}/recordings/${e.id}/consent`}
+                href={`/api/studios/${studioId}/recordings/${e.id}/consent`}
                 className="text-sm text-muted underline-offset-2 hover:text-text hover:underline"
                 data-testid="consent-record"
               >
                 Consent record: who agreed, when, to what (.txt)
               </a>
               <ConfirmAction
-                label="Delete this episode…"
+                label="Delete this recording…"
                 testId="delete-recording"
                 question={
                   <>
-                    Delete Episode {e.number} and all of its files from the server? This can&apos;t be undone.
+                    Delete Recording {e.number} and all of its files from the server? This can&apos;t be undone.
                     {e.incompleteTracks > 0 && " Guests still sending it will stop, and their copies are discarded."}
                   </>
                 }
-                confirmLabel="Delete episode"
+                confirmLabel="Delete recording"
                 action={onRemove}
               />
             </div>
@@ -209,7 +209,7 @@ function EpisodeRow({
 }
 
 /** One line per person: recording, still arriving, or received. */
-function PeopleProgress({ episode: e }: { episode: Episode }) {
+function PeopleProgress({ recording: e }: { recording: Recording }) {
   return (
     <div className="flex flex-col gap-2.5">
       {e.people.map((x) => {
@@ -235,10 +235,10 @@ function PeopleProgress({ episode: e }: { episode: Episode }) {
 const FILE_ICON: Record<string, string> = { audio: "∿", video: "▶", combined: "▦", transcript: "Aa" };
 
 /** What a downloaded file is, in words: "Ines's audio", "Side-by-side video", "Captions (.srt)". */
-function describe(o: Episode["outputs"][number]) {
+function describe(o: Recording["outputs"][number]) {
   const ext = o.fileName.split(".").pop()?.toUpperCase() ?? "";
   if (o.kind === "combined") {
-    // The mix of an episode without video is audio (WAV or FLAC); otherwise it's the grid video.
+    // The mix of a recording without video is audio (WAV or FLAC); otherwise it's the grid video.
     return o.fileName.endsWith(".mp4")
       ? { title: "Side-by-side video", icon: FILE_ICON.combined!, format: ext }
       : { title: "Everyone, mixed", icon: FILE_ICON.audio!, format: ext };
@@ -252,7 +252,7 @@ function describe(o: Episode["outputs"][number]) {
   return { title: `${who}'s ${o.kind}`, icon: FILE_ICON[o.kind]!, format: ext };
 }
 
-function Downloads({ showId, episode: e }: { showId: string; episode: Episode }) {
+function Downloads({ studioId, recording: e }: { studioId: string; recording: Recording }) {
   const transcribing = e.transcript === "queued" || e.transcript === "processing";
   const total = e.outputs.reduce((n, o) => n + o.bytes, 0);
   return (
@@ -267,7 +267,7 @@ function Downloads({ showId, episode: e }: { showId: string; episode: Episode })
         </span>
         {e.outputs.length > 1 && (
           <a
-            href={`/api/studios/${showId}/recordings/${e.id}/zip`}
+            href={`/api/studios/${studioId}/recordings/${e.id}/zip`}
             className="inline-flex h-11 items-center rounded-xl bg-accent px-[22px] text-[15px] font-semibold whitespace-nowrap text-accent-text hover:bg-accent-hover"
             data-testid="download-zip"
           >
@@ -286,7 +286,7 @@ function Downloads({ showId, episode: e }: { showId: string; episode: Episode })
           return (
             <li key={o.id}>
               <a
-                href={`/api/studios/${showId}/recordings/${e.id}/outputs/${o.id}`}
+                href={`/api/studios/${studioId}/recordings/${e.id}/outputs/${o.id}`}
                 className="flex items-center gap-3 rounded-[10px] border border-border px-3.5 py-3 text-text hover:border-border-strong"
                 data-testid="download"
                 data-file-name={o.fileName}

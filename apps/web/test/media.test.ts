@@ -26,7 +26,7 @@ describe("buildConstraints", () => {
     expect(c.audio).toMatchObject({ sampleRate: { ideal: 48_000 }, autoGainControl: false });
   });
 
-  it("asks for no camera at all in an audio-only show", () => {
+  it("asks for no camera at all in an audio-only studio", () => {
     expect(buildConstraints({ ...defaults, audioOnly: true }, { headphones: false }).video).toBe(false);
   });
 

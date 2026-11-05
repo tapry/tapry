@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expectOk, setup } from "./harness";
 
 /** A stopped recording where host and guest each recorded, processed: rows as the job runner leaves them. */
-async function processedEpisode() {
+async function processedRecording() {
   const t = await setup();
   const track = async (token: string, trackId: string, kind: "audio" | "video") =>
     expectOk(
@@ -34,7 +34,7 @@ async function processedEpisode() {
 
 describe("a participant's own recording (end screen)", () => {
   it("is announced while processing, then offered as links to their own files only", async () => {
-    const t = await processedEpisode();
+    const t = await processedRecording();
     expect(await t.mine(t.guest.token)).toEqual({
       downloads: true,
       recordings: [{ number: 1, processing: expect.stringMatching(/pending|queued|processing/), files: [] }],
@@ -49,16 +49,16 @@ describe("a participant's own recording (end screen)", () => {
     expect(host.recordings[0].files.map((f: { fileName: string }) => f.fileName)).toEqual(["Host - audio.wav"]);
   });
 
-  it("offers nothing when the show doesn't let guests download, and only to people in the session", async () => {
-    const t = await processedEpisode();
+  it("offers nothing when the studio doesn't let guests download, and only to people in the session", async () => {
+    const t = await processedRecording();
     await t.ready();
     await expectOk(t.hostBrowser.patch(`/studios/${t.studio.id}`, { settings: { guestDownloads: false } }));
     expect(await t.mine(t.guest.token)).toEqual({ downloads: false, recordings: [], promoUrl: null });
     expect((await t.client().get(`/sessions/${t.sessionId}/my-recordings`)).status).toBe(401);
   });
 
-  it("leaves out a deleted episode", async () => {
-    const t = await processedEpisode();
+  it("leaves out a deleted recording", async () => {
+    const t = await processedRecording();
     await t.ready();
     await expectOk(t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${t.recordingId}`));
     expect((await t.mine(t.guest.token)).recordings).toEqual([]);

@@ -3,7 +3,7 @@ import { ToolPage } from "../tool-page";
 import { UploadSpeedTest } from "./upload-speed-test";
 
 export const metadata: Metadata = {
-  title: "Upload speed test for podcasts: is your internet good enough to record? · Tapry",
+  title: "Upload speed test for podcasts, interviews and video: is your internet good enough to record? · Tapry",
   description:
     "Test your upload speed and see whether it keeps up with recording a podcast or interview in sound only, 720p or 1080p video. Free, no sign-up.",
   alternates: { canonical: "/upload-speed-test" },

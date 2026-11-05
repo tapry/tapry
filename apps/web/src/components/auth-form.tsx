@@ -21,7 +21,7 @@ export function AuthForm({ mode, firstAccount = false }: { mode: "login" | "sign
       await apiFetch(`/auth/${mode}`, {
         body: Object.fromEntries(["email", "password", ...(signup ? ["name"] : [])].map((k) => [k, form.get(k)])),
       });
-      router.replace("/shows");
+      router.replace("/studios");
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
@@ -51,7 +51,7 @@ export function AuthForm({ mode, firstAccount = false }: { mode: "login" | "sign
       {signup && firstAccount && (
         <Notice tone="warn" className="flex items-start gap-3">
           <span aria-hidden>★</span>
-          <span>You're the first person on this server, so your account will be in charge. You can create shows and invite guests.</span>
+          <span>You're the first person on this server, so your account will be in charge. You can create studios and invite guests.</span>
         </Notice>
       )}
       {error && <Notice tone="danger">{error}</Notice>}

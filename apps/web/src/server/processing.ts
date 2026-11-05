@@ -19,7 +19,7 @@ export interface RecordingProgress {
 
 export interface RecordingSummary {
   id: string;
-  /** "Episode 41": numbered per show, in the order they were recorded. */
+  /** "Recording 41": numbered per studio, in the order they were recorded. */
   number: number;
   sessionId: string;
   status: "recording" | "stopped";
@@ -110,7 +110,7 @@ export class ProcessingService {
     const rec = await this.ownedRecording(owner, studioId, recordingId);
     if (rec.status !== "stopped") throw new ApiError(409, "still_recording", "Stop the recording first");
     if (rec.raw_deleted_at) {
-      throw new ApiError(409, "originals_removed", "The original uploads were removed after the retention period, so this episode can't be processed again");
+      throw new ApiError(409, "originals_removed", "The original uploads were removed after the retention period, so this recording can't be processed again");
     }
     await this.enqueue(recordingId);
   }
@@ -234,7 +234,7 @@ export class ProcessingService {
    * keys, plus a name for the zip ("My Podcast - 2026-10-30 19.59 UTC.zip").
    */
   /**
-   * Who agreed to be recorded in this episode, when, and to which text (with its SHA-256), as a
+   * Who agreed to be recorded in this recording, when, and to which text (with its SHA-256), as a
    * plain-text file the host can keep with the recording (an ethics board asks for exactly this).
    */
   async consentRecord(owner: User, studioId: string, recordingId: string) {
@@ -245,7 +245,7 @@ export class ProcessingService {
       [recordingId, studioId, owner.id],
     );
     if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
-    // Everyone recorded in this episode.
+    // Everyone recorded in this recording.
     const people = await this.db.query<{ display_name: string; role: "host" | "guest"; consented_at: Date | null; consent_hash: string | null; text: string | null }>(
       `SELECT p.display_name, p.role, p.consented_at, p.consent_hash, c.text
        FROM participants p LEFT JOIN consent_texts c ON c.hash = p.consent_hash
@@ -255,7 +255,7 @@ export class ProcessingService {
     );
     const iso = (ms: number) => `${new Date(ms).toISOString().slice(0, 19)}Z`; // to the second
     const lines = [
-      `Consent record: ${rec.studio_name}, Episode ${rec.number ?? "?"}`,
+      `Consent record: ${rec.studio_name}, Recording ${rec.number ?? "?"}`,
       `Recorded ${iso(rec.started_at)} to ${rec.stopped_at ? iso(rec.stopped_at) : "(still recording)"} (UTC)`,
       `Host: ${rec.host}`,
       "",
@@ -274,7 +274,7 @@ export class ProcessingService {
     }
     for (const [hash, text] of texts) lines.push("", `Text SHA-256 ${hash}:`, text);
     const body = `${lines.join("\n")}\n`;
-    return { fileName: `Consent record - Episode ${rec.number ?? "?"}.txt`, body };
+    return { fileName: `Consent record - Recording ${rec.number ?? "?"}.txt`, body };
   }
 
   async zipContents(owner: User, studioId: string, recordingId: string) {
@@ -314,7 +314,7 @@ export class ProcessingService {
 
   /**
    * A participant's own files from their session, for the end screen: only theirs (never the
-   * combined video or anyone else's), only when the show allows it, as links valid for an hour.
+   * combined video or anyone else's), only when the studio allows it, as links valid for an hour.
    */
   async ownRecordings(p: Participant, promoUrl: string | null): Promise<OwnRecordings> {
     const [studio] = await this.db.query<{ settings: unknown }>(

@@ -22,7 +22,7 @@ export function ToolPage({
           Tapry
         </a>
         <a href="/" style={{ fontSize: 15, fontWeight: 500, color: "#1d1d1f" }}>
-          Record a podcast →
+          Start recording →
         </a>
       </header>
 

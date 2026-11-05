@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Create account" };
 
 export default async function SignupPage() {
-  if (await currentUser()) redirect("/shows");
+  if (await currentUser()) redirect("/studios");
   return (
     <AuthShell title="Set up your studio" subtitle="Create your account to start recording. It takes less than a minute.">
       <AuthForm mode="signup" firstAccount={await isFreshInstall()} />

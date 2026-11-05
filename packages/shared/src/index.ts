@@ -38,13 +38,13 @@ const settingsFields = {
   maxGuests: z.number().int().min(1).max(7),
   /** Off gives better audio for guests on headphones. */
   echoCancellation: z.boolean(),
-  /** Bring each person's audio, and the combined mix, to podcast loudness (-16 LUFS) after recording. */
+  /** Bring each person's audio, and the combined mix, to a common level for spoken audio (-16 LUFS) after recording. */
   levelLoudness: z.boolean(),
-  /** Sound only: nobody's camera is asked for, the call is voice only, episodes have no video. */
+  /** Sound only: nobody's camera is asked for, the call is voice only, recordings have no video. */
   audioOnly: z.boolean(),
   /** Guests can download their own recording (their WAV, and MP4 with a camera) from the end screen. */
   guestDownloads: z.boolean(),
-  /** Per-person audio (and the mix of an audio-only episode): WAV opens anywhere, FLAC is lossless at about half the size. */
+  /** Per-person audio (and the mix of an audio-only recording): WAV opens anywhere, FLAC is lossless at about half the size. */
   audioFormat: z.enum(["wav", "flac"]),
   /** What guests agree to before joining. Empty: the default text (defaultConsentText). */
   consentText: z.string().trim().max(4000),
@@ -62,12 +62,12 @@ export const studioSettings = z.object({
   audioFormat: settingsFields.audioFormat.default("wav"),
 });
 
-/** The consent text when a show sets none. */
+/** The consent text when a studio sets none. */
 export function defaultConsentText(hostName: string, audioOnly: boolean) {
   return `I'm happy to be recorded. My ${audioOnly ? "microphone is" : "camera and microphone are"} recorded on this computer and sent to ${hostName}.`;
 }
 
-/** The exact text a guest of this show agrees to (what's hashed and kept with their consent). */
+/** The exact text a guest of this studio agrees to (what's hashed and kept with their consent). */
 export function consentTextFor(settings: StudioSettings, hostName: string) {
   return settings.consentText || defaultConsentText(hostName, settings.audioOnly);
 }
@@ -93,7 +93,7 @@ export const joinBody = z.object({
   /** The guest ticked "I agree to be recorded". */
   consent: z.literal(true, { error: "Consent to recording is required" }),
   /**
-   * SHA-256 (hex) of the consent text the guest was shown. When it isn't the show's current
+   * SHA-256 (hex) of the consent text the guest was shown. When it isn't the studio's current
    * text (the host changed it meanwhile), joining is refused so they read the new one.
    * Optional for pages loaded before this existed.
    */
@@ -196,7 +196,7 @@ export interface SessionState {
 export interface OwnRecordings {
   /** False when the host doesn't let guests download their own recording. */
   downloads: boolean;
-  /** Each episode of this session they recorded in, oldest first. */
+  /** Each recording of this session they recorded in, oldest first. */
   recordings: Array<{
     number: number;
     processing: "pending" | "queued" | "processing" | "ready" | "failed";
@@ -209,7 +209,7 @@ export interface OwnRecordings {
 
 /** The end screen's "email me my recording": state for this participant. */
 export interface RecapStatus {
-  /** The server sends email, the show lets guests have their files, and they recorded something. */
+  /** The server sends email, the studio lets guests have their files, and they recorded something. */
   enabled: boolean;
   status: "none" | "pending" | "sent" | "failed";
   /** Only until it's sent: the address isn't kept after that. */

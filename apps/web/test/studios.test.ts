@@ -118,11 +118,11 @@ describe("studios", () => {
   it("creates, lists, updates studios with validated settings", async () => {
     const server = await createServer();
     const browser = await signedInHost(server);
-    const created = await browser.post("/studios", { name: "Weekly Show", settings: { maxGuests: 2 } });
+    const created = await browser.post("/studios", { name: "Weekly Studio", settings: { maxGuests: 2 } });
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
       id: expect.stringMatching(/^std_/),
-      name: "Weekly Show",
+      name: "Weekly Studio",
       inviteCode: expect.stringMatching(/^[\w-]{22}$/),
       settings: { videoQuality: "1080p", maxGuests: 2, echoCancellation: true, levelLoudness: true, audioOnly: false },
     });
@@ -139,7 +139,7 @@ describe("studios", () => {
       consentText: "",
       audioFormat: "wav",
     });
-    expect(updated.body.name).toBe("Weekly Show");
+    expect(updated.body.name).toBe("Weekly Studio");
 
     expect((await browser.patch(`/studios/${id}`, { settings: { maxGuests: 50 } })).status).toBe(400);
     expect((await browser.get("/studios")).body.studios.map((s: { id: string }) => s.id)).toEqual([id]);

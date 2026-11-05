@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { describeProgress, timelineSteps } from "../src/components/episode-timeline";
+import { describeProgress, timelineSteps } from "../src/components/recording-timeline";
 import type { RecordingSummary } from "../src/server/processing";
 
 const T = Date.UTC(2026, 10, 2, 14, 0);
-const episode = (over: Partial<RecordingSummary> = {}): RecordingSummary => ({
+const recording = (over: Partial<RecordingSummary> = {}): RecordingSummary => ({
   id: "rec_1",
   number: 1,
   sessionId: "ses_1",
@@ -33,13 +33,13 @@ const states = (e: RecordingSummary) => timelineSteps(e, T + 10 * 60_000, true).
 
 describe("processing timeline", () => {
   it("waits for a guest's upload, naming them", () => {
-    const e = episode({ incompleteTracks: 1, people: [episode().people[0]!, { ...episode().people[1]!, completeTracks: 0 }] });
+    const e = recording({ incompleteTracks: 1, people: [recording().people[0]!, { ...recording().people[1]!, completeTracks: 0 }] });
     expect(states(e)).toEqual(["recorded:done", "uploaded:current", "files:todo"]);
     expect(timelineSteps(e, T, true)[1]!.detail).toBe("Waiting for Sam");
   });
 
   it("shows the running job's step and how far it is", () => {
-    const e = episode({
+    const e = recording({
       uploadedAt: T + 60_000,
       processing: "processing",
       processingStartedAt: T + 60_000,
@@ -52,7 +52,7 @@ describe("processing timeline", () => {
   });
 
   it("says how long the files and the transcript took, once done", () => {
-    const e = episode({
+    const e = recording({
       uploadedAt: T + 60_000,
       processing: "ready",
       processingStartedAt: T + 60_000,
@@ -67,11 +67,11 @@ describe("processing timeline", () => {
   });
 
   it("marks finishing without someone, and failures", () => {
-    const missing = { ...episode().people[1]!, completeTracks: 0 };
-    const forced = episode({ processing: "failed", processingError: "Processing failed.", people: [episode().people[0]!, missing] });
+    const missing = { ...recording().people[1]!, completeTracks: 0 };
+    const forced = recording({ processing: "failed", processingError: "Processing failed.", people: [recording().people[0]!, missing] });
     expect(states(forced)).toEqual(["recorded:done", "uploaded:skipped", "files:failed"]);
     expect(timelineSteps(forced, T, true)[1]!.detail).toBe("Missing: Sam");
-    const noTranscript = episode({ uploadedAt: T, processing: "ready", processedAt: T, transcript: "failed" });
+    const noTranscript = recording({ uploadedAt: T, processing: "ready", processedAt: T, transcript: "failed" });
     expect(states(noTranscript).at(-1)).toBe("transcript:failed");
   });
 

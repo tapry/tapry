@@ -23,12 +23,12 @@ export default async function HealthPage() {
   const user = await requireUser();
   if (!user.isAdmin) notFound();
   const services = await getServices();
-  const [shows, report] = await Promise.all([services.studios.list(user), services.health.report()]);
+  const [studios, report] = await Promise.all([services.studios.list(user), services.health.report()]);
   const problems = report.checks.filter((c) => c.tone === "danger").length;
   const warnings = report.checks.filter((c) => c.tone === "warn").length;
 
   return (
-    <DashboardShell user={user} shows={shows} title="Server health">
+    <DashboardShell user={user} studios={studios} title="Server health">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <h1 className="text-[clamp(28px,3.2vw,38px)] leading-[1.08] font-semibold tracking-[-.02em]">Server health</h1>
@@ -91,7 +91,7 @@ export default async function HealthPage() {
               <li key={`${f.recordingId}-${f.at}`} className="flex flex-col gap-0.5" data-testid="failed-job">
                 <span>
                   <span className="font-medium">{f.type === "transcribe_recording" ? "Transcript" : "Processing"}</span>
-                  <span className="text-muted"> · {formatWhen(f.at, report.checkedAt)} · episode {f.recordingId}</span>
+                  <span className="text-muted"> · {formatWhen(f.at, report.checkedAt)} · recording {f.recordingId}</span>
                 </span>
                 {f.error && <code className="font-mono text-[12px] break-words text-muted">{f.error}</code>}
               </li>

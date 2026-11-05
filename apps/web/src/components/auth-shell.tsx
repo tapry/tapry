@@ -21,7 +21,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   );
 }
 
-/** Decorative: a studio with three people and a ready episode. Nothing here is real data. */
+/** Decorative: a studio with three people and a ready recording. Nothing here is real data. */
 function StudioPicture() {
   return (
     <div
@@ -50,7 +50,7 @@ function StudioPicture() {
           ))}
         </div>
         <span className="flex items-center gap-2 self-start rounded-full bg-white px-3.5 py-2 text-sm font-medium text-[#1d1d1f] shadow-[0_8px_20px_-10px_rgba(60,20,30,.5)]">
-          <StatusDot tone="ok" /> Episode 40 · ready to download
+          <StatusDot tone="ok" /> Recording 40 · ready to download
         </span>
       </div>
     </div>

@@ -157,12 +157,12 @@ export class StudioService {
   }
 
   /**
-   * What a guest sees before joining: the show's name and who invited them. Null for a link
+   * What a guest sees before joining: the studio's name and who invited them. Null for a link
    * that is wrong, replaced or deleted. Anyone with the link may see this, like the link itself.
    */
   async invitePreview(
     inviteCode: string,
-  ): Promise<{ showName: string; hostName: string; settings: StudioSettings; consentText: string; consentHash: string } | null> {
+  ): Promise<{ studioName: string; hostName: string; settings: StudioSettings; consentText: string; consentHash: string } | null> {
     const [row] = await this.db.query<{ name: string; host: string; settings: unknown }>(
       `SELECT st.name, st.settings, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
@@ -171,10 +171,10 @@ export class StudioService {
     if (!row) return null;
     const settings = studioSettings.parse(row.settings);
     const consentText = consentTextFor(settings, row.host);
-    return { showName: row.name, hostName: row.host, settings, consentText, consentHash: sha256Hex(consentText) };
+    return { studioName: row.name, hostName: row.host, settings, consentText, consentHash: sha256Hex(consentText) };
   }
 
-  /** The show an invite code belongs to, for the tech check; 404 for a dead link. */
+  /** The studio an invite code belongs to, for the tech check; 404 for a dead link. */
   private async studioForInvite(inviteCode: string) {
     const [row] = await this.db.query<{ id: string }>("SELECT id FROM studios WHERE invite_code = $1 AND deleted_at IS NULL", [inviteCode]);
     if (!row) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
@@ -198,7 +198,7 @@ export class StudioService {
          ON CONFLICT (id) DO UPDATE SET name = $3, browser = $4, checks = $5, created_at = now()`,
         [body.reportId, studioId, body.name, body.browser, JSON.stringify(body.checks)],
       );
-      // Keep the newest 50 per show: enough for any real schedule, bounded for a leaked link.
+      // Keep the newest 50 per studio: enough for any real schedule, bounded for a leaked link.
       await tx.query(
         `DELETE FROM tech_checks WHERE studio_id = $1 AND id NOT IN (
            SELECT id FROM tech_checks WHERE studio_id = $1 ORDER BY created_at DESC, id LIMIT 50)`,
@@ -207,7 +207,7 @@ export class StudioService {
     });
   }
 
-  /** The show's tech checks from the last 30 days, newest first (for the host). */
+  /** The studio's tech checks from the last 30 days, newest first (for the host). */
   async techChecks(owner: User, studioId: string): Promise<TechCheck[]> {
     await this.owned(owner, studioId);
     const rows = await this.db.query<{ id: string; name: string; browser: string; checks: TechCheckResult[]; created_at: Date }>(
@@ -227,7 +227,7 @@ export class StudioService {
     );
     if (!studio) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
     const settings = studioSettings.parse(studio.settings);
-    // What they agree to is the show's text as of now; the page tells us which text it showed.
+    // What they agree to is the studio's text as of now; the page tells us which text it showed.
     const consentText = consentTextFor(settings, studio.host);
     const consentHash = sha256Hex(consentText);
     if (body.consentHash && body.consentHash !== consentHash) {

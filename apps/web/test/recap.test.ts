@@ -20,8 +20,8 @@ class FakeMailer implements Mailer {
 
 const GUEST_EMAIL = "sam@guest.test";
 
-/** A stopped episode the guest recorded in; `ready()` finishes its processing. */
-async function episode() {
+/** A stopped recording the guest recorded in; `ready()` finishes its processing. */
+async function recording() {
   const mailer = new FakeMailer();
   const t = await setup(new FakeStorage(), { mailer });
   await expectOk(
@@ -59,7 +59,7 @@ describe("the guest's recap email", () => {
   });
 
   it("waits for the files, sends a link, then keeps no address", async () => {
-    const t = await episode();
+    const t = await recording();
     expect(await t.status()).toEqual({ enabled: true, status: "none", email: null, canSend: true });
     expect((await t.ask("not an address")).status).toBe(400);
     await expectOk(t.ask());
@@ -87,8 +87,8 @@ describe("the guest's recap email", () => {
     expect(await t.services.recaps.participantFor("wrong")).toBeNull();
   });
 
-  it("waits for every episode the guest is in", async () => {
-    const t = await episode();
+  it("waits for every recording the guest is in", async () => {
+    const t = await recording();
     await t.ready();
     await expectOk(t.ask());
     await t.db.query("UPDATE recordings SET processing = 'processing' WHERE id = $1", [t.recordingId]);
@@ -100,7 +100,7 @@ describe("the guest's recap email", () => {
   });
 
   it("is sent by the job runner, when the runner has mail", async () => {
-    const t = await episode();
+    const t = await recording();
     await t.ready();
     await expectOk(t.ask());
     const opts = { ffmpeg: "ffmpeg", ffprobe: "ffprobe" };
@@ -111,7 +111,7 @@ describe("the guest's recap email", () => {
   });
 
   it("can change address; a new send kills the old link; sends are capped", async () => {
-    const t = await episode();
+    const t = await recording();
     await t.ready();
     await expectOk(t.ask("typo@guest.test"));
     await expectOk(t.ask()); // before sending: replaced, not a second mail
@@ -130,7 +130,7 @@ describe("the guest's recap email", () => {
   });
 
   it("retries, then gives up and forgets the address; failures never store it", async () => {
-    const t = await episode();
+    const t = await recording();
     await t.ready();
     await expectOk(t.ask());
     t.mailer.fail = Object.assign(new Error(`550 <${GUEST_EMAIL}> no such user`), { code: "EENVELOPE", responseCode: 550 });
@@ -155,14 +155,14 @@ describe("the guest's recap email", () => {
   });
 
   it("gives up when the guest has no files, or the host turned downloads off", async () => {
-    const t = await episode();
+    const t = await recording();
     await expectOk(t.ask());
     await t.db.query("UPDATE recordings SET processing = 'failed' WHERE id = $1", [t.recordingId]);
     await t.send();
     expect(t.mailer.sent).toEqual([]);
     expect(await t.row()).toMatchObject({ status: "failed", email: null, error: "NO_FILES" });
 
-    const u = await episode();
+    const u = await recording();
     await u.ready();
     await expectOk(u.ask());
     await expectOk(u.hostBrowser.patch(`/studios/${u.studio.id}`, { settings: { guestDownloads: false } }));
@@ -173,8 +173,8 @@ describe("the guest's recap email", () => {
     expect((await u.ask()).status).toBe(409);
   });
 
-  it("forgets the address when the host deletes the episode", async () => {
-    const t = await episode();
+  it("forgets the address when the host deletes the recording", async () => {
+    const t = await recording();
     await expectOk(t.ask());
     await t.db.query("UPDATE recordings SET processing = 'ready' WHERE id = $1", [t.recordingId]);
     expect((await t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${t.recordingId}`)).status).toBeLessThan(300);
@@ -183,8 +183,8 @@ describe("the guest's recap email", () => {
     expect(t.mailer.sent).toEqual([]);
   });
 
-  it("stops the link once the show is deleted, or after it expires", async () => {
-    const t = await episode();
+  it("stops the link once the studio is deleted, or after it expires", async () => {
+    const t = await recording();
     await t.ready();
     await expectOk(t.ask());
     await t.send();
@@ -200,7 +200,7 @@ describe("the guest's recap email", () => {
   });
 
   it("drops an old request that never got its files", async () => {
-    const t = await episode();
+    const t = await recording();
     await expectOk(t.ask());
     await sweepRecaps(t.db);
     expect(await t.row()).toBeDefined();
@@ -209,7 +209,7 @@ describe("the guest's recap email", () => {
     expect(await t.row()).toBeUndefined();
   });
 
-  it("escapes the show's name, and only carries the promo link when set", () => {
+  it("escapes the studio's name, and only carries the promo link when set", () => {
     const m = recapMessage("a@b.test", `<script>"x"</script>`, "https://s.test/recap/t", null);
     expect(m.html).not.toContain("<script>");
     expect(m.html).toContain("&lt;script&gt;");
@@ -227,14 +227,14 @@ describe("SMTP", () => {
     close = sink.close;
     const mailer = new SmtpMailer({ host: "127.0.0.1", port: sink.port, from: "Studio <studio@tapry.test>", insecure: true });
     await mailer.verify();
-    await mailer.send(recapMessage(GUEST_EMAIL, "My Show", "https://studio.test/recap/abc", null));
+    await mailer.send(recapMessage(GUEST_EMAIL, "My studio", "https://studio.test/recap/abc", null));
     expect(sink.mails).toHaveLength(1);
     expect(sink.mails[0]!.to).toBe(GUEST_EMAIL);
-    expect(sink.mails[0]!.decoded).toContain("Subject: Your recording from My Show");
+    expect(sink.mails[0]!.decoded).toContain("Subject: Your recording from My studio");
     expect(sink.mails[0]!.decoded).toContain("https://studio.test/recap/abc");
 
     sink.rejectWith = "550";
-    const err = await mailer.send(recapMessage(GUEST_EMAIL, "My Show", "https://studio.test/recap/abc", null)).catch((e) => e);
+    const err = await mailer.send(recapMessage(GUEST_EMAIL, "My studio", "https://studio.test/recap/abc", null)).catch((e) => e);
     expect(String(err)).toContain(GUEST_EMAIL); // the library's own message does quote it…
     expect(mailFailureReason(err)).toMatch(/^[A-Z_]+ \(server said 550\)$/); // …ours doesn't
   });
