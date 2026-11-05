@@ -3,7 +3,7 @@
 # Every pull request gets a "CLA" commit status. It passes once the PR's author and every
 # commit author have signed, by commenting the phrase below on any Tapry pull request.
 # Signatures are kept in cla-signatures.json on the `cla-signatures` branch: who, when, and a
-# link to the comment. The repository owner and bots don't need to sign.
+# link to the comment. The maintainer (MAINTAINER below) and bots don't need to sign.
 #
 # pull_request_target runs this file from the default branch with write access, so it must
 # never check out or run code from the pull request. It only reads metadata and comments.
@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/github-script@v9
         env:
-          # Set the repository variable CLA_EXEMPT_OWNER=false to make the owner sign too (testing).
+          # Set the repository variable CLA_EXEMPT_OWNER=false to make the maintainer sign too (testing).
           EXEMPT_OWNER: ${{ vars.CLA_EXEMPT_OWNER != 'false' }}
         with:
           script: |
@@ -40,6 +40,8 @@ jobs:
             const BRANCH = "cla-signatures";
             const FILE = "cla-signatures.json";
             const MARKER = "<!-- tapry-cla -->";
+            // The copyright holder has nothing to sign. Not the repo's owner: that's the org.
+            const MAINTAINER = "mithrandiirr";
             const { owner, repo } = context.repo;
             const number = (context.payload.pull_request ?? context.payload.issue).number;
             const claUrl = `${context.serverUrl}/${owner}/${repo}/blob/${context.payload.repository.default_branch}/CLA.md`;
@@ -103,7 +105,7 @@ jobs:
               else unlinked.add(c.commit.author?.email ?? c.sha.slice(0, 7));
             }
             const exempt = (id, login) =>
-              login.endsWith("[bot]") || (process.env.EXEMPT_OWNER === "true" && login.toLowerCase() === owner.toLowerCase());
+              login.endsWith("[bot]") || (process.env.EXEMPT_OWNER === "true" && login.toLowerCase() === MAINTAINER);
             const signed = new Set(signatures.list.map((s) => s.id));
             const missing = [...people].filter(([id, login]) => !exempt(id, login) && !signed.has(id)).map(([, login]) => login);
             const ok = missing.length === 0 && unlinked.size === 0;
