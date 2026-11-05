@@ -5,8 +5,8 @@ import { expectOk, setup } from "./harness";
 
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 
-describe("consent per show", () => {
-  it("uses the show's own text, or the default (sound-only wording for audio-only shows)", () => {
+describe("consent per studio", () => {
+  it("uses the studio's own text, or the default (sound-only wording for audio-only studios)", () => {
     const base = studioSettings.parse({});
     expect(consentTextFor(base, "Ines")).toBe(defaultConsentText("Ines", false));
     expect(consentTextFor({ ...base, audioOnly: true }, "Ines")).toMatch(/My microphone is recorded/);
@@ -41,9 +41,9 @@ describe("consent per show", () => {
     expect(res.body.error).toBe("consent_changed");
   });
 
-  it("writes an episode's consent record: everyone recorded, when, which text", async () => {
+  it("writes a recording's consent record: everyone recorded, when, which text", async () => {
     const t = await setup();
-    // The setup's guest joined with the default text; they record in the episode.
+    // The setup's guest joined with the default text; they record in the recording.
     await expectOk(
       t.call(`/sessions/${t.sessionId}/tracks`, { recordingId: t.recordingId, kind: "audio", mimeType: "audio/webm", startedAt: t.now() }),
     );
@@ -52,9 +52,9 @@ describe("consent per show", () => {
     );
     const host = (await expectOk(t.hostBrowser.get("/auth/me"))).body.user;
     const { fileName, body } = await t.services.processing.consentRecord(host, t.studio.id, t.recordingId);
-    expect(fileName).toBe("Consent record - Episode 1.txt");
+    expect(fileName).toBe("Consent record - Recording 1.txt");
     const hash = sha256(defaultConsentText("Host", false));
-    expect(body).toMatch(/^Consent record: My Podcast, Episode 1\n/);
+    expect(body).toMatch(/^Consent record: My Podcast, Recording 1\n/);
     expect(body).toContain("Host (host): runs the recording.");
     expect(body).toMatch(new RegExp(`Guest \\(guest\\): agreed \\d{4}-\\d\\d-\\d\\dT[\\d:]+Z, to text SHA-256 ${hash}`));
     expect(body).toContain(`Text SHA-256 ${hash}:\n${defaultConsentText("Host", false)}`);

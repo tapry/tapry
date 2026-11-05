@@ -4,7 +4,7 @@ import { expect, test } from "./fixtures";
 
 test.skip(({ browserName }) => browserName !== "chromium", "the same page in every engine");
 
-test("the upload-speed check says which kinds of show the line keeps up with", async ({ page }) => {
+test("the upload-speed check says which kinds of studio the line keeps up with", async ({ page }) => {
   await page.goto("/tools/upload-speed");
   await page.getByRole("button", { name: "Test my upload" }).click();
   await expect(page.getByTestId("upload-mbps")).toHaveText(/^\d+(\.\d)?$/, { timeout: 30_000 });

@@ -140,15 +140,15 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   it uses no extra disk but does pass through the web container: a 5 GB zip is 5 GB of its
   bandwidth. Zips can't be resumed if the connection drops; single files can.
 - **Keeping originals:** by default the original uploads are kept next to the processed files.
-  Set `RAW_RETENTION_DAYS=7` in `.env` to remove them 7 days after an episode's files are ready
+  Set `RAW_RETENTION_DAYS=7` in `.env` to remove them 7 days after a recording's files are ready
   (0: right away). That saves 40–50% of the space ([costs.md](costs.md)). Once they're gone,
-  the episode can't be processed again, and a guest's upload arriving after that is turned away.
+  the recording can't be processed again, and a guest's upload arriving after that is turned away.
   The originals are the best-quality copies: keep them if you edit from the raw video.
 - **Upload-speed check:** `/tools/upload-speed` is a free, public page on your server that tells
   anyone (no account) whether their upload keeps up with recording. Its test data is read and
   thrown away, at most 64 MB a minute per address. Set `SPEED_TEST_ORIGINS` only to let another
   site's pages use it too.
-- **Guests' end screen:** guests can download their own recording once it's processed (a show
+- **Guests' end screen:** guests can download their own recording once it's processed (a studio
   setting, on by default). Set `GUEST_PROMO_URL` in `.env` to also show them a "Record your own,
   free" link; unset, there is none.
 - **Recap email:** set `SMTP_HOST`, `SMTP_FROM` and, if needed, `SMTP_PORT`, `SMTP_USER` and

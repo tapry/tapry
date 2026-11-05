@@ -165,7 +165,7 @@ export class HealthService {
         id: "workers",
         label,
         tone: "danger",
-        summary: "No worker is running: new episodes won't be processed",
+        summary: "No worker is running: new recordings won't be processed",
         details: [
           last ? `Last seen ${ago(last.ageMs)}.` : "None has started since this version was installed.",
           this.opts.inProcess === false
@@ -243,7 +243,7 @@ export class HealthService {
       tone: least < LOW_DISK_BYTES ? "warn" : "ok",
       summary:
         least < LOW_DISK_BYTES
-          ? `Only ${gb(least)} free where recordings are processed: long episodes may not fit`
+          ? `Only ${gb(least)} free where recordings are processed: long recordings may not fit`
           : `${gb(least)} free where recordings are processed`,
       details: [],
     };

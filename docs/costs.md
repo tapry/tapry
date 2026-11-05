@@ -7,7 +7,7 @@ the cap, is kept below for comparison.
 
 ## Method
 
-The script builds a 3-minute, 2-person episode the way browsers record it (per person: a 1080p
+The script builds a 3-minute, 2-person recording the way browsers record it (per person: a 1080p
 VP9 camera track at the recorder's 8 Mbit/s with sound, and an Opus audio track at 128 kbit/s),
 with real speech and webcam-like noise in the picture, then runs the real processing pipeline and
 transcription and times their CPU with `/usr/bin/time`. Everything scales linearly with length, so
@@ -41,7 +41,7 @@ CPU-minutes of processing. 720p roughly halves the video sizes and the encoding 
    who left early.
 2. **Removing originals after processing saves 40–50%.** `RAW_RETENTION_DAYS` (off by default) does
    it; see [self-hosting.md](self-hosting.md). Trade-off: the originals are the best-quality
-   copies, and an episode can't be processed again after they go.
+   copies, and a recording can't be processed again after they go.
 3. **Processing is CPU-heavy; transcription is not.** Rendering is mostly x264 encoding of
    1080p video: about 1 vCPU-hour per person per recorded hour. Whisper `base` adds almost
    nothing.

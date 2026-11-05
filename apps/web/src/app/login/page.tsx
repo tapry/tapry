@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Log in" };
 
 export default async function LoginPage() {
-  if (await currentUser()) redirect("/shows");
+  if (await currentUser()) redirect("/studios");
   return (
-    <AuthShell title="Welcome back" subtitle="Log in to see your shows and record your next episode.">
+    <AuthShell title="Welcome back" subtitle="Log in to see your studios and record your next recording.">
       <AuthForm mode="login" />
     </AuthShell>
   );

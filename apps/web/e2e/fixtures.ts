@@ -58,17 +58,17 @@ export async function signInHost(page: Page) {
   await page.getByLabel("Email").fill(HOST_EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: fresh ? "Create account" : "Log in" }).click();
-  // /shows redirects on to the newest show (or New show): wait for that, or the test's next
+  // /studios redirects on to the newest show (or New studio): wait for that, or the test's next
   // navigation races it ("interrupted by another navigation").
-  await expect(page).toHaveURL(/\/shows\/(new|std_[\w-]+)$/);
+  await expect(page).toHaveURL(/\/studios\/(new|std_[\w-]+)$/);
 }
 
-/** A new show (a "studio" in the API), through the New show page. */
+/** A new studio (a "studio" in the API), through the New studio page. */
 export async function createStudio(page: Page, name: string, opts: { audioOnly?: boolean } = {}) {
-  await page.goto("/shows/new");
+  await page.goto("/studios/new");
   await page.getByLabel("What's it called?").fill(name);
   if (opts.audioOnly) await page.getByRole("radio", { name: "Audio only" }).click();
-  await page.getByRole("button", { name: "Create show" }).click();
+  await page.getByRole("button", { name: "Create studio" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
   const invite = page.getByLabel("Guest invite link");
   await expect(invite).toHaveValue(/^https?:\/\/.+\/join\//);

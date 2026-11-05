@@ -11,8 +11,8 @@ const MAX_GUESTS = 7;
 // Guests in the seat preview get calm placeholder colors; the host shows their initials.
 const SEAT_COLORS = ["#fbd5cc", "#f4b6a3", "#d98a9c", "#c9b8e4", "#ffe3d6", "#e7c2cf", "#b9a6d6"];
 
-/** The "New show" screen: a name, how many guests, video quality and sound options. */
-export function NewShowForm({ hostName, firstShow }: { hostName: string; firstShow: boolean }) {
+/** The "New studio" screen: a name, how many guests, video quality and sound options. */
+export function NewStudioForm({ hostName, firstStudio }: { hostName: string; firstStudio: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [guests, setGuests] = useState(3);
@@ -30,7 +30,7 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
     setBusy(true);
     setError(null);
     try {
-      const show = await apiFetch<{ id: string }>("/studios", {
+      const studio = await apiFetch<{ id: string }>("/studios", {
         body: {
           name: name.trim(),
           settings: {
@@ -42,7 +42,7 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
           },
         },
       });
-      router.push(`/shows/${show.id}`);
+      router.push(`/studios/${studio.id}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
@@ -52,9 +52,9 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
 
   return (
     <div className="flex w-full max-w-[620px] flex-col gap-5">
-      {!firstShow && (
-        <Link href="/shows" className="self-start text-sm text-muted hover:text-text">
-          ← Your shows
+      {!firstStudio && (
+        <Link href="/studios" className="self-start text-sm text-muted hover:text-text">
+          ← Your studios
         </Link>
       )}
       <form
@@ -68,9 +68,9 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
             </span>
             <span className="flex flex-col gap-0.5">
               <h1 className="text-[clamp(26px,3vw,32px)] leading-[1.1] font-bold tracking-[-.03em]">
-                {firstShow ? "Your first show" : "New show"}
+                {firstStudio ? "Your first studio" : "New studio"}
               </h1>
-              <span className="text-[15px] text-muted">Where your episodes and guests live.</span>
+              <span className="text-[15px] text-muted">Where your recordings and guests live.</span>
             </span>
           </div>
 
@@ -100,7 +100,7 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
           <div className="flex flex-wrap items-center justify-between gap-4">
             <span className="flex flex-col gap-[3px]">
               <span className="text-[15px] font-medium" id="guests-label">
-                Guests per episode
+                Guests per recording
               </span>
               <span className="text-sm text-muted">
                 You + {guests} guest{guests === 1 ? "" : "s"}, up to {MAX_GUESTS}
@@ -208,8 +208,8 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-border bg-[#faf9f7] px-[clamp(20px,4vw,40px)] py-[18px] dark:bg-surface-2">
-          {!firstShow && (
-            <Link href="/shows" className="flex h-[50px] items-center rounded-xl px-[18px] text-base font-medium text-text-2 hover:text-text">
+          {!firstStudio && (
+            <Link href="/studios" className="flex h-[50px] items-center rounded-xl px-[18px] text-base font-medium text-text-2 hover:text-text">
               Cancel
             </Link>
           )}
@@ -221,7 +221,7 @@ export function NewShowForm({ hostName, firstShow }: { hostName: string; firstSh
               ready ? "cursor-pointer bg-accent hover:bg-accent-hover" : "cursor-not-allowed bg-[#e2c3bb] dark:bg-accent-line",
             )}
           >
-            {busy ? "Creating…" : "Create show"}
+            {busy ? "Creating…" : "Create studio"}
           </button>
         </div>
       </form>

@@ -5,7 +5,7 @@ import { expectOk, FakeStorage, setup, sha256 } from "./harness";
 
 const MIME = "audio/webm;codecs=opus";
 
-// RAW_RETENTION_DAYS: the original uploads of a processed episode are removed after a while,
+// RAW_RETENTION_DAYS: the original uploads of a processed recording are removed after a while,
 // the processed files stay. Off by default; these tests drive the purge_raw job directly.
 describe("raw upload retention", () => {
   let t: Awaited<ReturnType<typeof setup>>;
@@ -58,8 +58,8 @@ describe("raw upload retention", () => {
     expect(keysUnder(`recordings/${t.sessionId}/${trackId}/`)).toEqual([]);
     expect(storage.objects.has(output)).toBe(true);
     expect((await rec()).raw_deleted_at).not.toBeNull();
-    const [episode] = (await expectOk(t.hostBrowser.get(`/studios/${t.studio.id}/recordings`))).body.recordings;
-    expect(episode).toMatchObject({ rawDeleted: true, bytes: 15, processing: "ready" });
+    const [recording] = (await expectOk(t.hostBrowser.get(`/studios/${t.studio.id}/recordings`))).body.recordings;
+    expect(recording).toMatchObject({ rawDeleted: true, bytes: 15, processing: "ready" });
   });
 
   it("then refuses to process again, and turns away a late upload (410) instead of half-using it", async () => {
@@ -85,7 +85,7 @@ describe("raw upload retention", () => {
     expect((await rec()).raw_deleted_at).toBeNull();
   });
 
-  it("waits while the episode is being processed again", async () => {
+  it("waits while the recording is being processed again", async () => {
     const trackId = await uploadTrack(["abc"]);
     await processed();
     await t.db.query("UPDATE recordings SET processing = 'queued' WHERE id = $1", [t.recordingId]);

@@ -93,9 +93,9 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
   let inviteUrl = "";
   let studioUrl = "";
 
-  const studioName = `E2E Show ${randomBytes(3).toString("hex")}`;
+  const studioName = `E2E Studio ${randomBytes(3).toString("hex")}`;
 
-  await test.step("host creates the admin account (or logs in to it) and a show", async () => {
+  await test.step("host creates the admin account (or logs in to it) and a studio", async () => {
     // The first run on a fresh server creates the admin; repeats log in (sign-up is closed by then).
     await signInHost(host);
     ({ studioUrl, inviteUrl } = await createStudio(host, studioName));
@@ -307,7 +307,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     const recording = studioPage.getByTestId("recording").first();
     const names = await fileNames(recording.getByTestId("download"));
     const [download] = await Promise.all([studioPage.waitForEvent("download"), recording.getByTestId("download-zip").click()]);
-    expect(download.suggestedFilename()).toMatch(/^E2E Show \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
+    expect(download.suggestedFilename()).toMatch(/^E2E Studio \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
     const file = join(mkdtempSync(join(tmpdir(), "tapry-zip-")), "all.zip");
     await download.saveAs(file);
     // Python's zipfile checks every CRC and lists what's inside.
@@ -318,7 +318,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
       file,
     ]).toString();
     // Every file, then the consent record (who agreed, when, to what).
-    expect(JSON.parse(listed)).toEqual([...names, "Consent record - Episode 1.txt"]);
+    expect(JSON.parse(listed)).toEqual([...names, "Consent record - Recording 1.txt"]);
     await studioPage.close();
   });
 
@@ -371,7 +371,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await expect(host.getByTestId("session-ended")).toContainText("That's a wrap");
     await expect(host.getByRole("button", { name: "Record", exact: true })).toHaveCount(0);
 
-    // The guest, whose upload is done: their own files from both (processed) episodes, and the
+    // The guest, whose upload is done: their own files from both (processed) recordings, and the
     // "record your own" link. Never anyone else's.
     await expect(guestPage.getByTestId("session-ended")).toContainText("Thanks, Sam Guest. All done!", { timeout: 30_000 });
     const own = guestPage.getByTestId("own-recording");
@@ -407,7 +407,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await studioPage.getByTestId("delete-studio").click();
     await studioPage.getByTestId("delete-studio-confirm").click();
     await expect(studioPage).not.toHaveURL(studioUrl);
-    await expect(studioPage.getByTestId("show-link").filter({ hasText: studioName })).toHaveCount(0);
+    await expect(studioPage.getByTestId("studio-link").filter({ hasText: studioName })).toHaveCount(0);
     if (canReadStorage) await expect.poll(async () => listChunks(sessionId), { timeout: 15_000 }).toEqual([]);
     await studioPage.close();
   });

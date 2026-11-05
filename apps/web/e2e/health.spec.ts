@@ -5,7 +5,7 @@ test.skip(({ browserName }) => browserName !== "chromium", "a server page");
 
 test("the admin sees what's working on the server", async ({ page }) => {
   await signInHost(page);
-  // Straight there: on a fresh install the admin lands on "Your first show", which has no sidebar.
+  // Straight there: on a fresh install the admin lands on "Your first studio", which has no sidebar.
   await page.goto("/admin/health");
   await expect(page.getByRole("heading", { name: "Server health" })).toBeVisible();
   const checks = page.getByRole("list", { name: "Checks" });

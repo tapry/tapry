@@ -5,6 +5,9 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- The app now says **studios** and **recordings** instead of shows and episodes, to suit podcasts,
+  interviews, research and video alike. Pages moved to `/studios`; old `/shows` links redirect. New
+  consent records and transcripts say "Recording 1"; files already made keep their names.
 - The project moved to github.com/tapry/tapry. New release images are at `ghcr.io/tapry`: if you use
   the release images, set `TAPRY_IMAGES=ghcr.io/tapry` in `.env`. Earlier versions stay where they were.
 

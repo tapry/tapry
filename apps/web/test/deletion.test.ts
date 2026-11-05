@@ -190,7 +190,7 @@ describe("deleting recordings and studios", () => {
       expect(await list()).toHaveLength(1);
     });
 
-    it("no longer shows in the live session", async () => {
+    it("no longer studios in the live session", async () => {
       await stop();
       await expectOk(t.hostBrowser.del(recordingPath()));
       const state = (await expectOk(host().get(`/sessions/${t.sessionId}/state`))).body;

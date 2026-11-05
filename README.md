@@ -24,17 +24,17 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
 - **Guests need nothing.** A link, a browser (Chrome, Edge, Firefox, Safari), no account, no
   install. A green room checks their camera, microphone and storage first; a tech-check link
   lets them test their setup days before, and the host sees how it went.
-- **Consent kept properly:** each show sets what guests agree to; every guest's agreement is
-  stored with the exact text (SHA-256) and time, in a consent record per episode.
+- **Consent kept properly:** each studio sets what guests agree to; every guest's agreement is
+  stored with the exact text (SHA-256) and time, in a consent record per recording.
 - **Live call** alongside the recording (LiveKit), including guests behind strict firewalls
   (TURN over TLS on port 443).
 - **Files ready to edit:** per person a WAV (or FLAC) and an MP4, a combined grid video with names
-  on the tiles (or one mixed audio file for audio-only shows), all aligned to the moment you
-  pressed Record and cut to the same length. Audio levelled to podcast loudness (−16 LUFS)
+  on the tiles (or one mixed audio file for audio-only studios), all aligned to the moment you
+  pressed Record and cut to the same length. Audio levelled to a common level for spoken audio (−16 LUFS)
   without compression. Download one by one or all as a zip; guests can download their own.
 - **Transcripts** (whisper.cpp, runs on your server, 99 languages) as TXT, Word, SRT and VTT,
   labelled by speaker.
-- **Easy to run:** a server health page for the admin, and an episode timeline that shows what's
+- **Easy to run:** a server health page for the admin, and a recording timeline that studios what's
   happening from Stop to files.
 - **Yours:** recordings live in your S3-compatible storage (SeaweedFS included; R2, AWS,
   Backblaze work). Storage usage per studio; deleting removes the files.

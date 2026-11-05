@@ -6,7 +6,7 @@ import { AUDIO_BITRATE, VIDEO_BITRATE } from "./recording";
 /** The live call on top of the recording: a 360p camera and the voice. */
 const CALL_BITS = { video: 700_000, audio: 50_000 };
 
-/** What this show sends while recording, in Mbit/s: the recording plus the call. */
+/** What this studio sends while recording, in Mbit/s: the recording plus the call. */
 export function neededMbps(settings: StudioSettings) {
   const bits = settings.audioOnly
     ? AUDIO_BITRATE + CALL_BITS.audio
@@ -28,17 +28,17 @@ export function uploadCheck(mbps: number | null, settings: StudioSettings): Tech
     return {
       id: "upload",
       tone: "warn",
-      label: `Upload ${mbit(mbps)} Mbit/s, a bit under the ${mbit(needed)} this show sends. The last minutes may finish uploading after the session: keep the tab open until it says so.`,
+      label: `Upload ${mbit(mbps)} Mbit/s, a bit under the ${mbit(needed)} this studio sends. The last minutes may finish uploading after the session: keep the tab open until it says so.`,
     };
   }
   return {
     id: "upload",
     tone: "warn",
-    label: `Upload ${mbit(mbps)} Mbit/s, well under the ${mbit(needed)} this show sends. Your recording is safe, but uploading may take a long while after the session. A wired connection or sitting closer to the Wi-Fi helps.`,
+    label: `Upload ${mbit(mbps)} Mbit/s, well under the ${mbit(needed)} this studio sends. Your recording is safe, but uploading may take a long while after the session. A wired connection or sitting closer to the Wi-Fi helps.`,
   };
 }
 
-/** What each kind of show needs, for the upload-speed tool: ok when the line keeps up with it. */
+/** What each kind of studio needs, for the upload-speed tool: ok when the line keeps up with it. */
 export function uploadVerdicts(mbps: number) {
   const base = studioSettings.parse({});
   return [

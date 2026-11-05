@@ -41,7 +41,7 @@ export interface JobRunnerOptions {
    * long (crash, kill -9, lost machine). Renewed every minute while the job runs.
    */
   lockMs?: number;
-  /** Delete an episode's original uploads this long after it's processed. Unset: keep them. */
+  /** Delete a recording's original uploads this long after it's processed. Unset: keep them. */
   rawRetentionMs?: number;
   /** Inside the web server, or a separate worker process (shown on the admin health page). */
   kind?: "inprocess" | "worker";
@@ -256,7 +256,7 @@ export class JobRunner {
     );
     this.opts.onChange?.(rec.session_id);
 
-    // Keep the claim alive for as long as the work takes (transcribing a long episode on a
+    // Keep the claim alive for as long as the work takes (transcribing a long recording on a
     // small CPU can outlast any fixed lock); a dead worker stops renewing and loses it.
     const renew = setInterval(() => {
       this.db
@@ -339,7 +339,7 @@ export class JobRunner {
   }
 
   /**
-   * RAW_RETENTION_DAYS after an episode is processed: delete its original uploads, keep the
+   * RAW_RETENTION_DAYS after a recording is processed: delete its original uploads, keep the
    * processed files. Only when nothing can still need them: processing done and successful,
    * every track complete, no processing queued. Otherwise it waits (processing under way) or
    * gives up (it failed, or a track is still arriving); the next successful run schedules it again.
@@ -447,7 +447,7 @@ export class JobRunner {
       speakers.push({ speaker, language, segments });
     }
     const lines = mergeSpeakers(speakers);
-    const [show] = await this.db.query<{ name: string; number: number | null }>(
+    const [studio] = await this.db.query<{ name: string; number: number | null }>(
       "SELECT st.name, r.number FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id WHERE r.id = $1",
       [rec.id],
     );
@@ -458,7 +458,7 @@ export class JobRunner {
         name: "Transcript.docx",
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         body: toDocx(lines, {
-          title: `Transcript: ${show?.name ?? "Episode"}${show?.number ? `, Episode ${show.number}` : ""}`,
+          title: `Transcript: ${studio?.name ?? "Recording"}${studio?.number ? `, Recording ${studio.number}` : ""}`,
           subtitle: `Recorded ${recorded} · ${speakers.map((s) => s.speaker).join(", ")}`,
         }),
       },

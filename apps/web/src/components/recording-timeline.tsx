@@ -1,4 +1,4 @@
-// An episode's way from Stop to files: recorded → uploaded → files ready → transcript, each with
+// A recording's way from Stop to files: recorded → uploaded → files ready → transcript, each with
 // when it finished, and a progress bar on the step that's running.
 import { formatDuration } from "@/lib/format";
 import type { RecordingProgress, RecordingSummary } from "@/server/processing";
@@ -94,8 +94,8 @@ export function timelineSteps(e: RecordingSummary, now: number, levelLoudness: b
   return steps;
 }
 
-export function EpisodeTimeline({ episode, now, levelLoudness }: { episode: RecordingSummary; now: number; levelLoudness: boolean }) {
-  const steps = timelineSteps(episode, now, levelLoudness);
+export function RecordingTimeline({ recording, now, levelLoudness }: { recording: RecordingSummary; now: number; levelLoudness: boolean }) {
+  const steps = timelineSteps(recording, now, levelLoudness);
   return (
     <ol className="flex flex-col" aria-label="Processing timeline" data-testid="timeline">
       {steps.map((s, i) => (

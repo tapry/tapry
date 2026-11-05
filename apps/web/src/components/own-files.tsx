@@ -2,14 +2,14 @@ import type { OwnRecordings } from "@tapry/shared";
 import { StatusDot } from "@/components/ui";
 import { mb } from "@/lib/format";
 
-/** A participant's own files, episode by episode: on their end screen and the emailed page. */
+/** A participant's own files, recording by recording: on their end screen and the emailed page. */
 export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["recordings"]; waiting: string }) {
   const several = recordings.length > 1;
   return (
     <>
       {recordings.map((r) => (
         <div key={r.number} className="flex flex-col gap-2">
-          {several && <span className="text-sm text-muted">Episode {r.number}</span>}
+          {several && <span className="text-sm text-muted">Recording {r.number}</span>}
           {r.processing === "ready" && r.files.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {r.files.map((f) => (

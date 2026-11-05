@@ -6,7 +6,7 @@ import { expectOk, setup } from "./harness";
 const settings = studioSettings.parse({});
 
 describe("tech check (in the browser)", () => {
-  it("knows what each kind of show sends while recording", () => {
+  it("knows what each kind of studio sends while recording", () => {
     expect(neededMbps(settings)).toBeCloseTo(9.0, 0); // 8 Mbit/s 1080p, two audio tracks, the call
     expect(neededMbps({ ...settings, videoQuality: "720p" })).toBeCloseTo(5.0, 0);
     expect(neededMbps({ ...settings, audioOnly: true })).toBeLessThan(0.5);
@@ -71,11 +71,11 @@ describe("tech check (server)", () => {
     expect((await guest.post(`/check/${t.studio.inviteCode}/report`, { ...report("chk_dddddddddd", "Kim"), checks: [] })).status).toBe(400);
   });
 
-  it("keeps a report to its own show, and goes with the show", async () => {
+  it("keeps a report to its own studio, and goes with the studio", async () => {
     const t = await setup();
-    const other = (await expectOk(t.hostBrowser.post("/studios", { name: "Other show" }))).body;
+    const other = (await expectOk(t.hostBrowser.post("/studios", { name: "Other studio" }))).body;
     await expectOk(t.client().post(`/check/${t.studio.inviteCode}/report`, report("chk_aaaaaaaaaa", "Sam")));
-    // The same id through another show's link can't take the report over.
+    // The same id through another studio's link can't take the report over.
     expect((await t.client().post(`/check/${other.inviteCode}/report`, report("chk_aaaaaaaaaa", "Mallory"))).status).toBe(409);
 
     await expectOk(t.client({ token: t.host.token }).post(`/sessions/${t.sessionId}/recordings/${t.recordingId}/stop`));
@@ -83,7 +83,7 @@ describe("tech check (server)", () => {
     expect(await t.db.query("SELECT id FROM tech_checks")).toEqual([]);
   });
 
-  it("keeps the newest 50 reports per show", async () => {
+  it("keeps the newest 50 reports per studio", async () => {
     const t = await setup();
     for (let i = 0; i < 55; i++) {
       await expectOk(t.client().post(`/check/${t.studio.inviteCode}/report`, report(`chk_${String(i).padStart(10, "0")}`, `Guest ${i}`)));

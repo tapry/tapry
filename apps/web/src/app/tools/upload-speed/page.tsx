@@ -3,7 +3,7 @@ import { UploadSpeed } from "./upload-speed";
 
 export const metadata = {
   title: "Upload-speed check",
-  description: "Is your internet good enough to record a podcast or interview? Test your upload speed, free.",
+  description: "Is your internet good enough to record a podcast, interview or video? Test your upload speed, free.",
 };
 
 /** The free upload-speed check, also on self-hosted servers: no account, tests against this server. */

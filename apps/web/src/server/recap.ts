@@ -69,18 +69,18 @@ export class RecapService {
   }
 
   /** Whose files an emailed link opens; null when it's wrong, replaced or expired. */
-  async participantFor(token: string): Promise<(Participant & { showName: string }) | null> {
-    const [row] = await this.db.query<{ id: string; session_id: string; role: Participant["role"]; show_name: string }>(
-      `SELECT p.id, p.session_id, p.role, st.name AS show_name
+  async participantFor(token: string): Promise<(Participant & { studioName: string }) | null> {
+    const [row] = await this.db.query<{ id: string; session_id: string; role: Participant["role"]; studio_name: string }>(
+      `SELECT p.id, p.session_id, p.role, st.name AS studio_name
        FROM recap_requests q JOIN participants p ON p.id = q.participant_id
        JOIN sessions s ON s.id = p.session_id JOIN studios st ON st.id = s.studio_id
        WHERE q.token_hash = $1 AND q.status = 'sent' AND q.expires_at > now() AND st.deleted_at IS NULL`,
       [hashToken(token)],
     );
-    return row ? { id: row.id, sessionId: row.session_id, role: row.role, showName: row.show_name } : null;
+    return row ? { id: row.id, sessionId: row.session_id, role: row.role, studioName: row.studio_name } : null;
   }
 
-  /** The show lets guests have their files, and this person recorded something still here. */
+  /** The studio lets guests have their files, and this person recorded something still here. */
   private async allowed(p: Participant) {
     const [row] = await this.db.query<{ settings: unknown }>(
       `SELECT st.settings FROM sessions s JOIN studios st ON st.id = s.studio_id
@@ -98,7 +98,7 @@ interface Due {
   session_id: string;
   email: string;
   attempts: number;
-  show_name: string;
+  studio_name: string;
   settings: unknown;
   has_files: boolean;
 }
@@ -117,7 +117,7 @@ export async function sendDueRecaps(db: Db, mail: RecapMail) {
       continue;
     }
     try {
-      await mail.mailer.send(recapMessage(due.email, due.show_name, `${mail.appUrl.replace(/\/$/, "")}/recap/${token}`, mail.promoUrl));
+      await mail.mailer.send(recapMessage(due.email, due.studio_name, `${mail.appUrl.replace(/\/$/, "")}/recap/${token}`, mail.promoUrl));
       // token_hash only matches if the guest didn't change the address meanwhile; then the new one is still due.
       await db.query(
         `UPDATE recap_requests SET status = 'sent', email = NULL, error = NULL, finished_at = now(), locked_until = NULL,
@@ -141,11 +141,11 @@ export async function sendDueRecaps(db: Db, mail: RecapMail) {
   }
 }
 
-/** The next recap to send, with a fresh link token. Every episode they're in must have settled. */
+/** The next recap to send, with a fresh link token. Every recording they're in must have settled. */
 async function claim(db: Db, token: string): Promise<Due | null> {
   return db.transaction(async (tx) => {
     const [due] = await tx.query<Due>(
-      `SELECT q.participant_id, q.session_id, q.email, q.attempts, st.name AS show_name, st.settings,
+      `SELECT q.participant_id, q.session_id, q.email, q.attempts, st.name AS studio_name, st.settings,
               EXISTS (SELECT 1 FROM outputs o JOIN recordings r ON r.id = o.recording_id
                       WHERE o.participant_id = q.participant_id AND r.deleted_at IS NULL AND r.processing = 'ready'
                         AND o.kind IN ('audio', 'video')) AS has_files
@@ -191,20 +191,20 @@ export async function sweepRecaps(db: Db) {
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export function recapMessage(to: string, showName: string, link: string, promoUrl: string | null) {
+export function recapMessage(to: string, studioName: string, link: string, promoUrl: string | null) {
   const promo = promoUrl ? `Record your own, free: ${promoUrl}` : null;
   const text = [
-    `Your recording from ${showName} is ready.`,
+    `Your recording from ${studioName} is ready.`,
     `Download it here: ${link}`,
     `This link is just for you and works for ${RECAP_LINK_DAYS} days. We won't email you again about it, and we don't keep your address.`,
     ...(promo ? [promo] : []),
   ].join("\n\n");
   const p = 'style="margin:0 0 16px;font:16px/1.5 system-ui,sans-serif;color:#222"';
   const html = [
-    `<p ${p}>Your recording from <strong>${escapeHtml(showName)}</strong> is ready.</p>`,
+    `<p ${p}>Your recording from <strong>${escapeHtml(studioName)}</strong> is ready.</p>`,
     `<p ${p}><a href="${escapeHtml(link)}">Download your recording</a></p>`,
     `<p ${p}>This link is just for you and works for ${RECAP_LINK_DAYS} days. We won't email you again about it, and we don't keep your address.</p>`,
     ...(promoUrl ? [`<p ${p}><a href="${escapeHtml(promoUrl)}">Record your own, free</a></p>`] : []),
   ].join("\n");
-  return { to, subject: `Your recording from ${showName}`, text, html };
+  return { to, subject: `Your recording from ${studioName}`, text, html };
 }

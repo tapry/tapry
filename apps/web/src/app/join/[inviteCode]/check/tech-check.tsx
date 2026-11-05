@@ -15,7 +15,7 @@ const SAMPLE_SECONDS = 5;
 
 /**
  * The guest tech check: the green room's checks plus an upload-speed test and a short test
- * recording played back on the spot. Nothing is recorded for the show; the results go to the
+ * recording played back on the spot. Nothing is recorded for the studio; the results go to the
  * host only when the guest sends them.
  */
 export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: string; hostName: string; settings: StudioSettings }) {
