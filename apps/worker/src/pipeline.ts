@@ -342,7 +342,7 @@ async function renderPiece(track: TrackInput, path: string, { opts, duration, ti
     );
     return true;
   }
-  const hasAudio = (await probeStreams(opts.ffprobe, track.rawPath)).includes("audio");
+  const hasAudio = (await probeStreams(opts.ffprobe, track.rawPath, RAW_FORMATS)).includes("audio");
   const h = opts.videoHeight;
   const frame = multi
     ? `scale=${even((h * 16) / 9)}:${h}:force_original_aspect_ratio=decrease,pad=${even((h * 16) / 9)}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`
@@ -579,7 +579,9 @@ async function renderMix(rendered: OutputFile[], opts: PipelineOptions, timeoutM
 }
 
 // MediaRecorder output has no index and sometimes odd timestamps: regenerate them.
-const INPUT_FLAGS = ["-y", "-hide_banner", "-nostdin", "-fflags", "+genpts"];
+/** What MediaRecorder writes (WebM, or MP4 in Safari): other demuxers never see a guest's bytes. */
+export const RAW_FORMATS = "matroska,webm,mov,mp4,m4a";
+const INPUT_FLAGS = ["-y", "-hide_banner", "-nostdin", "-fflags", "+genpts", "-format_whitelist", RAW_FORMATS];
 
 /** "Sam", "Sam (2)" when two people share a name; safe for file names everywhere. */
 function uniqueNames(tracks: TrackInput[]) {

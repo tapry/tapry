@@ -52,6 +52,7 @@ export async function signInHost(page: Page) {
   if (fresh) {
     await page.getByRole("link", { name: "Create admin account" }).click();
     await page.getByLabel("Your name").fill("Dev Host");
+    await page.getByLabel("Setup code").fill("e2e-setup-code-12345"); // playwright.config.ts sets SETUP_TOKEN
   } else {
     await page.getByRole("link", { name: "Log in" }).click();
   }

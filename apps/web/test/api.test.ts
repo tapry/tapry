@@ -17,7 +17,7 @@ describe("upload API", () => {
   const createTrack = async (token = t.guest.token) => {
     const res = await t.call(
       `/sessions/${t.sessionId}/tracks`,
-      { recordingId: t.recordingId, kind: "audio", mimeType: MIME, startedAt: 1000 },
+      { recordingId: t.recordingId, kind: "audio", mimeType: MIME, startedAt: t.now() },
       token,
     );
     expect(res.status).toBe(201);
@@ -77,7 +77,7 @@ describe("upload API", () => {
       const outsider = (await t.hostBrowser.post(`/studios/${otherStudio.id}/open`)).body;
       const res = await t.call(
         `/sessions/${t.sessionId}/tracks`,
-        { recordingId: t.recordingId, kind: "audio", mimeType: MIME, startedAt: 1 },
+        { recordingId: t.recordingId, kind: "audio", mimeType: MIME, startedAt: t.now() },
         outsider.token,
       );
       expect(res.status).toBe(403);
@@ -100,7 +100,7 @@ describe("upload API", () => {
   });
 
   describe("client-chosen track ids", () => {
-    const body = (trackId: string) => ({ trackId, recordingId: t.recordingId, kind: "audio", mimeType: MIME, startedAt: 1 });
+    const body = (trackId: string) => ({ trackId, recordingId: t.recordingId, kind: "audio", mimeType: MIME, startedAt: t.now() });
 
     it("registers with the client's id, and a repeat is harmless", async () => {
       const first = await t.call(`/sessions/${t.sessionId}/tracks`, body("trk_clientchosen00000001"));
@@ -279,7 +279,7 @@ describe("upload API", () => {
         recordingId: "rec_doesnotexist",
         kind: "audio",
         mimeType: MIME,
-        startedAt: 1,
+        startedAt: t.now(),
       });
       expect(res.status).toBe(404);
     });
@@ -288,7 +288,7 @@ describe("upload API", () => {
   it("reports each participant's upload progress in the session state", async () => {
     const audio = await createTrack();
     const video = (
-      await t.call(`/sessions/${t.sessionId}/tracks`, { recordingId: t.recordingId, kind: "video", mimeType: MIME, startedAt: 1 })
+      await t.call(`/sessions/${t.sessionId}/tracks`, { recordingId: t.recordingId, kind: "video", mimeType: MIME, startedAt: t.now() })
     ).body.trackId;
     await upload(audio, 0, "12345");
     await upload(video, 0, "1234567890");
@@ -320,7 +320,7 @@ describe("upload API", () => {
       headers: () => ({ authorization: `Bearer ${t.guest.token}` }),
     });
     const queue = new UploadQueue({ store, transport });
-    const track = { sessionId: t.sessionId, trackId, kind: "audio" as const, mimeType: MIME, startedAt: 1000 };
+    const track = { sessionId: t.sessionId, trackId, kind: "audio" as const, mimeType: MIME, startedAt: t.now() };
     await store.putTrack(track);
 
     for (let seq = 0; seq < 5; seq++) {

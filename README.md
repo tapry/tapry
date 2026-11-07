@@ -61,7 +61,7 @@ git clone <this repository> tapry && cd tapry/deploy/compose
 docker compose up -d
 ```
 
-Open `https://studio.example.com`; the first account becomes the admin. Requirements, ports,
+Open `https://studio.example.com`; the first account becomes the admin (the form asks for the setup code `setup.sh` printed). Requirements, ports,
 using your own S3, updating and backups: **[docs/self-hosting.md](docs/self-hosting.md)**.
 
 To try it on your own machine: `./setup.sh localhost && docker compose up -d`, then open

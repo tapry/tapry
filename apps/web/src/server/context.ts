@@ -34,7 +34,7 @@ export function getServices(): Promise<Services> {
     await migrate(db);
     const mailer = config.mail && new SmtpMailer(config.mail.smtp);
     const svc = createServices(db, storage, {
-      auth: { allowSignup: config.allowSignup },
+      auth: { allowSignup: config.allowSignup, setupToken: config.setupToken },
       hub: (shared.hub ??= new LiveHub()),
       call: config.call,
       guestPromoUrl: config.guestPromoUrl,

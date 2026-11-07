@@ -44,8 +44,10 @@ git clone <repo> tapry && cd tapry/deploy/compose
 docker compose up -d                            # first run builds the image (a few minutes)
 ```
 
-Open `https://studio.example.com`. The **first account you create becomes the admin**; after
-that sign-up is closed (set `ALLOW_SIGNUP=true` in `.env` to let others register).
+Open `https://studio.example.com`. The **first account you create becomes the admin**: the form
+asks for the setup code `setup.sh` printed (`SETUP_TOKEN` in `.env`), so nobody who finds your new
+server first can take it. After that sign-up is closed (set `ALLOW_SIGNUP=true` in `.env` to let
+others register).
 
 ### Using the release images instead of building
 
@@ -158,6 +160,9 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   connection must be encrypted unless you set `SMTP_INSECURE=true` (a mail server on your own
   network). Outside Docker, also set `APP_URL`, your server's public address. The health page says
   whether the mail server answers.
+- **What a guest's link can do:** upload their own tracks, for up to 7 days after a recording
+  stops, up to a sane amount for the recording's length (32 Mbit/s of it). Chunks left on a device
+  after that stay there. Failed logins are limited per account and per address.
 - **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
   processed files). Deleting a recording or a studio removes its files from storage within
   seconds, and once more about 16 minutes later to catch uploads that were already on their way.

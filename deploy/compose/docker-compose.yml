@@ -70,6 +70,8 @@ services:
     environment:
       <<: *app-env
       ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+      # The first account must enter this code (setup.sh writes one); empty: anyone who gets there first.
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
       # Other sites allowed to use the public upload-speed test (comma-separated origins).
       SPEED_TEST_ORIGINS: ${SPEED_TEST_ORIGINS:-}
       # GitHub "owner/name" whose latest release the health page compares with; empty: no check.

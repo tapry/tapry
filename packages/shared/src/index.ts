@@ -5,6 +5,9 @@ export const MAX_CHUNK_BYTES = 64 * 1024 * 1024;
 export const MAX_SEQ = 10_000_000;
 
 const serverTime = z.number().int().nonnegative();
+/** A name people type: no control or formatting characters, which could forge lines in the consent record. */
+const plainText = (max: number) =>
+  z.string().trim().min(1).max(max).regex(/^[^\p{Cc}\p{Cf}]+$/u, "Letters, numbers and punctuation only");
 const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/, "expected lowercase hex SHA-256");
 const mimeType = z.string().min(1).max(200);
 
@@ -21,8 +24,10 @@ const email = z
 
 export const signupBody = z.object({
   email,
-  name: z.string().trim().min(1).max(100),
+  name: plainText(100),
   password: z.string().min(10, "Use at least 10 characters").max(200),
+  /** The install's SETUP_TOKEN: the first account needs it when the server has one. */
+  setupToken: z.string().max(200).optional(),
 });
 
 export const loginBody = z.object({
@@ -78,7 +83,7 @@ export type StudioSettings = z.infer<typeof studioSettings>;
 const settingsPatch = z.object(settingsFields).partial();
 
 export const createStudioBody = z.object({
-  name: z.string().trim().min(1).max(100),
+  name: plainText(100),
   settings: settingsPatch.optional(),
 });
 
@@ -89,7 +94,7 @@ export const updateStudioBody = z.object({
 
 export const joinBody = z.object({
   inviteCode: z.string().min(1).max(100),
-  displayName: z.string().trim().min(1).max(60),
+  displayName: plainText(60),
   /** The guest ticked "I agree to be recorded". */
   consent: z.literal(true, { error: "Consent to recording is required" }),
   /**
@@ -112,7 +117,7 @@ export type TechCheckResult = z.infer<typeof techCheckResult>;
 export const techCheckReport = z.object({
   /** Chosen by the page, so sending again (after another try) updates the same report. */
   reportId: z.string().regex(/^chk_[A-Za-z0-9_-]{8,40}$/),
-  name: z.string().trim().min(1).max(60),
+  name: plainText(60),
   /** "Chrome on macOS": worked out by the page from its user agent. */
   browser: z.string().max(60),
   checks: z.array(techCheckResult).min(1).max(12),

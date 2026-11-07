@@ -11,9 +11,17 @@
 	https_port 8443
 	# Automatic redirects would point at :8443; the http:// block below redirects instead.
 	auto_https disable_redirects
-	servers {
+	servers :8443 {
 		# HTTP/3 would advertise UDP 8443, which isn't published.
 		protocols h1 h2
+		# The layer4 proxy below passes the visitor's address in a PROXY header; without it every
+		# visitor would look like 127.0.0.1 to the sites (and to the app's per-address limits).
+		listener_wrappers {
+			proxy_protocol {
+				allow 127.0.0.1/32
+			}
+			tls
+		}
 	}
 	layer4 {
 		:443 {
@@ -23,7 +31,10 @@
 				proxy 127.0.0.1:5349
 			}
 			route {
-				proxy 127.0.0.1:8443
+				proxy {
+					upstream 127.0.0.1:8443
+					proxy_protocol v2
+				}
 			}
 		}
 	}

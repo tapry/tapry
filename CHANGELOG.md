@@ -5,6 +5,17 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- Security, before going public:
+  - **Setup code for the first account.** `setup.sh` now writes `SETUP_TOKEN` to `.env` and prints
+    it; creating the first (admin) account asks for it, so nobody else can claim a new install
+    first. Existing installs aren't affected (they have their admin). Without `SETUP_TOKEN` the
+    first visitor still becomes admin, as before.
+  - Guests' uploads are accepted for 7 days after a recording stops, within a sane amount for
+    its length and at most 50 tracks per person; a track can't claim to have begun before Record.
+  - Failed logins are also limited per address, and names can't contain control characters.
+  - Docker: Caddy now passes each visitor's real address to the app, so per-address limits (the
+    public upload-speed test, logins) apply per visitor instead of to everyone at once.
+  - The media tools only read the formats browsers record (WebM, MP4).
 - Reliability, after a review for ways to lose a recording:
   - One unreadable track no longer fails the recording for everyone. The rest get their files, and the
     host sees who's missing and can try again.

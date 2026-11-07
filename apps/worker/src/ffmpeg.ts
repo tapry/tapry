@@ -44,7 +44,10 @@ export async function probeDurationMs(ffprobe: string, file: string): Promise<nu
 }
 
 /** Stream kinds present in a file, e.g. ["video", "audio"]. */
-export async function probeStreams(ffprobe: string, file: string): Promise<string[]> {
-  const out = await run(ffprobe, ["-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", file]);
+export async function probeStreams(ffprobe: string, file: string, formatWhitelist?: string): Promise<string[]> {
+  const out = await run(ffprobe, [
+    "-v", "error", ...(formatWhitelist ? ["-format_whitelist", formatWhitelist] : []),
+    "-show_entries", "stream=codec_type", "-of", "csv=p=0", file,
+  ]);
   return out.split("\n").map((s) => s.trim()).filter(Boolean);
 }

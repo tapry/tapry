@@ -1,4 +1,5 @@
 import type { loginBody, signupBody } from "@tapry/shared";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
@@ -18,9 +19,16 @@ export interface AuthOptions {
   sessionTtlMs?: number;
   /** Failed logins per email before a cooldown. */
   maxFailures?: number;
+  /** Failed logins from one address (any emails) before a cooldown. */
+  maxFailuresPerAddress?: number;
   failureWindowMs?: number;
+  /** The first account must present this, so a stranger can't take over a new install. Unset: no code. */
+  setupToken?: string | null;
   now?: () => number;
 }
+
+/** Failure records kept before idle addresses and emails are dropped. */
+const MAX_TRACKED = 10_000;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -36,8 +44,17 @@ export class AuthService {
     this.now = opts.now ?? Date.now;
   }
 
+  /** Whether the first account needs the install's setup code. */
+  get setupRequired() {
+    return !!this.opts.setupToken;
+  }
+
   /** The first account on an install becomes admin; after that, sign-up needs allowSignup. */
   async signup(body: z.infer<typeof signupBody>): Promise<{ user: User; token: string }> {
+    // Refuse before the (deliberately slow) password hash, so a closed server can't be made to
+    // hash for anyone; the transaction checks again under the lock.
+    const [{ count: before }] = (await this.db.query<{ count: number }>("SELECT count(*)::int AS count FROM users")) as [{ count: number }];
+    this.checkSignup(before, body.setupToken);
     const passwordHash = await hashPassword(body.password);
     const id = newId("usr");
     const user = await this.db.transaction(async (tx) => {
@@ -46,9 +63,7 @@ export class AuthService {
       const [{ count }] = (await tx.query<{ count: number }>("SELECT count(*)::int AS count FROM users")) as [
         { count: number },
       ];
-      if (count > 0 && !this.opts.allowSignup) {
-        throw new ApiError(403, "signup_closed", "Sign-up is closed on this server. Ask the admin for an account.");
-      }
+      this.checkSignup(count, body.setupToken);
       const [row] = await tx.query<UserRow>(
         `INSERT INTO users (id, email, name, password_hash, is_admin) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (email) DO NOTHING RETURNING *`,
@@ -60,12 +75,29 @@ export class AuthService {
     return { user, token: await this.createSession(user.id) };
   }
 
-  async login(body: z.infer<typeof loginBody>): Promise<{ user: User; token: string }> {
-    this.checkRateLimit(body.email);
+  private checkSignup(existing: number, setupToken: string | undefined) {
+    if (existing > 0) {
+      if (!this.opts.allowSignup) throw new ApiError(403, "signup_closed", "Sign-up is closed on this server. Ask the admin for an account.");
+      return;
+    }
+    const expected = this.opts.setupToken;
+    if (!expected) return;
+    const digest = (s: string) => createHash("sha256").update(s, "utf8").digest();
+    if (!setupToken || !timingSafeEqual(digest(setupToken), digest(expected))) {
+      throw new ApiError(403, "setup_token_required", "The first account needs this server's setup code (SETUP_TOKEN in its .env file)");
+    }
+  }
+
+  /** `address`: the client's, for a limit across emails (an attacker trying many accounts). */
+  async login(body: z.infer<typeof loginBody>, address = "unknown"): Promise<{ user: User; token: string }> {
+    const addressKey = `addr:${address}`;
+    this.checkRateLimit(body.email, this.opts.maxFailures ?? 10);
+    this.checkRateLimit(addressKey, this.opts.maxFailuresPerAddress ?? 50);
     const [row] = await this.db.query<UserRow>("SELECT * FROM users WHERE email = $1", [body.email]);
     const ok = await verifyPassword(body.password, row?.password_hash ?? (await dummyHash()));
     if (!row || !ok) {
       this.recordFailure(body.email);
+      this.recordFailure(addressKey);
       throw new ApiError(401, "invalid_credentials", "Wrong email or password");
     }
     this.failures.delete(body.email);
@@ -107,17 +139,26 @@ export class AuthService {
 
   // In-memory, per process: enough to stop password guessing on a single-node self-host.
   // Move to Redis/Postgres when the cloud runs several web instances.
-  private checkRateLimit(email: string) {
-    const window = this.opts.failureWindowMs ?? 15 * 60 * 1000;
-    const recent = (this.failures.get(email) ?? []).filter((t) => t > this.now() - window);
-    this.failures.set(email, recent);
-    if (recent.length >= (this.opts.maxFailures ?? 10)) {
+  private checkRateLimit(key: string, max: number) {
+    const recent = (this.failures.get(key) ?? []).filter((t) => t > this.now() - this.window());
+    if (recent.length) this.failures.set(key, recent);
+    else this.failures.delete(key);
+    if (recent.length >= max) {
       throw new ApiError(429, "too_many_attempts", "Too many failed sign-ins. Try again in a few minutes.");
     }
   }
 
-  private recordFailure(email: string) {
-    this.failures.set(email, [...(this.failures.get(email) ?? []), this.now()]);
+  private recordFailure(key: string) {
+    this.failures.set(key, [...(this.failures.get(key) ?? []), this.now()]);
+    // Every new email or address adds an entry: drop the idle ones so memory can't grow without end.
+    if (this.failures.size > MAX_TRACKED) {
+      const cutoff = this.now() - this.window();
+      for (const [k, times] of this.failures) if (!times.some((t) => t > cutoff)) this.failures.delete(k);
+    }
+  }
+
+  private window() {
+    return this.opts.failureWindowMs ?? 15 * 60 * 1000;
   }
 }
 

@@ -33,7 +33,7 @@ export interface Services {
 export function createServices(
   db: Db,
   storage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call"> } = {
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call"> } = {
     auth: { allowSignup: false },
   },
 ): Services {
@@ -50,7 +50,7 @@ export function createServices(
     auth: new AuthService(db, { now: opts.now, ...opts.auth }),
     studios: new StudioService(db, live, () => processing.onEnqueue()),
     live,
-    uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess),
+    uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess, { now: opts.now, bytesPerSecondCap: opts.bytesPerSecondCap }),
     processing,
     call: new CallService(db, opts.call ?? null),
     recaps: new RecapService(db, !!opts.mailer, () => processing.onEnqueue()),
