@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryChunkStore } from "../src/store/memory.js";
-import { ChunkNotPersistedError, TrackRecorder } from "../src/track-recorder.js";
+import { ChunkNotPersistedError, RecorderStalledError, TrackRecorder } from "../src/track-recorder.js";
 import type { ChunkMeta } from "../src/types.js";
 import { UploadQueue } from "../src/upload-queue.js";
 import { asMediaRecorder, FakeMediaRecorder, FakeTransport, fakeStream, flush, text } from "./fakes.js";
@@ -158,5 +158,46 @@ describe("TrackRecorder", () => {
     const rec = make();
     await rec.start();
     await expect(rec.start()).rejects.toThrow(/state "recording"/);
+  });
+
+  it("says so when MediaRecorder stops by itself, after its chunks are safe", async () => {
+    const stops: string[] = [];
+    const rec = make({ onUnexpectedStop: () => stops.push(rec.state) });
+    await rec.start();
+    FakeMediaRecorder.instances[0]!.emit("a");
+    FakeMediaRecorder.instances[0]!.stop();
+    await rec.stop();
+    expect(stops).toEqual(["stopped"]);
+    expect(errors).toEqual([expect.objectContaining({ message: "Recording stopped unexpectedly" })]);
+  });
+
+  it("doesn't report a normal stop as unexpected", async () => {
+    const stops: string[] = [];
+    const rec = make({ onUnexpectedStop: () => stops.push("x") });
+    await rec.start();
+    await rec.stop();
+    expect(stops).toEqual([]);
+  });
+
+  it("reports a recorder that stops producing chunks, and when it recovers", async () => {
+    vi.useFakeTimers();
+    try {
+      let recovered = 0;
+      const rec = make({ stallMs: 15_000, onRecovered: () => recovered++ });
+      await rec.start();
+      clock += 14_000;
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(errors).toEqual([]);
+      clock += 2_000;
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(errors).toEqual([expect.any(RecorderStalledError)]);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(errors).toHaveLength(1); // once per stall
+      FakeMediaRecorder.instances[0]!.emit("a");
+      expect(recovered).toBe(1);
+      await rec.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

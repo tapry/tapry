@@ -10,6 +10,7 @@ const recording = (over: Partial<RecordingSummary> = {}): RecordingSummary => ({
   status: "stopped",
   processing: "pending",
   processingError: null,
+  skippedTracks: [],
   transcript: "off",
   startedAt: T - 30 * 60_000,
   stoppedAt: T,

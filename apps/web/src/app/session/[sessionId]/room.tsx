@@ -66,6 +66,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         console.error("[recording]", err);
         setRecorderError(err instanceof Error ? err.message : String(err));
       },
+      onRecovered: () => setRecorderError(null),
       onLocalActive: setLocalActive,
     });
     return () => {
@@ -350,6 +351,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                             upload={state.uploads.find((u) => u.participantId === p.id)}
                             stopped={state.recording.status === "stopped"}
                             away={!!away}
+                            startedAt={state.recording.startedAt}
+                            offsetMs={ready.clock?.offsetMs ?? 0}
                           />
                         ) : (
                           present && (
@@ -622,6 +625,8 @@ function EndedView({
   );
 }
 
+/** A device starts recording within seconds; longer means it may have missed Record. */
+const LATE_START_MS = 20_000;
 const READY_POLL_MS = 5_000;
 /** Download links are signed for an hour: fetch fresh ones well before that. */
 const LINKS_REFRESH_MS = 30 * 60_000;
@@ -741,12 +746,30 @@ function ParticipantUpload({
   upload,
   stopped,
   away,
+  startedAt,
+  offsetMs,
 }: {
   upload: SessionState["uploads"][number] | undefined;
   stopped: boolean;
   away: boolean;
+  startedAt: number;
+  /** Server time minus this device's clock. */
+  offsetMs: number;
 }) {
-  if (!upload) return <span className="text-xs text-muted">{stopped ? "Nothing recorded" : "Starting…"}</span>;
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (upload || stopped) return setLate(false);
+    const id = setTimeout(() => setLate(true), Math.max(0, startedAt + LATE_START_MS - localNow() - offsetMs));
+    return () => clearTimeout(id);
+  }, [upload, stopped, startedAt, offsetMs]);
+  if (!upload) {
+    if (stopped) return <span className="text-xs text-muted">Nothing recorded</span>;
+    return late ? (
+      <span className="text-xs text-warn-strong" data-testid="not-recording-yet">Not recording yet. Ask them to reload the page.</span>
+    ) : (
+      <span className="text-xs text-muted">Starting…</span>
+    );
+  }
   const done = upload.tracks > 0 && upload.completeTracks === upload.tracks;
   const text = done
     ? `✓ Uploaded · ${mb(upload.bytes)}`

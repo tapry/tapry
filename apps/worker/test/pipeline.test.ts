@@ -14,6 +14,8 @@ import {
   measureLoudness,
   PODCAST_LOUDNESS,
   renderRecording,
+  type SkippedTrack,
+  type TrackInput,
   type TrackInput,
   VIDEO_MAX_BITRATE,
 } from "../src/pipeline.js";
@@ -396,5 +398,84 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     ).catch((e) => e);
     expect(err).toBeInstanceOf(FfmpegError);
     expect(err.stderrTail).toMatch(/Invalid data|could not find|EBML/i);
+  });
+
+  describe("when a track is damaged", () => {
+    const track = (over: Partial<TrackInput>): TrackInput => ({
+      trackId: "trk",
+      participantId: "good",
+      participantName: "Good",
+      kind: "audio",
+      rawPath: audioWebm,
+      offsetMs: 0,
+      ...over,
+    });
+    const junk = () => {
+      const path = join(dir, "junk.raw");
+      writeFileSync(path, "this is not media at all".repeat(100));
+      return path;
+    };
+    const render = (tracks: TrackInput[], name: string) => {
+      const skipped: SkippedTrack[] = [];
+      const outputs = renderRecording(tracks, {
+        ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoHeight: 720, onSkipped: (s) => skipped.push(s),
+      });
+      return { outputs, skipped };
+    };
+
+    it("renders everyone else and says who was left out", async () => {
+      const run = render([track({}), track({ trackId: "bad", participantId: "bad", participantName: "Bad", rawPath: junk() })], "one-bad");
+      const names = (await run.outputs).map((o) => o.fileName);
+      expect(names).toEqual(["Good - audio.wav", "Combined.wav"]);
+      expect(run.skipped).toEqual([expect.objectContaining({ trackId: "bad", participantName: "Bad", kind: "audio", reason: expect.any(String) })]);
+    });
+
+    it("keeps the readable piece when one of a person's pieces is damaged", async () => {
+      const run = render([track({ trackId: "a" }), track({ trackId: "b", rawPath: junk() })], "one-piece");
+      expect((await run.outputs).map((o) => o.fileName)).toEqual(["Good - audio.wav", "Combined.wav"]);
+      expect(run.skipped.map((s) => s.trackId)).toEqual(["b"]);
+    });
+
+    it("keeps the readable piece of a person's video too (one piece: nothing to blend)", async () => {
+      const run = render([track({ trackId: "v1", kind: "video", rawPath: videoWebm }), track({ trackId: "v2", kind: "video", rawPath: junk() })], "video-piece");
+      const outputs = await run.outputs;
+      expect(outputs.map((o) => o.fileName)).toEqual(["Good - video.mp4", "Combined.mp4"]);
+      expect(probe(outputs[0]!.path, "stream=codec_type")).toContain("audio");
+      expect(run.skipped.map((s) => s.trackId)).toEqual(["v2"]);
+    });
+
+    it("fails when nothing can be read, which is more likely the machine than the media", async () => {
+      await expect(render([track({ rawPath: junk() })], "all-bad").outputs).rejects.toBeInstanceOf(FfmpegError);
+    });
+
+    it("keeps what follows a lost chunk in place, instead of pulling it earlier", async () => {
+      // A beep every 2 s, so every position after the gap is checkable.
+      const source = join(dir, "beeps.webm");
+      await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "aevalsrc='if(lt(mod(t,2),0.2),0.3*sin(2*PI*440*t),0)':s=48000:d=30",
+        "-c:a", "libopus", "-b:a", "128k", "-vbr", "off", source]);
+      const parts = chunk(source, 8);
+      const gapped = join(dir, "gapped.raw");
+      await concatChunks(parts.filter((_, i) => i !== 3), gapped);
+      const beeps = (file: string) => {
+        const s = samples(file);
+        const found: number[] = [];
+        for (let i = 0, last = -1; i < s.length; i++) {
+          if (Math.abs(s[i]!) > 3000 && (last < 0 || i - last > 48000)) {
+            found.push(i / 48000);
+            last = i;
+          } else if (Math.abs(s[i]!) > 3000) last = i;
+        }
+        return found;
+      };
+      const opts = { ffmpeg, ffprobe, durationMs: 30_000, videoHeight: 720 as const };
+      const [repaired] = await renderRecording([track({ rawPath: gapped, hasGaps: true })], { ...opts, workDir: join(dir, "gap-fixed") });
+      const after = beeps(repaired!.path).filter((t) => t > 11);
+      expect(after.length).toBeGreaterThan(3); // the gap itself is silent, then the beeps return
+      for (const t of after) expect(Math.abs(t - Math.round(t / 2) * 2)).toBeLessThan(0.05); // still on the 2-second marks
+      // Without the flag, this is what happens: everything after the gap lands off the marks.
+      const [shifted] = await renderRecording([track({ rawPath: gapped })], { ...opts, workDir: join(dir, "gap-shifted") });
+      const off = beeps(shifted!.path).filter((t) => t > 11);
+      expect(off.some((t) => Math.abs(t - Math.round(t / 2) * 2) > 0.2)).toBe(true);
+    });
   });
 });

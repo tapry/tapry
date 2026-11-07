@@ -252,4 +252,10 @@ CREATE TABLE recap_requests (
 CREATE INDEX recap_requests_session ON recap_requests (session_id);
 CREATE INDEX recap_requests_pending ON recap_requests (created_at) WHERE status = 'pending';
 `,
+  `
+-- Tracks left out of the files because they couldn't be read: { name, kind }, shown to the host.
+ALTER TABLE recordings ADD COLUMN skipped_tracks jsonb NOT NULL DEFAULT '[]';
+-- A track finished while a render was running, after it had read its chunks: render again.
+ALTER TABLE recordings ADD COLUMN rerun_requested boolean NOT NULL DEFAULT false;
+`,
 ];

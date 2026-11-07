@@ -127,6 +127,11 @@ function RecordingRow({
     };
   else if (e.processing === "failed")
     note = { text: e.processingError ?? "We couldn't finish the files for this recording. Your recordings are safe; try again.", tone: "danger" };
+  else if (e.processing === "ready" && e.skippedTracks.length > 0)
+    note = {
+      text: `We couldn't read ${listNames(e.skippedTracks.map((t) => `${t.name}'s ${t.kind}`))}, so it's missing from these files. Everyone else's are fine. The upload is kept, so you can try again.`,
+      tone: "warn",
+    };
 
   return (
     <li className="border-b border-border last:border-0" data-testid="recording">
@@ -164,9 +169,9 @@ function RecordingRow({
               )}
             >
               <span className="text-pretty">{note.text}</span>
-              {(waiting || e.processing === "failed") && (
+              {(waiting || e.processing === "failed" || (e.processing === "ready" && e.skippedTracks.length > 0)) && (
                 <Button variant="secondary" className="h-10 px-[18px] text-sm" onClick={onProcessNow}>
-                  {e.processing === "failed" ? "Try again" : "Finish without them"}
+                  {waiting ? "Finish without them" : "Try again"}
                 </Button>
               )}
             </div>

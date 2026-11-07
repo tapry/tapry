@@ -8,6 +8,7 @@ import {
   mergeSpeakers,
   PODCAST_LOUDNESS,
   renderRecording,
+  type SkippedTrack,
   toDocx,
   toSrt,
   toTxt,
@@ -202,6 +203,19 @@ export class JobRunner {
     }
   }
 
+  /** Queue the processing asked for while a run was under way. */
+  private async rerunIfRequested(recordingId: string) {
+    const again = await this.db.query("UPDATE recordings SET rerun_requested = false WHERE id = $1 AND rerun_requested RETURNING id", [recordingId]);
+    if (again.length === 0) return;
+    await this.db.query(
+      `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'process_recording', $2)
+       ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running') DO NOTHING`,
+      [newId("job"), recordingId],
+    );
+    await this.db.query("UPDATE recordings SET processing = 'queued', processing_error = NULL WHERE id = $1", [recordingId]);
+    this.kicked = true;
+  }
+
   private schedule(ms: number) {
     if (this.stopped) return;
     clearTimeout(this.timer);
@@ -250,7 +264,7 @@ export class JobRunner {
     const column = STATUS_COLUMN[job.type as MediaJobType];
     await this.db.query(
       job.type === "process_recording"
-        ? `UPDATE recordings SET ${column} = 'processing', processing_started_at = now(), progress = NULL WHERE id = $1`
+        ? `UPDATE recordings SET ${column} = 'processing', processing_started_at = now(), progress = NULL, rerun_requested = false WHERE id = $1`
         : `UPDATE recordings SET ${column} = 'processing', progress = NULL WHERE id = $1`,
       [rec.id],
     );
@@ -289,6 +303,8 @@ export class JobRunner {
           finalAttempt ? "failed" : "queued",
           finalAttempt ? "Processing failed. Try again, or check the server logs." : null,
         ]);
+        // A track that finished during this run may be what it needed.
+        if (finalAttempt) await this.rerunIfRequested(rec.id);
       } else {
         await this.db.query("UPDATE recordings SET transcript = $2 WHERE id = $1", [rec.id, finalAttempt ? "failed" : "queued"]);
       }
@@ -348,8 +364,8 @@ export class JobRunner {
     const done = (error: string | null = null) =>
       this.db.query("UPDATE jobs SET status = 'done', finished_at = now(), error = $2 WHERE id = $1", [job.id, error]);
     try {
-      const [rec] = await this.db.query<{ session_id: string; processing: string; deleted_at: Date | null; raw_deleted_at: Date | null; open_tracks: number; busy: boolean }>(
-        `SELECT r.session_id, r.processing, r.deleted_at, r.raw_deleted_at,
+      const [rec] = await this.db.query<{ session_id: string; processing: string; deleted_at: Date | null; raw_deleted_at: Date | null; skipped_tracks: unknown[]; open_tracks: number; busy: boolean }>(
+        `SELECT r.session_id, r.processing, r.deleted_at, r.raw_deleted_at, r.skipped_tracks,
                 (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS open_tracks,
                 EXISTS (SELECT 1 FROM jobs j WHERE j.recording_id = r.id AND j.type = 'process_recording' AND j.status IN ('queued', 'running')) AS busy
          FROM recordings r WHERE r.id = $1`,
@@ -361,6 +377,8 @@ export class JobRunner {
         return;
       }
       if (rec.processing !== "ready" || rec.open_tracks > 0) return void (await done("kept: not fully processed"));
+      // A track the files lack exists only in its upload.
+      if (rec.skipped_tracks.length > 0) return void (await done("kept: some tracks couldn't be read"));
 
       // Mark first, so uploads and re-processing are refused while the files go.
       await this.db.query("UPDATE recordings SET raw_deleted_at = now() WHERE id = $1", [job.recording_id]);
@@ -389,8 +407,11 @@ export class JobRunner {
   }
 
   private async processRecording(rec: RecordingRow, work: string, job: JobRow) {
-    const outputs = await this.render(rec, work);
-    const replaced = await this.db.transaction(async (tx) => {
+    const { outputs, skipped } = await this.render(rec, work);
+    const { replaced, rerun } = await this.db.transaction(async (tx) => {
+      // Locked first, so a track finishing right now either asks for a rerun before we read it or finds the job done.
+      const [row] = await tx.query<{ rerun_requested: boolean }>("SELECT rerun_requested FROM recordings WHERE id = $1 FOR UPDATE", [rec.id]);
+      const rerun = row?.rerun_requested ?? false;
       // Re-processing (a late upload, "Process now" twice) replaces the previous files,
       // transcripts included: they are redone from the new audio.
       const old = await tx.query<{ storage_key: string }>("DELETE FROM outputs WHERE recording_id = $1 RETURNING storage_key", [
@@ -398,11 +419,13 @@ export class JobRunner {
       ]);
       for (const o of outputs) await insertOutput(tx, rec.id, o);
       await tx.query(
-        "UPDATE recordings SET processing = 'ready', processed_at = now(), processing_error = NULL WHERE id = $1",
-        [rec.id],
+        `UPDATE recordings SET processing = $2, processed_at = now(), processing_error = NULL, skipped_tracks = $3, rerun_requested = false WHERE id = $1`,
+        [rec.id, rerun ? "queued" : "ready", JSON.stringify(skipped)],
       );
       await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
-      if (this.opts.whisper) {
+      if (rerun) {
+        await tx.query(`INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'process_recording', $2)`, [newId("job"), rec.id]);
+      } else if (this.opts.whisper) {
         // Queued in the same transaction: a recording can't end up processed without its transcript job.
         await tx.query(
           `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'transcribe_recording', $2)
@@ -422,15 +445,19 @@ export class JobRunner {
           [newId("job"), rec.id, this.opts.rawRetentionMs / 1000],
         );
       }
-      return old.map((o) => o.storage_key);
+      return { replaced: old.map((o) => o.storage_key), rerun };
     });
     await this.removeReplaced(replaced);
-    if (this.opts.whisper) this.kicked = true; // pick the transcript up right after
+    if (rerun) this.kicked = true;
+    else if (this.opts.whisper) this.kicked = true; // pick the transcript up right after
   }
 
   /** Transcribe each person's audio separately (each track is one speaker), then merge by time. */
   private async transcribeRecording(rec: RecordingRow, work: string, job: JobRow) {
     if (!this.opts.whisper) throw new Error("Transcription is not configured on this worker");
+    const processedAt = async (q: Queryable, lock = "") =>
+      (await q.query<{ at: string | null }>(`SELECT processed_at::text AS at FROM recordings WHERE id = $1 ${lock}`, [rec.id]))[0]?.at ?? null;
+    const audioFrom = await processedAt(this.db);
     const audio = await this.db.query<{ storage_key: string; file_name: string }>(
       `SELECT o.storage_key, o.file_name FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
        WHERE o.recording_id = $1 AND o.kind = 'audio' ORDER BY p.created_at`,
@@ -475,6 +502,8 @@ export class JobRunner {
       uploaded.push({ id, key, bytes, kind: "transcript" as const, fileName: f.name, contentType: f.type, durationMs: null });
     }
     const replaced = await this.db.transaction(async (tx) => {
+      // The files were redone while this ran: this transcript is of the old audio, so go again.
+      const stale = (await processedAt(tx, "FOR UPDATE")) !== audioFrom;
       const old = await tx.query<{ storage_key: string }>(
         "DELETE FROM outputs WHERE recording_id = $1 AND kind = 'transcript' RETURNING storage_key",
         [rec.id],
@@ -482,6 +511,11 @@ export class JobRunner {
       for (const o of uploaded) await insertOutput(tx, rec.id, o);
       await tx.query("UPDATE recordings SET transcript = 'ready', transcribed_at = now() WHERE id = $1", [rec.id]);
       await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+      if (stale) {
+        await tx.query(`INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'transcribe_recording', $2)`, [newId("job"), rec.id]);
+        await tx.query("UPDATE recordings SET transcript = 'queued' WHERE id = $1", [rec.id]);
+        this.kicked = true;
+      }
       return old.map((o) => o.storage_key);
     });
     await this.removeReplaced(replaced);
@@ -528,6 +562,7 @@ export class JobRunner {
         paths.push(path);
         lastEnd = Math.max(lastEnd, c.end_ts);
       }
+      const hasGaps = chunks.some((c, n) => n > 0 && c.seq !== chunks[n - 1]!.seq + 1);
       const rawPath = join(work, `${t.id}.raw`);
       await concatChunks(paths, rawPath);
       await rm(dir, { recursive: true, force: true });
@@ -538,11 +573,18 @@ export class JobRunner {
         kind: t.kind,
         rawPath,
         offsetMs: t.started_at - rec.started_at,
+        hasGaps,
       });
     }
 
     const settings = studioSettings.parse(rec.settings);
+    const skipped: Array<{ name: string; kind: "audio" | "video" }> = [];
     const files = await renderRecording(inputs, {
+      // Metadata in the log, never the name. One bad upload must not cost everyone their files.
+      onSkipped: (s: SkippedTrack) => {
+        console.error(`[worker] left ${s.kind} ${s.trackId ?? ""} out of ${rec.id}: ${s.reason.slice(0, 500)}`);
+        if (s.kind !== "combined" && s.participantName) skipped.push({ name: s.participantName, kind: s.kind });
+      },
       ffmpeg: this.opts.ffmpeg,
       ffprobe: this.opts.ffprobe,
       workDir: join(work, "out"),
@@ -563,7 +605,7 @@ export class JobRunner {
       const bytes = await this.storage.uploadFrom(key, f.path, f.contentType);
       uploaded.push({ ...f, id, key, bytes });
     }
-    return uploaded;
+    return { outputs: uploaded, skipped };
   }
 }
 

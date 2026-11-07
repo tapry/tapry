@@ -26,7 +26,7 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
                 </a>
               ))}
             </div>
-          ) : r.processing === "failed" ? (
+          ) : r.processing === "failed" || r.processing === "ready" ? (
             <p className="text-sm text-muted">Your file couldn&apos;t be prepared here. The host has your recording.</p>
           ) : (
             <p className="flex items-center gap-2 text-sm text-muted">

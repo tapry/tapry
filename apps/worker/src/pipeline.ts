@@ -2,7 +2,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
-import { probeDurationMs, probeStreams, run } from "./ffmpeg.js";
+import { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";
 
 export interface TrackInput {
   trackId: string;
@@ -13,9 +13,22 @@ export interface TrackInput {
   rawPath: string;
   /** Track start minus recording start, server clock. Positive: the track started late. */
   offsetMs: number;
+  /** A chunk is missing from the middle: time the sound by its timestamps, so what follows stays in place. */
+  hasGaps?: boolean;
+}
+
+/** A track or file left out because ffmpeg couldn't read or render it. */
+export interface SkippedTrack {
+  trackId?: string;
+  participantId?: string;
+  participantName?: string;
+  kind: "audio" | "video" | "combined";
+  reason: string;
 }
 
 export interface PipelineOptions {
+  /** A track was left out and the rest rendered without it. */
+  onSkipped?: (skipped: SkippedTrack) => void;
   ffmpeg: string;
   ffprobe: string;
   /** Scratch folder for outputs; the caller uploads and deletes it. */
@@ -101,6 +114,7 @@ export function alignmentFilters(
   offsetMs: number,
   /** How video ends: freeze the last frame (a whole track), or black (one piece of several). */
   videoEnd: "clone" | "black" = "clone",
+  hasGaps = false,
 ): string {
   const late = Math.max(0, Math.round(offsetMs));
   const early = Math.max(0, Math.round(-offsetMs));
@@ -108,7 +122,9 @@ export function alignmentFilters(
     return [
       // Time audio by sample count from 0. Container timestamps can start below zero
       // (Opus pre-skip) or jitter, which would make -t cut files a few ms short.
-      "aresample=48000,asetpts=N/SR/TB",
+      // With a chunk missing, that count would pull everything after the gap earlier, so the
+      // timestamps decide and the gap becomes silence (under 10 ms later than a whole track).
+      hasGaps ? "aresample=48000:async=1:first_pts=0" : "aresample=48000,asetpts=N/SR/TB",
       early ? `atrim=start=${sec(early)},asetpts=PTS-STARTPTS` : "",
       late ? `adelay=${late}:all=1` : "",
       "apad",
@@ -196,6 +212,11 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   const gains = new Map<string, number>();
   const groups = groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`);
   const byGroup = new Map<TrackInput[], OutputFile>();
+  let firstFailure: FfmpegError | undefined;
+  const skip = (t: TrackInput, err: FfmpegError) => {
+    firstFailure ??= err;
+    opts.onSkipped?.({ trackId: t.trackId, participantId: t.participantId, participantName: t.participantName, kind: t.kind, reason: failureReason(err) });
+  };
   const audioFirst = [...groups].sort((a, b) => Number(a[0]!.kind === "video") - Number(b[0]!.kind === "video"));
 
   // One file per person per kind. A person can have several tracks of a kind when they
@@ -208,16 +229,28 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     const path = join(opts.workDir, `${first.trackId}.${ext}`);
     const gainDb = first.kind === "video" ? gains.get(first.participantId) : undefined;
     let hasAudio: boolean;
-    if (pieces.length === 1) {
-      hasAudio = await renderPiece(first, path, { opts, duration, timeoutMs, multi: false, gainDb });
-    } else {
-      const parts: Array<{ path: string; hasAudio: boolean }> = [];
-      for (const piece of pieces) {
-        const partPath = join(opts.workDir, `${piece.trackId}.part.${ext}`);
-        parts.push({ path: partPath, hasAudio: await renderPiece(piece, partPath, { opts, duration, timeoutMs, multi: true }) });
+    try {
+      if (pieces.length === 1) {
+        hasAudio = await renderPiece(first, path, { opts, duration, timeoutMs, multi: false, gainDb });
+      } else {
+        const parts: Array<{ path: string; hasAudio: boolean }> = [];
+        for (const piece of pieces) {
+          const partPath = join(opts.workDir, `${piece.trackId}.part.${ext}`);
+          try {
+            parts.push({ path: partPath, hasAudio: await renderPiece(piece, partPath, { opts, duration, timeoutMs, multi: true }) });
+          } catch (err) {
+            if (!(err instanceof FfmpegError)) throw err;
+            skip(piece, err);
+          }
+        }
+        if (parts.length === 0) continue;
+        await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs, gainDb });
+        hasAudio = parts.some((p) => p.hasAudio);
       }
-      await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs, gainDb });
-      hasAudio = parts.some((p) => p.hasAudio);
+    } catch (err) {
+      if (!(err instanceof FfmpegError)) throw err;
+      skip(first, err);
+      continue;
     }
     const output: OutputFile = {
       kind: first.kind,
@@ -236,18 +269,29 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     }
     byGroup.set(pieces, output);
   }
-  const outputs = groups.map((g) => byGroup.get(g)!);
+  const outputs = groups.flatMap((g) => byGroup.get(g) ?? []);
+  // Nothing readable at all: more likely the machine than the media, so the job fails and retries.
+  if (outputs.length === 0) throw firstFailure ?? new Error("No tracks to render");
 
   const hasVideo = outputs.some((o) => o.kind === "video");
   opts.onProgress?.({ done: groups.length, total: groups.length + 1, current: hasVideo ? "Side-by-side video" : "Everyone, mixed" });
-  const combined = await renderCombined(tracks, outputs, opts, timeoutMs);
-  if (combined) outputs.push(combined);
+  // Only people with a file get a tile. People's own files matter most, so a failure here doesn't lose them.
+  const rendered = tracks.filter((t) => outputs.some((o) => o.participantId === t.participantId));
+  try {
+    const combined = await renderCombined(rendered, outputs, opts, timeoutMs);
+    if (combined) outputs.push(combined);
+  } catch (err) {
+    if (!(err instanceof FfmpegError)) throw err;
+    opts.onSkipped?.({ kind: "combined", reason: failureReason(err) });
+  }
   // FLAC last, from the finished WAVs: alignment and levelling are done once, the same either way.
   if (opts.audioFormat === "flac") {
     for (const o of outputs) if (o.contentType === "audio/wav") await toFlac(o, opts, timeoutMs);
   }
   return outputs;
 }
+
+const failureReason = (err: FfmpegError) => `${err.message}: ${err.stderrTail.split("\n").slice(-3).join(" ")}`;
 
 /** Replace a finished WAV output with the same sound as FLAC (lossless). */
 async function toFlac(o: OutputFile, opts: PipelineOptions, timeoutMs: number) {
@@ -292,7 +336,7 @@ async function renderPiece(track: TrackInput, path: string, { opts, duration, ti
   if (track.kind === "audio") {
     await run(
       opts.ffmpeg,
-      [...INPUT_FLAGS, "-i", track.rawPath, "-vn", "-af", alignmentFilters("audio", track.offsetMs),
+      [...INPUT_FLAGS, "-i", track.rawPath, "-vn", "-af", alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps),
         "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", path],
       { timeoutMs },
     );
@@ -307,7 +351,7 @@ async function renderPiece(track: TrackInput, path: string, { opts, duration, ti
     opts.ffmpeg,
     [...INPUT_FLAGS, "-i", track.rawPath,
       "-vf", `${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
-      ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs), volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
+      ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps), volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
       // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
       "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(opts.videoHeight)), "-r", String(FPS),
       ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
@@ -354,7 +398,8 @@ async function mergePieces(
   if (audioLabels.length) filters.push(mix(audioLabels));
   await run(
     opts.ffmpeg,
-    ["-y", "-hide_banner", "-nostdin", ...inputs, "-filter_complex", filters.join(";"), "-map", video,
+    // One piece left (the others were unreadable): nothing to blend, so its video is mapped straight.
+    ["-y", "-hide_banner", "-nostdin", ...inputs, ...(filters.length ? ["-filter_complex", filters.join(";")] : []), "-map", parts.length > 1 ? video : "0:v",
       ...(audioLabels.length ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : []),
       "-t", duration, ...cappedVideo(opts.videoHeight), "-r", String(FPS),
       "-pix_fmt", "yuv420p", "-movflags", "+faststart", out],
