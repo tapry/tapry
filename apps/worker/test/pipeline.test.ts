@@ -16,7 +16,6 @@ import {
   renderRecording,
   type SkippedTrack,
   type TrackInput,
-  type TrackInput,
   VIDEO_MAX_BITRATE,
 } from "../src/pipeline.js";
 
