@@ -38,8 +38,33 @@ export interface TrackCompletion {
  */
 /** Slack for client clock-offset error when judging whether a track began before Stop. */
 const LATE_TRACK_SLACK_MS = 10_000;
+/**
+ * How long after Stop a recording still takes uploads: a guest who was offline can come back
+ * days later, but not weeks, when their token could otherwise add a track to a long-finished
+ * recording. Chunks still on a device after this stay there (the queue keeps trying).
+ */
+export const UPLOAD_GRACE_DAYS = 7;
+const UPLOAD_GRACE_MS = UPLOAD_GRACE_DAYS * 86_400_000;
+/** Tracks one person may register in one recording: a restart or rejoin adds a few, never dozens. */
+export const MAX_TRACKS_PER_PERSON = 50;
+/**
+ * Bytes one person may upload per second of recording (plus ten minutes' worth): 32 Mbit/s,
+ * four times what 1080p video with audio takes. Stops a guest filling the disk.
+ */
+export const BYTES_PER_SECOND_CAP = 4 * 1024 * 1024;
+const QUOTA_SLACK_S = 600;
+/** The most a "complete" may say was recorded beyond the last committed chunk (missing seqs are listed one by one). */
+const MAX_SEQ_GAP = 10_000;
+
+export interface UploadServiceOptions {
+  now?: () => number;
+  bytesPerSecondCap?: number;
+}
 
 export class UploadService {
+  private now: () => number;
+  private bytesPerSecond: number;
+
   constructor(
     private db: Db,
     private storage: Storage,
@@ -47,7 +72,11 @@ export class UploadService {
     private onProgress: (sessionId: string) => void = () => {},
     /** Called when a track is fully uploaded (the last one triggers processing). */
     private onTrackDone: (recordingId: string) => void | Promise<void> = () => {},
-  ) {}
+    opts: UploadServiceOptions = {},
+  ) {
+    this.now = opts.now ?? Date.now;
+    this.bytesPerSecond = opts.bytesPerSecondCap ?? BYTES_PER_SECOND_CAP;
+  }
 
   /**
    * Register a camera or mic track. Clients pick the id and start recording locally
@@ -55,20 +84,30 @@ export class UploadService {
    * they register (and upload) once they're back, possibly after Stop.
    */
   async createTrack(p: Participant, body: z.infer<typeof createTrackBody>) {
-    const [recording] = await this.db.query<{ status: string; stopped_at: number | null; deleted_at: Date | null }>(
-      "SELECT status, stopped_at, coalesce(deleted_at, raw_deleted_at) AS deleted_at FROM recordings WHERE id = $1 AND session_id = $2",
-      [body.recordingId, p.sessionId],
+    const [recording] = await this.db.query<{ status: string; started_at: number; stopped_at: number | null; deleted_at: Date | null; mine: number }>(
+      `SELECT status, started_at, stopped_at, coalesce(deleted_at, raw_deleted_at) AS deleted_at,
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.participant_id = $3) AS mine
+       FROM recordings r WHERE id = $1 AND session_id = $2`,
+      [body.recordingId, p.sessionId, p.id],
     );
     if (!recording) throw new ApiError(404, "recording_not_found", "Recording not found");
     if (recording.deleted_at) throw recordingGone();
+    this.checkOpen(recording);
+    // A track began while the recording ran: not before Record (clock error aside), not after Stop.
     const startedBeforeStop =
       recording.status === "recording" ||
       (recording.stopped_at !== null && body.startedAt <= recording.stopped_at + LATE_TRACK_SLACK_MS);
     if (!startedBeforeStop) {
       throw new ApiError(409, "recording_stopped", "This recording has already stopped");
     }
-
+    if (body.startedAt < recording.started_at - LATE_TRACK_SLACK_MS) {
+      throw new ApiError(409, "track_too_early", "This track began before the recording did");
+    }
     const trackId = body.trackId ?? newId("trk");
+    if (recording.mine >= MAX_TRACKS_PER_PERSON) {
+      const [known] = await this.db.query("SELECT 1 FROM tracks WHERE id = $1 AND participant_id = $2", [trackId, p.id]);
+      if (!known) throw new ApiError(429, "too_many_tracks", "Too many tracks for one person in this recording");
+    }
     const inserted = await this.db.query(
       `INSERT INTO tracks (id, session_id, recording_id, participant_id, kind, mime_type, started_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -102,6 +141,8 @@ export class UploadService {
       throw new ApiError(409, "chunk_conflict", `Chunk ${seq} was already committed with different content`);
     }
     if (track.status !== "recording") throw new ApiError(409, "track_closed", "Track is already complete");
+    this.checkOpen(track);
+    await this.checkQuota(p, track, body.bytes);
 
     // The track's own mime type, not the request's: it is what the worker will expect.
     return this.storage.presignPut(chunkStorageKey(p.sessionId, trackId, seq), {
@@ -112,7 +153,7 @@ export class UploadService {
   }
 
   async commitChunk(p: Participant, trackId: string, seq: number, body: z.infer<typeof commitChunkBody>) {
-    await this.ownedTrack(p, trackId);
+    this.checkOpen(await this.ownedTrack(p, trackId));
     const key = chunkStorageKey(p.sessionId, trackId, seq);
 
     // Trust storage, not the client: the object must really be there, whole.
@@ -148,6 +189,7 @@ export class UploadService {
     body: z.infer<typeof completeTrackBody>,
   ): Promise<TrackCompletion> {
     const owned = await this.ownedTrack(p, trackId);
+    this.checkOpen(owned);
     const result = await this.db.transaction(async (tx): Promise<TrackCompletion> => {
       const [track] = await tx.query<TrackRow>("SELECT * FROM tracks WHERE id = $1 FOR UPDATE", [trackId]);
       if (track!.status !== "recording") {
@@ -165,6 +207,9 @@ export class UploadService {
       )) as [{ max_seq: number | null }];
       // A crashed client sends null: every chunk it still had is uploaded by now,
       // so the highest committed seq is the real end of the recording.
+      if (body.lastSeq !== null && body.lastSeq > (max_seq ?? -1) + MAX_SEQ_GAP) {
+        throw new ApiError(400, "last_seq_too_high", "lastSeq is far beyond the last uploaded chunk");
+      }
       const lastSeq = Math.max(body.lastSeq ?? -1, max_seq ?? -1);
       const [{ missing }] = (await tx.query<{ missing: number[] | null }>(
         `SELECT array_agg(s ORDER BY s) AS missing FROM generate_series(0, $2::int) AS s
@@ -187,9 +232,31 @@ export class UploadService {
     return result;
   }
 
+  /** Uploads stop UPLOAD_GRACE_DAYS after Stop (see above). */
+  private checkOpen(rec: { stopped_at: number | null }) {
+    if (rec.stopped_at !== null && this.now() > rec.stopped_at + UPLOAD_GRACE_MS) {
+      throw new ApiError(409, "recording_closed", `This recording stopped more than ${UPLOAD_GRACE_DAYS} days ago and takes no more uploads`);
+    }
+  }
+
+  /** This person's committed bytes in the recording, plus this chunk, against what its length allows. */
+  private async checkQuota(p: Participant, track: TrackRow & { started_at: number; stopped_at: number | null }, bytes: number) {
+    const [{ used }] = (await this.db.query<{ used: string }>(
+      `SELECT coalesce(sum(c.bytes), 0)::text AS used FROM chunks c JOIN tracks t ON t.id = c.track_id
+       WHERE t.recording_id = $1 AND t.participant_id = $2`,
+      [track.recording_id, p.id],
+    )) as [{ used: string }];
+    const elapsedS = Math.max(0, (track.stopped_at ?? this.now()) - track.started_at) / 1000;
+    const allowance = this.bytesPerSecond * (elapsedS + QUOTA_SLACK_S);
+    if (Number(used) + bytes > allowance) {
+      throw new ApiError(413, "upload_quota", "This person has uploaded more than a recording of this length can hold");
+    }
+  }
+
   private async ownedTrack(p: Participant, trackId: string) {
-    const [track] = await this.db.query<TrackRow & { deleted_at: Date | null }>(
-      `SELECT t.*, coalesce(r.deleted_at, r.raw_deleted_at) AS deleted_at FROM tracks t JOIN recordings r ON r.id = t.recording_id
+    const [track] = await this.db.query<TrackRow & { deleted_at: Date | null; started_at: number; stopped_at: number | null }>(
+      `SELECT t.*, coalesce(r.deleted_at, r.raw_deleted_at) AS deleted_at, r.started_at, r.stopped_at
+       FROM tracks t JOIN recordings r ON r.id = t.recording_id
        WHERE t.id = $1 AND t.session_id = $2 AND t.participant_id = $3`,
       [trackId, p.sessionId, p.id],
     );

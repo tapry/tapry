@@ -19,6 +19,8 @@ const bool = (fallback: "true" | "false") =>
 const env = z.object({
   DATABASE_URL: z.string().optional(),
   ALLOW_SIGNUP: bool("false"),
+  /** The first account must enter this (setup.sh generates one), so a stranger can't claim a new install. */
+  SETUP_TOKEN: unsetIfEmpty(z.string().min(8)),
   S3_ENDPOINT: z.string().url().optional(),
   S3_PUBLIC_ENDPOINT: z.string().url().optional(),
   S3_REGION: z.string().default("us-east-1"),
@@ -83,6 +85,7 @@ export interface WorkerConfig {
 export interface Config {
   databaseUrl: string | undefined;
   allowSignup: boolean;
+  setupToken: string | null;
   storage: S3StorageConfig;
   /** How recordings get processed; `inProcess` false when a separate worker does it. */
   worker: WorkerConfig & { inProcess: boolean };
@@ -109,6 +112,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   return {
     databaseUrl: cfg.DATABASE_URL,
     allowSignup: cfg.ALLOW_SIGNUP,
+    setupToken: cfg.SETUP_TOKEN ?? null,
     storage: {
       endpoint: cfg.S3_ENDPOINT,
       publicEndpoint: cfg.S3_PUBLIC_ENDPOINT,

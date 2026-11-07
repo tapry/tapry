@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { Button, Field, Input, Notice } from "./ui";
 
-export function AuthForm({ mode, firstAccount = false }: { mode: "login" | "signup"; firstAccount?: boolean }) {
+export function AuthForm({ mode, firstAccount = false, setupRequired = false }: { mode: "login" | "signup"; firstAccount?: boolean; setupRequired?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +19,9 @@ export function AuthForm({ mode, firstAccount = false }: { mode: "login" | "sign
     setError(null);
     try {
       await apiFetch(`/auth/${mode}`, {
-        body: Object.fromEntries(["email", "password", ...(signup ? ["name"] : [])].map((k) => [k, form.get(k)])),
+        body: Object.fromEntries(
+          ["email", "password", ...(signup ? ["name"] : []), ...(signup && firstAccount && setupRequired ? ["setupToken"] : [])].map((k) => [k, form.get(k)]),
+        ),
       });
       router.replace("/studios");
       router.refresh();
@@ -48,6 +50,11 @@ export function AuthForm({ mode, firstAccount = false }: { mode: "login" | "sign
           required
         />
       </Field>
+      {signup && firstAccount && setupRequired && (
+        <Field label="Setup code" hint="SETUP_TOKEN in the server's .env file: only whoever installed it can take charge.">
+          <Input name="setupToken" autoComplete="off" required maxLength={200} />
+        </Field>
+      )}
       {signup && firstAccount && (
         <Notice tone="warn" className="flex items-start gap-3">
           <span aria-hidden>★</span>

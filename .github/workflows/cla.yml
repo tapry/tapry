@@ -136,7 +136,7 @@ jobs:
                 "",
                 missing.length ? `Still to sign: ${missing.map((l) => `@${l}`).join(", ")}` : "",
                 unlinked.size
-                  ? `Some commits aren't linked to a GitHub account (${[...unlinked].join(", ")}). Add that email to your GitHub account, or rewrite the commits with an email that is on it, then push again.`
+                  ? `Some commits aren't linked to a GitHub account (${[...unlinked].map((u) => `\`${String(u).replace(/`/g, "")}\``).join(", ")}). Add that email to your GitHub account, or rewrite the commits with an email that is on it, then push again.`
                   : "",
               ].filter((line, i, all) => line !== "" || all[i - 1] !== "").join("\n");
             }

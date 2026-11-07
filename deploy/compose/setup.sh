@@ -32,7 +32,10 @@ LIVEKIT_API_KEY=tapry
 LIVEKIT_API_SECRET=$(secret 32)
 # The first account becomes admin; after that sign-up is closed unless this is true.
 ALLOW_SIGNUP=false
+# Creating that first account asks for this code, so nobody else can claim the install first.
+SETUP_TOKEN=$(secret 12)
 ENV
 echo "Wrote .env for $SCHEME://$DOMAIN"
+echo "Setup code for the first account (also in .env as SETUP_TOKEN): $(grep ^SETUP_TOKEN= .env | cut -d= -f2)"
 [ "$DOMAIN" = "localhost" ] || echo "DNS: point $DOMAIN, s3.$DOMAIN, livekit.$DOMAIN and turn.$DOMAIN at this server. Open TCP 80, 443, 7881 and UDP 3478, 7882."
 echo "Then: docker compose up -d   (first build takes a few minutes)"

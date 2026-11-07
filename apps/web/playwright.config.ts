@@ -81,6 +81,7 @@ export default defineConfig<{ forceMp4: boolean }>({
     reuseExistingServer: false,
     env: {
       NEXT_DIST_DIR: ".next-e2e",
+      SETUP_TOKEN: "e2e-setup-code-12345",
       DATABASE_URL: `pglite://${dbDir}`,
       S3_ENDPOINT: process.env.S3_E2E_ENDPOINT ?? "",
       S3_BUCKET: "tapry-e2e",

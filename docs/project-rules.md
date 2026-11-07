@@ -86,6 +86,13 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - Transcripts: a separate `transcribe_recording` job queued when processing succeeds. Each person's audio is transcribed alone (speaker = track), then merged by time into TXT/DOCX/SRT/VTT. DOCX (`toDocx`, apps/worker) is a minimal package written with our own stored-zip writer (`zip.ts`), no dependency. Off when `WHISPER_MODEL` is unset.
 - Audio format (studio setting `audioFormat`, default wav): with flac, each finished WAV (per person, and the mix of a video-less recording) is converted to FLAC as the very last step, so alignment and loudness are identical; the WAV isn't kept.
 
+## Limits on what a token may do
+- Participant tokens don't expire (the end screen keeps using them), but uploads do: `UploadService.checkOpen` refuses tracks, chunks and completions `UPLOAD_GRACE_DAYS` (7) after Stop with 409 `recording_closed`, never 410, so a device keeps its chunks. A track's `startedAt` must be within clock slack of the recording. `MAX_TRACKS_PER_PERSON` (50) per recording; bytes per person capped at `BYTES_PER_SECOND_CAP` (32 Mbit/s) × (length + 10 min); a completion's `lastSeq` may not run more than 10,000 past the last chunk.
+- The first account needs `SETUP_TOKEN` when the server has one (`AuthService.checkSignup`, compared in constant time, checked before the password hash and again under the lock). `setup.sh` generates it; dev and tests set `SETUP_TOKEN` in the environment (e2e: playwright.config.ts).
+- Logins are limited per email (10) and per address (50) per 15 min, in memory, idle entries dropped. The address is the last X-Forwarded-For entry, which Caddy sets from the PROXY protocol header the layer4 proxy adds (deploy/compose/Caddyfile): without that every visitor would be 127.0.0.1.
+- Names (`plainText` in shared) reject control and format characters: the consent record is line-based.
+- ffmpeg and ffprobe read raw uploads with `-format_whitelist` (`RAW_FORMATS`): only the WebM and MP4 demuxers see a guest's bytes.
+
 ## Recovery on the guest's device
 - One tab per session (`holdSessionLock`, Web Lock `tapry:session:<id>`): a second tab waits and continues when the first closes, since two would record the person twice.
 - A track keeps the token it was recorded under in its `meta` (`uploadToken` in `recording.ts`), so joining again as someone new doesn't strand it. The current ticket wins for the same person, because a host's token changes on reopening.

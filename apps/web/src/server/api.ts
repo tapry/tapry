@@ -71,7 +71,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     }),
     login: handler(async (svc, req) => {
       checkOrigin(req);
-      const { user, token } = await svc.auth.login(await parseBody(req, loginBody));
+      const { user, token } = await svc.auth.login(await parseBody(req, loginBody), clientAddress(req));
       return withSessionCookie(json(200, { user }), req, token);
     }),
     logout: handler(async (svc, req) => {
