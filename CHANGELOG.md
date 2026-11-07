@@ -5,6 +5,21 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+## 0.3.0 (7 November 2026)
+
+Tapry 0.3.0: the guest recap email, a round of reliability fixes so one bad upload or a late
+guest can't cost anyone their files, security limits before going public, and the app now says
+studios and recordings.
+
+### Upgrading from 0.2.x
+
+- Set `TAPRY_IMAGES=ghcr.io/tapry` in `.env` if you use the release images: the project moved to
+  github.com/tapry/tapry.
+- Copy the new `deploy/compose/Caddyfile` (Caddy now passes visitors' real addresses to the app).
+- Optional: `SMTP_HOST`, `SMTP_FROM` (and `SMTP_USER`, `SMTP_PASSWORD`) in `.env` turn on the recap
+  email; `SETUP_TOKEN` only matters for new installs.
+- Migrations run on start, as usual.
+
 - Security, before going public:
   - **Setup code for the first account.** `setup.sh` now writes `SETUP_TOKEN` to `.env` and prints
     it; creating the first (admin) account asks for it, so nobody else can claim a new install

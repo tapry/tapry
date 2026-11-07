@@ -1,6 +1,6 @@
 {
   "name": "@tapry/site",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "description": "The Tapry website (landing page). A static export, separate from the app self-hosters run.",
