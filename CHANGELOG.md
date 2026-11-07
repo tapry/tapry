@@ -5,6 +5,16 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- Reliability, after a review for ways to lose a recording:
+  - One unreadable track no longer fails the recording for everyone. The rest get their files, and the
+    host sees who's missing and can try again.
+  - A track that finishes while the files are being made now triggers another run, instead of being
+    left out with no warning.
+  - Audio stays in place after a lost chunk, instead of moving earlier for the rest of the recording.
+  - Joining again as someone new no longer strands what you recorded before.
+  - A second tab waits instead of recording the same person twice.
+  - Join waits for the clock check, a dead connection reconnects so nobody misses Record, and a
+    recorder that stops by itself carries on in a new track.
 - The app now says **studios** and **recordings** instead of shows and episodes, to suit podcasts,
   interviews, research and video alike. Pages moved to `/studios`; old `/shows` links redirect. New
   consent records and transcripts say "Recording 1"; files already made keep their names.

@@ -279,6 +279,55 @@ describe("recording processing", () => {
       expect(job).toMatchObject({ status: "failed", error: expect.stringMatching(/ffmpeg exited/) });
     });
 
+    it("leaves a guest's unreadable upload out, gives everyone else their files, and tells the host", async () => {
+      await uploadTrack(split(media, 3)); // the guest's: fine
+      await uploadTrack([Buffer.from("not media".repeat(200))], { token: t.host.token }); // the host's: junk
+      t.tick(2000);
+      await stop();
+      await runner().drain();
+      expect(await processing()).toBe("ready");
+      const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
+      expect(recordings[0].skippedTracks).toEqual([{ name: "Host", kind: "audio" }]);
+      expect(recordings[0].outputs.map((o: { fileName: string }) => o.fileName)).toContain("Guest - audio.wav");
+      // The guest still gets their own file.
+      const { body } = await t.client({ token: t.guest.token }).get(`/sessions/${t.sessionId}/my-recordings`);
+      expect(body.recordings[0].files).toHaveLength(1);
+    });
+
+    it("renders again when a late track finishes during a render, so nobody is silently missing", async () => {
+      await uploadTrack(split(media, 3));
+      t.tick(2000);
+      await stop();
+      expect(await processing()).toBe("queued");
+      // While the job runs (it has marked itself started), the host's late track arrives.
+      let late: Promise<unknown> | null = null;
+      const r = new JobRunner(t.db, storage, {
+        ffmpeg, ffprobe,
+        onChange: () => {
+          late ??= uploadTrack(split(media, 2), { token: t.host.token });
+        },
+      });
+      await r.drain();
+      await late;
+      await r.drain();
+      expect(await processing()).toBe("ready");
+      const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
+      expect(recordings[0].outputs.map((o: { fileName: string }) => o.fileName)).toEqual(expect.arrayContaining(["Guest - audio.wav", "Host - audio.wav"]));
+      const [{ rerun_requested }] = (await t.db.query<{ rerun_requested: boolean }>("SELECT rerun_requested FROM recordings WHERE id = $1", [t.recordingId])) as [{ rerun_requested: boolean }];
+      expect(rerun_requested).toBe(false);
+      expect(await jobs()).toEqual([{ status: "done" }, { status: "done" }]);
+    });
+
+    it("still renders a track with a lost middle chunk (where it lands: apps/worker/test/pipeline.test.ts)", async () => {
+      const parts = split(media, 4);
+      const trackId = await uploadTrack(parts);
+      await t.db.query("DELETE FROM chunks WHERE track_id = $1 AND seq = 2", [trackId]);
+      t.tick(2000);
+      await stop();
+      await runner().drain();
+      expect(await processing()).toBe("ready");
+    });
+
     const whisper = process.env.WHISPER_PATH;
     const model = process.env.WHISPER_MODEL;
     const canSay = (() => {

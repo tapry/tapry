@@ -26,6 +26,9 @@ export function parseSse(buffer: string): { messages: SseMessage[]; rest: string
   return { messages, rest };
 }
 
+/** The server pings every 15 s, so this much silence means a dead connection that hasn't said so. */
+export const SSE_SILENCE_MS = 45_000;
+
 export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "unauthorized";
 
 /**
@@ -46,10 +49,15 @@ export function followSession(
   const run = async () => {
     while (!abort.signal.aborted) {
       onStatus(attempt === 0 ? "connecting" : "reconnecting");
+      // A half-open connection never errors: without this a guest could miss Record entirely.
+      const connection = new AbortController();
+      const hangUp = () => connection.abort();
+      abort.signal.addEventListener("abort", hangUp);
+      let silence = setTimeout(hangUp, SSE_SILENCE_MS);
       try {
         const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/events`, {
           headers: { authorization: `Bearer ${token}` },
-          signal: abort.signal,
+          signal: connection.signal,
         });
         if (res.status === 401 || res.status === 403) {
           onStatus("unauthorized");
@@ -62,6 +70,8 @@ export function followSession(
         for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
+          clearTimeout(silence);
+          silence = setTimeout(hangUp, SSE_SILENCE_MS);
           buffer += decoder.decode(value, { stream: true });
           const parsed = parseSse(buffer);
           buffer = parsed.rest;
@@ -74,6 +84,9 @@ export function followSession(
         }
       } catch {
         if (abort.signal.aborted) return;
+      } finally {
+        clearTimeout(silence);
+        abort.signal.removeEventListener("abort", hangUp);
       }
       attempt++;
       await new Promise((r) => setTimeout(r, Math.min(10_000, 500 * 2 ** Math.min(attempt, 5))));

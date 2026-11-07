@@ -20,6 +20,12 @@ export interface TrackRecorderOptions {
   now?: () => number;
   /** Non-fatal problems: a chunk that could not be persisted, an unexpected stop. */
   onError?: (err: unknown) => void;
+  /** MediaRecorder stopped by itself, after this track's chunks are safe. Start a new track to carry on. */
+  onUnexpectedStop?: () => void;
+  /** No chunk for this long counts as stalled and is reported through onError. Default 15000 ms; 0 turns it off. */
+  stallMs?: number;
+  /** Chunks are arriving again after a stall. */
+  onRecovered?: () => void;
   /** Stored with the track and handed back to the transport, also after a crash. */
   meta?: Record<string, string>;
   /** Injection point for tests. */
@@ -46,6 +52,9 @@ export class TrackRecorder {
   private writes: Promise<void> = Promise.resolve();
   private finished?: Promise<CompletedTrack>;
   private releaseLock: () => void = () => {};
+  private watchdog?: ReturnType<typeof setInterval>;
+  private lastDataAt = 0;
+  private stalled = false;
 
   constructor(opts: TrackRecorderOptions) {
     this.opts = opts;
@@ -83,6 +92,17 @@ export class TrackRecorder {
     this.lastTs = startedAt;
     recorder.start(this.opts.timesliceMs ?? 4000);
     this.state = "recording";
+    this.lastDataAt = this.now();
+    const stallMs = this.opts.stallMs ?? 15_000;
+    if (stallMs > 0) {
+      this.watchdog = setInterval(() => {
+        if (this.stalled || this.state !== "recording" || this.now() - this.lastDataAt < stallMs) return;
+        // Muted or camera off: some browsers encode nothing then, and silence is what the recording should hold.
+        if (stream.getTracks().every((t) => !t.enabled)) return;
+        this.stalled = true;
+        this.opts.onError?.(new RecorderStalledError(trackId));
+      }, Math.min(stallMs, 5_000));
+    }
   }
 
   /** Stops recording. Resolves once every chunk is durable locally (upload continues in the queue). */
@@ -98,6 +118,11 @@ export class TrackRecorder {
   private onData(blob: Blob) {
     if (blob.size === 0) return;
     const endTs = this.now();
+    this.lastDataAt = endTs;
+    if (this.stalled) {
+      this.stalled = false;
+      this.opts.onRecovered?.();
+    }
     const meta: ChunkMeta = {
       sessionId: this.opts.sessionId,
       trackId: this.opts.trackId,
@@ -131,7 +156,9 @@ export class TrackRecorder {
   }
 
   private async finalize(): Promise<CompletedTrack> {
-    if (this.state === "recording") {
+    clearInterval(this.watchdog);
+    const unexpected = this.state === "recording";
+    if (unexpected) {
       // MediaRecorder stopped by itself: device unplugged, permission revoked, track ended.
       this.opts.onError?.(new Error("Recording stopped unexpectedly"));
     }
@@ -146,6 +173,7 @@ export class TrackRecorder {
     this.opts.queue.finishTrack(info);
     this.releaseLock();
     this.state = "stopped";
+    if (unexpected) this.opts.onUnexpectedStop?.();
     return info;
   }
 }
@@ -156,6 +184,12 @@ export class ChunkNotPersistedError extends Error {
     readonly cause: unknown,
   ) {
     super(`Chunk ${chunk.seq} of track ${chunk.trackId} could not be saved locally; uploading from memory`);
+  }
+}
+
+export class RecorderStalledError extends Error {
+  constructor(readonly trackId: string) {
+    super("Recording seems to have stopped on this device. Check your microphone and camera, and reload the page if this stays.");
   }
 }
 

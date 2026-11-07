@@ -41,7 +41,7 @@ export class FakeMediaRecorder extends EventTarget {
 }
 
 export const asMediaRecorder = FakeMediaRecorder as unknown as typeof MediaRecorder;
-export const fakeStream = {} as MediaStream;
+export const fakeStream = { getTracks: () => [{ enabled: true, readyState: "live" }] } as unknown as MediaStream;
 
 export class FakeTransport implements ChunkTransport {
   uploaded = new Map<string, StoredChunk & { mimeType: string }>();

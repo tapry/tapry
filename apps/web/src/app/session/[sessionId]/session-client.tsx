@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Eyebrow, Notice } from "@/components/ui";
 import { loadTicket } from "@/lib/client/api";
 import { getPipeline } from "@/lib/client/recording";
+import { holdSessionLock } from "@/lib/client/session-lock";
 import { GreenRoom, type ReadyToJoin } from "./green-room";
 import { Room } from "./room";
 
@@ -13,7 +14,21 @@ export function SessionClient({ sessionId }: { sessionId: string }) {
   const [ticket, setTicket] = useState<SessionTicket | null | undefined>(undefined);
   const [ready, setReady] = useState<ReadyToJoin | null>(null);
 
+  const [tab, setTab] = useState<"checking" | "held" | "elsewhere">("checking");
+
   useEffect(() => setTicket(loadTicket(sessionId)), [sessionId]);
+  useEffect(() => {
+    setTab("checking");
+    return holdSessionLock(
+      sessionId,
+      () => {
+        setTab("held");
+        // The other tab may have been someone else joining, with a newer ticket.
+        setTicket(loadTicket(sessionId));
+      },
+      () => setTab("elsewhere"),
+    );
+  }, [sessionId]);
   // Upload anything a crashed or closed tab left behind, as early as possible.
   useEffect(() => void getPipeline(), []);
 
@@ -24,6 +39,19 @@ export function SessionClient({ sessionId }: { sessionId: string }) {
         <Notice tone="warn">
           This browser isn&apos;t part of this session. Guests: open the invite link your host sent you. Hosts: enter the
           studio from your studio&apos;s page.
+        </Notice>
+      </div>
+    );
+  }
+  if (tab === "checking") return null;
+  if (tab === "elsewhere") {
+    return (
+      <div className="mx-auto max-w-xl px-5 py-16">
+        <Notice tone="warn">
+          <span data-testid="open-elsewhere">
+            This session is already open in another tab. Use that one, or close it and this page continues by itself. Two tabs would
+            record you twice.
+          </span>
         </Notice>
       </div>
     );

@@ -25,6 +25,8 @@ export interface RecordingSummary {
   status: "recording" | "stopped";
   processing: ProcessingStatus;
   processingError: string | null;
+  /** People's tracks left out of the files because they couldn't be read. Their uploads are kept. */
+  skippedTracks: Array<{ name: string; kind: "audio" | "video" }>;
   /** off: transcription not configured on this server. */
   transcript: "off" | "queued" | "processing" | "ready" | "failed";
   startedAt: number;
@@ -85,17 +87,33 @@ export class ProcessingService {
     if (r?.status === "stopped" && r.tracks > 0 && r.open === 0) {
       // Everyone's upload is in (the first time only: a late re-upload doesn't move it).
       await this.db.query("UPDATE recordings SET uploaded_at = coalesce(uploaded_at, now()) WHERE id = $1", [recordingId]);
-      await this.enqueue(recordingId);
+      await this.enqueue(recordingId, { rerunIfRunning: true });
     }
   }
 
-  /** Queue (or re-queue) processing with whatever has arrived. A no-op while a job is open. */
-  async enqueue(recordingId: string) {
-    const inserted = await this.db.query(
-      `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'process_recording', $2)
-       ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running') DO NOTHING RETURNING id`,
-      [newId("job"), recordingId],
-    );
+  /**
+   * Queue (or re-queue) processing with whatever has arrived. A no-op while a job is open, except
+   * that `rerunIfRunning` has a running job go again: it has already read its chunks, and a late
+   * track would otherwise be missing from "ready" files with nothing to say so.
+   */
+  async enqueue(recordingId: string, opts: { rerunIfRunning?: boolean } = {}) {
+    // The row lock orders this against a job finishing, so the request can't fall between the two.
+    const inserted = await this.db.transaction(async (tx) => {
+      await tx.query("SELECT 1 FROM recordings WHERE id = $1 FOR UPDATE", [recordingId]);
+      const rows = await tx.query(
+        `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'process_recording', $2)
+         ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running') DO NOTHING RETURNING id`,
+        [newId("job"), recordingId],
+      );
+      if (rows.length === 0 && opts.rerunIfRunning) {
+        await tx.query(
+          `UPDATE recordings SET rerun_requested = true WHERE id = $1 AND EXISTS (
+             SELECT 1 FROM jobs WHERE recording_id = $1 AND type = 'process_recording' AND status = 'running')`,
+          [recordingId],
+        );
+      }
+      return rows;
+    });
     if (inserted.length === 0) return;
     const [rec] = await this.db.query<{ session_id: string }>(
       "UPDATE recordings SET processing = 'queued', processing_error = NULL WHERE id = $1 RETURNING session_id",
@@ -135,6 +153,7 @@ export class ProcessingService {
       status: "recording" | "stopped";
       processing: ProcessingStatus;
       processing_error: string | null;
+      skipped_tracks: RecordingSummary["skippedTracks"];
       transcript: RecordingSummary["transcript"];
       started_at: number;
       stopped_at: number | null;
@@ -147,7 +166,7 @@ export class ProcessingService {
       incomplete: number;
       bytes: number;
     }>(
-      `SELECT r.id, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.transcript, r.started_at, r.stopped_at,
+      `SELECT r.id, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
@@ -212,6 +231,7 @@ export class ProcessingService {
       status: r.status,
       processing: r.processing,
       processingError: r.processing_error,
+      skippedTracks: r.skipped_tracks,
       transcript: r.transcript,
       startedAt: r.started_at,
       stoppedAt: r.stopped_at,

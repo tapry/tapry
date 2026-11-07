@@ -70,7 +70,8 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   }, []);
 
   const blocking = checks.some((c) => c.tone === "danger");
-  const canJoin = status === "live" && !!stream && !blocking && !joining;
+  // Waits for the clock estimate: without it this person's recording is placed by their own clock.
+  const canJoin = status === "live" && !!stream && !!clock && !blocking && !joining;
 
   async function join() {
     if (!stream) return;
@@ -115,8 +116,11 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
           <RecDot />
           {ticket.role === "host" ? "Enter the studio" : "Join the studio"}
         </Button>
-        {status === "live" && level.state !== "good" && (
-          <p className="text-center text-xs text-muted">You can join anyway, but check the microphone first.</p>
+        {status === "live" && !clock ? (
+          <p className="text-center text-xs text-muted">Checking the connection…</p>
+        ) : (
+          status === "live" &&
+          level.state !== "good" && <p className="text-center text-xs text-muted">You can join anyway, but check the microphone first.</p>
         )}
       </div>
     </div>

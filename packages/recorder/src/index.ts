@@ -7,6 +7,7 @@ export {
   TrackRecorder,
   ChunkNotPersistedError,
   ChunkLostError,
+  RecorderStalledError,
   type TrackRecorderOptions,
   type TrackRecorderState,
 } from "./track-recorder.js";

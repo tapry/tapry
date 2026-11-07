@@ -5,6 +5,7 @@ export {
   renderRecording,
   type OutputFile,
   type PipelineOptions,
+  type SkippedTrack,
   type TrackInput,
 } from "./pipeline.js";
 export { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";

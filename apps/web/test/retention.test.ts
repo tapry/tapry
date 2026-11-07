@@ -95,4 +95,13 @@ describe("raw upload retention", () => {
     const [job] = await t.db.query<{ status: string }>("SELECT status FROM jobs WHERE id = 'job_raw'");
     expect(job!.status).toBe("queued"); // comes back later
   });
+
+  it("keeps the originals when a track couldn't be read: they are that person's only copy", async () => {
+    const trackId = await uploadTrack(["a"]);
+    await processed();
+    await t.db.query(`UPDATE recordings SET skipped_tracks = '[{"name":"Sam","kind":"audio"}]' WHERE id = $1`, [t.recordingId]);
+    await runner().drain();
+    expect((await rec()).raw_deleted_at).toBeNull();
+    expect(keysUnder(`recordings/${t.sessionId}/${trackId}/`)).toHaveLength(1);
+  });
 });
