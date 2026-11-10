@@ -7,6 +7,7 @@ import {
   loginBody,
   seqParam,
   recapBody,
+  setFiltersBody,
   telemetryBody,
   techCheckReport,
   SPEED_TEST_MAX_BYTES,
@@ -116,8 +117,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       return new Response(null, { status: 204 });
     }),
     /** Process now, without tracks that never finished uploading. */
-    processRecording: asUser(async (svc, user, _req, params) => {
-      await svc.processing.processNow(user, params.studioId!, params.recordingId!);
+    processRecording: asUser(async (svc, user, req, params) => {
+      // The body is optional: `{ "filters": false }` gives the files as recorded, true puts people's filters back.
+      const text = await req.text();
+      const { filters } = text.trim() ? processBody.parse(parseJson(text)) : {};
+      await svc.processing.processNow(user, params.studioId!, params.recordingId!, { filters });
       return json(202, { queued: true });
     }),
     /** Redirects to a short-lived signed storage URL, so big files never pass through this server. */
@@ -247,6 +251,10 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       svc.live.reportHealth(p, await parseBody(req, telemetryBody));
       return new Response(null, { status: 204 });
     }),
+    /** A person's filters (how they look and sound in their files), for their tracks in the running recording. */
+    setFilters: asParticipant(async (svc, p, req) =>
+      json(200, await svc.uploads.setFilters(p, (await parseBody(req, setFiltersBody)).filters)),
+    ),
     /** The end screen: this participant's own files from the session, and the promo link. */
     ownRecordings: asParticipant(async (svc, p) => json(200, await svc.processing.ownRecordings(p, svc.guestPromoUrl))),
     /** The end screen's recap email: whether it's offered and how it's going; asking for one. */
@@ -376,6 +384,17 @@ async function parseBody<S extends z.ZodType>(req: Request, schema: S): Promise<
   }
   return schema.parse(raw);
 }
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(400, "invalid_json", "Request body must be JSON");
+  }
+}
+
+/** "Process again": with people's filters (true), without (false), or as it was last time (left out). */
+const processBody = z.object({ filters: z.boolean().optional() });
 
 function parseSeq(params: Params) {
   const seq = seqParam.safeParse(params.seq);

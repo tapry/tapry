@@ -88,8 +88,9 @@ export function BrandPanel({ style, bars = true }: { style?: CSSProperties; bars
     <span aria-hidden="true" style={{ position: "relative", display: "grid", placeItems: "center", width: "100%", height: "100%", overflow: "hidden", background: "linear-gradient(160deg,#7d2613 0%,#a83a1e 38%,#d2603c 70%,#f3b9a0 100%)", ...style }}>
       <span style={{ position: "absolute", left: "-10%", top: "20%", width: "60%", height: "60%", borderRadius: "50%", background: "rgba(255,255,255,.22)", filter: "blur(50px)", animation: "drift 26s ease-in-out infinite" }} />
       <span style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, color: "#fff" }}>
-        <svg viewBox="0 0 24 24" width={56} height={56} fill="none" stroke="#fff" strokeWidth={2.2} strokeLinecap="round">
-          <path d="M12 3v18M5 8l7 4l7-4M5 16l7-4l7 4" />
+        <svg viewBox="0 0 32 32" width={64} height={64}>
+          <rect width="32" height="32" rx="8" fill="#fff" />
+          <path d="M8 9v4M12 9v7.5M16 9v15M20 9v7.5M24 9v4" fill="none" stroke="#c43c25" strokeWidth={2.6} strokeLinecap="round" />
         </svg>
         {bars && (
           <span style={{ display: "flex", height: 28, alignItems: "center", gap: 4 }}>
@@ -109,10 +110,9 @@ export const CODE_FONT = "ui-monospace,SFMono-Regular,Menlo,monospace";
 /** The author mark for posts by the team: the Tapry logo instead of a person's photo. */
 export function TeamAvatar({ size }: { size: number }) {
   return (
-    <span aria-hidden="true" style={{ display: "grid", width: size, height: size, flexShrink: 0, placeItems: "center", borderRadius: "50%", background: "#a83a1e" }}>
-      <svg viewBox="0 0 24 24" width={size * 0.55} height={size * 0.55} fill="none" stroke="#fff" strokeWidth={2.8} strokeLinecap="round">
-        <path d="M12 3v18M5 8l7 4l7-4M5 16l7-4l7 4" />
-      </svg>
-    </span>
+    <svg aria-hidden="true" viewBox="0 0 32 32" width={size} height={size} style={{ flexShrink: 0 }}>
+      <rect width="32" height="32" rx="8" fill="#e8553d" />
+      <path d="M8 9v4M12 9v7.5M16 9v15M20 9v7.5M24 9v4" fill="none" stroke="#fff" strokeWidth={size <= 16 ? 3 : 2.6} strokeLinecap="round" />
+    </svg>
   );
 }

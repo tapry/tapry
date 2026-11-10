@@ -48,6 +48,7 @@ export const ICONS = {
   search: "M21 21l-4.34-4.34M11 3a8 8 0 1 0 0 16a8 8 0 0 0 0-16z",
   play: "M6 4l14 8l-14 8z",
   pauseBars: "M7 4v16M17 4v16",
+  sliders: "M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4",
 } as const;
 
 export type IconName = keyof typeof ICONS;

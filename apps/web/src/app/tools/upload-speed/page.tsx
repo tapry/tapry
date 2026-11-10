@@ -14,7 +14,7 @@ export default function UploadSpeedPage() {
       <section className="bg-blush px-[clamp(16px,3vw,28px)] pt-8 pb-10">
         <div className="mx-auto flex max-w-[760px] flex-col gap-[clamp(32px,6vw,64px)]">
           <Link href="/" aria-label="Tapry home" className="self-start text-text hover:text-text">
-            <Logo className="text-[15px]" tile="size-6 rounded-[7px]" />
+            <Logo className="text-[15px]" mark="size-6" />
           </Link>
           <div className="flex flex-col gap-4">
             <h1 className="animate-rise text-[clamp(32px,4vw,48px)] leading-[1.06] font-medium tracking-[-.03em] text-balance">

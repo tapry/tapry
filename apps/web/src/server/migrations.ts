@@ -258,4 +258,16 @@ ALTER TABLE recordings ADD COLUMN skipped_tracks jsonb NOT NULL DEFAULT '[]';
 -- A track finished while a render was running, after it had read its chunks: render again.
 ALTER TABLE recordings ADD COLUMN rerun_requested boolean NOT NULL DEFAULT false;
 `,
+  `
+-- Filters: what a person chose for how they look and sound ({ brightness, look, touchUp,
+-- noiseRemoval }; null: none). The upload is untouched; processing applies them to that
+-- person's files, unless the host asked for the files without filters.
+ALTER TABLE tracks ADD COLUMN filters jsonb;
+ALTER TABLE recordings ADD COLUMN apply_filters boolean NOT NULL DEFAULT true;
+`,
+  `
+-- Files that came out as recorded in the last run because a person's filters couldn't be
+-- applied to them: { name, kind }, shown to the host. Written with every run, like skipped_tracks.
+ALTER TABLE recordings ADD COLUMN filters_failed jsonb NOT NULL DEFAULT '[]';
+`,
 ];

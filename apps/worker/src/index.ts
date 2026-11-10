@@ -1,8 +1,11 @@
 export {
   alignmentFilters,
+  audioCleanFilters,
   concatChunks,
   gridLayout,
   renderRecording,
+  videoLookFilters,
+  type FilterFailure,
   type OutputFile,
   type PipelineOptions,
   type SkippedTrack,
@@ -12,11 +15,14 @@ export { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";
 export {
   findFont,
   FONT_CANDIDATES,
+  filterDelaySamples,
   loudnessGain,
+  measureNoiseFloor,
   measureLoudness,
   PODCAST_LOUDNESS,
   type LoudnessMeasurement,
   type LoudnessTarget,
+  type NoiseMeasurement,
 } from "./pipeline.js";
 export {
   mergeSpeakers,

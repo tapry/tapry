@@ -1,6 +1,7 @@
 import type { OwnRecordings } from "@tapry/shared";
 import { StatusDot } from "@/components/ui";
 import { Icon } from "@/components/ui-extra";
+import { isOriginalAudio } from "@/components/recordings";
 import { mb } from "@/lib/format";
 
 /** A participant's own files, recording by recording: on their end screen and the emailed page. */
@@ -25,7 +26,10 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
                   <span className="flex min-w-0 items-center gap-2.5">
                     <Icon name={f.kind === "audio" ? "wave" : "camera"} size={15} className="text-muted" />
                     <span className="flex min-w-0 flex-col gap-px">
-                      <span className="truncate">{f.kind === "audio" ? "Your audio" : "Your video"}</span>
+                      <span className="truncate">
+                        {f.kind === "audio" ? "Your audio" : "Your video"}
+                        {isOriginalAudio(f.fileName) && " (original)"}
+                      </span>
                       <span className="text-[12.5px] text-muted">
                         {f.fileName.split(".").pop()!.toUpperCase()} · {mb(f.bytes)}
                       </span>

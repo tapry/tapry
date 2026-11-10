@@ -23,6 +23,9 @@ const recording = (over: Partial<RecordingSummary> = {}): RecordingSummary => ({
   incompleteTracks: 0,
   bytes: 0,
   rawDeleted: false,
+  hasFilters: false,
+  applyFilters: true,
+  filtersFailed: [],
   people: [
     { participantId: "p1", name: "Host", role: "host", tracks: 1, completeTracks: 1, bytes: 0 },
     { participantId: "p2", name: "Sam", role: "guest", tracks: 1, completeTracks: 1, bytes: 0 },

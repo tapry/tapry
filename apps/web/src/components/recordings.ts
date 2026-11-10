@@ -45,9 +45,14 @@ export function describeOutput(o: Recording["outputs"][number]): { title: string
     if (o.fileName.endsWith(".docx")) return { title: "Transcript (Word)", icon: "file", format: "DOCX" };
     return { title: `Captions (.${ext.toLowerCase()})`, icon: "text", format: ext };
   }
-  const who = o.fileName.replace(/ - (audio|video)\.\w+$/, "");
-  return { title: `${who}'s ${o.kind}`, icon: o.kind === "audio" ? "wave" : "camera", format: ext };
+  // "Sam Guest - audio (original).wav": their sound before noise removal, kept beside the cleaned file.
+  const original = isOriginalAudio(o.fileName);
+  const who = o.fileName.replace(/ - (audio|video)( \(original\))?\.\w+$/, "");
+  return { title: `${who}'s ${o.kind}${original ? " (original)" : ""}`, icon: o.kind === "audio" ? "wave" : "camera", format: ext };
 }
+
+/** A person's audio as recorded, which the worker keeps next to the file with noise removal. */
+export const isOriginalAudio = (fileName: string) => / - audio \(original\)\.\w+$/.test(fileName);
 
 /** Where a recording's file downloads from (the server redirects to a short-lived storage link). */
 export const outputUrl = (studioId: string, recordingId: string, outputId: string) =>
