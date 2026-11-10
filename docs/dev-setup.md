@@ -23,6 +23,7 @@ VERSION=v1.13.11
 SRC=$(go mod download -json github.com/livekit/livekit-server@$VERSION | grep '"Dir"' | cut -d'"' -f4)
 cp -R "$SRC" livekit-src && chmod -R u+w livekit-src && cd livekit-src
 # `go install pkg@version` refuses modules with replace directives; build it as the main module.
+go mod download github.com/livekit/protocol   # on a fresh module cache `go list` below is empty without it
 PROTO=$(go list -m -f '{{.Dir}}' github.com/livekit/protocol)
 cp -R "$PROTO" third_party-protocol && chmod -R u+w third_party-protocol
 H=third_party-protocol/utils/hwstats

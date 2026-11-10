@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
+import { HAS_SPEED_TEST, pageMeta } from "@/content/site";
 import { ToolPage } from "../tool-page";
-import { UploadSpeedTest } from "./upload-speed-test";
+import { SpeedCard } from "../tools/speed-card";
 
-export const metadata: Metadata = {
-  title: "Upload speed test for podcasts, interviews and video: is your internet good enough to record? · Tapry",
-  description:
-    "Test your upload speed and see whether it keeps up with recording a podcast or interview in sound only, 720p or 1080p video. Free, no sign-up.",
-  alternates: { canonical: "/upload-speed-test" },
-};
+// Not indexed while the test isn't connected to a server (NEXT_PUBLIC_SPEED_TEST_URL unset).
+export const metadata = pageMeta({
+  title: "Upload speed test: is your internet good enough to record? · Tapry",
+  description: "Test your upload speed and see whether it keeps up with recording a podcast or interview in sound only, 720p or 1080p video. Free, no sign-up.",
+  path: "/upload-speed-test/",
+  index: HAS_SPEED_TEST,
+});
 
 const FAQ: Array<[string, string]> = [
   [
@@ -35,7 +36,7 @@ export default function UploadSpeedTestPage() {
       intro="Test your upload speed and see whether it keeps up with recording a podcast or interview: sound only, 720p or Full HD video. Takes about five seconds; the test data is thrown away."
       faq={FAQ}
     >
-      <UploadSpeedTest />
+      <SpeedCard />
     </ToolPage>
   );
 }

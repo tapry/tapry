@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/components/ui";
 import { UploadSpeed } from "./upload-speed";
 
@@ -9,16 +10,26 @@ export const metadata = {
 /** The free upload-speed check, also on self-hosted servers: no account, tests against this server. */
 export default function UploadSpeedPage() {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[760px] flex-col gap-6 px-[clamp(16px,3vw,32px)] py-8">
-      <Logo className="text-[15px]" />
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-[clamp(28px,3.4vw,38px)] leading-[1.08] font-bold tracking-[-.02em]">Is your internet good enough to record?</h1>
-        <p className="text-[15px] text-text-2">
-          Test your upload: how fast your recording can travel from your computer to this server. Takes about five seconds; the
-          test data is thrown away.
-        </p>
-      </div>
-      <UploadSpeed endpoint="/api/speed-test" />
-    </main>
+    <div className="min-h-dvh bg-bg">
+      <section className="bg-blush px-[clamp(16px,3vw,28px)] pt-8 pb-10">
+        <div className="mx-auto flex max-w-[760px] flex-col gap-[clamp(32px,6vw,64px)]">
+          <Link href="/" aria-label="Tapry home" className="self-start text-text hover:text-text">
+            <Logo className="text-[15px]" tile="size-6 rounded-[7px]" />
+          </Link>
+          <div className="flex flex-col gap-4">
+            <h1 className="animate-rise text-[clamp(32px,4vw,48px)] leading-[1.06] font-medium tracking-[-.03em] text-balance">
+              Is your internet good enough to record?
+            </h1>
+            <p className="max-w-[560px] text-[17px] leading-normal text-pretty text-muted">
+              Recording depends on upload, not download. This measures how fast your recording can travel from your computer to this
+              server. Takes about five seconds; the test data is thrown away.
+            </p>
+          </div>
+        </div>
+      </section>
+      <main className="mx-auto w-full max-w-[760px] px-[clamp(16px,3vw,28px)] pt-2 pb-20">
+        <UploadSpeed endpoint="/api/speed-test" />
+      </main>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { OwnFiles } from "@/components/own-files";
 import { Logo } from "@/components/ui";
+import { EmberCard, EmberPage, Icon } from "@/components/ui-extra";
 import { getServices } from "@/server/context";
 
 export const dynamic = "force-dynamic";
@@ -16,31 +17,51 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
   const services = await getServices();
   const participant = await services.recaps.participantFor(token);
   const own = participant && (await services.processing.ownRecordings(participant, services.guestPromoUrl));
+  const found = participant && own?.downloads && own.recordings.length > 0;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[760px] flex-col gap-6 px-[clamp(16px,3vw,32px)] py-8">
-      <Logo className="text-[15px]" />
-      {participant && own?.downloads && own.recordings.length > 0 ? (
-        <>
-          <div className="flex flex-col gap-1.5">
-            <h1 className="text-[clamp(28px,3.4vw,38px)] leading-[1.08] font-bold tracking-[-.02em]">Your recording</h1>
-            <p className="text-[15px] text-text-2">From {participant.studioName}. These are your files only, recorded on your own device.</p>
-          </div>
-          <div className="flex flex-col gap-3" data-testid="own-recording">
-            <OwnFiles recordings={own.recordings} waiting="Getting your file ready. Takes a few minutes; reload this page to check." />
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <h1 className="text-[clamp(28px,3.4vw,38px)] leading-[1.08] font-bold tracking-[-.02em]">This link no longer works</h1>
-          <p className="text-[15px] text-text-2">It may have expired, or the host may have removed the recording. Ask them for a copy.</p>
-        </div>
-      )}
-      {own?.promoUrl && (
-        <a href={own.promoUrl} target="_blank" rel="noopener" className="text-[15px] font-semibold text-accent-strong">
-          Record your own, free →
-        </a>
-      )}
-    </main>
+    <EmberPage>
+      <main className="w-full max-w-[560px]">
+        <EmberCard className="flex animate-fade-up flex-col gap-[22px] p-[clamp(22px,5vw,36px)]">
+          <Logo className="text-[15px]" tile="size-6 rounded-[7px]" />
+          {found ? (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">Your recording</h1>
+                <p className="text-[14.5px] leading-normal text-pretty text-muted">
+                  From {participant.studioName}. These are your files only, recorded on your own device.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3" data-testid="own-recording">
+                <OwnFiles recordings={own.recordings} waiting="Getting your file ready. Takes a few minutes; reload this page to check." />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <span className="grid size-12 place-items-center rounded-full bg-surface-2 text-muted">
+                <Icon name="link" size={22} />
+              </span>
+              <div className="flex flex-col gap-1.5">
+                <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">This link no longer works</h1>
+                <p className="text-[14.5px] leading-normal text-pretty text-muted">
+                  It may have expired, or the host may have removed the recording. Ask them for a copy.
+                </p>
+              </div>
+            </div>
+          )}
+          {own?.promoUrl && (
+            <a
+              href={own.promoUrl}
+              target="_blank"
+              rel="noopener"
+              className="flex items-center justify-between gap-3 border-t border-border pt-[18px] text-[13.5px] font-medium text-text hover:text-accent-strong"
+            >
+              Record your own, free
+              <span aria-hidden>→</span>
+            </a>
+          )}
+        </EmberCard>
+      </main>
+    </EmberPage>
   );
 }

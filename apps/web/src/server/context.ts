@@ -41,6 +41,16 @@ export function getServices(): Promise<Services> {
       mailer,
       speedTestOrigins: config.speedTestOrigins,
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
+      serverInfo: {
+        storage: { endpoint: config.storage.endpoint ?? null, region: config.storage.region, bucket: config.storage.bucket, accessKeyId: config.storage.accessKeyId },
+        rawRetentionDays: config.worker.rawRetentionMs === undefined ? null : config.worker.rawRetentionMs / 86_400_000,
+        whisperModel: config.worker.whisper?.model ?? null,
+        emailOn: !!config.mail,
+        updateRepo: config.updateRepo,
+        setupTokenSet: !!config.setupToken,
+        allowSignup: config.allowSignup,
+        callOn: !!config.call,
+      },
     });
     if (config.worker.inProcess) {
       // Replace the runner too, so worker code edits apply. The old one finishes its current job.

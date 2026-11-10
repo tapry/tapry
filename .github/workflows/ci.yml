@@ -23,6 +23,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      # The website is a static export nothing else builds: catch a broken page here.
+      - run: pnpm --filter @tapry/site build
 
   # The image builds (no push): catches Dockerfile and production build breakage.
   docker:

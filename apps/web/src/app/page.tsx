@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth-shell";
+import { Icon } from "@/components/ui-extra";
 import { currentUser, isFreshInstall } from "@/server/page-auth";
 
 export const dynamic = "force-dynamic";
 
 const cta =
-  "inline-flex h-[54px] w-full items-center justify-center rounded-xl bg-accent text-[17px] font-semibold text-accent-text shadow-[0_10px_22px_-12px_var(--accent)] hover:bg-accent-hover";
+  "inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ink text-[14.5px] font-medium text-ink-text transition-colors hover:bg-ink-hover";
 
 export default async function Home() {
   if (await currentUser()) redirect("/studios");
@@ -28,6 +29,10 @@ export default async function Home() {
       <Link className={cta} href="/login">
         Log in
       </Link>
+      <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 text-[13.5px] text-text-2">
+        <Icon name="link" />
+        Got a guest link? Open it to join. Guests never need an account.
+      </div>
     </AuthShell>
   );
 }

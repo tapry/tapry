@@ -1,63 +1,50 @@
-// The frame every free tool shares: logo, title, the tool, "Need to record guests? Try Tapry."
-// (the plan's line for every tool), then questions and answers for people arriving from search.
-export function ToolPage({
-  title,
-  intro,
-  faq,
-  children,
-}: {
-  title: string;
-  intro: string;
-  faq: Array<[string, string]>;
-  children: React.ReactNode;
-}) {
+// The frame every free tool shares (Tools design): the hero, the tool, "Need to record guests?
+// Try Tapry." (the plan's line for every tool), then questions for people arriving from search.
+import { Faq } from "@/components/faq";
+import { DarkBtn, H2, OutlineBtn, Shell } from "@/components/ui";
+
+export function ToolPage({ title, intro, faq, children }: { title: string; intro: string; faq: Array<[string, string]>; children: React.ReactNode }) {
   return (
-    <div style={{ minHeight: "100vh", background: "#f6f5f3" }}>
-      <header style={{ maxWidth: 1180, margin: "0 auto", padding: "0 20px", height: 76, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-        <a href="/" aria-label="Tapry home" style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700, fontSize: 22, letterSpacing: "-.02em", color: "#1d1d1f" }}>
-          <span style={{ position: "relative", width: 24, height: 24 }}>
-            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#fbd5cc", transform: "translate(4px,3px)" }} />
-            <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#e8553d" }} />
+    <Shell active="resources" label="Free tools">
+      <section style={{ background: "linear-gradient(180deg,#fbe3d8 0%,#fff 100%)", padding: "80px 28px 40px" }}>
+        <div style={{ margin: "0 auto", display: "flex", maxWidth: 1180, flexDirection: "column", gap: 16 }}>
+          <span style={{ fontSize: 14, color: "#5f6470" }}>
+            <a href="/tools/" className="hv-red" style={{ color: "#5f6470" }}>
+              Free tools
+            </a>{" "}
+            · No sign-up
           </span>
-          Tapry
-        </a>
-        <a href="/" style={{ fontSize: 15, fontWeight: 500, color: "#1d1d1f" }}>
-          Start recording →
-        </a>
-      </header>
-
-      <main style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 20px 72px", display: "flex", flexDirection: "column", gap: 28 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 760 }}>
-          <span style={{ fontFamily: "var(--mono)", fontSize: 13, letterSpacing: ".12em", color: "#c43c25" }}>FREE TOOL · NO SIGN-UP</span>
-          <h1 style={{ margin: 0, fontSize: "clamp(34px,5vw,56px)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-.035em" }}>{title}</h1>
-          <p style={{ margin: 0, fontSize: "clamp(17px,1.6vw,20px)", color: "#6e6e73", lineHeight: 1.5 }}>{intro}</p>
+          <h1 className="rise" style={{ margin: 0, fontSize: "clamp(36px,4vw,52px)", lineHeight: 1.06, fontWeight: 500, letterSpacing: "-.03em", textWrap: "balance" }}>
+            {title}
+          </h1>
+          <p style={{ margin: 0, maxWidth: 640, fontSize: 18, lineHeight: 1.5, color: "#5f6470", textWrap: "pretty" }}>{intro}</p>
         </div>
+      </section>
+      <section style={{ padding: "24px 28px 96px" }}>
+        <div style={{ margin: "0 auto", maxWidth: 1180 }}>
+          <div style={{ maxWidth: 640 }}>{children}</div>
+        </div>
+      </section>
 
-        {children}
+      <section style={{ borderTop: "1px solid #ececef", padding: "96px 32px" }}>
+        <div style={{ margin: "0 auto", display: "flex", maxWidth: 1180, alignItems: "center", justifyContent: "space-between", gap: 24, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 640 }}>
+            <h2 style={{ ...H2, textWrap: "balance" }}>Need to record guests? Try Tapry.</h2>
+            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: "#6b6b70" }}>Everyone is recorded in full quality on their own computer, even on bad Wi-Fi, and the files line up by themselves. Free and open source.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <DarkBtn href="/">See how it works</DarkBtn>
+            <OutlineBtn href="/self-hosting/">Self-host it</OutlineBtn>
+          </div>
+        </div>
+      </section>
 
-        <section style={{ borderRadius: 22, background: "#1d1d1f", color: "#ffffff", padding: "30px 28px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 18 }}>
-          <span style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 640 }}>
-            <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-.02em" }}>Need to record guests? Try Tapry.</span>
-            <span style={{ fontSize: 16, color: "#c7c7cc", lineHeight: 1.5 }}>
-              Everyone is recorded in full quality on their own computer, even on bad Wi-Fi, and the files line up by themselves.
-              Free and open source.
-            </span>
-          </span>
-          <a href="/" className="cta" style={{ padding: "16px 26px", borderRadius: 14, background: "#e8553d", color: "#ffffff", fontWeight: 600, fontSize: 17, whiteSpace: "nowrap" }}>
-            See how it works
-          </a>
-        </section>
-
-        <section style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 820 }}>
-          <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-.02em" }}>Common questions</h2>
-          {faq.map(([q, a]) => (
-            <div key={q} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{q}</h3>
-              <p style={{ margin: 0, fontSize: 16, lineHeight: 1.6, color: "#3a3a3c" }}>{a}</p>
-            </div>
-          ))}
-        </section>
-      </main>
-    </div>
+      <section style={{ borderTop: "1px solid #ececef", padding: "96px 32px" }}>
+        <div style={{ margin: "0 auto", display: "grid", maxWidth: 1180, gap: "40px 64px", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,360px),1fr))", alignItems: "start" }}>
+          <h2 style={H2}>Common questions</h2>
+          <Faq items={faq} />
+        </div>
+      </section>
+    </Shell>
   );
 }

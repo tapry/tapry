@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Avatar, Logo } from "@/components/ui";
+import { Avatar } from "@/components/ui";
 import { getServices } from "@/server/context";
+import { Icon, ICON } from "../../session/[sessionId]/icons";
+import { GuestGrid, GuestHeading, GuestShell, Steps } from "../shell";
 import { JoinForm } from "./join-form";
 
 export const dynamic = "force-dynamic";
@@ -9,41 +11,50 @@ export const metadata = { title: "Join recording" };
 export default async function JoinPage({ params }: { params: Promise<{ inviteCode: string }> }) {
   const { inviteCode } = await params;
   const preview = await (await getServices()).studios.invitePreview(inviteCode);
+  if (!preview) {
+    return (
+      <GuestShell title="Tapry">
+        <div className="flex max-w-[520px] flex-col gap-4 p-[clamp(20px,4vw,36px)]">
+          <GuestHeading title="This invite link doesn't work">
+            It may have been replaced with a new one, or the studio was deleted. Ask your host to send you the current link.
+          </GuestHeading>
+        </div>
+      </GuestShell>
+    );
+  }
+  const audioOnly = preview.settings.audioOnly;
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-gradient-to-b from-canvas to-accent-soft px-5 py-12">
-      <div className="flex w-full max-w-[480px] flex-col gap-[22px] rounded-3xl bg-surface p-6 shadow-[0_30px_60px_-30px_rgba(60,20,30,.35),0_0_0_1px_var(--border)] sm:p-10">
-        {preview ? (
-          <>
-            <div className="flex items-center gap-3.5">
-              <Avatar name={preview.hostName} className="size-14 text-lg ring-[3px] ring-accent-line ring-offset-2 ring-offset-surface" />
-              <span className="flex flex-col gap-0.5">
-                <span className="text-sm text-muted">{preview.hostName} invited you to</span>
-                <h1 className="text-2xl font-bold tracking-[-.02em]">{preview.studioName}</h1>
-              </span>
-            </div>
-            <p className="text-[15px] leading-relaxed text-text-2">
-              You&apos;ll be recorded {preview.settings.audioOnly ? "(sound only, no camera)" : "in full quality"} right here in your browser. There&apos;s nothing to install and no
-              account to make.
-            </p>
-            <JoinForm inviteCode={inviteCode} hostName={preview.hostName} consentText={preview.consentText} consentHash={preview.consentHash} />
-            <p className="text-sm text-muted">
-              Early?{" "}
-              <Link href={`/join/${inviteCode}/check`} className="underline">
-                Test your setup first
-              </Link>
-              .
-            </p>
-          </>
-        ) : (
-          <>
-            <h1 className="text-2xl font-bold tracking-[-.02em]">This invite link doesn&apos;t work</h1>
-            <p className="text-[15px] leading-relaxed text-text-2">
-              It may have been replaced with a new one, or the studio was deleted. Ask your host to send you the current link.
-            </p>
-          </>
-        )}
-      </div>
-      <Logo className="text-[15px] opacity-70" />
-    </main>
+    <GuestShell title={preview.studioName} right={<Steps current={0} />}>
+      <GuestGrid>
+        {/* The call stage is dark in both themes. No camera is opened here: that waits for the next step. */}
+        <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[14px] bg-[#18181b] text-white [--ring:#fafafa]">
+          <span className="flex flex-col items-center gap-3 px-6 text-center">
+            <Avatar name={preview.hostName} className="size-20 text-2xl ring-4 ring-white/10" />
+            <span className="text-[15px] font-medium">{preview.hostName}</span>
+          </span>
+          <span className="absolute bottom-3 left-3 flex items-center gap-2.5 rounded-full bg-black/60 py-1.5 pr-3 pl-2 backdrop-blur-md">
+            <span className="grid size-[22px] place-items-center rounded-full bg-accent text-accent-text">
+              <Icon d={audioOnly ? ICON.mic : ICON.cam} className="size-[11px]" strokeWidth={2.6} />
+            </span>
+            <span className="text-[12.5px]">{audioOnly ? "Sound only" : "Camera and microphone"}</span>
+          </span>
+        </div>
+
+        <div className="flex animate-fade-up flex-col gap-4">
+          <GuestHeading title={`${preview.hostName} invited you to record`}>
+            No account, nothing to install. You&apos;ll be recorded on this computer
+            {audioOnly ? ", sound only (no camera)" : " in full quality"}.
+          </GuestHeading>
+          <JoinForm inviteCode={inviteCode} hostName={preview.hostName} consentText={preview.consentText} consentHash={preview.consentHash} />
+          <p className="text-[13.5px] text-muted">
+            Early?{" "}
+            <Link href={`/join/${inviteCode}/check`} className="font-medium text-text underline underline-offset-2 hover:text-accent-strong">
+              Test your setup first
+            </Link>
+            .
+          </p>
+        </div>
+      </GuestGrid>
+    </GuestShell>
   );
 }

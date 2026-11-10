@@ -4,10 +4,11 @@
 // delete, and logging out. Creating a studio has its own page (new-studio-form.tsx).
 import { defaultConsentText, type SessionTicket, type StudioSettings } from "@tapry/shared";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
 import { ConfirmAction } from "./confirm-action";
-import { Button, CheckboxRow, cn, Field, Input, Notice, RecDot, Select, Textarea } from "./ui";
+import { Icon, ListCard, Spinner } from "./ui-extra";
+import { Button, cn, Input, Notice, Select, Textarea } from "./ui";
 
 const message = (err: unknown) => (err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
 
@@ -40,32 +41,43 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        <input
-          readOnly
-          value={link}
-          aria-label="Guest invite link"
-          onFocus={(e) => e.currentTarget.select()}
-          className="h-12 min-w-60 flex-1 truncate rounded-full border border-dashed border-border-strong bg-transparent px-5 font-mono text-sm text-text-2 focus:outline-none"
-        />
-        <Button onClick={() => copy("invite")} className="h-12 px-[22px]">
-          {copied === "invite" ? "✓ Copied" : "Copy link"}
-        </Button>
-        <Button variant="secondary" onClick={rotate} className="h-12 px-5 font-medium">
-          Make a new link
-        </Button>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
+        <span className="text-[13px] text-muted">Guest link · anyone with it can join from a browser, once you&apos;ve entered the studio</span>
+        <span className="flex flex-wrap gap-1.5">
+          <input
+            readOnly
+            value={link}
+            aria-label="Guest invite link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="h-9 min-w-48 flex-1 truncate rounded-md bg-surface-2 px-[11px] text-sm text-text-2 focus:outline-none"
+          />
+          <Button size="sm" onClick={() => copy("invite")}>
+            <Icon name={copied === "invite" ? "check" : "copy"} size={15} />
+            {copied === "invite" ? "Copied" : "Copy link"}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={rotate}>
+            Make a new link
+          </Button>
+        </span>
       </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
-        <span>Before the session, guests can test their setup:</span>
-        <input
-          readOnly
-          value={checkLink}
-          aria-label="Tech-check link"
-          onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 truncate bg-transparent font-mono text-[13px] text-text-2 focus:outline-none"
-        />
-        <button type="button" onClick={() => copy("check")} className="cursor-pointer font-medium text-text underline-offset-2 hover:underline">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3.5 py-3">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="font-medium">Tech-check link</span>
+          <span className="text-[13px] text-muted">Before the session, guests can test their camera, mic and connection.</span>
+          <input
+            readOnly
+            value={checkLink}
+            aria-label="Tech-check link"
+            onFocus={(e) => e.currentTarget.select()}
+            className="mt-1 min-w-0 truncate bg-transparent font-mono text-[12px] text-muted focus:outline-none"
+          />
+        </span>
+        <button
+          type="button"
+          onClick={() => copy("check")}
+          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-[7px] text-[13px] font-medium whitespace-nowrap text-text transition-colors hover:border-ink"
+        >
           {copied === "check" ? "✓ Copied" : "Copy tech-check link"}
         </button>
       </div>
@@ -79,11 +91,17 @@ export function StudioSettingsForm({
   name,
   settings,
   hostName,
+  section,
 }: {
   studioId: string;
   name: string;
   settings: StudioSettings;
   hostName: string;
+  /**
+   * Show only part of the form (the Settings page's Recording and Guests tabs). The rest stays in
+   * the form, hidden, so saving always sends every setting as it is.
+   */
+  section?: "recording" | "guests";
 }) {
   const router = useRouter();
   const [quality, setQuality] = useState<StudioSettings["videoQuality"] | "audio">(settings.audioOnly ? "audio" : settings.videoQuality);
@@ -97,7 +115,8 @@ export function StudioSettingsForm({
       await apiFetch(`/studios/${studioId}`, {
         method: "PATCH",
         body: {
-          name: f.get("name"),
+          // On the Guests tab the name field is hidden: an emptied one there keeps the saved name.
+          name: section === "guests" && !String(f.get("name") ?? "").trim() ? name : f.get("name"),
           settings: {
             // Audio only keeps the video quality as it was, for switching back.
             videoQuality: quality === "audio" ? settings.videoQuality : quality,
@@ -120,111 +139,188 @@ export function StudioSettingsForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-6">
-      <Field label="Studio name">
-        <Input name="name" defaultValue={name} required maxLength={100} />
-      </Field>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-[15px] font-medium">Recording</legend>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {(
-            [
-              ["1080p", "Full HD", "Best quality, larger files"],
-              ["720p", "Standard", "Smaller files, still sharp"],
-              ["audio", "Audio only", "Sound only, no cameras"],
-            ] as const
-          ).map(([value, label, sub]) => (
-            <label
-              key={value}
-              className={cn(
-                "flex cursor-pointer flex-col gap-[3px] rounded-[10px] border px-4 py-3.5 text-[15px] font-semibold",
-                quality === value ? "border-accent bg-accent-soft" : "border-border-strong",
-              )}
-            >
-              <input
-                type="radio"
-                name="videoQuality"
-                value={value}
-                checked={quality === value}
-                onChange={() => setQuality(value)}
-                className="sr-only"
-              />
-              {label}
-              <span className="text-[13px] font-normal text-muted">{sub}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <div className="flex flex-wrap items-center justify-between gap-4 text-[15px]">
-        <span className="flex flex-col gap-[3px]">
-          <span className="font-medium" id="guests-label">
-            Number of guests
-          </span>
-          <span className="text-sm text-muted">Not counting you</span>
-        </span>
-        <div className="flex items-center overflow-hidden rounded-full border border-border-strong" role="group" aria-labelledby="guests-label">
-          <button
-            type="button"
-            aria-label="Fewer guests"
-            onClick={() => setGuests(Math.max(1, guests - 1))}
-            className="size-11 cursor-pointer text-lg font-semibold"
+    <form onSubmit={submit} className="flex flex-col gap-5">
+      <ListCard>
+        <div className={section === "guests" ? "hidden" : "contents"}>
+          <SectionLabel>Studio</SectionLabel>
+          <Row label={<label htmlFor="studio-name">Studio name</label>} help="Guests see this on their invite.">
+            <Input id="studio-name" name="name" defaultValue={name} required={section !== "guests"} maxLength={100} className="sm:w-[280px]" />
+          </Row>
+
+          <SectionLabel>Recording</SectionLabel>
+          <fieldset className="flex flex-col gap-3 border-b border-divider py-4">
+            <legend className="sr-only">Recording</legend>
+            <span className="flex flex-col gap-[3px]">
+              <span className="font-medium">Video quality</span>
+              <span className="text-[13px] leading-normal text-muted">Each person is recorded on their own device at this quality.</span>
+            </span>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {(
+                [
+                  ["1080p", "Full HD", "Best quality, larger files"],
+                  ["720p", "Standard", "Smaller files, still sharp"],
+                  ["audio", "Audio only", "Sound only, no cameras"],
+                ] as const
+              ).map(([value, label, sub]) => (
+                <label
+                  key={value}
+                  className={cn(
+                    "flex cursor-pointer flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] transition-[border-color,box-shadow]",
+                    "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
+                    quality === value ? "border-ink shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border shadow-xs hover:border-border-strong",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="videoQuality"
+                    value={value}
+                    checked={quality === value}
+                    onChange={() => setQuality(value)}
+                    className="sr-only"
+                  />
+                  <span className="font-medium">{label}</span>
+                  <span className="text-[12.5px] text-muted">{sub}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <Row label={<span id="guests-label">Number of guests</span>} help="Not counting you.">
+            <Stepper value={guests} min={1} max={7} onChange={setGuests} labelledBy="guests-label" />
+          </Row>
+          <SwitchRow
+            name="echoCancellation"
+            defaultChecked={settings.echoCancellation}
+            label="Reduce echo for guests without headphones"
+            help="It switches off automatically for guests wearing headphones, because they sound better without it."
+          />
+          <SwitchRow
+            name="levelLoudness"
+            defaultChecked={settings.levelLoudness}
+            label="Even out everyone's volume"
+            help="Quiet guests are brought up to the same level as everyone else (−16 LUFS, a common level for spoken audio). Only the volume changes, never how anyone sounds. Applies to recordings processed from now on."
+          />
+          <Row
+            label={<label htmlFor="audio-format">Audio files</label>}
+            help="For each person's audio. FLAC is the same sound at about half the size; a few older editors only open WAV. Applies to recordings processed from now on."
           >
-            −
-          </button>
-          <span className="w-9 text-center font-semibold" aria-live="polite">
-            {guests}
-          </span>
-          <button
-            type="button"
-            aria-label="More guests"
-            onClick={() => setGuests(Math.min(7, guests + 1))}
-            className="size-11 cursor-pointer text-lg font-semibold"
-          >
-            +
-          </button>
+            <Select id="audio-format" name="audioFormat" defaultValue={settings.audioFormat} className="sm:w-[280px]">
+              <option value="wav">WAV (opens anywhere)</option>
+              <option value="flac">FLAC (lossless, about half the size)</option>
+            </Select>
+          </Row>
         </div>
-      </div>
-      <CheckboxRow
-        name="echoCancellation"
-        defaultChecked={settings.echoCancellation}
-        label="Reduce echo for guests without headphones"
-        description="It switches off automatically for guests wearing headphones, because they sound better without it."
-      />
-      <CheckboxRow
-        name="levelLoudness"
-        defaultChecked={settings.levelLoudness}
-        label="Even out everyone's volume"
-        description="Quiet guests are brought up to the same level as everyone else (−16 LUFS, a common level for spoken audio). Only the volume changes, never how anyone sounds. Applies to recordings processed from now on."
-      />
-      <Field label="Audio files" hint="For each person's audio. FLAC is the same sound at about half the size; a few older editors only open WAV. Applies to recordings processed from now on.">
-        <Select name="audioFormat" defaultValue={settings.audioFormat}>
-          <option value="wav">WAV (opens anywhere)</option>
-          <option value="flac">FLAC (lossless, about half the size)</option>
-        </Select>
-      </Field>
-      <Field
-        label="What guests agree to"
-        hint="Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each guest's agreement is kept with the exact text and when they agreed (the recording's consent record). A change applies to guests who join from now on."
-      >
-        <Textarea
-          name="consentText"
-          defaultValue={settings.consentText}
-          maxLength={4000}
-          rows={4}
-          placeholder={defaultConsentText(hostName, quality === "audio")}
-        />
-      </Field>
-      <CheckboxRow
-        name="guestDownloads"
-        defaultChecked={settings.guestDownloads}
-        label="Guests can download their own recording"
-        description="Once a recording is ready, each guest can download their own audio (and video) from the page they recorded on. Only their own, never anyone else's."
-      />
+        <div className={section === "recording" ? "hidden" : "contents"}>
+          <SectionLabel>Guests</SectionLabel>
+          <div className="flex flex-col gap-3 border-b border-divider py-4">
+            <span className="flex flex-col gap-[3px]">
+              <label htmlFor="consent-text" className="font-medium">
+                What guests agree to
+              </label>
+              <span className="text-[13px] leading-normal text-pretty text-muted">
+                Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each
+                guest&apos;s agreement is kept with the exact text and when they agreed (the recording&apos;s consent record). A change
+                applies to guests who join from now on.
+              </span>
+            </span>
+            <Textarea
+              id="consent-text"
+              name="consentText"
+              defaultValue={settings.consentText}
+              maxLength={4000}
+              rows={4}
+              placeholder={defaultConsentText(hostName, quality === "audio")}
+            />
+          </div>
+          <SwitchRow
+            name="guestDownloads"
+            defaultChecked={settings.guestDownloads}
+            label="Guests can download their own recording"
+            help="Once a recording is ready, each guest can download their own audio (and video) from the page they recorded on. Only their own, never anyone else's."
+            last
+          />
+        </div>
+      </ListCard>
       <div className="flex items-center gap-3.5">
         <Button type="submit">Save changes</Button>
-        {status && <span className={cn("text-[15px]", status.tone === "ok" ? "text-ok" : "text-danger")}>{status.text}</span>}
+        {status && <span className={cn("text-sm", status.tone === "ok" ? "text-ok-strong" : "text-danger")}>{status.text}</span>}
       </div>
     </form>
+  );
+}
+
+/** A small grey heading inside a settings card ("Recording", "Guests"). */
+function SectionLabel({ children }: { children: ReactNode }) {
+  return <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">{children}</span>;
+}
+
+/** A settings row: what it is and why on the left, the control on the right. */
+function Row({ label, help, children, last }: { label: ReactNode; help?: ReactNode; children: ReactNode; last?: boolean }) {
+  return (
+    <div className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4", !last && "border-b border-divider")}>
+      <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
+        <span className="font-medium">{label}</span>
+        {help && <span className="text-[13px] leading-normal text-pretty text-muted">{help}</span>}
+      </span>
+      <span className="flex w-full shrink-0 sm:w-auto">{children}</span>
+    </div>
+  );
+}
+
+/**
+ * A checkbox drawn as the designs' switch, in a settings row. The whole row is its label.
+ * The knob is the surface colour, not white: in the dark theme the "on" track is near-white.
+ */
+function SwitchRow({
+  label,
+  help,
+  last,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { label: string; help: string; last?: boolean }) {
+  return (
+    <label className={cn("flex cursor-pointer items-center justify-between gap-x-6 gap-y-3 py-4", !last && "border-b border-divider")}>
+      <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
+        <span className="font-medium">{label}</span>
+        <span className="text-[13px] leading-normal text-pretty text-muted">{help}</span>
+      </span>
+      <input type="checkbox" role="switch" className="peer sr-only" {...props} />
+      <span
+        aria-hidden
+        className="relative h-5 w-9 shrink-0 rounded-full bg-subtle transition-colors duration-[250ms] peer-checked:bg-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring peer-checked:[&>span]:left-[18px]"
+      >
+        <span className="absolute top-0.5 left-0.5 size-4 rounded-full bg-surface shadow-xs transition-[left] duration-[250ms] ease-[cubic-bezier(.2,.7,.2,1)]" />
+      </span>
+    </label>
+  );
+}
+
+/** − n + in a pill, for counts like guests per recording. */
+export function Stepper({
+  value,
+  min,
+  max,
+  onChange,
+  labelledBy,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+  labelledBy: string;
+}) {
+  const btn =
+    "grid size-9 cursor-pointer place-items-center text-base text-text transition-colors hover:bg-surface-2 disabled:cursor-default disabled:text-border-strong disabled:hover:bg-transparent";
+  return (
+    <span className="flex items-center overflow-hidden rounded-md border border-border bg-surface shadow-xs" role="group" aria-labelledby={labelledBy}>
+      <button type="button" aria-label="Fewer guests" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className={btn}>
+        −
+      </button>
+      <span className="w-8 text-center font-medium tabular-nums" aria-live="polite">
+        {value}
+      </span>
+      <button type="button" aria-label="More guests" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className={btn}>
+        +
+      </button>
+    </span>
   );
 }
 
@@ -248,8 +344,8 @@ export function OpenStudioButton({ studioId, live = false }: { studioId: string;
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button variant="record" size="lg" onClick={open} disabled={busy}>
-        <RecDot />
+      <Button variant="record" size="sm" onClick={open} disabled={busy}>
+        {busy ? <Spinner size={15} /> : <span aria-hidden className={cn("size-2 rounded-full bg-current", live && "animate-rec-pulse")} />}
         {live ? "Back to the live studio" : "Enter studio"}
       </Button>
       {error && <Notice tone="danger">{error}</Notice>}
@@ -281,19 +377,22 @@ export function DeleteStudioButton({ studioId, name, recordings }: { studioId: s
   );
 }
 
+/** The sidebar's log-out icon, next to the account. */
 export function LogOutButton() {
   const router = useRouter();
   return (
-    <Button
-      variant="secondary"
-      className="h-9 px-4 text-sm font-medium"
+    <button
+      type="button"
+      aria-label="Log out"
+      title="Log out"
+      className="ml-auto grid size-7 shrink-0 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-text"
       onClick={async () => {
         await apiFetch("/auth/logout", { body: {} }).catch(() => {});
         router.replace("/login");
         router.refresh();
       }}
     >
-      Log out
-    </Button>
+      <Icon name="logout" size={15} />
+    </button>
   );
 }

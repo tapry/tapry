@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
-import { Avatar, CheckboxRow, cn, Notice } from "./ui";
+import { Stepper } from "./studio-forms";
+import { Icon, Spinner } from "./ui-extra";
+import { Avatar, CheckboxRow, cn, Logo, Notice } from "./ui";
 
 const MAX_NAME = 100;
 const MAX_GUESTS = 7;
-// Guests in the seat preview get calm placeholder colors; the host shows their initials.
-const SEAT_COLORS = ["#fbd5cc", "#f4b6a3", "#d98a9c", "#c9b8e4", "#ffe3d6", "#e7c2cf", "#b9a6d6"];
 
 /** The "New studio" screen: a name, how many guests, video quality and sound options. */
 export function NewStudioForm({ hostName, firstStudio }: { hostName: string; firstStudio: boolean }) {
@@ -51,31 +51,28 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
   }
 
   return (
-    <div className="flex w-full max-w-[620px] flex-col gap-5">
-      {!firstStudio && (
-        <Link href="/studios" className="self-start text-sm text-muted hover:text-text">
-          ← Your studios
-        </Link>
-      )}
-      <form
-        onSubmit={submit}
-        className="overflow-hidden rounded-3xl bg-surface shadow-[0_30px_60px_-36px_rgba(60,20,30,.35),0_0_0_1px_var(--border)]"
-      >
-        <div className="flex flex-col gap-[22px] px-[clamp(20px,4vw,40px)] pt-[clamp(24px,4vw,40px)] pb-7">
-          <div className="flex items-center gap-3.5">
-            <span aria-hidden className="grid size-[52px] shrink-0 place-items-center rounded-[14px] bg-accent-soft text-[22px] font-bold text-accent">
-              {(name.trim()[0] ?? "+").toUpperCase()}
-            </span>
-            <span className="flex flex-col gap-0.5">
-              <h1 className="text-[clamp(26px,3vw,32px)] leading-[1.1] font-bold tracking-[-.03em]">
-                {firstStudio ? "Your first studio" : "New studio"}
-              </h1>
-              <span className="text-[15px] text-muted">Where your recordings and guests live.</span>
-            </span>
+    <div className="flex w-full max-w-[560px] flex-col gap-4">
+      <form onSubmit={submit} className="ember-card flex animate-fade-up flex-col gap-[22px] rounded-[19px] bg-canvas p-[clamp(22px,5vw,36px)] text-text">
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/studios" aria-label="Tapry home" className="text-text hover:text-text">
+            <Logo className="text-[15px]" tile="size-6 rounded-[7px]" />
+          </Link>
+          {!firstStudio && (
+            <Link href="/studios" className="flex items-center gap-1.5 text-[13px] text-muted hover:text-text">
+              <Icon name="back" size={14} />
+              Your studios
+            </Link>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">{firstStudio ? "Your first studio" : "New studio"}</h1>
+            <p className="text-[14.5px] leading-normal text-muted">Where your recordings and guests live. You can add more studios later.</p>
           </div>
 
-          <label className="flex flex-col gap-2 text-[15px] font-medium">
-            What&apos;s it called?
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">What&apos;s it called?</span>
             <input
               name="name"
               value={name}
@@ -84,12 +81,9 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
               required
               autoFocus
               placeholder="e.g. The Long Table"
-              className={cn(
-                "h-[60px] rounded-[14px] border-2 bg-surface px-[18px] text-xl font-medium tracking-[-.01em] outline-none transition-colors placeholder:text-subtle",
-                ready ? "border-accent" : "border-border-strong focus:border-accent",
-              )}
+              className="h-10 rounded-md border border-border bg-surface px-3 text-[15px] text-text shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-subtle focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)]"
             />
-            <span className="flex justify-between gap-3 text-[13px] font-normal text-subtle">
+            <span className="flex justify-between gap-3 text-[12.5px] text-muted">
               <span>Guests see this on their invite. You can rename it anytime.</span>
               <span className="tabular-nums">
                 {name.length} / {MAX_NAME}
@@ -97,65 +91,18 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
             </span>
           </label>
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <span className="flex flex-col gap-[3px]">
-              <span className="text-[15px] font-medium" id="guests-label">
-                Guests per recording
-              </span>
-              <span className="text-sm text-muted">
-                You + {guests} guest{guests === 1 ? "" : "s"}, up to {MAX_GUESTS}
-              </span>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium" id="quality-label">
+              Recording
             </span>
-            <span className="flex items-center gap-3">
-              <span aria-hidden className="flex pl-2">
-                <Avatar name={hostName} className="-ml-2 size-[30px] border-2 border-surface text-[10px]" />
-                {Array.from({ length: guests }, (_, i) => (
-                  <span key={i} className="-ml-2 size-[30px] rounded-full border-2 border-surface" style={{ background: SEAT_COLORS[i] }} />
-                ))}
-              </span>
-              <span className="flex items-center overflow-hidden rounded-full border border-border-strong" role="group" aria-labelledby="guests-label">
-                <button
-                  type="button"
-                  aria-label="Fewer guests"
-                  disabled={guests <= 1}
-                  onClick={() => setGuests(Math.max(1, guests - 1))}
-                  className="size-11 cursor-pointer text-lg font-semibold disabled:cursor-default disabled:text-border-strong"
-                >
-                  −
-                </button>
-                <span className="w-7 text-center text-base font-semibold tabular-nums" aria-live="polite">
-                  {guests}
-                </span>
-                <button
-                  type="button"
-                  aria-label="More guests"
-                  disabled={guests >= MAX_GUESTS}
-                  onClick={() => setGuests(Math.min(MAX_GUESTS, guests + 1))}
-                  className="size-11 cursor-pointer text-lg font-semibold disabled:cursor-default disabled:text-border-strong"
-                >
-                  +
-                </button>
-              </span>
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <span className="flex flex-col gap-[3px]">
-              <span className="text-[15px] font-medium" id="quality-label">
-                Recording
-              </span>
-              <span className="text-sm text-muted">
-                {quality === "1080p" ? "Best quality, larger files" : quality === "720p" ? "Smaller files, still sharp" : "Sound only, no cameras"}
-              </span>
-            </span>
-            <span className="flex gap-1 rounded-xl bg-[#f2f1ef] p-1 dark:bg-surface-2" role="radiogroup" aria-labelledby="quality-label">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2" role="radiogroup" aria-labelledby="quality-label">
               {(
                 [
-                  ["1080p", "Full HD"],
-                  ["720p", "Standard"],
-                  ["audio", "Audio only"],
+                  ["1080p", "Full HD", "Best quality, larger files"],
+                  ["720p", "Standard", "Smaller files, still sharp"],
+                  ["audio", "Audio only", "Sound only, no cameras"],
                 ] as const
-              ).map(([value, label]) => (
+              ).map(([value, label, sub]) => (
                 <button
                   key={value}
                   type="button"
@@ -163,30 +110,54 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
                   aria-checked={quality === value}
                   onClick={() => setQuality(value)}
                   className={cn(
-                    "cursor-pointer rounded-[9px] px-4 py-[9px] text-sm font-medium whitespace-nowrap",
-                    quality === value ? "bg-surface text-text shadow-[0_1px_3px_rgba(0,0,0,.1)]" : "text-muted",
+                    "flex cursor-pointer flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
+                    quality === value ? "border-ink shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border shadow-xs hover:border-border-strong",
                   )}
                 >
-                  {label}
+                  <span className="text-sm font-medium">{label}</span>
+                  <span className="text-[12.5px] text-muted">{sub}</span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <span className="flex flex-col gap-[3px]">
+              <span className="text-sm font-medium" id="guests-label">
+                Guests per recording
+              </span>
+              <span className="text-[13px] text-muted">
+                You + {guests} guest{guests === 1 ? "" : "s"}, up to {MAX_GUESTS}
+              </span>
+            </span>
+            <span className="flex items-center gap-3">
+              <span aria-hidden className="flex pl-2">
+                <span className="-ml-2 rounded-full border-2 border-canvas">
+                  <Avatar name={hostName} className="size-[26px] text-[10px]" />
+                </span>
+                {Array.from({ length: guests }, (_, i) => (
+                  <span key={i} className="-ml-2 size-[30px] rounded-full border-2 border-canvas bg-surface-2" />
+                ))}
+              </span>
+              <Stepper value={guests} min={1} max={MAX_GUESTS} onChange={setGuests} labelledBy="guests-label" />
             </span>
           </div>
 
-          <div className="flex flex-col border-t border-border pt-1.5">
+          <div className="flex flex-col rounded-lg border border-border bg-surface px-3.5">
             <button
               type="button"
               aria-expanded={soundOpen}
               onClick={() => setSoundOpen(!soundOpen)}
-              className="flex cursor-pointer items-center justify-between py-3 text-left text-[15px] font-medium"
+              className="flex cursor-pointer items-center justify-between gap-3 py-3 text-left text-sm font-medium"
             >
               Sound options
-              <span className="text-[13px] font-normal text-subtle">
+              <span className="flex items-center gap-1.5 text-[13px] font-normal text-muted">
                 {soundOpen ? "Hide" : [echo && "Echo reduction", level && "Even volume"].filter(Boolean).join(" · ") || "Off"}
+                <Icon name="back" size={13} className={cn("transition-transform", soundOpen ? "rotate-90" : "-rotate-90")} />
               </span>
             </button>
             {soundOpen && (
-              <div className="flex flex-col gap-1 pb-1">
+              <div className="flex animate-fade-up flex-col gap-1 border-t border-divider pt-1 pb-2">
                 <CheckboxRow
                   className="py-2.5"
                   checked={echo}
@@ -207,25 +178,31 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
           {error && <Notice tone="danger">{error}</Notice>}
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2.5 border-t border-border bg-[#faf9f7] px-[clamp(20px,4vw,40px)] py-[18px] dark:bg-surface-2">
-          {!firstStudio && (
-            <Link href="/studios" className="flex h-[50px] items-center rounded-xl px-[18px] text-base font-medium text-text-2 hover:text-text">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-[18px]">
+          {!firstStudio ? (
+            <Link
+              href="/studios"
+              className="flex h-[38px] items-center rounded-md border border-border bg-surface px-3.5 text-sm font-medium text-text transition-colors hover:bg-surface-2 hover:text-text"
+            >
               Cancel
             </Link>
+          ) : (
+            <span className="text-[13px] text-muted">Next: a guest link to share. Nothing records until you press Record.</span>
           )}
+          {!firstStudio && <span className="text-[13px] text-muted">Nothing records until you press Record.</span>}
           <button
             type="submit"
             aria-disabled={!ready}
             className={cn(
-              "h-[50px] rounded-xl px-[26px] text-base font-semibold whitespace-nowrap text-white transition-colors",
-              ready ? "cursor-pointer bg-accent hover:bg-accent-hover" : "cursor-not-allowed bg-[#e2c3bb] dark:bg-accent-line",
+              "ml-auto flex h-[38px] items-center gap-2 rounded-md px-4 text-sm font-medium whitespace-nowrap transition-colors",
+              ready ? "cursor-pointer bg-ink text-ink-text hover:bg-ink-hover" : "cursor-not-allowed bg-ink text-ink-text opacity-50",
             )}
           >
+            {busy && <Spinner size={15} />}
             {busy ? "Creating…" : "Create studio"}
           </button>
         </div>
       </form>
-      <p className="text-center text-sm text-subtle">Next, you&apos;ll get a guest link to share. Nothing records until you press Record.</p>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { SpeedTestLimiter } from "./speed-test";
 import { AuthService, type AuthOptions } from "./auth";
 import { CallService, type CallConfig } from "./call";
 import type { Db } from "./db";
+import { LibraryService, type ServerInfo } from "./library";
 import { LiveHub, LiveService } from "./live";
 import type { Mailer } from "./mail";
 import { ProcessingService } from "./processing";
@@ -28,12 +29,14 @@ export interface Services {
   speedTest: { limiter: SpeedTestLimiter; origins: string[] };
   /** The admin health page's checks. */
   health: HealthService;
+  /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
+  library: LibraryService;
 }
 
 export function createServices(
   db: Db,
   storage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call"> } = {
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo } = {
     auth: { allowSignup: false },
   },
 ): Services {
@@ -44,11 +47,13 @@ export function createServices(
     processing.maybeEnqueue(recordingId).catch((err) => console.error("[processing] enqueue failed", err));
   const live = new LiveService(db, { now: opts.now, hub: opts.hub, onStopped: maybeProcess });
   processing = new ProcessingService(db, storage, (sessionId) => live.publishSoon(sessionId));
+  const studios = new StudioService(db, live, () => processing.onEnqueue());
+  const health = new HealthService(db, storage, { ...opts.health, call: opts.call ?? null, mailer: opts.mailer ?? null });
   return {
     db,
     storage,
     auth: new AuthService(db, { now: opts.now, ...opts.auth }),
-    studios: new StudioService(db, live, () => processing.onEnqueue()),
+    studios,
     live,
     uploads: new UploadService(db, storage, (sessionId) => live.publishSoon(sessionId), maybeProcess, { now: opts.now, bytesPerSecondCap: opts.bytesPerSecondCap }),
     processing,
@@ -56,6 +61,7 @@ export function createServices(
     recaps: new RecapService(db, !!opts.mailer, () => processing.onEnqueue()),
     guestPromoUrl: opts.guestPromoUrl ?? null,
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
-    health: new HealthService(db, storage, { ...opts.health, call: opts.call ?? null, mailer: opts.mailer ?? null }),
+    health,
+    library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),
   };
 }

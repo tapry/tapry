@@ -5,6 +5,25 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **New design.** The app and the website follow one design: grey neutrals, a terracotta accent
+  and Geist type (still served from your own server), in light and dark. Sign-in, the dashboard
+  with its folding sidebar, the studio page, the guest invite and green room, the recording room
+  (grid, speaker and side-by-side layouts, full screen) and the end screens are redrawn; what they
+  do is unchanged. In the room, a person's row says "Saved" only once every track is complete,
+  an offline or silent device says so, and level bars move only while that person speaks.
+- **Dashboard.** New pages across all your studios: Recordings (with filters), a page per
+  recording with a player, its files and its transcript, Studios, Guests (with their latest tech
+  check), Transcripts (searchable by what was said), Storage and Settings. All read from what the
+  server already stores; nothing about recording, upload or processing changed.
+- Fixed: logging in could leave the button on "One moment…" and land back on the login page.
+- **Website.** Use cases, self-hosting, pricing, docs (one page per topic under `/docs/<page>/`),
+  resources, about, a blog, legal (draft) and a free-tools page join the landing page, with real
+  content only. Pages are exported with trailing slashes, with `robots.txt`, a sitemap (needs
+  `NEXT_PUBLIC_SITE_URL`) and an icon.
+- CI builds the website.
+- Docs: using your own S3 also means removing `web`'s `depends_on` entry for `seaweedfs`; the
+  disk estimate matches docs/costs.md.
+
 ## 0.3.0 (7 November 2026)
 
 Tapry 0.3.0: the guest recap email, a round of reliability fixes so one bad upload or a late

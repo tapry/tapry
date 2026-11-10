@@ -18,7 +18,7 @@ Each run checks: the green room preview and mic meter, one audio-only and one ca
 in the expected format, all chunks uploaded, processing to WAV + MP4 + combined video, every
 download a valid file, all outputs the same length.
 
-**Not tested:** real Safari on macOS/iOS (WebKit is the same engine, but Playwright's build
+**Not tested:** real Safari on macOS/iOS, apart from the sync run further down (WebKit is the same engine, but Playwright's build
 isn't Safari: codecs and permission prompts can differ), Edge (Chromium-based), Android Chrome,
 real cameras and microphones. Recording on phones also stops when the tab is backgrounded;
 the green room warns about it.

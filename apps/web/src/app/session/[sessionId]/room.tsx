@@ -4,14 +4,15 @@ import type { UploadProgress } from "@tapry/recorder";
 import { STALE_REPORT_MS, type OwnRecordings, type RecapStatus, type SessionState, type SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
 import { OwnFiles } from "@/components/own-files";
-import { Avatar, Button, cn, Notice, StatusDot } from "@/components/ui";
+import { Avatar, Button, cn, Mark, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { mb } from "@/lib/format";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
 import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
-import { CallGrid } from "./call-grid";
+import { CallGrid, type Layout } from "./call-grid";
+import { eqAnimation, Icon, ICON } from "./icons";
 import { RecapEmail } from "./recap-email";
 import { followSession, type ConnectionStatus } from "@/lib/client/session-events";
 import type { ReadyToJoin } from "./green-room";
@@ -175,32 +176,199 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     return () => clearTimeout(id);
   }, [flash]);
 
-  return (
-    <div className="flex min-h-dvh flex-col p-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-2.5 pt-1.5 pb-3.5">
-        <span className="flex min-w-0 flex-wrap items-center gap-3 text-base font-semibold">
-          <span className="truncate">{ticket.studio.name}</span>
-          <RecPill startedAt={recording?.startedAt ?? null} offsetMs={ready.clock?.offsetMs ?? 0} />
-        </span>
-        <span className="flex items-center gap-2.5">
-          {isHost && state && !ended && <InviteButton studioId={state.session.studioId} />}
-          <Avatar name={selfName} className="size-[34px] text-xs" />
-        </span>
-      </div>
+  // Presentation only: how the tiles are laid out, and the full-screen view. Nothing here reaches the server.
+  const [layout, setLayout] = useState<Layout>("grid");
+  const [full, setFull] = useState(false);
+  const fullOpen = full && !ended;
+  const exitFull = useRef<HTMLButtonElement>(null);
+  const enterFull = useRef<HTMLButtonElement>(null);
+  const wasFull = useRef(false);
+  useEffect(() => {
+    if (!fullOpen) {
+      // Back from full screen: focus returns to the button that opened it.
+      if (wasFull.current) enterFull.current?.focus();
+      wasFull.current = false;
+      return;
+    }
+    wasFull.current = true;
+    exitFull.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFull(false);
+    };
+    window.addEventListener("keydown", onKey);
+    // The page behind is inert and covered: it shouldn't scroll under the full-screen view.
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [fullOpen]);
 
-      <div className="flex flex-col gap-2 px-2.5 pb-3 empty:hidden">
-        {connection === "unauthorized" && (
-          <Notice tone="danger">Your access to this session has ended. Open your invite link again to rejoin.</Notice>
+  const offsetMs = ready.clock?.offsetMs ?? 0;
+  const clock = useElapsed(recording?.startedAt ?? null, offsetMs);
+  const recordDisabled = busy || (!recording && connection !== "live");
+  const toggleRecording = () => void (recording ? hostAction(`/recordings/${recording.id}/stop`) : hostAction("/recordings"));
+  function toggleCamera() {
+    setCameraOff(!cameraOff);
+    void call.setCameraOff(!cameraOff);
+  }
+
+  const participants = state?.participants ?? [];
+  const connectedCount = present ? participants.filter((p) => present.has(p.id)).length : null;
+  const peerById = new Map(call.peers.map((p) => [p.id, p]));
+  const callLive = call.status === "connected";
+  const someoneTalking = (call.localSpeaking && !micMuted) || call.peers.some((p) => p.speaking);
+
+  // The host's view of everyone's device reports. A report that has gone quiet says nothing about
+  // now (offline, asleep or left), so it never counts as "up to date" or keeps an old "behind".
+  const now = useNow(5000);
+  const health = isHost && state ? state.health : [];
+  const staleIds = new Set(health.filter((h) => now + offsetMs - h.reportedAt > STALE_REPORT_MS).map((h) => h.participantId));
+  const behind = new Map<string, number | null>();
+  for (const h of health) if (!staleIds.has(h.participantId) && h.alerts.includes("upload_behind")) behind.set(h.participantId, h.uploadBehindS);
+  const badges = new Map([...behind].map(([id, s]) => [id, behindText(s)]));
+  for (const id of staleIds) if (id !== ticket.participantId) badges.set(id, "Not reporting");
+  // Who needs the host's attention, in words: shown in the full-screen view, where the panel is hidden.
+  const pastLateStart = usePast(recording ? recording.startedAt + LATE_START_MS - offsetMs : null);
+  const attention = !isHost
+    ? []
+    : participants.flatMap((p) => {
+        const reasons: string[] = [];
+        const report = health.find((h) => h.participantId === p.id);
+        if (present && !present.has(p.id)) reasons.push("Not connected");
+        if (staleIds.has(p.id)) reasons.push("Not reporting");
+        else if (report) reasons.push(...report.alerts.filter((a) => a !== "no_headphones").map((a) => alertLabel(a, report.uploadBehindS)));
+        if (recording && pastLateStart && !state?.uploads.some((u) => u.participantId === p.id)) reasons.push("Not recording yet");
+        return reasons.length > 0 ? [{ id: p.id, name: p.displayName, reasons }] : [];
+      });
+
+  const notices = (
+    <>
+      {connection === "unauthorized" && (
+        <Notice tone="danger">Your access to this session has ended. Open your invite link again to rejoin.</Notice>
+      )}
+      {!durable && (
+        <Notice tone="warn">
+          This browser blocks local storage (private window?), so your recording can&apos;t survive a crash. Keep this tab
+          open until the upload finishes.
+        </Notice>
+      )}
+      {recorderError && <Notice tone="danger">Recording problem: {recorderError}</Notice>}
+      {error && <Notice tone="danger">{error}</Notice>}
+    </>
+  );
+  // This person's own alerts. Rendered once: under the recording card, or in the full-screen view.
+  const ownAlerts = (
+    <>
+      {(advice.length > 0 || nudge) && (
+        <div className="flex flex-col gap-2" data-testid="own-alerts">
+          {advice.map((text) => (
+            <AlertLine key={text}>{text}</AlertLine>
+          ))}
+          {nudge && (
+            <div data-testid="talk-nudge" role="status" className="animate-fade-up rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text-2">
+              {nudge}
+            </div>
+          )}
+        </div>
+      )}
+      {micMuted && recording && <AlertLine>You&apos;re muted: your microphone is silent in the recording too.</AlertLine>}
+    </>
+  );
+
+  const hearOthers = call.audioBlocked && call.peers.length > 0 && (
+    <button
+      type="button"
+      onClick={call.startAudio}
+      className={cn(STAGE_WHITE_BUTTON, fullOpen ? "h-11 rounded-[22px] px-4" : "h-9 rounded-md px-3")}
+    >
+      Click to hear the others
+    </button>
+  );
+  const invite = isHost && state && <InviteButton studioId={state.session.studioId} large={fullOpen} />;
+  const size = fullOpen ? "lg" : "md";
+  const stageControls = (
+    <>
+      <StageButton
+        size={size}
+        active={micMuted}
+        aria-pressed={micMuted}
+        aria-label={micMuted ? "Unmute" : "Mute"}
+        title="Mute or unmute (⌘⇧M / Ctrl+Shift+M)"
+        onClick={toggleMute}
+      >
+        <Icon d={micMuted ? ICON.micOff : ICON.mic} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
+      </StageButton>
+      {hasCamera && (
+        <StageButton
+          size={size}
+          active={cameraOff}
+          aria-pressed={cameraOff}
+          aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}
+          title={cameraOff ? "Turn camera on" : "Turn camera off"}
+          onClick={toggleCamera}
+        >
+          <Icon d={cameraOff ? ICON.camOff : ICON.cam} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
+        </StageButton>
+      )}
+      {/* The layouts only differ once someone else is in the call. On a phone the full-screen bar keeps to one row. */}
+      {call.peers.length > 0 && (
+        <span className={cn("flex items-center gap-1.5", fullOpen && "gap-2 max-sm:hidden")}>
+          <StageSeparator tall={fullOpen} />
+          {LAYOUTS.map(([id, name, d]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setLayout(id)}
+              aria-pressed={layout === id}
+              aria-label={name}
+              title={name}
+              className={cn(
+                "grid cursor-pointer place-items-center text-white transition-colors hover:bg-white/28",
+                fullOpen ? "size-11 rounded-full" : "size-9 rounded-md",
+                layout === id ? "bg-white/28" : "bg-white/12",
+              )}
+            >
+              <Icon d={d} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
+            </button>
+          ))}
+        </span>
+      )}
+      {(hearOthers || invite || !fullOpen) && <StageSeparator tall={fullOpen} />}
+      {hearOthers}
+      {invite}
+    </>
+  );
+  const recLabel = isHost ? (recording ? "Stop recording" : "Start recording") : recording ? "Recording" : "Waiting to record";
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <header inert={fullOpen} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-[clamp(14px,3vw,28px)] py-3">
+        <span className="flex min-w-0 flex-wrap items-center gap-3">
+          <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
+            <Mark className="size-[15px]" />
+          </span>
+          <span className="truncate text-[15px] font-medium">{ticket.studio.name}</span>
+          <RecPill clock={clock} />
+        </span>
+        {!ended && (
+          <button
+            type="button"
+            onClick={() => setPanelOpen(!panelOpen)}
+            aria-pressed={panelOpen}
+            className={cn(
+              "inline-flex h-[34px] cursor-pointer items-center gap-[7px] rounded-md border px-3 text-sm font-medium shadow-xs transition-colors",
+              panelOpen ? "border-ink bg-ink text-ink-text hover:bg-ink-hover" : "border-border bg-surface text-text hover:bg-surface-2",
+            )}
+          >
+            <Icon d={ICON.people} className="size-[15px]" />
+            People
+          </button>
         )}
-        {!durable && (
-          <Notice tone="warn">
-            This browser blocks local storage (private window?), so your recording can&apos;t survive a crash. Keep this tab
-            open until the upload finishes.
-          </Notice>
-        )}
-        {recorderError && <Notice tone="danger">Recording problem: {recorderError}</Notice>}
-        {error && <Notice tone="danger">{error}</Notice>}
-      </div>
+      </header>
+
+      {!fullOpen && <div className="flex flex-col gap-2 px-[clamp(14px,3vw,28px)] pt-3 empty:hidden">{notices}</div>}
 
       {ended ? (
         <EndedView
@@ -214,229 +382,641 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           finishing={localActive}
         />
       ) : (
-        <div className={cn("grid min-h-0 flex-1 gap-2.5", panelOpen && "lg:grid-cols-[minmax(0,1fr)_300px]")}>
-          <div className="flex min-w-0 flex-col rounded-[18px] bg-surface shadow-[0_1px_3px_rgba(0,0,0,.05)]">
-            <div className="flex flex-1 flex-col justify-center p-[clamp(14px,2.4vw,28px)]">
-              <CallGrid
-                stream={ready.stream}
-                selfName={selfName}
-                selfMicMuted={micMuted}
-                selfCameraOff={cameraOff}
-                selfSpeaking={call.localSpeaking}
-                peers={call.peers}
-                recording={!!recording}
-              />
-            </div>
-            {(advice.length > 0 || nudge) && (
-              <div className="mx-[clamp(14px,2.4vw,28px)] mb-3 flex flex-col gap-1.5" data-testid="own-alerts">
-                {advice.map((text) => (
-                  <Notice key={text} tone="warn">
-                    {text}
-                  </Notice>
-                ))}
-                {nudge && (
-                  <div data-testid="talk-nudge">
-                    <Notice tone="info">{nudge}</Notice>
+        <div className="flex flex-1 flex-col lg:flex-row">
+          <div className="min-w-0 flex-1 px-[clamp(14px,3vw,28px)] pt-[22px] pb-8">
+            {/* No entrance animation on this wrapper: an animated transform would trap the full-screen stage inside it. */}
+            <div className="mx-auto flex max-w-[860px] flex-col gap-5">
+              {/*
+                The call stage: dark in both themes, so focus rings are light here. Full screen is this
+                same element laid over the page (never a second grid), so nobody's video or sound is
+                re-attached when it opens or closes.
+              */}
+              <section
+                role={fullOpen ? "dialog" : undefined}
+                aria-modal={fullOpen || undefined}
+                aria-label={fullOpen ? "Full screen studio" : "Call"}
+                className={cn(
+                  "text-white [--ring:#fafafa]",
+                  fullOpen ? "fixed inset-0 z-40 flex flex-col bg-[#09090b]" : "relative overflow-hidden rounded-2xl bg-[#18181b] p-3",
+                )}
+              >
+                {fullOpen && (
+                  <div className="flex shrink-0 items-center justify-between gap-4 px-[18px] py-3.5">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
+                        <Mark className="size-[15px]" />
+                      </span>
+                      <span className="truncate text-[15px] font-medium">{ticket.studio.name}</span>
+                    </span>
+                    <span className="flex items-center gap-2.5">
+                      {/* A fixed terracotta dark enough for white text: this view is dark in both themes. */}
+                      <span
+                        className={cn(
+                          "flex items-center gap-2 rounded-md px-2.5 py-[5px] text-[13px] font-semibold whitespace-nowrap",
+                          recording ? "bg-[#c43c25]" : "bg-white/12",
+                        )}
+                      >
+                        <span aria-hidden className={cn("size-[7px] rounded-full bg-white", recording && "animate-rec-pulse")} />
+                        {recording ? "Recording" : "Ready"}
+                        {clock && <span className="font-mono font-medium tabular-nums">{clock}</span>}
+                      </span>
+                      <span
+                        className="flex items-center gap-1.5 rounded-md bg-white/8 px-2.5 py-[5px] text-[13px] whitespace-nowrap text-white/80"
+                        title={connectedCount !== null ? `${connectedCount} of ${participants.length} in the call` : `${participants.length} in the studio`}
+                      >
+                        <Icon d={ICON.people} className="size-3.5" />
+                        <span className="sr-only">{connectedCount !== null ? "People in the call:" : "People in the studio:"}</span>
+                        {connectedCount ?? participants.length}
+                      </span>
+                      <button
+                        ref={exitFull}
+                        type="button"
+                        onClick={() => setFull(false)}
+                        aria-label="Exit full screen"
+                        className="inline-flex h-8 cursor-pointer items-center gap-[7px] rounded-md border border-white/16 px-[11px] text-[13px] font-medium whitespace-nowrap transition-colors hover:bg-white/10"
+                      >
+                        <Icon d={ICON.shrink} className="size-3.5" />
+                        <span className="max-sm:hidden">Exit full screen</span>
+                      </button>
+                    </span>
                   </div>
                 )}
-              </div>
-            )}
-            <div className="mx-[clamp(14px,2.4vw,28px)] border-t border-border" />
-            <div className="flex flex-wrap items-start justify-center gap-3 px-[clamp(10px,2vw,24px)] pt-3.5 pb-[18px]">
-              {isHost && (
-                <ToolButton
-                  label={recording ? "Recording" : "Start"}
-                  aria-label={recording ? "Stop recording" : "Record"}
-                  disabled={busy || (!recording && connection !== "live")}
-                  title="Start or stop recording (⌘⇧R / Ctrl+Shift+R)"
-                  onClick={() => (recording ? hostAction(`/recordings/${recording.id}/stop`) : hostAction("/recordings"))}
-                  wide
-                  icon={
-                    <span className={cn("flex h-[42px] items-center gap-[9px] rounded-[10px] px-4 text-[15px] font-semibold text-white", recording ? "bg-[#2b2424]" : "bg-accent")}>
-                      <span className={cn("grid size-3.5 place-items-center border-2 border-white", recording ? "rounded-[3px]" : "rounded-full")}>
-                        <span className={cn("size-1.5 bg-white", recording ? "rounded-[1px]" : "rounded-full")} />
+                {/* Problems stay in sight in full screen: the page's notices, this person's alerts, and (host) who needs attention. */}
+                {fullOpen && (
+                  <div className="flex max-h-[30vh] shrink-0 flex-col gap-2 overflow-auto px-[18px] pb-2.5 empty:hidden">
+                    {notices}
+                    {ownAlerts}
+                    {attention.map((a) => (
+                      <AlertLine key={a.id}>
+                        <span className="font-medium">{a.name}:</span> {a.reasons.join(", ")}
+                      </AlertLine>
+                    ))}
+                  </div>
+                )}
+                <div className={cn(fullOpen && "flex min-h-0 flex-1 px-[18px]")}>
+                  <CallGrid
+                    stream={ready.stream}
+                    selfId={ticket.participantId}
+                    selfName={selfName}
+                    selfMicMuted={micMuted}
+                    selfCameraOff={cameraOff}
+                    selfSpeaking={call.localSpeaking}
+                    peers={call.peers}
+                    recording={!!recording}
+                    layout={layout}
+                    variant={fullOpen ? "full" : "stage"}
+                    badges={isHost ? badges : undefined}
+                  />
+                </div>
+                {fullOpen ? (
+                  <div className="flex shrink-0 justify-center px-[18px] pt-3.5 pb-[18px]">
+                    <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-[32px] border border-white/10 bg-white/7 px-2.5 py-2 backdrop-blur-md">
+                      <span className="flex items-center gap-3 pr-2.5 pl-0.5">
+                        <RecControl recording={!!recording} size={44} onClick={isHost ? toggleRecording : undefined} disabled={recordDisabled} />
+                        <span className={cn("text-sm font-medium whitespace-nowrap", isHost && "max-sm:hidden")}>{recLabel}</span>
                       </span>
-                      {recording ? "Stop" : "Record"}
+                      <StageSeparator tall />
+                      {stageControls}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 px-1 pt-3">
+                    <span className="flex items-center gap-[13px] pl-1">
+                      {/* For the host, a mouse shortcut to the Record button in the card below (hidden from assistive tech, which uses that one). */}
+                      <RecControl
+                        recording={!!recording}
+                        size={40}
+                        onClick={isHost ? toggleRecording : undefined}
+                        disabled={recordDisabled}
+                        duplicate
+                      />
+                      <span className="flex flex-col leading-[1.3]">
+                        <span className="text-sm font-medium whitespace-nowrap">{recLabel}</span>
+                        {/* A guest's clock only runs while they're recorded; the host's sits at 00:00 beside Record. */}
+                        {(isHost || clock) && <span className="text-xs text-white/60 tabular-nums">{clock ?? "00:00"}</span>}
+                      </span>
                     </span>
-                  }
-                />
-              )}
-              <ToolButton
-                label={micMuted ? "Unmute" : "Mute"}
-                active={micMuted}
-                aria-pressed={micMuted}
-                onClick={toggleMute}
-                title="Mute or unmute (⌘⇧M / Ctrl+Shift+M)"
-                icon={<Icon d={micMuted ? ICONS.micOff : ICONS.mic} />}
-              />
-              {hasCamera && (
-                <ToolButton
-                  label={cameraOff ? "Camera on" : "Camera"}
-                  aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}
-                  active={cameraOff}
-                  aria-pressed={cameraOff}
-                  onClick={() => {
-                    setCameraOff(!cameraOff);
-                    void call.setCameraOff(!cameraOff);
-                  }}
-                  icon={<Icon d={cameraOff ? ICONS.camOff : ICONS.cam} />}
-                />
-              )}
-              <ToolButton
-                label="People"
-                aria-pressed={panelOpen}
-                inverted={panelOpen}
-                onClick={() => setPanelOpen(!panelOpen)}
-                icon={<Icon d={ICONS.people} />}
-              />
-            </div>
-            <div className="flex flex-col items-center gap-2 px-4 pb-4 text-center">
-              {flash && (
-                <p role="status" className="rounded-full bg-ink px-3.5 py-1.5 text-sm font-medium text-ink-text" data-testid="shortcut-flash">
-                  {flash}
-                </p>
-              )}
-              {call.audioBlocked && call.peers.length > 0 && (
-                <Button variant="primary" onClick={call.startAudio}>
-                  Click to hear the others
-                </Button>
-              )}
-              {!isHost && (
-                <p className="text-sm font-medium text-text-2">
-                  {recording ? "You're being recorded." : "Waiting for the host to start recording."}
-                </p>
-              )}
-              {micMuted && recording && (
-                <p className="text-sm text-warn-strong">You&apos;re muted: your microphone is silent in the recording too.</p>
-              )}
-              <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} offsetMs={ready.clock?.offsetMs ?? 0} />
-              <div className="flex flex-wrap justify-center gap-x-4">
-                <ConnectionLabel status={connection} />
-                <CallLabel status={call.status} />
-              </div>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {stageControls}
+                      <button
+                        ref={enterFull}
+                        type="button"
+                        onClick={() => setFull(true)}
+                        className={cn(STAGE_WHITE_BUTTON, "h-9 gap-[7px] rounded-md px-3")}
+                      >
+                        <Icon d={ICON.expand} className="size-[15px]" />
+                        Full screen
+                      </button>
+                    </span>
+                  </div>
+                )}
+              </section>
+
+              {/* The recording: Record/Stop, the clock, and (for the host) everyone's track as it's saved. */}
+              <section inert={fullOpen} className="flex animate-fade-up flex-col overflow-hidden rounded-xl border border-border bg-surface">
+                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 bg-linear-to-b from-accent-tint to-surface px-5 py-[18px]">
+                  <span className="flex items-center gap-[18px]">
+                    <span className="relative grid size-[60px] shrink-0 place-items-center">
+                      {recording &&
+                        [0, 0.8, 1.6].map((d) => (
+                          <span
+                            key={d}
+                            aria-hidden
+                            className="absolute inset-0 animate-ring-slow rounded-full border-2 border-accent"
+                            style={{ animationDelay: `${d}s` }}
+                          />
+                        ))}
+                      <BigRecordButton
+                        recording={!!recording}
+                        onClick={isHost ? toggleRecording : undefined}
+                        disabled={recordDisabled}
+                      />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-[3px]">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold tracking-[.02em]",
+                            recording ? "bg-accent-soft text-accent-strong" : "bg-surface-2 text-muted",
+                          )}
+                        >
+                          <span className={cn("size-1.5 rounded-full bg-current", recording && "animate-rec-pulse")} />
+                          {recording ? "Recording" : "Ready"}
+                        </span>
+                        {/* Moves only while someone is actually talking (the call's voice detection): flat for silence or a dead mic. */}
+                        <span aria-hidden className={cn("flex h-[18px] items-center gap-0.5", recording ? "text-accent-strong" : "text-muted")}>
+                          {HEADER_EQ.map((d, k) => (
+                            <span
+                              key={k}
+                              className="h-[18px] w-[3px] rounded-[2px] bg-current"
+                              style={{
+                                transform: "scaleY(.25)",
+                                animation: recording && someoneTalking ? `eq ${d}s ease-in-out ${(-k * 0.13).toFixed(2)}s infinite` : "none",
+                              }}
+                            />
+                          ))}
+                        </span>
+                      </span>
+                      <span className="text-[36px] leading-[1.1] font-medium tracking-[-.03em] tabular-nums">{clock ?? "00:00"}</span>
+                      {isHost ? (
+                        <span className="text-[12.5px] whitespace-nowrap text-muted">
+                          {recording ? "Press to stop recording for everyone" : "Press to start recording everyone"}
+                        </span>
+                      ) : (
+                        <span className="text-[13.5px] font-medium text-text-2">
+                          {recording ? "You're being recorded." : "Waiting for the host to start recording."}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  {isHost && state && (
+                    <span className="-ml-[18px] flex flex-wrap gap-y-2.5">
+                      {[
+                        {
+                          icon: ICON.people,
+                          k: "People",
+                          v: connectedCount !== null ? `${connectedCount} of ${participants.length} in the call` : `${participants.length} in the studio`,
+                        },
+                        { icon: ICON.cloudCheck, k: "Uploads", v: uploadsSummary(state, (id) => behind.has(id) || staleIds.has(id) || (!!present && !present.has(id))) },
+                        {
+                          icon: ICON.cloudUp,
+                          k: "Saved so far",
+                          v: state.recording && state.uploads.length > 0 ? mb(state.uploads.reduce((sum, u) => sum + u.bytes, 0)) : "—",
+                        },
+                      ].map((st) => (
+                        <span key={st.k} className="flex flex-col gap-1 border-l border-border px-[18px] py-0.5">
+                          <span className="flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-muted">
+                            <Icon d={st.icon} className="size-3.5" />
+                            {st.k}
+                          </span>
+                          <span className="text-base font-medium whitespace-nowrap tabular-nums">{st.v}</span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+
+                {isHost &&
+                  state &&
+                  participants.map((p) => {
+                    const self = p.id === ticket.participantId;
+                    const peer = peerById.get(p.id);
+                    return (
+                      <TrackRow
+                        key={p.id}
+                        name={p.displayName}
+                        self={self}
+                        role={p.role}
+                        muted={self ? micMuted : !!peer?.micMuted}
+                        speaking={self ? call.localSpeaking && !micMuted : !!peer?.speaking}
+                        away={!!present && !present.has(p.id)}
+                        recording={!!recording}
+                        callLive={callLive}
+                        upload={state.recording ? state.uploads.find((u) => u.participantId === p.id) : undefined}
+                        hasRecording={!!state.recording}
+                        behindS={behind.has(p.id) ? (behind.get(p.id) ?? null) : undefined}
+                        stale={staleIds.has(p.id)}
+                      />
+                    );
+                  })}
+
+                <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} offsetMs={offsetMs} />
+
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-divider bg-canvas px-5 py-[11px] text-[13.5px] text-muted">
+                  <span className="flex min-w-0 flex-[1_1_240px] items-center gap-2">
+                    <Icon d={ICON.shield} className="size-[15px] text-ok" />
+                    <span className="text-pretty">
+                      {recording
+                        ? "Everyone is recorded on their own computer, so a bad connection can't spoil the result."
+                        : isHost
+                          ? "Nothing is being recorded right now. Press Record when everyone is ready."
+                          : "Nothing is being recorded right now. Your host starts when everyone is ready."}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap gap-x-4 gap-y-1">
+                    <ConnectionLabel status={connection} />
+                    <CallLabel status={call.status} />
+                  </span>
+                </div>
+              </section>
+
+              {!fullOpen && ownAlerts}
             </div>
           </div>
 
           {panelOpen && (
-            <aside className="flex min-w-0 flex-col gap-4 rounded-[18px] bg-surface p-5 shadow-[0_1px_3px_rgba(0,0,0,.05)]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold">In the studio</h2>
-                {present && (
-                  <span className="text-[13px] text-subtle">
-                    {state?.participants.filter((p) => present.has(p.id)).length ?? 0} of {state?.participants.length ?? 0} connected
-                  </span>
-                )}
-              </div>
-              <ul className="flex flex-col gap-3">
-                {state?.participants.map((p) => {
-                  const away = present && !present.has(p.id);
-                  return (
-                    <li key={p.id} className="flex items-center gap-3" data-testid="participant">
-                      <Avatar name={p.displayName} className={cn("size-9 text-[13px]", away && "opacity-50 grayscale")} />
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-sm font-medium">
-                          {p.displayName}
-                          {p.id === ticket.participantId && <span className="font-normal text-muted"> (you)</span>}
-                          {p.role === "host" && <span className="text-xs font-normal text-muted"> · host</span>}
-                        </span>
-                        {shares && <TalkShare share={shares.get(p.id) ?? 0} />}
-                        {isHost && (
-                          <HealthChips
-                            health={state.health.find((h) => h.participantId === p.id)}
-                            offsetMs={ready.clock?.offsetMs ?? 0}
-                          />
-                        )}
-                        {isHost && state.recording ? (
-                          <ParticipantUpload
-                            upload={state.uploads.find((u) => u.participantId === p.id)}
-                            stopped={state.recording.status === "stopped"}
-                            away={!!away}
-                            startedAt={state.recording.startedAt}
-                            offsetMs={ready.clock?.offsetMs ?? 0}
-                          />
-                        ) : (
-                          present && (
-                            <span className={cn("text-xs", away ? "text-warn-strong" : "text-muted")} title={away ? "Not connected" : "In the call"}>
-                              {away ? "Not connected" : "In the call"}
-                            </span>
-                          )
-                        )}
+            <aside inert={fullOpen} className="w-full shrink-0 border-t border-border bg-canvas lg:w-[380px] lg:border-t-0 lg:border-l">
+              <div className="flex flex-col gap-4 p-4 lg:sticky lg:top-0 lg:max-h-dvh lg:min-h-[calc(100dvh-58px)] lg:overflow-auto">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-[15px] font-medium">In the studio · {participants.length}</h2>
+                  <span className="flex items-center gap-2">
+                    {present && (
+                      <span className="text-[13px] text-muted">
+                        {connectedCount} of {participants.length} connected
                       </span>
-                    </li>
-                  );
-                })}
-              </ul>
-              {isHost && (
-                <div className="mt-auto flex flex-col gap-3">
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Close panel"
+                      onClick={() => setPanelOpen(false)}
+                      className="grid size-7 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                    >
+                      <Icon d={ICON.close} className="size-[15px]" />
+                    </button>
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-2">
+                  {participants.map((p) => {
+                    const away = present && !present.has(p.id);
+                    return (
+                      <li key={p.id} className="flex gap-[11px] rounded-xl border border-border bg-surface px-3 py-[11px]" data-testid="participant">
+                        <Avatar name={p.displayName} className={cn("size-[34px] text-xs", away && "opacity-50 grayscale")} />
+                        <span className="flex min-w-0 flex-1 flex-col gap-1">
+                          <span className="flex items-baseline justify-between gap-2">
+                            <span className="min-w-0 truncate text-[14.5px] font-medium">
+                              {p.displayName}
+                              {p.id === ticket.participantId && <span className="font-normal text-muted"> (you)</span>}
+                              {p.role === "host" && <span className="font-normal text-muted"> · host</span>}
+                            </span>
+                            {shares && <TalkShare share={shares.get(p.id) ?? 0} />}
+                          </span>
+                          {isHost && state?.recording ? (
+                            <ParticipantUpload
+                              upload={state.uploads.find((u) => u.participantId === p.id)}
+                              stopped={state.recording.status === "stopped"}
+                              away={!!away}
+                              startedAt={state.recording.startedAt}
+                              offsetMs={offsetMs}
+                            />
+                          ) : (
+                            present && (
+                              <span
+                                className={cn("flex items-center gap-[7px] text-[13.5px]", away ? "text-warn-strong" : "text-muted")}
+                                title={away ? "Not connected" : "In the call"}
+                              >
+                                <StatusDot tone={away ? "warn" : "ok"} />
+                                {away ? "Not connected" : "In the call"}
+                              </span>
+                            )
+                          )}
+                          {isHost && state && (
+                            <HealthChips health={state.health.find((h) => h.participantId === p.id)} offsetMs={offsetMs} />
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {!isHost && (
+                  <div className="flex flex-col gap-[9px] rounded-xl border border-border bg-surface p-3.5 text-sm leading-normal text-text-2">
+                    <span>• If your internet drops, keep talking. Your recording is saved here first.</span>
+                    <span>• Keep this tab open until your upload is finished.</span>
+                    <span>• Plug in your laptop if you can.</span>
+                  </div>
+                )}
+                {isHost && (
                   <Button
                     variant="danger"
-                    className="h-11 w-full rounded-[10px] border-accent-line text-sm"
+                    size="sm"
+                    className="mt-auto w-full"
                     disabled={busy}
                     onClick={() => confirm("End the session for everyone?") && hostAction("/end")}
                   >
                     End session for everyone
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </aside>
           )}
         </div>
+      )}
+
+      {flash && (
+        <p
+          role="status"
+          className="fixed bottom-7 left-1/2 z-50 -translate-x-1/2 animate-fade-up rounded-md bg-ink px-3.5 py-2 text-sm font-medium text-ink-text shadow-[0_10px_30px_-10px_rgba(0,0,0,.4)]"
+          data-testid="shortcut-flash"
+        >
+          {flash}
+        </p>
       )}
     </div>
   );
 }
 
-const ICONS = {
-  mic: "M9 4a3 3 0 0 1 6 0v7a3 3 0 0 1 -6 0zM5 11a7 7 0 0 0 14 0M12 18v3",
-  micOff: "M3 3l18 18M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V4a3 3 0 0 0 -5.9 -.7M5 11a7 7 0 0 0 11.5 5.4M12 18v3",
-  cam: "M3 7h12v10H3zM15 10l6 -3v10l-6 -3",
-  camOff: "M3 3l18 18M15 10l6 -3v10l-6 -3M3 7h4M15 15v2H3V7",
-  people: "M9 11a4 4 0 1 0 0 -8a4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M17 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0 -4 -6.3",
-  invite: "M9 11a4 4 0 1 0 0 -8a4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M19 8v6M16 11h6",
-};
+const LAYOUTS: Array<[Layout, string, string]> = [
+  ["grid", "Grid", ICON.grid],
+  ["speaker", "Speaker", ICON.speaker],
+  ["side", "Side by side", ICON.side],
+];
 
-function Icon({ d }: { d: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d={d} />
-    </svg>
-  );
-}
+/** The recording card's level bars (durations from the design). */
+const HEADER_EQ = [0.9, 0.7, 1.1, 0.6, 0.95, 0.75, 1.05, 0.65, 0.85];
 
-/** A studio toolbar button: an icon tile with a caption underneath. */
-function ToolButton({
-  icon,
-  label,
+/** White button on the dark stage (both themes), like the design's Leave/Full screen. */
+const STAGE_WHITE_BUTTON =
+  "inline-flex shrink-0 cursor-pointer items-center bg-white text-sm font-medium whitespace-nowrap text-[#18181b] transition-colors hover:bg-[#e4e4e7]";
+
+function StageButton({
+  size,
   active,
-  inverted,
-  wide,
   className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon: React.ReactNode; label: string; active?: boolean; inverted?: boolean; wide?: boolean }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { size: "md" | "lg"; active: boolean }) {
   return (
     <button
       type="button"
       className={cn(
-        "flex cursor-pointer flex-col items-center gap-1.5 text-[13px] text-text-2 disabled:cursor-not-allowed disabled:opacity-50",
-        !wide && "min-w-14",
+        "grid cursor-pointer place-items-center rounded-full transition-colors",
+        size === "lg" ? "size-11" : "size-[38px]",
+        active ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-white/12 text-white hover:bg-white/28",
         className,
       )}
       {...props}
-    >
-      {wide ? (
-        icon
-      ) : (
-        <span
-          className={cn(
-            "grid size-[42px] place-items-center rounded-[10px] transition-colors",
-            active ? "bg-accent-soft text-accent-strong" : inverted ? "bg-ink text-ink-text" : "bg-[#f2f1ef] text-text dark:bg-surface-2",
-          )}
+    />
+  );
+}
+
+function StageSeparator({ tall }: { tall?: boolean }) {
+  return <span aria-hidden className={cn("mx-1 w-px", tall ? "h-6 bg-white/14" : "h-5 bg-white/20")} />;
+}
+
+/** The round terracotta record control on the stage: a dot to start, a square to stop. */
+function RecControl({
+  recording,
+  size,
+  onClick,
+  disabled,
+  duplicate,
+}: {
+  recording: boolean;
+  size: 40 | 44;
+  onClick?: () => void;
+  disabled?: boolean;
+  /** A second copy of the card's Record button: clickable with the mouse, but out of the accessibility tree and tab order, and it never takes focus. */
+  duplicate?: boolean;
+}) {
+  const glyph = (
+    <span
+      className="block bg-accent-text transition-all duration-300"
+      style={{ width: recording ? 13 : 15, height: recording ? 13 : 15, borderRadius: recording ? 3 : "50%" }}
+    />
+  );
+  return (
+    <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
+      {recording &&
+        [0, 0.66, 1.33].map((d) => (
+          <span key={d} aria-hidden className="absolute inset-0 animate-ring-slow rounded-full bg-accent" style={{ animationDelay: `${d}s` }} />
+        ))}
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          // Focus must never land on an element assistive tech can't see.
+          onMouseDown={duplicate ? (e) => e.preventDefault() : undefined}
+          disabled={disabled}
+          aria-label={duplicate ? undefined : recording ? "Stop recording" : "Record"}
+          aria-hidden={duplicate || undefined}
+          tabIndex={duplicate ? -1 : undefined}
+          title={`${recording ? "Stop recording" : "Start recording"} (⌘⇧R / Ctrl+Shift+R)`}
+          className="relative grid size-full cursor-pointer place-items-center rounded-full bg-accent transition-[transform,background-color] hover:bg-accent-hover active:scale-[.93] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {icon}
+          {glyph}
+        </button>
+      ) : (
+        <span aria-hidden className={cn("relative grid size-full place-items-center rounded-full", recording ? "bg-accent" : "bg-white/12")}>
+          {recording ? glyph : <span className="size-2.5 rounded-full bg-white/60" />}
         </span>
       )}
-      {label}
+    </span>
+  );
+}
+
+/** The recording card's big button (the host's Record/Stop); for guests, the same disc as a status. */
+function BigRecordButton({ recording, onClick, disabled }: { recording: boolean; onClick?: () => void; disabled: boolean }) {
+  const style = {
+    background: recording || onClick ? "radial-gradient(circle at 35% 30%, #f47a5f, var(--accent) 55%, var(--accent-hover))" : "var(--surface-2)",
+    boxShadow: `0 0 0 5px var(--surface), 0 0 0 6px ${recording ? "var(--accent-line)" : "var(--border)"}${recording || onClick ? ", 0 10px 24px -8px rgba(196,60,37,.6)" : ""}`,
+  };
+  const glyph = (
+    <span
+      className={cn("block transition-all duration-300", recording || onClick ? "bg-accent-text" : "bg-subtle")}
+      style={{ width: recording ? 18 : 22, height: recording ? 18 : 22, borderRadius: recording ? 3 : "50%" }}
+    />
+  );
+  if (!onClick) {
+    return (
+      <span aria-hidden className="relative grid size-[60px] place-items-center rounded-full" style={style}>
+        {glyph}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={recording ? "Stop recording" : "Record"}
+      title="Start or stop recording (⌘⇧R / Ctrl+Shift+R)"
+      className="relative grid size-[60px] cursor-pointer place-items-center rounded-full transition-[transform,box-shadow] duration-300 active:scale-[.94] disabled:cursor-not-allowed disabled:opacity-50"
+      style={style}
+    >
+      {glyph}
     </button>
+  );
+}
+
+/** One person's track in the host's recording card: who's talking, and whether their recording is safely here. */
+function TrackRow({
+  name,
+  self,
+  role,
+  muted,
+  speaking,
+  away,
+  recording,
+  callLive,
+  upload,
+  hasRecording,
+  behindS,
+  stale,
+}: {
+  name: string;
+  self: boolean;
+  role: "host" | "guest";
+  muted: boolean;
+  speaking: boolean;
+  away: boolean;
+  recording: boolean;
+  callLive: boolean;
+  upload: SessionState["uploads"][number] | undefined;
+  hasRecording: boolean;
+  /** Set (seconds, or null when unknown) when their upload is behind. */
+  behindS: number | null | undefined;
+  /** Their device has stopped reporting (offline, asleep or left). */
+  stale: boolean;
+}) {
+  const off = !recording || muted || away;
+  const talking = speaking && !off;
+  const voice = muted ? "Muted" : away ? "Not connected" : !recording ? "Ready" : !callLive ? "" : talking ? "Speaking" : "Listening";
+  const done = !!upload && upload.tracks > 0 && upload.completeTracks === upload.tracks;
+  // "Saved" only once every track is complete on the server. Until then it's still on its way,
+  // and someone who's offline or whose device went quiet is a warning, never a green tick.
+  const pill = !hasRecording
+    ? null
+    : done
+      ? { tone: "ok", icon: ICON.cloudCheck, text: "Saved" }
+      : away
+        ? { tone: "warn", icon: ICON.alert, text: "Offline" }
+        : stale
+          ? { tone: "warn", icon: ICON.alert, text: "Not reporting" }
+          : behindS !== undefined
+            ? { tone: "warn", icon: ICON.cloudUp, text: behindText(behindS) }
+            : upload
+              ? { tone: recording ? "ok" : "warn", icon: ICON.cloudUp, text: "Uploading" }
+              : { tone: "idle", icon: ICON.clock, text: recording ? "Waiting" : "Nothing" };
+  return (
+    <div className="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 border-t border-divider px-5 py-[13px] sm:grid-cols-[34px_minmax(0,140px)_minmax(40px,1fr)_auto]">
+      <span className="relative grid size-[34px] place-items-center">
+        {talking &&
+          [0, 0.6, 1.2].map((d) => (
+            <span key={d} aria-hidden className="absolute inset-0 animate-ring rounded-full border-2 border-accent" style={{ animationDelay: `${d}s` }} />
+          ))}
+        <Avatar
+          name={name}
+          className={cn("relative size-[34px] text-xs ring-2 transition-shadow", talking ? "ring-accent" : "ring-surface", away && "opacity-50 grayscale")}
+        />
+        <span
+          aria-hidden
+          // Fixed fills, dark enough for the white glyph in both themes.
+          className={cn(
+            "absolute -right-1 -bottom-1 grid size-[17px] place-items-center rounded-full border-2 border-surface text-white transition-colors",
+            muted ? "bg-[#dc2626]" : talking ? "bg-[#c43c25]" : "bg-[#71717a]",
+          )}
+        >
+          <Icon d={muted ? ICON.micOff : ICON.mic} className="size-[9px]" strokeWidth={2.6} />
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-col gap-px">
+        <span className="truncate text-[15px] font-medium">
+          {name}
+          {self && <span className="font-normal text-muted"> (you)</span>}
+        </span>
+        {/* What the server has from them. Your own row leaves the figure to the line below, which counts on this device. */}
+        <span className="truncate text-[12.5px] text-muted">
+          {role === "host" ? "Host" : "Guest"}
+          {upload && !self && ` · ${mb(upload.bytes)} received`}
+        </span>
+      </span>
+      <span
+        aria-hidden
+        className={cn(
+          "flex h-[34px] min-w-0 items-center gap-2.5 overflow-hidden rounded-full px-3 transition-colors max-sm:hidden",
+          talking ? "bg-accent-soft" : "bg-surface-2",
+        )}
+      >
+        <span className="flex h-[22px] min-w-0 flex-1 items-center justify-between gap-0.5 overflow-hidden">
+          {Array.from({ length: 22 }, (_, k) => (
+            <span
+              key={k}
+              className={cn(
+                "h-[22px] max-w-[3px] min-w-[2px] flex-1 rounded-[2px] transition-colors",
+                talking ? "bg-accent" : off ? "bg-border-strong" : "bg-subtle",
+              )}
+              // Moves only while the call hears them talking; flat otherwise, so it never suggests sound that isn't there.
+              style={{ transform: `scaleY(${off ? 0.1 : 0.2})`, animation: talking ? eqAnimation(k) : "none" }}
+            />
+          ))}
+        </span>
+        {voice && (
+          <span className={cn("text-xs font-medium whitespace-nowrap transition-colors", talking ? "text-accent-strong" : "text-muted")}>{voice}</span>
+        )}
+      </span>
+      {pill ? (
+        <span
+          className={cn(
+            "flex items-center gap-1.5 justify-self-end rounded-md py-[3px] pr-2 pl-1.5 text-[12.5px] font-medium whitespace-nowrap",
+            pill.tone === "ok" ? "bg-ok-soft text-ok-strong" : pill.tone === "warn" ? "bg-warn-soft text-warn-strong" : "bg-surface-2 text-muted",
+          )}
+        >
+          <Icon d={pill.icon} className="size-3.5" />
+          {pill.text}
+        </span>
+      ) : (
+        <span />
+      )}
+    </div>
+  );
+}
+
+/** "48 s behind", "3 min behind", or just "Upload behind" when the device didn't say. */
+function behindText(s: number | null | undefined) {
+  if (s === null || s === undefined) return "Upload behind";
+  return s >= 120 ? `${Math.floor(s / 60)} min behind` : `${s} s behind`;
+}
+
+/**
+ * The host's "Uploads" figure. While recording: how many of everyone in the studio are sending and
+ * up to date (not behind, offline or gone quiet). Once stopped: how many of those who recorded have
+ * arrived in full.
+ */
+function uploadsSummary(state: SessionState, troubled: (participantId: string) => boolean) {
+  if (!state.recording) return "—";
+  if (state.recording.status === "recording") {
+    const ok = state.uploads.filter((u) => !troubled(u.participantId)).length;
+    return `${ok} of ${state.participants.length} up to date`;
+  }
+  if (state.uploads.length === 0) return "—";
+  return `${state.uploads.filter((u) => u.tracks > 0 && u.completeTracks === u.tracks).length} of ${state.uploads.length} received`;
+}
+
+/** An amber line with a warning sign: advice for this person about their own setup. */
+function AlertLine({ children }: { children: React.ReactNode }) {
+  return (
+    <div role="status" className="flex animate-fade-up items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[13.5px] leading-[1.45] text-text-2">
+      <Icon d={ICON.alert} className="mt-0.5 size-[15px] text-warn" />
+      <span className="text-pretty">{children}</span>
+    </div>
   );
 }
 
@@ -444,11 +1024,8 @@ function ToolButton({
 function TalkShare({ share }: { share: number }) {
   const percent = Math.round(share * 100);
   return (
-    <span className="flex items-center gap-2 text-xs text-muted" data-testid="talk-share" data-share={percent}>
-      <span className="h-1 w-16 overflow-hidden rounded-full bg-border" aria-hidden>
-        <span className="block h-full rounded-full bg-text-2" style={{ width: `${percent}%` }} />
-      </span>
-      {percent}% of the talking
+    <span className="shrink-0 text-[12.5px] whitespace-nowrap text-muted tabular-nums" data-testid="talk-share" data-share={percent}>
+      {percent}% talking
     </span>
   );
 }
@@ -467,17 +1044,18 @@ function HealthChips({ health, offsetMs }: { health: SessionState["health"][numb
     : health.alerts.map((a) => ({ key: a, label: alertLabel(a, health.uploadBehindS), info: a === "no_headphones" }));
   if (chips.length === 0) return null;
   return (
-    <span className="flex flex-wrap gap-1 py-0.5" data-testid="health">
+    <span className="flex flex-wrap gap-1.5" data-testid="health">
       {chips.map((c) => (
         <span
           key={c.key}
           data-alert={c.key}
           className={cn(
-            "rounded-full px-2 py-0.5 text-[11px] font-medium",
+            "flex items-center gap-[5px] rounded-[7px] px-[7px] py-px text-[12.5px] whitespace-nowrap",
             c.info ? "bg-surface-2 text-muted" : "bg-warn-soft text-warn-strong",
           )}
         >
-          {c.info ? c.label : `⚠ ${c.label}`}
+          {!c.info && <Icon d={ICON.alert} className="size-3" />}
+          {c.label}
         </span>
       ))}
     </span>
@@ -495,7 +1073,7 @@ async function copyInviteLink(studioId: string) {
   }
 }
 
-function InviteButton({ studioId }: { studioId: string }) {
+function InviteButton({ studioId, large }: { studioId: string; large?: boolean }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     if (await copyInviteLink(studioId)) {
@@ -510,9 +1088,12 @@ function InviteButton({ studioId }: { studioId: string }) {
       type="button"
       onClick={copy}
       title="Copy the guest link (⌘⇧L / Ctrl+Shift+L)"
-      className="flex cursor-pointer items-center gap-2 rounded-[10px] bg-[#2b2424] px-4 py-[9px] text-sm font-medium whitespace-nowrap text-white"
+      className={cn(
+        "inline-flex shrink-0 cursor-pointer items-center gap-[7px] bg-white/14 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-white/28",
+        large ? "h-11 rounded-[22px] px-4" : "h-9 rounded-md px-3",
+      )}
     >
-      <Icon d={ICONS.invite} />
+      {copied && <Icon d={ICON.check} className="size-[15px]" />}
       {copied ? "Link copied" : "Invite"}
     </button>
   );
@@ -541,19 +1122,20 @@ function EndedView({
   const ownSent = upload?.uploadedBytes ?? 0;
   const ownLeft = upload?.pendingBytes ?? 0;
   const ownDone = !finishing && (upload?.idle ?? true);
-  const rows = isHost
+  // pct null: the host can't know how much is still to come, so the bar shows "arriving" without a share.
+  const rows: Array<{ name: string; done: boolean; label: string; pct: number | null }> = isHost
     ? participants
         .map((p) => ({ p, u: uploads.find((u) => u.participantId === p.id) }))
         .filter((r) => r.u)
         .map(({ p, u }) => {
           const done = u!.tracks > 0 && u!.completeTracks === u!.tracks;
-          return { name: p.displayName, done, label: done ? "Received ✓" : `still arriving · ${mb(u!.bytes)} so far`, pct: done ? 100 : 60 };
+          return { name: p.displayName, done, label: done ? "Received" : `Still arriving · ${mb(u!.bytes)} so far`, pct: done ? 100 : null };
         })
     : [
         {
           name: selfName,
           done: ownDone,
-          label: ownDone ? "Sent ✓" : `${mb(ownLeft)} left to send`,
+          label: ownDone ? "Sent" : `${mb(ownLeft)} left to send`,
           pct: ownDone ? 100 : Math.max(5, Math.round((ownSent / Math.max(1, ownSent + ownLeft)) * 100)),
         },
       ];
@@ -576,40 +1158,66 @@ function EndedView({
       : "Your recording is still being sent to the host. Please keep this tab open until it's done.";
 
   return (
-    <div className="flex flex-1 items-center justify-center px-5 py-12">
-      <div className="flex w-full max-w-[560px] flex-col gap-[22px] rounded-3xl bg-surface p-6 shadow-[0_30px_60px_-30px_rgba(60,20,30,.3),0_0_0_1px_var(--border)] sm:p-10" data-testid="session-ended">
-        <span className={cn("grid size-[60px] place-items-center rounded-full text-[26px] text-white", allDone ? "bg-ok" : "bg-accent")}>
-          {allDone ? "✓" : "■"}
-        </span>
-        <div className="flex flex-col gap-2">
-          <h1 className="text-[clamp(28px,3.2vw,38px)] leading-[1.08] font-bold tracking-[-.03em]">{title}</h1>
-          <p className="text-base leading-normal text-muted">{sub}</p>
+    <div className="flex flex-1 justify-center px-[clamp(16px,4vw,44px)] py-7">
+      <div className="flex w-full max-w-[720px] animate-fade-up flex-col gap-[22px]" data-testid="session-ended">
+        <div className="flex items-start gap-3.5">
+          <span
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-full",
+              allDone ? "bg-ok-soft text-ok-strong" : "bg-accent-soft text-accent-strong",
+            )}
+          >
+            <Icon d={allDone ? ICON.checkCircle : ICON.cloudUp} className="size-[22px]" />
+          </span>
+          <div className="flex flex-col gap-[5px]">
+            <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em] text-balance">{title}</h1>
+            <p className="text-[14.5px] leading-normal text-pretty text-muted">{sub}</p>
+          </div>
         </div>
         {rows.length > 0 && (
-          <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] py-1">
+            <span className="pt-3 pb-2 font-medium">{isHost ? "Recordings arriving" : "Your upload"}</span>
             {rows.map((r) => (
-              <div key={r.name} className="flex flex-col gap-[7px]">
-                <div className="flex justify-between gap-3 text-sm">
-                  <span className="flex items-center gap-2.5 font-medium">
-                    <Avatar name={r.name} className="size-[26px] text-[10px]" />
-                    {r.name}
-                  </span>
-                  <span className={cn("tabular-nums", r.done ? "text-ok-strong" : "text-accent-strong")}>{r.label}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-border">
-                  <div className={cn("h-full rounded-full transition-[width] duration-300", r.done ? "bg-ok" : "animate-rec-pulse bg-accent")} style={{ width: `${r.pct}%` }} />
-                </div>
+              <div
+                key={r.name}
+                className="grid grid-cols-1 items-center gap-x-3.5 gap-y-2 border-t border-divider py-3 text-[14.5px] sm:grid-cols-[minmax(96px,auto)_minmax(40px,1fr)_auto]"
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <Avatar name={r.name} className="size-6 text-[10px]" />
+                  <span className="truncate">{r.name}</span>
+                </span>
+                <span className="h-[5px] overflow-hidden rounded-[3px] bg-border">
+                  <span
+                    className={cn(
+                      "block h-full rounded-[3px] transition-[width] duration-400",
+                      r.done ? "bg-ok" : "bg-warn",
+                      r.pct === null && "animate-rec-pulse opacity-60",
+                    )}
+                    style={{ width: `${r.pct ?? 100}%` }}
+                  />
+                </span>
+                <span
+                  className={cn(
+                    "flex items-center gap-[7px] text-[13.5px] tabular-nums sm:justify-end sm:whitespace-nowrap",
+                    r.done ? "text-ok-strong" : "text-warn-strong",
+                  )}
+                >
+                  <Icon d={r.done ? ICON.checkCircle : ICON.cloudUp} className="size-[15px]" />
+                  {r.label}
+                </span>
               </div>
             ))}
           </div>
         )}
         {isHost && studioId && (
-          <a
-            href={`/studios/${studioId}`}
-            className={cn("flex h-[54px] items-center justify-center rounded-xl text-[17px] font-semibold text-white hover:opacity-90", allDone ? "bg-accent" : "bg-[#2b2424]")}
-          >
-            Go to your studio
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/studios/${studioId}`}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-3.5 text-sm font-medium whitespace-nowrap text-ink-text transition-colors hover:bg-ink-hover"
+            >
+              Go to your studio
+            </a>
+          </div>
         )}
         {!isHost && (
           <Notice tone={allDone ? "ok" : "warn"}>
@@ -624,7 +1232,6 @@ function EndedView({
     </div>
   );
 }
-
 /** A device starts recording within seconds; longer means it may have missed Record. */
 const LATE_START_MS = 20_000;
 const READY_POLL_MS = 5_000;
@@ -670,8 +1277,8 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
   return (
     <>
       {own.downloads && own.recordings.length > 0 && (
-        <div className="flex flex-col gap-3 border-t border-border pt-5" data-testid="own-recording">
-          <h2 className="text-[17px] font-semibold">Your recording</h2>
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-[18px]" data-testid="own-recording">
+          <h2 className="font-medium">Your recording</h2>
           <OwnFiles recordings={own.recordings} waiting="Getting your file ready. Takes a few minutes; keep this page open to download it." />
           {recap?.enabled && <RecapEmail
               ticket={ticket}
@@ -688,11 +1295,11 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
           href={own.promoUrl}
           target="_blank"
           rel="noopener"
-          className="flex flex-col gap-1 rounded-2xl bg-accent-soft px-5 py-4 hover:opacity-90"
+          className="flex flex-col gap-1 rounded-xl border border-accent-line bg-accent-soft px-[18px] py-3.5 transition-colors hover:border-accent"
           data-testid="promo"
         >
-          <span className="text-[15px] font-semibold text-accent-strong">Record your own, free →</span>
-          <span className="text-sm text-text-2">
+          <span className="text-[14.5px] font-medium text-accent-strong">Record your own, free →</span>
+          <span className="text-[13.5px] leading-normal text-text-2">
             Podcasts, interviews and video in full quality, everyone recorded on their own computer. Open source, and you can run it
             yourself.
           </span>
@@ -736,8 +1343,8 @@ function LocalUploadStatus({
     text = `Uploading your recording: ${mb(upload.pendingBytes)} left. Keep this tab open.`;
   }
   return (
-    <p className="flex items-center gap-2 text-sm text-muted" role="status" data-testid="local-upload">
-      <StatusDot tone={tone} /> {text}
+    <p className="flex items-center gap-2 border-t border-divider px-5 py-3 text-[13.5px] text-text-2" role="status" data-testid="local-upload">
+      <StatusDot tone={tone} className={cn(tone === "warn" && "animate-rec-pulse")} /> {text}
     </p>
   );
 }
@@ -763,11 +1370,17 @@ function ParticipantUpload({
     return () => clearTimeout(id);
   }, [upload, stopped, startedAt, offsetMs]);
   if (!upload) {
-    if (stopped) return <span className="text-xs text-muted">Nothing recorded</span>;
+    if (stopped) return <span className="text-[13.5px] text-muted">Nothing recorded</span>;
     return late ? (
-      <span className="text-xs text-warn-strong" data-testid="not-recording-yet">Not recording yet. Ask them to reload the page.</span>
+      <span className="flex items-start gap-[7px] text-[13.5px] text-warn-strong" data-testid="not-recording-yet">
+        <Icon d={ICON.alert} className="mt-0.5 size-[15px]" />
+        Not recording yet. Ask them to reload the page.
+      </span>
     ) : (
-      <span className="text-xs text-muted">Starting…</span>
+      <span className="flex items-center gap-[7px] text-[13.5px] text-muted">
+        <Icon d={ICON.loader} className="size-[15px] animate-spin-fast" />
+        Starting…
+      </span>
     );
   }
   const done = upload.tracks > 0 && upload.completeTracks === upload.tracks;
@@ -777,8 +1390,12 @@ function ParticipantUpload({
       ? `Offline. Recording is safe on their computer · ${mb(upload.bytes)} sent`
       : `${stopped ? "Uploading" : "Recording"} · ${mb(upload.bytes)} sent`;
   return (
-    <span className={cn("text-xs", done ? "text-ok-strong" : away ? "text-warn-strong" : "text-muted")} data-testid="participant-upload">
-      {text}
+    <span
+      className={cn("flex min-w-0 items-center gap-[7px] text-[13.5px]", done ? "text-ok-strong" : away ? "text-warn-strong" : "text-text-2")}
+      data-testid="participant-upload"
+    >
+      <Icon d={done ? ICON.cloudCheck : ICON.cloudUp} className="size-[15px]" />
+      <span className="min-w-0 truncate">{text}</span>
     </span>
   );
 }
@@ -794,7 +1411,7 @@ function CallLabel({ status }: { status: CallStatus }) {
   } as const;
   const [tone, label] = map[status];
   return (
-    <p className="flex items-center gap-2 text-sm text-muted" data-testid="call-status">
+    <p className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted" data-testid="call-status">
       <StatusDot tone={tone} /> {label}
     </p>
   );
@@ -809,32 +1426,60 @@ function ConnectionLabel({ status }: { status: ConnectionStatus }) {
   } as const;
   const [tone, label] = map[status];
   return (
-    <p className="flex items-center gap-2 text-sm text-muted">
+    <p className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted">
       <StatusDot tone={tone} /> {label}
     </p>
   );
 }
 
-/** "REC 12:04" while recording, "Not recording" otherwise. */
-function RecPill({ startedAt, offsetMs }: { startedAt: number | null; offsetMs: number }) {
+/** This device's clock, read again every `everyMs`: for things that go stale without any event. */
+function useNow(everyMs: number) {
+  const [now, setNow] = useState(localNow);
+  useEffect(() => {
+    const id = setInterval(() => setNow(localNow()), everyMs);
+    return () => clearInterval(id);
+  }, [everyMs]);
+  return now;
+}
+
+/** True once this device's clock passes `at` (null: never). */
+function usePast(at: number | null) {
+  const [past, setPast] = useState(false);
+  useEffect(() => {
+    setPast(false);
+    if (at === null) return;
+    const id = setTimeout(() => setPast(true), Math.max(0, at - localNow()));
+    return () => clearTimeout(id);
+  }, [at]);
+  return past;
+}
+
+/** Time since the recording started ("04:12", "1:02:09"), ticking; null when not recording. */
+function useElapsed(startedAt: number | null, offsetMs: number): string | null {
   const [now, setNow] = useState(localNow);
   useEffect(() => {
     if (startedAt === null) return;
+    setNow(localNow());
     const id = setInterval(() => setNow(localNow()), 500);
     return () => clearInterval(id);
   }, [startedAt]);
-  if (startedAt === null) {
+  if (startedAt === null) return null;
+  const s = Math.max(0, Math.floor((now + offsetMs - startedAt) / 1000));
+  return `${Math.floor(s / 3600) ? `${Math.floor(s / 3600)}:` : ""}${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** "REC 12:04" while recording, "Not recording" otherwise. */
+function RecPill({ clock }: { clock: string | null }) {
+  if (clock === null) {
     return (
-      <span className="inline-flex items-center gap-[7px] rounded-full bg-[#efeeec] px-[11px] py-[5px] font-mono text-xs font-medium text-muted dark:bg-surface-2">
+      <span className="inline-flex items-center gap-[7px] rounded-md bg-surface-2 px-2.5 py-1 font-mono text-xs font-medium whitespace-nowrap text-muted">
         <span aria-hidden className="size-[7px] rounded-full bg-current" /> Not recording
       </span>
     );
   }
-  const s = Math.max(0, Math.floor((now + offsetMs - startedAt) / 1000));
-  const text = `${Math.floor(s / 3600) ? `${Math.floor(s / 3600)}:` : ""}${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   return (
-    <span className="inline-flex items-center gap-[7px] rounded-full bg-accent-soft px-[11px] py-[5px] font-mono text-xs font-medium text-accent-strong">
-      <span aria-hidden className="size-[7px] animate-rec-pulse rounded-full bg-current" /> REC {text}
+    <span className="inline-flex items-center gap-[7px] rounded-md bg-accent-soft px-2.5 py-1 font-mono text-xs font-medium whitespace-nowrap text-accent-strong tabular-nums">
+      <span aria-hidden className="size-[7px] animate-rec-pulse rounded-full bg-current" /> REC {clock}
     </span>
   );
 }

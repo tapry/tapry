@@ -58,6 +58,12 @@ export interface RecordingSummary {
   outputs: Array<{ id: string; kind: "audio" | "video" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
+/** A recording seen across all of a host's studios (the dashboard's Recordings, Guests, Transcripts). */
+export interface OwnedRecording extends RecordingSummary {
+  studioId: string;
+  studioName: string;
+}
+
 /**
  * Turning a stopped recording into downloadable files: deciding when it's ready to
  * process, queueing the job, and serving the results. The work itself is JobRunner's.
@@ -145,8 +151,27 @@ export class ProcessingService {
   }
 
   async listForStudio(owner: User, studioId: string): Promise<RecordingSummary[]> {
+    const rows = await this.summaries(owner, { studioId, limit: 100 });
+    return rows.map(({ studioId: _studio, studioName: _name, ...r }) => r);
+  }
+
+  /** The host's recordings across all their studios (or one), newest first. Read-only. */
+  async listForOwner(owner: User, opts: { studioId?: string; limit?: number } = {}): Promise<OwnedRecording[]> {
+    return this.summaries(owner, { studioId: opts.studioId, limit: Math.max(1, Math.min(opts.limit ?? 200, 500)) });
+  }
+
+  /** One of the host's recordings, from any of their studios; 404 for anyone else's. */
+  async getForOwner(owner: User, recordingId: string): Promise<OwnedRecording> {
+    const [r] = await this.summaries(owner, { recordingId, limit: 1 });
+    if (!r) throw new ApiError(404, "recording_not_found", "Recording not found");
+    return r;
+  }
+
+  private async summaries(owner: User, filter: { studioId?: string; recordingId?: string; limit: number }): Promise<OwnedRecording[]> {
     const rows = await this.db.query<{
       id: string;
+      studio_id: string;
+      studio_name: string;
       number: number | null;
       raw_deleted_at: Date | null;
       session_id: string;
@@ -166,7 +191,7 @@ export class ProcessingService {
       incomplete: number;
       bytes: number;
     }>(
-      `SELECT r.id, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
+      `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
@@ -174,10 +199,11 @@ export class ProcessingService {
        FROM recordings r
        JOIN sessions s ON s.id = r.session_id
        JOIN studios st ON st.id = s.studio_id
-       WHERE st.id = $1 AND st.owner_id = $2 AND st.deleted_at IS NULL AND r.deleted_at IS NULL
+       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL
+         AND ($2::text IS NULL OR st.id = $2) AND ($3::text IS NULL OR r.id = $3)
        ORDER BY r.started_at DESC, r.number DESC
-       LIMIT 100`,
-      [studioId, owner.id],
+       LIMIT $4`,
+      [owner.id, filter.studioId ?? null, filter.recordingId ?? null, filter.limit],
     );
     if (rows.length === 0) return [];
     const outputs = await this.db.query<{
@@ -215,6 +241,8 @@ export class ProcessingService {
     );
     return rows.map((r) => ({
       id: r.id,
+      studioId: r.studio_id,
+      studioName: r.studio_name,
       number: r.number ?? 0,
       rawDeleted: r.raw_deleted_at !== null,
       people: people

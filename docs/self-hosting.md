@@ -8,7 +8,7 @@ runs from `deploy/compose`.
 | | Minimum | Notes |
 |---|---|---|
 | Server | 2 vCPU, 4 GB RAM | Processing a 1 h 1080p recording uses one core for roughly real time. More cores → faster. |
-| Disk | 50 GB+ | 1 h with 4 people at 1080p ≈ 6–12 GB of chunks, plus the processed files. |
+| Disk | 50 GB+ | 1 h with 4 people at 1080p ≈ 12–16 GB of chunks (docs/costs.md), plus the processed files. |
 | OS | any Linux with Docker Engine + Compose v2 | Caddy and LiveKit use host networking (see below). macOS works for trying it out (OrbStack / Docker Desktop). |
 | DNS | `studio.example.com`, `s3.`, `livekit.` and `turn.studio.example.com` | All four → the server's IP. |
 | Ports open | TCP 80, 443, 7881 · UDP 3478, 7882 | 7881/7882: the call's audio and video. 3478/UDP and 443: TURN relay. |
@@ -100,7 +100,7 @@ a quiet track is raised by at most 20 dB (so a mic left muted doesn't turn into 
 ## Transcripts
 
 On by default. Each person's audio is transcribed separately with whisper.cpp (language
-detected per speaker), then merged into `Transcript.txt`, `.srt` and `.vtt` with speaker names.
+detected per speaker), then merged into `Transcript.txt`, `.docx`, `.srt` and `.vtt` with speaker names.
 They appear on the recording a little after its audio and video files.
 
 - **Model:** the image ships Whisper `base` (multilingual, 148 MB). For better accuracy, build
@@ -116,7 +116,8 @@ right-to-left shaping, so Arabic or Hebrew names render with unjoined letters.
 
 ## Using your own S3 (R2, AWS, Backblaze…)
 
-Delete the `seaweedfs` service, then in the `x-app-env` block at the top of
+Delete the `seaweedfs` service and the `seaweedfs:` entry under `web`'s `depends_on` (Compose
+refuses to start with a dependency on a service that's gone), then in the `x-app-env` block at the top of
 `docker-compose.yml` (shared by `web` and `worker`) set `S3_ENDPOINT` (your provider's
 endpoint), `S3_PUBLIC_ENDPOINT` (remove it if it's the same), `S3_REGION`, `S3_BUCKET` and the
 keys. Your provider must accept presigned `PUT`s with a signed `x-amz-checksum-sha256` header;
@@ -131,8 +132,8 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Logs:** `docker compose logs -f web worker`. Logs never contain media, only ids and errors.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
   storage provider's replication). Recordings are useless without the database that indexes them.
-- **Health:** `GET /api/health` returns `{"ok":true,"version":"0.2.0"}` when the app and its database are up.
-  Signed in as the admin, **Server health** (link at the bottom of the sidebar, `/admin/health`)
+- **Health:** `GET /api/health` returns `{"ok":true,"version":"0.3.0"}` when the app and its database are up.
+  Signed in as the admin, **Server health** (link in the sidebar, `/admin/health`)
   checks everything else: storage (it writes, reads and deletes a test file), the workers and
   their ffmpeg, the job queue and recent failures, transcripts, the live call (tested from your
   browser), free working space and the version. Set `UPDATE_CHECK_REPO` to also compare with the latest release;

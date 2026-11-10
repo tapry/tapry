@@ -3,10 +3,11 @@
 import { checkStorage, requestPersistentStorage } from "@tapry/recorder";
 import type { SessionTicket, StudioSettings } from "@tapry/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, CheckboxRow, cn, Field, Notice, RecDot, Select } from "@/components/ui";
+import { Button, cn, Field, Notice, RecDot, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/client/api";
 import { estimateClock, type ClockEstimate } from "@/lib/client/clock";
 import { useDevices, useLocalMedia, useMicLevel, useStoredState, type Devices } from "@/lib/media/hooks";
+import { eqAnimation, Icon, ICON } from "./icons";
 import {
   browserChecks,
   buildConstraints,
@@ -41,6 +42,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   const [checks, setChecks] = useState<Check[]>([]);
   const [clock, setClock] = useState<ClockEstimate | null>(null);
   const [joining, setJoining] = useState(false);
+  const [measuring, setMeasuring] = useState(true);
 
   // Headphones: pre-tick when the default output looks like a headset. Guests can untick.
   const detected = useRef(false);
@@ -63,6 +65,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
       if (cancelled) return;
       setClock(est);
       setChecks([...base, storageCheck(disk?.freeBytes ?? null, disk?.ok ?? true), networkCheck(est?.rttMs ?? null)]);
+      setMeasuring(false);
     })();
     return () => {
       cancelled = true;
@@ -85,10 +88,17 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   }
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="flex flex-col gap-3.5">
-        <Preview stream={stream} cameraOff={!!choice.cameraOff} audioOnly={settings.audioOnly} failed={status === "error"} />
-        <MicMeter db={level.rmsDb} state={level.state} live={status === "live"} suspended={level.suspended} />
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-start gap-[18px]">
+      <div className="flex flex-col gap-3">
+        <Preview
+          stream={stream}
+          cameraOff={!!choice.cameraOff}
+          audioOnly={settings.audioOnly}
+          failed={status === "error"}
+          level={{ db: level.rmsDb, state: level.state, live: status === "live", suspended: level.suspended }}
+          onToggleCamera={() => setChoice({ ...choice, cameraOff: !choice.cameraOff })}
+        />
+        <LevelAdvice state={level.state} live={status === "live"} suspended={level.suspended} />
         {problem && (
           <Notice tone="danger">
             <p className="font-medium">{problem.title}</p>
@@ -100,30 +110,45 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
         )}
       </div>
 
-      <div className="flex flex-col gap-[18px] rounded-[20px] bg-surface p-6">
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-[18px]">
         <DevicePickers settings={settings} devices={devices} choice={choice} setChoice={setChoice} />
 
-        <CheckboxRow
-          checked={choice.headphones}
-          onChange={(e) => setChoice({ ...choice, headphones: e.target.checked })}
-          label="I'm wearing headphones"
-          description="Highly recommended. Without them, other people's voices can leak into your microphone."
-        />
+        <HeadphonesBox checked={choice.headphones} onChange={(headphones) => setChoice({ ...choice, headphones })}>
+          I&apos;m wearing headphones, so other voices don&apos;t leak into my microphone.
+        </HeadphonesBox>
 
-        <CheckList checks={checks} />
+        <CheckList checks={checks} pending={measuring ? ["Checking your storage and connection…"] : []} />
 
-        <Button variant="record" size="lg" className="w-full text-[17px]" disabled={!canJoin} onClick={join}>
+        <Button variant="record" className="w-full" disabled={!canJoin} onClick={join}>
           <RecDot />
           {ticket.role === "host" ? "Enter the studio" : "Join the studio"}
         </Button>
         {status === "live" && !clock ? (
-          <p className="text-center text-xs text-muted">Checking the connection…</p>
+          <p className="-mt-1.5 text-center text-xs text-muted">Checking the connection…</p>
         ) : (
           status === "live" &&
-          level.state !== "good" && <p className="text-center text-xs text-muted">You can join anyway, but check the microphone first.</p>
+          level.state !== "good" && <p className="-mt-1.5 text-center text-xs text-muted">You can join anyway, but check the microphone first.</p>
         )}
       </div>
     </div>
+  );
+}
+
+/** "I'm wearing headphones": a plain checkbox line, as in the designs. Also used by the tech check. */
+export function HeadphonesBox({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 shrink-0" />
+      <span>{children}</span>
+    </label>
   );
 }
 
@@ -182,65 +207,105 @@ export function DevicePickers({
   );
 }
 
-/** The list of checks with a ✓ or ! each ("Checking your browser…" while empty). */
-export function CheckList({ checks }: { checks: Array<{ id: string; tone: "ok" | "warn" | "danger"; label: string }> }) {
+/** The list of checks, each with a ✓ or a warning sign; a spinner for what's still being measured. */
+export function CheckList({
+  checks,
+  pending = [],
+}: {
+  checks: Array<{ id: string; tone: "ok" | "warn" | "danger"; label: string }>;
+  pending?: string[];
+}) {
   return (
-    <ul className="flex flex-col gap-2.5 border-t border-border pt-4 text-sm" aria-label="Checks">
-      {checks.length === 0 && <li className="text-muted">Checking your browser…</li>}
+    <ul className="flex flex-col gap-[9px] border-t border-divider pt-3.5 text-sm" aria-label="Checks">
+      {checks.length === 0 && pending.length === 0 && (
+        <li className="flex items-start gap-[9px] text-muted">
+          <Icon d={ICON.loader} className="mt-0.5 animate-spin-fast" />
+          Checking your browser…
+        </li>
+      )}
       {checks.map((c) => (
         <li
           key={c.id}
           data-check={c.id}
           data-tone={c.tone}
-          className={cn("flex items-start gap-2.5", c.tone === "ok" ? "text-text-2" : "text-warn-strong")}
+          className={cn(
+            "flex items-start gap-[9px] animate-fade-up",
+            c.tone === "ok" ? "text-text-2" : c.tone === "warn" ? "text-warn-strong" : "text-accent-strong",
+          )}
         >
-          <span
-            aria-hidden
-            className={cn(
-              "mt-px grid size-5 shrink-0 place-items-center rounded-full text-[11px]",
-              c.tone === "ok" ? "bg-ok-soft text-ok-strong" : c.tone === "warn" ? "bg-warn-soft" : "bg-accent-soft text-accent-strong",
-            )}
-          >
-            {c.tone === "ok" ? "✓" : "!"}
-          </span>
+          <Icon
+            d={c.tone === "ok" ? ICON.checkCircle : ICON.alert}
+            className={cn("mt-0.5", c.tone === "ok" ? "text-ok" : c.tone === "warn" ? "text-warn" : "text-accent")}
+          />
           {c.label}
+        </li>
+      ))}
+      {pending.map((label) => (
+        <li key={label} className="flex items-start gap-[9px] text-muted">
+          <Icon d={ICON.loader} className="mt-0.5 animate-spin-fast" />
+          {label}
         </li>
       ))}
     </ul>
   );
 }
 
+type LevelState = keyof typeof LEVEL_ADVICE;
+
+/** Short words for the level pill on the camera preview; the full advice goes under it. */
+const LEVEL_SHORT: Record<LevelState, string> = {
+  silent: "Can't hear you",
+  quiet: "A bit quiet",
+  good: "Sounds good",
+  clipping: "Too loud",
+};
+
+/** Above this share of the meter, someone's talking: the pill's rings and bars come alive. */
+const TALKING_FRACTION = 0.35;
+
+/**
+ * The camera preview on the dark stage, with the microphone level pill (the meter) bottom left
+ * and a camera on/off button bottom right. The call stage is dark in both themes.
+ */
 export function Preview({
   stream,
   cameraOff,
   audioOnly,
   failed,
+  level,
+  onToggleCamera,
 }: {
   stream: MediaStream | null;
   cameraOff: boolean;
   audioOnly: boolean;
   failed: boolean;
+  level?: { db: number; state: LevelState; live: boolean; suspended: boolean };
+  onToggleCamera?: () => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (video.current) video.current.srcObject = stream;
   }, [stream]);
-  const hasVideo = !!stream && stream.getVideoTracks().length > 0 && !cameraOff;
+  const hasCamera = !!stream && stream.getVideoTracks().length > 0;
+  const hasVideo = hasCamera && !cameraOff;
+  const fraction = level ? meterFraction(level.db) : 0;
+  const talking = !!level?.live && !level.suspended && fraction > TALKING_FRACTION;
   return (
-    <div className="relative aspect-video overflow-hidden rounded-[20px] bg-[#ebe9e6] dark:bg-surface-2">
+    // Dark in both themes, so the focus ring is light here.
+    <div className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#18181b] [--ring:#fafafa]">
       <video
         ref={video}
         autoPlay
         playsInline
         muted
-        className={cn("size-full -scale-x-100 object-cover", !hasVideo && "invisible")}
+        className={cn("size-full -scale-x-100 object-cover transition-opacity duration-300", !hasVideo && "opacity-0")}
       />
       {!hasVideo && (
-        <div className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-text-2">
+        <div className="absolute inset-0 grid place-items-center px-5 text-center text-[14.5px] text-white">
           {audioOnly
-            ? "This studio is sound only: just your microphone is recorded"
+            ? "This studio is sound only: just your microphone is recorded."
             : cameraOff
-              ? "Camera off. You'll be recorded with audio only"
+              ? "Camera off. You'll be recorded with audio only."
               : stream
                 ? "No camera"
                 : failed
@@ -248,45 +313,76 @@ export function Preview({
                   : "Starting camera…"}
         </div>
       )}
-      <span className="absolute bottom-3 left-3 rounded-[10px] bg-[rgba(30,26,26,.72)] px-3 py-1.5 text-sm text-white">You</span>
+      {level && (
+        <span className="absolute bottom-3 left-3 flex items-center gap-2.5 rounded-full bg-black/60 py-1.5 pr-3 pl-2 text-white backdrop-blur-md">
+          <span className="relative grid size-[22px] place-items-center">
+            {talking && (
+              <>
+                <span aria-hidden className="absolute inset-0 animate-ring rounded-full border-2 border-accent" />
+                <span aria-hidden className="absolute inset-0 animate-ring rounded-full border-2 border-accent [animation-delay:.6s]" />
+              </>
+            )}
+            <span className="relative grid size-[22px] place-items-center rounded-full bg-accent text-accent-text">
+              <Icon d={ICON.mic} className="size-[11px]" />
+            </span>
+          </span>
+          <span
+            role="meter"
+            aria-label="Microphone level"
+            aria-valuemin={-60}
+            aria-valuemax={0}
+            aria-valuenow={Math.round(Math.max(-60, level.db))}
+            className="flex h-4 items-center gap-0.5 transition-transform duration-75"
+            style={{ transform: talking ? `scaleY(${Math.max(0.45, fraction).toFixed(2)})` : undefined }}
+          >
+            {Array.from({ length: 12 }, (_, k) => (
+              <span
+                key={k}
+                className="h-4 w-[3px] rounded-[2px] bg-white"
+                style={{ transform: "scaleY(.25)", animation: talking ? eqAnimation(k) : "none" }}
+              />
+            ))}
+          </span>
+          <span className="text-[12.5px] whitespace-nowrap">
+            {!level.live ? (failed ? "No microphone" : "Starting…") : level.suspended ? "Click to start" : LEVEL_SHORT[level.state]}
+          </span>
+        </span>
+      )}
+      {/*
+        Same choice as "Camera off (audio only)" in the picker: it decides whether a camera is opened
+        for the whole session, so it says so (it is not the room's camera on/off). Not offered when
+        there is no camera to choose. The words avoid "camera": that is the picker's label.
+      */}
+      {onToggleCamera && !audioOnly && stream && (hasCamera || cameraOff) && (
+        <button
+          type="button"
+          onClick={onToggleCamera}
+          aria-label={cameraOff ? "Record with video" : "Record without video (audio only)"}
+          title={cameraOff ? "Record with video" : "Record without video (audio only)"}
+          className={cn(
+            "absolute right-3 bottom-3 grid size-9 cursor-pointer place-items-center rounded-full transition-colors",
+            cameraOff ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-black/55 text-white hover:bg-black/70",
+          )}
+        >
+          <Icon d={cameraOff ? ICON.camOff : ICON.cam} />
+        </button>
+      )}
     </div>
   );
 }
 
-export function MicMeter({
-  db,
-  state,
-  live,
-  suspended,
-}: {
-  db: number;
-  state: keyof typeof LEVEL_ADVICE;
-  live: boolean;
-  suspended: boolean;
-}) {
-  const color = state === "clipping" ? "bg-accent" : state === "good" ? "bg-ok" : "bg-warn";
-  const text = state === "clipping" ? "text-accent-strong" : state === "good" ? "text-ok-strong" : "text-warn-strong";
+/** Under the preview: what to do about the level, when it isn't right yet. */
+export function LevelAdvice({ state, live, suspended }: { state: LevelState; live: boolean; suspended: boolean }) {
+  if (!live || (state === "good" && !suspended)) return null;
   return (
-    <div className="flex flex-col gap-2.5 rounded-2xl bg-surface px-[18px] py-4">
-      <div className="flex items-center justify-between gap-3 text-[15px]">
-        <span className="font-medium">How you sound</span>
-        {live && (
-          <span className={cn("text-right text-sm", suspended ? "text-muted" : text)}>
-            {suspended ? "Click anywhere to start the meter" : LEVEL_ADVICE[state]}
-          </span>
-        )}
-      </div>
-      <div
-        className="h-2 overflow-hidden rounded-full bg-border"
-        role="meter"
-        aria-label="Microphone level"
-        aria-valuemin={-60}
-        aria-valuemax={0}
-        aria-valuenow={Math.round(Math.max(-60, db))}
-      >
-        <div className={cn("h-full rounded-full transition-[width] duration-75", color)} style={{ width: `${meterFraction(db) * 100}%` }} />
-      </div>
-      <span className="text-[13px] text-subtle">Say a few words. The bar should move into the middle.</span>
-    </div>
+    <p
+      className={cn(
+        "flex items-start gap-2 text-[13.5px] leading-[1.45]",
+        suspended ? "text-muted" : state === "clipping" ? "text-accent-strong" : "text-warn-strong",
+      )}
+    >
+      <Icon d={suspended ? ICON.mic : ICON.alert} className="mt-0.5 size-[15px]" />
+      {suspended ? "Click anywhere to start the meter." : `${LEVEL_ADVICE[state]} Say a few words: the bars should move.`}
+    </p>
   );
 }

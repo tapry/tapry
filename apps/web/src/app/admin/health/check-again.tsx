@@ -9,7 +9,7 @@ export function CheckAgain() {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
-    <Button variant="secondary" disabled={pending} onClick={() => start(() => router.refresh())}>
+    <Button variant="secondary" disabled={pending} size="sm" onClick={() => start(() => router.refresh())}>
       {pending ? "Checking…" : "Check again"}
     </Button>
   );
@@ -30,7 +30,7 @@ export function CallProbe({ url }: { url: string }) {
     };
   }, [url]);
   return (
-    <span className={state && !state.ok ? "text-sm text-accent-strong" : "text-sm text-muted"} data-testid="call-probe" data-ok={state ? String(state.ok) : undefined}>
+    <span className={state && !state.ok ? "text-[13px] text-accent-strong" : "text-[13px] text-muted"} data-testid="call-probe" data-ok={state ? String(state.ok) : undefined}>
       {!state
         ? "Testing from this browser…"
         : state.ok

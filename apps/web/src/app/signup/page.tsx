@@ -10,7 +10,7 @@ export const metadata = { title: "Create account" };
 export default async function SignupPage() {
   if (await currentUser()) redirect("/studios");
   return (
-    <AuthShell title="Set up your studio" subtitle="Create your account to start recording. It takes less than a minute.">
+    <AuthShell title="Create your account" subtitle="It takes less than a minute. Guests never need one.">
       <AuthForm mode="signup" firstAccount={await isFreshInstall()} setupRequired={(await getServices()).auth.setupRequired} />
     </AuthShell>
   );

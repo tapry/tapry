@@ -1,97 +1,137 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { formatBytes } from "@/lib/format";
 import type { User } from "@/server/auth";
+import { getServices } from "@/server/context";
 import type { StudioWithUsage } from "@/server/studios";
+import { AppFrame, CollapseSidebar } from "./app-frame";
+import { shortStatus } from "./recordings";
+import { PageNav, RecentNav, type PageLink, type RecentItem } from "./recent-nav";
+import { CopyGuestLink, OpenStudioAction } from "./studio-actions";
 import { LogOutButton } from "./studio-forms";
-import { Avatar, cn, Logo, StatusDot } from "./ui";
+import type { IconName } from "./ui-extra";
+import { Avatar, Mark } from "./ui";
 
-/** The host's dashboard frame: studios in a sidebar, breadcrumb and account in the header. */
-export function DashboardShell({
+export type NavKey = "recordings" | "guests" | "transcripts" | "studios" | "storage" | "settings" | "health";
+
+const NAV: Array<{ key: NavKey | "home"; href: string; icon: IconName; label: string; admin?: boolean }> = [
+  { key: "home", href: "/studios", icon: "home", label: "Home" },
+  { key: "recordings", href: "/recordings", icon: "chat", label: "Recordings" },
+  { key: "guests", href: "/guests", icon: "guests", label: "Guests" },
+  { key: "transcripts", href: "/transcripts", icon: "wave", label: "Transcripts" },
+  { key: "studios", href: "/studios/all", icon: "studios", label: "Studios" },
+  { key: "storage", href: "/storage", icon: "storage", label: "Storage" },
+  { key: "settings", href: "/settings", icon: "settings", label: "Settings" },
+  { key: "health", href: "/admin/health", icon: "pulse", label: "Server health", admin: true },
+];
+
+/**
+ * The host's dashboard frame (Studio Tembo design): the sidebar with the pages, the newest
+ * recordings and the account; the top bar with the page's name, the studio's guest link and
+ * Open studio.
+ */
+export async function DashboardShell({
   user,
   studios,
   currentId,
+  current,
+  currentRecordingId,
   title,
   children,
 }: {
   user: User;
   studios: StudioWithUsage[];
+  /** The studio the page is about: a studio page (Home), or a recording's studio. */
   currentId?: string;
+  /** Which sidebar item is the page; a studio page without it is Home. */
+  current?: NavKey;
+  /** A recording's page: its row in the sidebar's recent recordings is marked. */
+  currentRecordingId?: string;
   title?: string;
   children: ReactNode;
 }) {
-  const total = studios.reduce((n, s) => n + s.bytes, 0);
-  return (
-    <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[minmax(210px,248px)_minmax(0,1fr)]">
-      <aside className="flex flex-col border-b border-border bg-surface-2 lg:sticky lg:top-0 lg:h-dvh lg:border-r lg:border-b-0">
-        <Link href="/studios" className="flex h-[68px] shrink-0 items-center border-b border-border px-[22px] text-text">
-          <Logo />
+  const services = await getServices();
+  const serverNow = Date.now();
+  const recent: RecentItem[] = (await services.processing.listForOwner(user, { limit: 5 })).map((r) => ({
+    id: r.id,
+    number: r.number,
+    studioId: r.studioId,
+    studioName: r.studioName,
+    startedAt: r.startedAt,
+    stoppedAt: r.stoppedAt,
+    ...shortStatus(r),
+    people: r.people.map((p) => p.name),
+  }));
+  const active = current ?? (currentId ? "home" : undefined);
+  const studio = studios.find((s) => s.id === currentId);
+  const target = studio ?? studios[0];
+
+  const sidebar = (
+    <div className="flex h-full w-[248px] flex-col gap-0.5 overflow-x-hidden overflow-y-auto border-r border-border px-3 pt-3.5">
+      <div className="flex items-center justify-between gap-2 px-1 pt-0.5 pb-3.5 whitespace-nowrap">
+        <Link href="/studios" aria-label="Tapry home" className="flex items-center gap-[9px] text-[15px] font-medium text-text hover:text-text">
+          <span className="grid size-6 shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
+            <Mark className="size-3.5" />
+          </span>
+          Tapry
         </Link>
-        <div className="px-[22px] pt-[22px] pb-2 font-mono text-[11px] tracking-[.08em] text-subtle">YOUR STUDIOS</div>
-        <nav className="flex flex-col gap-0.5 overflow-y-auto px-3 pb-3" aria-label="Studios">
-          {studios.map((s) => {
-            const on = s.id === currentId;
-            return (
-              <Link
-                key={s.id}
-                href={`/studios/${s.id}`}
-                aria-current={on ? "page" : undefined}
-                data-testid="studio-link"
-                className={cn(
-                  "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-[15px] text-text",
-                  on ? "border-border-strong bg-surface font-semibold" : "border-transparent hover:bg-surface",
-                )}
-              >
-                <StatusDot tone={s.live ? "live" : "idle"} className="size-2" />
-                <span className="flex-1 truncate">{s.name}</span>
-                <span className="text-[13px] font-normal text-subtle">{s.recordings}</span>
-              </Link>
-            );
-          })}
+        <span className="flex gap-1">
           <Link
             href="/studios/new"
-            className="mt-1.5 rounded-lg border border-dashed border-border-strong px-3 py-2.5 text-[15px] font-medium text-muted hover:border-muted hover:text-text"
+            aria-label="New studio"
+            title="New studio"
+            className="grid size-7 place-items-center rounded-md border border-border bg-surface text-[15px] text-muted transition-colors hover:border-ink hover:text-text"
           >
-            + New studio
+            +
           </Link>
-        </nav>
-        <div className="mt-auto hidden flex-col gap-2.5 border-t border-border px-[22px] py-5 text-sm lg:flex">
-          <span className="flex justify-between text-muted">
-            Space used
-            <span className="font-semibold whitespace-nowrap text-text" data-testid="storage-total">
-              {formatBytes(total)}
-            </span>
-          </span>
-          <span className="text-[13px] text-subtle">
-            across {studios.length} studio{studios.length === 1 ? "" : "s"}
-          </span>
-          {user.isAdmin && (
-            <Link href="/admin/health" className="mt-1 text-[13px] text-muted hover:text-text">
-              Server health →
-            </Link>
-          )}
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-col">
-        <header className="flex h-[68px] items-center justify-between gap-4 border-b border-border px-5 sm:px-8">
-          <span className="min-w-0 flex-1 truncate text-[15px] text-muted">
-            Studios
-            {title && (
-              <>
-                <span className="mx-1.5">/</span>
-                <span className="font-semibold text-text">{title}</span>
-              </>
-            )}
-          </span>
-          <div className="flex items-center gap-2.5">
-            <span className="hidden text-sm text-muted sm:inline">{user.email}</span>
-            <Avatar name={user.name} />
-            <LogOutButton />
-          </div>
-        </header>
-        <main className="flex w-full max-w-[1140px] flex-col gap-7 px-5 pt-10 pb-16 sm:px-8">{children}</main>
+          <CollapseSidebar />
+        </span>
       </div>
+
+      <PageNav items={pages(user)} active={active} />
+
+      <span className="flex items-center justify-between px-2 pt-[18px] pb-1.5 text-[13px] whitespace-nowrap text-muted">
+        Recent recordings
+        <Link href="/recordings" className="text-[13px] text-muted hover:text-accent-strong">
+          View all
+        </Link>
+      </span>
+      <RecentNav items={recent} serverNow={serverNow} currentId={currentRecordingId} />
+
+      <span className="sticky bottom-0 mt-auto flex shrink-0 items-center gap-2.5 border-t border-border bg-canvas px-2 pt-3 pb-3.5 whitespace-nowrap">
+        <Avatar name={user.name} className="size-[26px] text-[10px]" />
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-sm">{user.name}</span>
+          <span className="truncate text-[12.5px] text-muted" title={user.email}>
+            {user.isAdmin ? "Admin" : "Host"} · {user.email}
+          </span>
+        </span>
+        <LogOutButton />
+      </span>
     </div>
   );
+
+  return (
+    <AppFrame
+      sidebar={sidebar}
+      crumbs={<span className="min-w-0 truncate text-[15px] font-medium">{title ?? "Studios"}</span>}
+      actions={
+        <>
+          {studio && <CopyGuestLink inviteCode={studio.inviteCode} look="icon" />}
+          <OpenStudioAction studioId={target?.id ?? null} label="Open studio" look="top" iconOnlyOnPhone />
+          <span title={user.name} className="ml-1 hidden sm:inline-flex">
+            <Avatar name={user.name} className="size-[26px] text-[10px]" />
+          </span>
+        </>
+      }
+    >
+      {children}
+    </AppFrame>
+  );
+}
+
+function pages(user: User): PageLink[] {
+  return [
+    ...NAV.filter((n) => !n.admin || user.isAdmin).map(({ key, href, icon, label }) => ({ key, href, icon, label })),
+    { key: "upload-speed", href: "/tools/upload-speed", icon: "gauge", label: "Upload-speed check" },
+  ];
 }

@@ -3,13 +3,14 @@
 import { checkStorage } from "@tapry/recorder";
 import type { StudioSettings, TechCheckResult } from "@tapry/shared";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Button, CheckboxRow, Field, Input, Notice } from "@/components/ui";
+import { Button, Field, Input, Notice } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { estimateClock } from "@/lib/client/clock";
 import { describeBrowser, measureUpload, uploadCheck } from "@/lib/client/tech-check";
 import { useDevices, useLocalMedia, useMicLevel, useStoredState } from "@/lib/media/hooks";
 import { browserChecks, buildConstraints, currentBrowserEnv, networkCheck, storageCheck, type DeviceChoice } from "@/lib/media/media";
-import { CheckList, DevicePickers, MicMeter, Preview } from "../../../session/[sessionId]/green-room";
+import { CheckList, DevicePickers, HeadphonesBox, LevelAdvice, Preview } from "../../../session/[sessionId]/green-room";
+import { Icon, ICON } from "../../../session/[sessionId]/icons";
 
 const SAMPLE_SECONDS = 5;
 
@@ -87,10 +88,17 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
   }
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="flex flex-col gap-3.5">
-        <Preview stream={stream} cameraOff={!!choice.cameraOff} audioOnly={settings.audioOnly} failed={status === "error"} />
-        <MicMeter db={level.rmsDb} state={level.state} live={status === "live"} suspended={level.suspended} />
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-start gap-[18px]">
+      <div className="flex flex-col gap-3">
+        <Preview
+          stream={stream}
+          cameraOff={!!choice.cameraOff}
+          audioOnly={settings.audioOnly}
+          failed={status === "error"}
+          level={{ db: level.rmsDb, state: level.state, live: status === "live", suspended: level.suspended }}
+          onToggleCamera={() => setChoice({ ...choice, cameraOff: !choice.cameraOff })}
+        />
+        <LevelAdvice state={level.state} live={status === "live"} suspended={level.suspended} />
         {problem && (
           <Notice tone="danger">
             <p className="font-medium">{problem.title}</p>
@@ -103,16 +111,15 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
         <HearYourself stream={stream} onAnswer={setSampleOk} answered={sampleOk} />
       </div>
 
-      <div className="flex flex-col gap-[18px] rounded-[20px] bg-surface p-6">
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-[18px]">
         <DevicePickers settings={settings} devices={devices} choice={choice} setChoice={setChoice} />
-        <CheckboxRow
-          checked={choice.headphones}
-          onChange={(e) => setChoice({ ...choice, headphones: e.target.checked })}
-          label="I'll wear headphones"
-          description="Highly recommended. Without them, other people's voices can leak into your microphone."
+        <HeadphonesBox checked={choice.headphones} onChange={(headphones) => setChoice({ ...choice, headphones })}>
+          I&apos;ll wear headphones, so other voices don&apos;t leak into my microphone.
+        </HeadphonesBox>
+        <CheckList
+          checks={checks}
+          pending={[...(status === "starting" ? ["Starting your camera and microphone…"] : []), ...(testing ? ["Testing your upload speed…"] : [])]}
         />
-        <CheckList checks={checks} />
-        {testing && <p className="text-sm text-muted">Testing your upload speed…</p>}
         <SendResults inviteCode={inviteCode} hostName={hostName} checks={checks} ready={!testing && status !== "starting"} />
       </div>
     </div>
@@ -162,11 +169,16 @@ function HearYourself({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-surface px-[18px] py-4" data-testid="hear-yourself">
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3.5" data-testid="hear-yourself">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[15px] font-medium">Hear yourself</span>
-          <span className="text-[13px] text-subtle">Record {SAMPLE_SECONDS} seconds and listen back. It stays on this computer.</span>
+        <span className="flex min-w-0 items-start gap-2.5">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong">
+            <Icon d={ICON.wave} className="size-[15px]" />
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">Hear yourself</span>
+            <span className="text-[13px] text-muted">Record {SAMPLE_SECONDS} seconds and listen back. It stays on this computer.</span>
+          </span>
         </span>
         <Button variant="secondary" onClick={record} disabled={!stream || left !== null}>
           {left !== null ? `Recording… ${left}` : url ? "Record again" : "Record a test"}
@@ -176,7 +188,7 @@ function HearYourself({
         <>
           <audio ref={audio} src={url} controls autoPlay className="w-full" />
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-text-2">How did it sound?</span>
+            <span className="mr-1 text-text-2">How did it sound?</span>
             <Button variant={answered === true ? "primary" : "secondary"} onClick={() => onAnswer(true)}>
               Clear
             </Button>
@@ -226,15 +238,16 @@ function SendResults({
 
   const changed = sent !== null && sent !== JSON.stringify(checks);
   return (
-    <form onSubmit={send} className="flex flex-col gap-3 border-t border-border pt-4">
+    <form onSubmit={send} className="flex flex-col gap-3 border-t border-divider pt-3.5">
       <Field label="Your name" hint={`So ${hostName} knows who checked.`}>
         <Input name="name" autoComplete="name" required maxLength={60} />
       </Field>
-      <Button type="submit" disabled={!ready || busy}>
+      <Button type="submit" disabled={!ready || busy} className="w-full">
         {sent && !changed ? "✓ Sent" : sent ? "Send the new results" : `Send results to ${hostName}`}
       </Button>
       {sent && !changed && (
-        <p className="text-sm text-text-2" data-testid="check-sent">
+        <p className="flex items-start gap-2 text-[13.5px] leading-[1.45] text-ok-strong" data-testid="check-sent">
+          <Icon d={ICON.checkCircle} className="mt-0.5 size-[15px]" />
           {hostName} can see how your setup did. At session time, open the invite link {hostName} sent you.
         </p>
       )}

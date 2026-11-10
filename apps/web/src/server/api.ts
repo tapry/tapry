@@ -132,6 +132,32 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
      * stored, not compressed (video and audio don't shrink), so the size is known up front
      * and browsers show real progress. ZIP64, so files over 4 GB are fine.
      */
+    // ── The dashboard: read-only views across all of the host's studios ─────────
+    /** Every recording of the host's, newest first; `?studio=` for one studio, `?limit=` up to 500. */
+    listAllRecordings: asUser(async (svc, user, req) => {
+      const q = new URL(req.url).searchParams;
+      const limit = Number(q.get("limit") ?? "") || undefined;
+      return json(200, { recordings: await svc.processing.listForOwner(user, { studioId: q.get("studio") ?? undefined, limit }) });
+    }),
+    getRecording: asUser(async (svc, user, _req, params) => json(200, await svc.processing.getForOwner(user, params.recordingId!))),
+    /** What was said, turn by turn, from the recording's transcript file. */
+    recordingTranscript: asUser(async (svc, user, _req, params) =>
+      json(200, await svc.library.transcriptTurns(user, params.recordingId!)),
+    ),
+    /** Each studio with its numbers (recordings, hours, space) and who recorded in it lately. */
+    studioCards: asUser(async (svc, user) => json(200, { studios: await svc.library.studioCards(user) })),
+    /** Everyone who recorded as a guest, with the newest tech check under their name. */
+    listGuests: asUser(async (svc, user) => json(200, { guests: await svc.library.guests(user) })),
+    /** Recordings with a transcript; `?q=` searches what was said. */
+    listTranscripts: asUser(async (svc, user, req) => {
+      const q = new URL(req.url).searchParams.get("q") ?? undefined;
+      return json(200, { model: await svc.library.transcriptsModel(), transcripts: await svc.library.transcripts(user, q) });
+    }),
+    /** Space used; for admins also whether storage answers and how it's set up (never the secret). */
+    storageOverview: asUser(async (svc, user) => json(200, await svc.library.storageOverview(user))),
+    /** How this server is set up, read-only (admins only; others get 404). */
+    workspaceSettings: asUser(async (svc, user) => json(200, await svc.library.workspace(user))),
+
     /** The admin health page's checks, as JSON (admins only; others get 404). */
     adminHealth: asUser(async (svc, user) => {
       if (!user.isAdmin) throw new ApiError(404, "not_found", "Not found");
