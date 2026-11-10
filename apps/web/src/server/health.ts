@@ -109,8 +109,8 @@ export class HealthService {
     }
   }
 
-  /** Write, read back and delete a small object: the same calls recordings rely on. */
-  private async storageCheck(): Promise<HealthCheck> {
+  /** Write, read back and delete a small object: the same calls recordings rely on. Also the admin's Storage page. */
+  async storageCheck(): Promise<HealthCheck> {
     const key = `health/check-${randomBytes(6).toString("hex")}.txt`;
     const dir = await mkdtemp(join(tmpdir(), "tapry-health-"));
     const t0 = performance.now();

@@ -1,8 +1,8 @@
-/* The landing page is light by design (with dark sections of its own), whatever the system theme. */
+/* The Tapry website, from the "Tembo" designs. Light by design, whatever the system theme. */
 :root {
   color-scheme: light;
-  --sans: var(--font-onest), system-ui, sans-serif;
-  --mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --sans: var(--font-geist), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -11,18 +11,27 @@
 
 body {
   margin: 0;
-  background: #ffffff;
-  color: #1d1d1f;
+  background: #fff;
+  color: #0b0b0f;
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
 a {
-  color: #d4472f;
+  color: #0b0b0f;
   text-decoration: none;
 }
 a:hover {
+  color: #c43c25;
+}
+.landing a:hover {
   color: #e8553d;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
 }
 
 ::selection {
@@ -34,32 +43,57 @@ a:hover {
   outline-offset: 3px;
 }
 
-button {
-  font-family: var(--sans);
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes ring2 {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+@keyframes eqlow {
+  0%, 100% { transform: scaleY(0.12); }
+  50% { transform: scaleY(0.36); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(40px); }
 }
 
-@keyframes otpulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
+.rise { animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.rise9 { animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.fade { animation: fade 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.fade4 { animation: fade 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
-/* Hover states the inline styles can't express. */
-.cta:hover {
-  background: #d4472f !important;
-  color: #ffffff !important;
+/* Scroll-driven reveals. Without view timelines the animation has no duration and ends at once. */
+.reveal,
+.reveal40 {
+  animation: reveal linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 50%;
 }
-.ghost-btn:hover {
-  background: #f7f7f8 !important;
-  color: #1d1d1f !important;
-}
-.dark-btn:hover {
-  background: #3a3a3c !important;
-  color: #ffffff !important;
+.reveal40 {
+  animation-range: entry 0% entry 40%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -69,16 +103,177 @@ button {
   }
 }
 
-/* The nav collapses to the logo and the main button on small screens. */
-@media (max-width: 720px) {
-  .nav-links {
-    display: none !important;
+/* ── Hover states the inline styles can't express ───────────────────────── */
+.hv-red:hover { color: #c43c25 !important; }
+.hv-op:hover { opacity: 1 !important; }
+.hv-dim:hover { opacity: 0.8; }
+.hv-85:hover { opacity: 0.85; }
+.btn-dark:hover { background: #2a2a2e !important; color: #fff !important; }
+.btn-dark-red:hover { background: #c43c25 !important; color: #fff !important; }
+.btn-outline:hover { border-color: #0b0b0f !important; color: #0b0b0f !important; }
+.btn-white:hover { color: #0b0b0f !important; transform: translateY(-1px); }
+.btn-white-flat:hover { color: #0b0b0f !important; }
+.link-white:hover { color: #fff !important; opacity: 0.8; }
+.chip:hover { background: #e6e6e9 !important; color: #0b0b0f !important; }
+.card-hover:hover { background: #fafafa !important; color: #0b0b0f !important; }
+.card-link:hover { color: #0b0b0f !important; }
+.zoom img { transition: transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.zoom:hover img { transform: scale(1.03); }
+.bucket:hover { background: #fff !important; }
+.docs-item:hover { background: #f4f4f5 !important; }
+.docs-pager:hover { border-color: #0b0b0f !important; }
+.toc-link:hover { color: #0b0b0f !important; border-left-color: #0b0b0f !important; }
+.mic-btn:hover { background: #c43c25 !important; }
+.speed-btn:hover:not(:disabled) { background: #c43c25 !important; }
+.foot-link:hover { color: #fff !important; opacity: 0.8; }
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid #ececef;
+  color: #0b0b0f;
+}
+.site-nav a { color: inherit; }
+.site-nav a:hover { color: #c43c25; }
+.site-nav a[aria-current="page"] { color: #c43c25; }
+.site-nav .nav-brand svg { color: #e8553d; }
+.site-nav .nav-cta { background: #0b0b0f; color: #fff; transition: background 0.2s, color 0.2s; }
+.site-nav .nav-cta:hover { background: #c43c25; color: #fff; }
+.nav-links { display: flex; }
+.nav-toggle {
+  display: none;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.nav-menu { display: none; }
+@media (max-width: 899px) {
+  .nav-links, .nav-github { display: none !important; }
+  .nav-toggle { display: inline-grid; }
+  .nav-menu:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid #ececef;
+    background: #fff;
+    padding: 8px 28px 16px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
   }
+  .nav-menu a { padding: 12px 0; border-bottom: 1px solid #f1f1f3; font-size: 16px; }
+  .nav-menu a:last-child { border-bottom: 0; }
+}
+/* On the landing page the header sits over the hero: clear with white text until the page
+   scrolls (data-scrolled, set by a few lines of script in the header itself, so it is right
+   before the rest of the page's script has loaded) or the menu opens. */
+.site-nav-overlay {
+  position: fixed;
+  inset: 0 0 auto 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+  color: #fff;
+  transition: background 0.35s, color 0.35s, border-color 0.35s;
+}
+.site-nav-overlay .nav-brand svg { color: inherit; }
+.site-nav-overlay a:hover { color: inherit; opacity: 0.8; }
+.site-nav-overlay .nav-cta { background: rgba(255, 255, 255, 0.2); }
+.site-nav-overlay .nav-cta:hover { background: rgba(255, 255, 255, 0.3); opacity: 1; }
+.site-nav-overlay :focus-visible { outline-color: #fff; }
+.site-nav-overlay[data-scrolled],
+.site-nav-overlay[data-open] {
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-bottom-color: #ececef;
+  color: #0b0b0f;
+}
+.site-nav-overlay[data-open] { background: #fff; }
+.site-nav-overlay[data-scrolled] .nav-brand svg,
+.site-nav-overlay[data-open] .nav-brand svg { color: #e8553d; }
+.site-nav-overlay[data-scrolled] a:hover,
+.site-nav-overlay[data-open] a:hover { color: #c43c25; opacity: 1; }
+.site-nav-overlay[data-scrolled] .nav-cta,
+.site-nav-overlay[data-open] .nav-cta { background: #0b0b0f; color: #fff; }
+.site-nav-overlay[data-scrolled] .nav-cta:hover,
+.site-nav-overlay[data-open] .nav-cta:hover { background: #c43c25; color: #fff; }
+.site-nav-overlay[data-scrolled] :focus-visible,
+.site-nav-overlay[data-open] :focus-visible { outline-color: #e8553d; }
+
+/* Skip link: off screen until it has the keyboard's focus. */
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 50;
+  border-radius: 10px;
+  background: #0b0b0f;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff !important;
+}
+.skip:focus { top: 12px; }
+
+/* The coral focus ring disappears on the terracotta areas: white there. */
+.on-brand :focus-visible { outline-color: #fff; }
+
+/* Questions and steps that open in place: the closed answer is hidden from everyone, not just clipped. */
+.fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.45s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.fold > * { overflow: hidden; visibility: hidden; transition: visibility 0s linear 0.45s; }
+.fold[data-open] { grid-template-rows: 1fr; }
+.fold[data-open] > * { visibility: visible; transition-delay: 0s; }
+.fold-btn { display: flex; width: 100%; cursor: pointer; align-items: center; justify-content: space-between; gap: 16px; border: 0; background: transparent; padding: 0; text-align: left; font: inherit; color: inherit; }
+
+/* ── Layout switches (the designs' width checks) ────────────────────────── */
+
+.hero-app { grid-template-columns: 230px minmax(0, 1fr) 300px; }
+@media (max-width: 1179px) {
+  .hero-stats { display: none !important; }
+}
+@media (max-width: 1039px) {
+  .hero-app { grid-template-columns: 220px minmax(0, 1fr); }
+  .hero-right { display: none !important; }
+}
+@media (max-width: 699px) {
+  .hero-app { grid-template-columns: minmax(0, 1fr); }
+  .hero-side { display: none !important; }
 }
 
-/* Mic test: camera and microphone side by side, stacked on narrow screens. */
-@media (max-width: 860px) {
-  .mic-test-grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
+.docs-search:focus-within { border-color: #0b0b0f !important; outline: 2px solid #e8553d; outline-offset: 2px; }
+.docs-item[aria-current="page"] { background: #f1f1f3; }
+.doc-row { display: grid; grid-template-columns: minmax(120px, max-content) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 759px) {
+  .doc-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
+.docs-shell { grid-template-columns: 220px minmax(0, 1fr) 180px; }
+@media (max-width: 1099px) {
+  .docs-shell { grid-template-columns: 220px minmax(0, 1fr); }
+  .docs-toc { display: none !important; }
+}
+@media (max-width: 759px) {
+  .docs-shell { grid-template-columns: minmax(0, 1fr); }
+  .docs-nav { position: static !important; }
+}
+
+/* Tables that scroll sideways on phones instead of the page. */
+.x-scroll { overflow-x: auto; }
+
+/* Mic test: device details as a two-column list. */
+.tool-details { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 14px; }
+.tool-details dt { color: #71717a; }
+.tool-details dd { margin: 0; overflow-wrap: anywhere; }
+
+/* For screen readers only. */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

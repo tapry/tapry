@@ -84,7 +84,7 @@ More: [recording architecture](docs/plan/03-recording-architecture.md),
 |---|---|
 | `apps/web` | Studio UI, API, job queue, standalone worker entry (Next.js) |
 | `apps/worker` | Media pipeline: ffmpeg rendering, loudness, whisper.cpp transcripts |
-| `apps/site` | The project's website (landing page), a static export; not part of a self-hosted install |
+| `apps/site` | The project's website (landing, use cases, docs, pricing, blog, free tools), a static export; not part of a self-hosted install |
 | `packages/recorder` | Browser recording core: capture → durable local chunks → resumable upload (MIT, usable on its own) |
 | `packages/shared` | Schemas and types shared by the browser and the server |
 | `deploy/` | Docker images and the Compose stack |

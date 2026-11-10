@@ -1,70 +1,93 @@
 @import "tailwindcss";
 
 /*
- * Design tokens (docs/plan/10-design-inspiration.md; the "Tapry Dashboard/Pages" mock-ups).
+ * Design tokens: the "Tapry … Tembo" designs (zinc neutrals, terracotta accent, Geist).
  * Components use the Tailwind names below (bg-surface-2, text-muted, …), never raw colors.
  */
 :root {
   --bg: #ffffff;
-  --surface: #ffffff;
-  --surface-2: #f7f7f8; /* cards and panels on white */
-  --canvas: #f6f5f3; /* warm backdrop behind the studio and guest pages */
-  --border: #ececef;
-  --border-strong: #e2e2e5;
-  --text: #1d1d1f;
-  --text-2: #3a3a3c;
-  --muted: #6e6e73;
-  --subtle: #8e8e93;
-  --ink: #1d1d1f; /* dark buttons */
-  --ink-text: #ffffff;
-  --accent: #e8553d; /* coral: record, primary actions */
-  --accent-hover: #d4472f;
-  --accent-strong: #c43c25; /* coral text on light backgrounds */
-  --accent-soft: #fdece8;
-  --accent-line: #f5c3b8;
+  --surface: #ffffff; /* cards, inputs, panels on the light grey app background */
+  --surface-2: #f4f4f5; /* chips, segmented controls, quiet panels */
+  --canvas: #fafafa; /* the app's background and the card around auth/guest screens */
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --divider: #f4f4f5; /* rows inside a card */
+  --text: #18181b;
+  --text-2: #3f3f46;
+  --muted: #71717a;
+  --subtle: #a1a1aa;
+  --ink: #18181b; /* dark buttons */
+  --ink-hover: #3f3f46;
+  --ink-text: #fafafa;
+  --accent: #e8553d; /* terracotta: record, the one main action */
+  --accent-hover: #c43c25;
+  --accent-strong: #c43c25; /* terracotta text on light backgrounds */
+  --accent-soft: #fef2f2;
+  --accent-tint: #fdf3ef; /* the warm wash at the top of recording cards */
+  --accent-line: #fbd5cc;
   --accent-text: #ffffff;
-  --ok: #1f9d55;
-  --ok-strong: #1f7a45;
-  --ok-soft: #e6f6ec;
-  --ok-line: #bfe5cc;
-  --warn: #e0a019;
-  --warn-strong: #8a5a0c;
-  --warn-soft: #fdf6e7;
-  --warn-line: #f3dfb0;
-  --danger: #c43c25;
-  --ring: #e8553d;
+  --ok: #16a34a;
+  --ok-strong: #15803d;
+  --ok-soft: #f0fdf4;
+  --ok-line: #bbf7d0;
+  --warn: #d97706;
+  --warn-strong: #b45309;
+  --warn-soft: #fffbeb;
+  --warn-line: #fde68a;
+  --danger: #dc2626; /* form errors */
+  --ring: #18181b;
+  --ring-soft: rgb(24 24 27 / 0.1);
+  /* Not named --shadow-xs: the theme key below has that name, and a variable can't refer to itself. */
+  --elev-xs: 0 1px 2px rgb(0 0 0 / 0.05);
+  /* The terracotta backdrop (.bg-ember) and the halo round the card on it. */
+  --ember-1: #7d2613;
+  --ember-2: #a83a1e;
+  --ember-3: #d2603c;
+  --ember-4: #f3b9a0;
+  --ember-halo: rgb(255 255 255 / 0.34);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b0b0d;
-    --surface: #141416;
-    --surface-2: #1c1c1f;
-    --canvas: #0f0f11;
-    --border: #2a2a2e;
-    --border-strong: #3a3a3e;
-    --text: #f5f5f7;
-    --text-2: #d1d1d6;
-    --muted: #a1a1a6;
-    --subtle: #8e8e93;
-    --ink: #f5f5f7;
-    --ink-text: #0b0b0d;
-    --accent: #ff7a5f;
-    --accent-hover: #ff8f78;
-    --accent-strong: #ff8f78;
-    --accent-soft: #3a1f1a;
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface-2: #27272a;
+    --canvas: #111113;
+    --border: #2e2e33;
+    --border-strong: #3f3f46;
+    --divider: #232327;
+    --text: #fafafa;
+    --text-2: #d4d4d8;
+    --muted: #a1a1aa;
+    --subtle: #71717a;
+    --ink: #fafafa;
+    --ink-hover: #d4d4d8;
+    --ink-text: #18181b;
+    --accent: #ef6a51;
+    --accent-hover: #f47a5f;
+    --accent-strong: #f8937c;
+    --accent-soft: #3a1a14;
+    --accent-tint: #2a1813;
     --accent-line: #6b3227;
-    --accent-text: #1d0f0c;
-    --ok: #3cc173;
-    --ok-strong: #5fd38e;
-    --ok-soft: #13291c;
-    --ok-line: #24533a;
-    --warn: #e8b13a;
-    --warn-strong: #f0c35f;
-    --warn-soft: #2d2412;
-    --warn-line: #5a4721;
-    --danger: #ff8f78;
-    --ring: #ff7a5f;
+    --accent-text: #1d0f0c; /* dark on the lighter terracotta: 6.1:1 (white would be 3.1:1) */
+    --ok: #22c55e;
+    --ok-strong: #4ade80;
+    --ok-soft: #10261a;
+    --ok-line: #1e5135;
+    --warn: #f59e0b;
+    --warn-strong: #fbbf24;
+    --warn-soft: #2b2110;
+    --warn-line: #5a4417;
+    --danger: #f87171;
+    --ring: #fafafa;
+    --ring-soft: rgb(250 250 250 / 0.12);
+    --elev-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+    /* A dark card in a bright peach frame glares: deeper terracotta and a faint halo. */
+    --ember-1: #1f0d08;
+    --ember-2: #34140c;
+    --ember-3: #4d1d10;
+    --ember-4: #6b2a17;
+    --ember-halo: rgb(255 255 255 / 0.07);
   }
 }
 
@@ -75,16 +98,19 @@
   --color-canvas: var(--canvas);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
   --color-text: var(--text);
   --color-text-2: var(--text-2);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
   --color-ink: var(--ink);
+  --color-ink-hover: var(--ink-hover);
   --color-ink-text: var(--ink-text);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-tint: var(--accent-tint);
   --color-accent-line: var(--accent-line);
   --color-accent-text: var(--accent-text);
   --color-ok: var(--ok);
@@ -97,9 +123,19 @@
   --color-warn-line: var(--warn-line);
   --color-danger: var(--danger);
   --color-ring: var(--ring);
-  --font-sans: var(--font-onest), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --color-ring-soft: var(--ring-soft);
+  --shadow-xs: var(--elev-xs);
+  --font-sans: var(--font-geist), "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Motion from the designs: recording blink, speaking rings, level bars, entrances. */
   --animate-rec-pulse: rec-pulse 1.2s ease-in-out infinite;
+  --animate-ring: ring 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+  --animate-ring-slow: ring 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+  --animate-spin-fast: spin 0.8s linear infinite;
+  --animate-fade-up: fade-up 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pop: pop 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   @keyframes rec-pulse {
     0%,
     100% {
@@ -107,6 +143,46 @@
     }
     50% {
       opacity: 0.35;
+    }
+  }
+  @keyframes ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1.75);
+      opacity: 0;
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
     }
   }
 }
@@ -131,6 +207,54 @@ body {
   outline-offset: 2px;
 }
 
-input[type="checkbox"] {
-  accent-color: var(--accent);
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ink);
+}
+
+/*
+ * The deep terracotta backdrop behind the sign-in, guest and setup cards (Auth, Guest, Welcome
+ * designs), and the soft blush wash at the top of content pages. A brand surface: the light theme
+ * has the designs' gradient, the dark theme a deeper one so the dark card doesn't sit in a glare.
+ */
+.bg-ember {
+  background: linear-gradient(180deg, var(--ember-1) 0%, var(--ember-2) 34%, var(--ember-3) 68%, var(--ember-4) 100%) fixed;
+}
+.bg-blush {
+  background: linear-gradient(180deg, var(--accent-tint) 0%, var(--bg) 100%);
+}
+/* The framed card on .bg-ember: a translucent white halo and a warm drop shadow. */
+.ember-card {
+  box-shadow:
+    0 0 0 8px var(--ember-halo),
+    0 40px 90px -40px rgb(70 20 8 / 0.6);
+}
+
+/* Level bars ("eq" in the designs): each bar sets its own duration and delay inline. */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes eqlow {
+  0%,
+  100% {
+    transform: scaleY(0.12);
+  }
+  50% {
+    transform: scaleY(0.36);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

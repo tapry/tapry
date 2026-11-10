@@ -22,7 +22,7 @@ TypeScript monorepo (pnpm + turborepo). Next.js (App Router), Tailwind, LiveKit 
 ```
 apps/web            studio UI, dashboard, API routes, job runner (src/worker-main.ts for separate workers)
 apps/worker         media pipeline (ffmpeg): chunks → aligned WAV/MP4 + combined grid; loudness; transcripts (whisper.cpp)
-apps/site           the project website (landing page), static export; separate from the self-hosted app
+apps/site           the project website (landing, use cases, docs, pricing, blog, free tools), static export; separate from the self-hosted app
 packages/recorder   capture → MediaRecorder → local chunk store → upload queue (MIT, standalone)
 packages/shared     zod schemas, types
 deploy/compose      docker-compose.yml + setup.sh
@@ -34,8 +34,11 @@ Not yet: `packages/sync`, `packages/exports`, `ee/`.
 Done for v1: studios, invite links, green room, consent text per studio (kept per guest by SHA-256, consent record per recording), local recording with crash recovery, live per-guest upload status, AI producer quality alerts (including too quiet and echo) and talk balance, audio-only studios, guest tech-check link, guest end screen (own recording + "record your own"), free mic & camera test (`apps/site`, /mic-test), free upload-speed check (app `/tools/upload-speed`, site `/upload-speed-test`), processing timeline, admin health page, FLAC audio and DOCX transcripts, live call with TURN, processing (aligned WAV/MP4, combined grid, loudness, transcripts), downloads and zip, delete and storage usage, Docker self-host, the redesign, measured sync, Gate A's 60-minute two-person run in Chromium, and with real Safari as the guest (automated, mock mic: nothing lost, no drift; the absolute Safari-to-host gap needs real devices). Open for v1: nothing left in code; alpha testing and launch (repo move, demo video, going public).
 
 ## UI
-- Users see **studios** and **recordings**, the same words as the API, database and code, so the app suits podcasts, interviews, research and video alike. Pages live under `/studios`; old `/shows` links redirect. Don't say "show" or "recording" in the product. Don't list webinars, live streaming or social clips as things it does: they aren't built (`docs/plan/14-riverside-parity.md`).
-- Design tokens are in `apps/web/src/app/globals.css` (light + dark); components use the Tailwind names, never raw colors. Primitives in `src/components/ui.tsx`.
+- Users see **studios** and **recordings**, the same words as the API, database and code, so the app suits podcasts, interviews, research and video alike. Pages live under `/studios`; old `/shows` links redirect. Don't say "show" or "episode" in the product. Don't list webinars, live streaming or social clips as things it does: they aren't built (`docs/plan/14-riverside-parity.md`).
+- The look is the "Tapry … Tembo" designs: zinc neutrals, terracotta accent, Geist (self-hosted through `next/font`), 6 px controls. Design tokens are in `apps/web/src/app/globals.css` (light + dark); components use the Tailwind names, never raw colors. Primitives in `src/components/ui.tsx` (Button sizes `sm`/`md`/`lg` and variant `link`: size by prop, class overrides of height and padding lose to the defaults), icons and the ember page frame in `ui-extra.tsx`, the dashboard frame in `app-frame.tsx`. The call stage and the full-screen view are dark in both themes and set their own `--ring`.
+- Everything on screen comes from real state: no placeholder people, numbers or meters. "Saved" means every track is complete; a stale health report (`STALE_REPORT_MS`) reads "Not reporting", never "up to date"; level bars move only while the call hears that person speak.
+- The website (`apps/site`) carries real content only: no invented customers, quotes, stats or team. Customers and blog pages are driven by `src/content/*` and hide themselves while empty. Cloud plans on the pricing page follow `docs/plan/06-monetization.md` and are labelled planned.
+- Dashboard pages across studios (`/recordings`, `/recordings/[id]`, `/studios/all`, `/guests`, `/transcripts`, `/storage`, `/settings`) read through `LibraryService` (`src/server/library.ts`) and `ProcessingService.listForOwner`: owner-scoped, read-only, no schema of their own. `/studios` still redirects to the newest studio. Transcript text is read from storage (4 MB cap, cached in memory) and never logged.
 - Download links show friendly titles; the real file name is in `data-file-name` (tests read that).
 
 ## Sync

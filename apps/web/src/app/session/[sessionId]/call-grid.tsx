@@ -1,47 +1,112 @@
 "use client";
 
 import type { RemoteAudioTrack, RemoteVideoTrack } from "livekit-client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Avatar as Initials, cn } from "@/components/ui";
 import type { RemotePeer } from "@/lib/client/call";
+import { Icon, ICON } from "./icons";
 
-/** You plus everyone in the call, in a grid that fits up to 8 people. */
+export type Layout = "grid" | "speaker" | "side";
+
+/**
+ * The call stage is dark in both themes (the designs' #18181b stage, #1c1c1f tiles, and a light
+ * terracotta ring for whoever is speaking): it frames video, so it doesn't follow the page theme.
+ */
+const TILE_BG = "bg-[#1c1c1f]";
+const SPEAKING_RING = "outline-[#ff8f78]";
+
+/**
+ * You plus everyone in the call. Grid, speaker (whoever of the others spoke last, full width) or
+ * side by side: the layout only changes how the tiles are placed, never what's sent or recorded.
+ * "full" fills the full-screen view's height instead of keeping the tiles' aspect ratio. The room
+ * keeps one CallGrid mounted and only switches the variant, so going full screen never re-attaches
+ * anyone's video or sound.
+ */
 export function CallGrid({
   stream,
+  selfId,
   selfName,
   selfMicMuted,
   selfCameraOff,
   selfSpeaking,
   peers,
   recording,
+  layout = "grid",
+  variant = "stage",
+  badges,
 }: {
   stream: MediaStream;
+  selfId: string;
   selfName: string;
   selfMicMuted: boolean;
   selfCameraOff: boolean;
   selfSpeaking: boolean;
   peers: RemotePeer[];
   recording: boolean;
+  layout?: Layout;
+  variant?: "stage" | "full";
+  /** Small warning on someone's tile (the host's view of an upload falling behind), by participant id. */
+  badges?: Map<string, string>;
 }) {
   const count = peers.length + 1;
-  const cols = count === 1 ? "grid-cols-1" : count <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 lg:grid-cols-3";
+  const speaker = useSpotlight(peers, layout === "speaker");
+
+  const full = variant === "full";
+  const cols =
+    count === 1
+      ? "grid-cols-1"
+      : layout === "side"
+        ? count === 2
+          ? "grid-cols-2"
+          : "grid-cols-2 sm:grid-cols-3"
+        : layout === "speaker"
+          ? count <= 3
+            ? "grid-cols-2"
+            : "grid-cols-3"
+          : count <= 4
+            ? "grid-cols-1 sm:grid-cols-2"
+            : "grid-cols-2 lg:grid-cols-3";
+  const aspect = (id: string) =>
+    full ? "min-h-0" : count === 1 ? "aspect-video" : layout === "side" ? "aspect-[3/4]" : id === speaker ? "aspect-[21/9]" : "aspect-video";
+  const tile = (id: string) => ({
+    full,
+    className: aspect(id),
+    spotlight: id === speaker,
+    badge: badges?.get(id),
+  });
+
   return (
-    <div className={cn("grid content-center gap-3", cols, count === 1 && "mx-auto w-full max-w-3xl")}>
+    <div
+      className={cn(
+        "grid",
+        cols,
+        full ? "min-h-0 min-w-0 flex-1 auto-rows-[minmax(0,1fr)] gap-2.5" : "gap-2",
+        full && speaker && "grid-rows-[minmax(0,2fr)_minmax(0,1fr)]",
+        !full && layout === "side" && count > 1 && "mx-auto w-full max-w-[640px]",
+      )}
+    >
       <Tile
         name={`${selfName} (you)`}
+        label={selfName}
         micMuted={selfMicMuted}
         speaking={selfSpeaking && !selfMicMuted}
         recording={recording}
         testId="self-tile"
+        {...tile(selfId)}
       >
-        {stream.getVideoTracks().length > 0 && !selfCameraOff ? (
-          <StreamVideo stream={stream} />
-        ) : (
-          <Avatar name={selfName} />
-        )}
+        {stream.getVideoTracks().length > 0 && !selfCameraOff ? <StreamVideo stream={stream} /> : <Avatar name={selfName} />}
       </Tile>
       {peers.map((p) => (
-        <Tile key={p.id} name={p.name} micMuted={p.micMuted} speaking={p.speaking} recording={recording} testId="remote-tile">
+        <Tile
+          key={p.id}
+          name={p.name}
+          label={p.name}
+          micMuted={p.micMuted}
+          speaking={p.speaking}
+          recording={recording}
+          testId="remote-tile"
+          {...tile(p.id)}
+        >
           {p.video && !p.cameraOff ? <TrackVideo track={p.video} /> : <Avatar name={p.name} />}
           {p.audio && <TrackAudio track={p.audio} />}
         </Tile>
@@ -50,19 +115,57 @@ export function CallGrid({
   );
 }
 
+/** Speaker layout: someone has to talk this long after the last switch before the big tile changes. */
+const SPEAKER_HOLD_MS = 2_000;
+
+/**
+ * Who gets the big tile in the speaker layout: the last of the others to speak (never yourself:
+ * you don't need to watch yourself talk), held for a moment so short interjections don't flip it.
+ * Remembered while another layout is showing; null when off or alone.
+ */
+function useSpotlight(peers: RemotePeer[], on: boolean) {
+  const [spot, setSpot] = useState<string | null>(null);
+  const switchedAt = useRef(0);
+  // Whoever has the tile keeps it while they're still talking, even if someone else talks too.
+  const candidate = peers.find((p) => p.id === spot)?.speaking ? spot : (peers.find((p) => p.speaking)?.id ?? null);
+  useEffect(() => {
+    if (!candidate || candidate === spot) return;
+    const id = setTimeout(
+      () => {
+        switchedAt.current = performance.now();
+        setSpot(candidate);
+      },
+      Math.max(0, switchedAt.current + SPEAKER_HOLD_MS - performance.now()),
+    );
+    return () => clearTimeout(id);
+  }, [candidate, spot]);
+  if (!on || peers.length === 0) return null;
+  return spot && peers.some((p) => p.id === spot) ? spot : peers[0]!.id;
+}
+
 function Tile({
   name,
+  label,
   micMuted,
   speaking,
   recording,
   testId,
+  full,
+  spotlight,
+  badge,
+  className,
   children,
 }: {
   name: string;
+  label: string;
   micMuted: boolean;
   speaking: boolean;
   recording: boolean;
   testId: string;
+  full: boolean;
+  spotlight: boolean;
+  badge?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -72,15 +175,37 @@ function Tile({
       data-mic={micMuted ? "muted" : "on"}
       data-recording={recording ? "on" : "off"}
       className={cn(
-        "relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#e9e7e4] outline-3 -outline-offset-3 transition-[outline-color] duration-300 sm:aspect-video dark:bg-surface-2",
-        speaking ? "outline-ok" : "outline-transparent",
+        "relative overflow-hidden text-white transition-[outline-color] duration-300",
+        TILE_BG,
+        full ? "rounded-[14px] outline-3 -outline-offset-3" : "rounded-lg outline-2 -outline-offset-2",
+        speaking ? SPEAKING_RING : "outline-transparent",
+        spotlight && "order-first col-span-full",
+        className,
       )}
     >
       {children}
-      <span className="absolute bottom-2 left-2 flex items-center gap-[7px] rounded-lg bg-[rgba(30,26,26,.72)] px-2.5 py-[5px] text-[13px] font-medium text-white">
-        {micMuted ? <MicOffIcon /> : <span aria-hidden className="size-[7px] rounded-full bg-ok" />}
-        {name}
+      <span
+        className={cn(
+          "absolute flex max-w-[calc(100%-20px)] items-center bg-black/60",
+          full ? "bottom-3 left-3 gap-2 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 gap-[7px] rounded-[7px] px-[9px] py-1 text-[13px]",
+        )}
+      >
+        {micMuted && <MicOffIcon />}
+        <span className="truncate">{label}</span>
+        {name !== label && <span className="text-white/60">(you)</span>}
       </span>
+      {badge && (
+        // On the dark stage in both themes, so the white chip keeps its fixed amber text.
+        <span
+          className={cn(
+            "absolute flex max-w-[calc(100%-20px)] items-center gap-[5px] overflow-hidden bg-white/95 whitespace-nowrap text-[#b45309]",
+            full ? "top-3 right-3 rounded-lg px-2.5 py-[5px] text-[12.5px] font-medium" : "top-2.5 right-2.5 rounded-[7px] px-2 py-[3px] text-xs",
+          )}
+        >
+          <Icon d={ICON.cloudUp} className="size-[13px]" />
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
@@ -123,16 +248,15 @@ function TrackAudio({ track }: { track: RemoteAudioTrack }) {
 function Avatar({ name }: { name: string }) {
   return (
     <div className="grid size-full place-items-center">
-      <Initials name={name} className="aspect-square w-[28%] max-w-24 text-xl" />
+      <Initials name={name} className="aspect-square w-[24%] max-w-24 min-w-10 text-[clamp(14px,2vw,26px)]" />
     </div>
   );
 }
 
 function MicOffIcon() {
   return (
-    <svg aria-label="Muted" viewBox="0 0 24 24" className="size-3.5 text-[#ff8f78]" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.8" />
-      <path d="M19 10v2a7 7 0 0 1-.9 3.4M5 10v2a7 7 0 0 0 11.6 5.3M12 19v3M2 2l20 20" />
+    <svg aria-label="Muted" viewBox="0 0 24 24" className="size-[13px] shrink-0 text-[#ff8f78]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={ICON.micOff} />
     </svg>
   );
 }

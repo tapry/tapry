@@ -407,6 +407,9 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await studioPage.getByTestId("delete-studio").click();
     await studioPage.getByTestId("delete-studio-confirm").click();
     await expect(studioPage).not.toHaveURL(studioUrl);
+    // The Studios page lists every studio the host has: the deleted one is gone from it.
+    await studioPage.goto("/studios/all");
+    await expect(studioPage.getByRole("heading", { name: "Studios", exact: true })).toBeVisible();
     await expect(studioPage.getByTestId("studio-link").filter({ hasText: studioName })).toHaveCount(0);
     if (canReadStorage) await expect.poll(async () => listChunks(sessionId), { timeout: 15_000 }).toEqual([]);
     await studioPage.close();

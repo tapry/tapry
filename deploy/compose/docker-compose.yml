@@ -18,7 +18,7 @@ x-app-env: &app-env
   # Transcripts (whisper.cpp + model are in the image). Set WHISPER_MODEL= (empty) in .env to turn off.
   WHISPER_MODEL: ${WHISPER_MODEL-/opt/whisper/ggml-base.bin}
   WHISPER_THREADS: ${WHISPER_THREADS:-4}
-  # Remove each episode's original uploads this many days after its files are ready (empty: keep).
+  # Remove each recording's original uploads this many days after its files are ready (empty: keep).
   RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS-}
   # A "Record your own, free" link on guests' end screen and recap email; empty: none.
   GUEST_PROMO_URL: ${GUEST_PROMO_URL:-}

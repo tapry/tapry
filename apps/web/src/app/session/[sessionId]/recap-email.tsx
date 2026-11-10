@@ -28,7 +28,7 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
 
   const form = recap.status === "none" || editing;
   return (
-    <div className="flex flex-col gap-2" data-testid="recap-email" data-status={recap.status}>
+    <div className="flex flex-col gap-2 border-t border-divider pt-3" data-testid="recap-email" data-status={recap.status}>
       {form && recap.canSend ? (
         <form onSubmit={submit} className="flex flex-col gap-2">
           <label htmlFor="recap-address" className="text-sm font-medium">
@@ -43,16 +43,16 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-11 min-w-0 flex-[1_1_220px]"
+              className="min-w-0 flex-[1_1_220px]"
             />
             <Button type="submit" variant="secondary" disabled={busy}>
               {busy ? "Saving…" : "Email me"}
             </Button>
           </div>
-          <p className="text-sm text-muted">Only used to send this one link, then deleted.</p>
+          <p className="text-[13px] text-muted">Only used to send this one link, then deleted.</p>
         </form>
       ) : (
-        <p className="text-sm text-text-2">
+        <p className="text-[13.5px] leading-normal text-text-2">
           {recap.status === "pending"
             ? `We'll email ${recap.email} when your file is ready.`
             : recap.status === "sent"
@@ -61,7 +61,7 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
           {recap.canSend && (
             <button
               type="button"
-              className="font-medium underline underline-offset-2"
+              className="cursor-pointer font-medium text-text underline underline-offset-2 hover:text-accent-strong"
               onClick={() => {
                 setEmail(recap.email ?? "");
                 setEditing(true);

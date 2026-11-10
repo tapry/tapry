@@ -7,7 +7,8 @@ import type { RecordingSummary } from "@/server/processing";
 import type { Studio, TechCheck } from "@/server/studios";
 import { RecordingList, settled } from "./recording-list";
 import { DeleteStudioButton, InviteLink, OpenStudioButton, StudioSettingsForm } from "./studio-forms";
-import { Card, cn, Eyebrow } from "./ui";
+import { Icon, ListCard } from "./ui-extra";
+import { Avatar, cn } from "./ui";
 
 type Tab = "recordings" | "settings" | "space";
 
@@ -51,11 +52,10 @@ export function StudioView({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-5">
-        <div className="flex flex-col gap-2">
-          <Eyebrow>Studio</Eyebrow>
-          <h1 className="text-[clamp(30px,3.4vw,42px)] leading-[1.05] font-medium tracking-[-.02em]">{studio.name}</h1>
-          <span className="text-[15px] text-pretty text-muted">
+      <div className="flex flex-wrap items-end justify-between gap-3.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em] break-words">{studio.name}</h1>
+          <span className="text-sm text-pretty text-muted">
             {studio.settings.audioOnly ? "Audio only" : studio.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {studio.settings.maxGuests}{" "}
             guest{studio.settings.maxGuests === 1 ? "" : "s"} · started{" "}
             {new Date(studio.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
@@ -64,7 +64,7 @@ export function StudioView({
         <OpenStudioButton studioId={studio.id} live={!!live} />
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,135px),1fr))] gap-3">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         <Stat label="Recordings" value={String(recordings.length)} sub={`${ready} ready to download`} />
         <Stat label="Time recorded" value={`${(recordedMs / 3_600_000).toFixed(1)} h`} sub="no limits on hours" />
         <Stat label="Space used" value={formatBytes(bytes)} sub="by this studio" testId="studio-bytes" />
@@ -76,7 +76,7 @@ export function StudioView({
         />
       </div>
 
-      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Studio sections">
+      <div className="-mb-2 flex gap-1 overflow-x-auto border-b border-border pb-3" role="tablist" aria-label="Studio sections">
         {(
           [
             ["recordings", "Recordings"],
@@ -90,8 +90,9 @@ export function StudioView({
             aria-selected={tab === key}
             onClick={() => setTab(key)}
             className={cn(
-              "cursor-pointer rounded-full border px-[18px] py-[9px] text-[15px] font-medium whitespace-nowrap",
-              tab === key ? "border-ink bg-ink text-ink-text" : "border-border-strong text-text hover:border-muted",
+              // The focus ring is drawn inside: the tab list scrolls sideways, which would clip one outside.
+              "cursor-pointer rounded-md border px-[11px] py-[5px] text-sm whitespace-nowrap transition-colors duration-[250ms] focus-visible:-outline-offset-2",
+              tab === key ? "border-border bg-surface font-medium text-text shadow-xs" : "border-transparent text-muted hover:text-text",
             )}
           >
             {label}
@@ -101,16 +102,11 @@ export function StudioView({
 
       {tab === "recordings" && (
         <>
-          <Card className="flex flex-col gap-3.5">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[19px] font-semibold">Invite link for guests</h2>
-              <p className="text-[15px] text-muted">
-                Send this to your guests. They open it in their browser, with nothing to install and no account needed.
-                They can join once you&apos;ve entered the studio.
-              </p>
-            </div>
+          <section className="flex flex-col gap-2.5">
+            <h2 className="font-medium">Invite guests</h2>
             <InviteLink studioId={studio.id} inviteCode={studio.inviteCode} />
-          </Card>
+            <p className="text-[13px] text-muted">They open it in their browser, with nothing to install and no account needed.</p>
+          </section>
           {checks.length > 0 && <TechChecks checks={checks} />}
           <RecordingList
             studioId={studio.id}
@@ -124,14 +120,11 @@ export function StudioView({
 
       {tab === "settings" && (
         <>
-          <Card className="flex max-w-[760px] flex-col gap-6 p-7">
-            <h2 className="text-[19px] font-semibold">Studio settings</h2>
-            <StudioSettingsForm studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} />
-          </Card>
-          <section className="flex max-w-[760px] flex-wrap items-center justify-between gap-4 rounded-xl border border-dashed border-accent-line px-7 py-6">
-            <span className="flex flex-col gap-1">
-              <span className="text-[17px] font-semibold">Delete this studio</span>
-              <span className="text-sm text-muted">Removes the studio, its invite link and every recording in it, including the files.</span>
+          <StudioSettingsForm studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} />
+          <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-accent-line bg-surface px-[18px] py-4">
+            <span className="flex flex-[1_1_260px] flex-col gap-[3px]">
+              <span className="font-medium">Delete this studio</span>
+              <span className="text-[13px] text-muted">Removes the studio, its invite link and every recording in it, including the files.</span>
             </span>
             <DeleteStudioButton studioId={studio.id} name={studio.name} recordings={recordings.length} />
           </section>
@@ -145,50 +138,55 @@ export function StudioView({
 
 function Stat({ label, value, sub, live, testId }: { label: string; value: string; sub: string; live?: boolean; testId?: string }) {
   return (
-    <div className="flex flex-col gap-2 rounded-[18px] bg-surface-2 p-[22px]">
-      <span className="text-sm text-muted">{label}</span>
+    <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-surface px-4 py-[18px] sm:px-5">
+      <span className="text-[13px] text-muted">{label}</span>
       <span
-        className={cn("text-[clamp(24px,2.4vw,32px)] font-medium tracking-[-.02em] whitespace-nowrap", live && "text-accent-strong")}
+        className={cn("text-[22px] font-medium tracking-[-.02em] whitespace-nowrap tabular-nums", live && "text-accent-strong")}
         data-testid={testId}
       >
         {value}
       </span>
-      <span className="text-[13px] text-subtle">{sub}</span>
+      <span className="text-[12.5px] text-muted">{sub}</span>
     </div>
   );
 }
 
-const BAR_COLORS = ["bg-accent", "bg-ink", "bg-muted", "bg-warn", "bg-ok"];
+const BAR_COLORS = ["bg-ink", "bg-muted", "bg-border-strong", "bg-accent", "bg-warn"];
 
 function SpaceUsed({ studios }: { studios: Array<{ id: string; name: string; bytes: number }> }) {
   const total = studios.reduce((n, s) => n + s.bytes, 0);
   return (
-    <Card className="flex flex-col gap-5 p-7">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-[19px] font-semibold">Space used by your studios</h2>
-        <span className="text-[15px] text-muted">{formatBytes(total)} in total</span>
+    <>
+      <div className="flex flex-col gap-2">
+        <span className="flex flex-wrap justify-between gap-2 text-[13px] text-muted">
+          <span>Space used by your studios</span>
+          <span>{formatBytes(total)} in total</span>
+        </span>
+        <div className="flex h-2 overflow-hidden rounded bg-surface-2" aria-hidden>
+          {studios.map((s, i) => (
+            <span key={s.id} className={BAR_COLORS[i % BAR_COLORS.length]} style={{ width: `${total ? (s.bytes / total) * 100 : 0}%` }} />
+          ))}
+        </div>
       </div>
-      <div className="flex h-3.5 overflow-hidden rounded-full bg-border" aria-hidden>
-        {studios.map((s, i) => (
-          <div key={s.id} className={BAR_COLORS[i % BAR_COLORS.length]} style={{ width: `${total ? (s.bytes / total) * 100 : 0}%` }} />
-        ))}
-      </div>
-      <ul className="flex flex-col">
-        {studios.map((s, i) => (
-          <li key={s.id} className="flex justify-between gap-3 border-b border-border py-3.5 text-[15px] last:border-0">
-            <span className="flex items-center gap-2.5">
-              <span className={cn("size-2.5 rounded-[3px]", BAR_COLORS[i % BAR_COLORS.length])} />
-              {s.name}
-            </span>
-            <span className="text-text-2">{formatBytes(s.bytes)}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="text-sm text-muted">
+      <ListCard>
+        <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">By studio</span>
+        <ul className="flex flex-col">
+          {studios.map((s, i) => (
+            <li key={s.id} className="flex justify-between gap-3 border-b border-divider py-3 last:border-0">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={cn("size-2 shrink-0 rounded-[2px]", BAR_COLORS[i % BAR_COLORS.length])} />
+                <span className="truncate">{s.name}</span>
+              </span>
+              <span className="whitespace-nowrap text-text-2 tabular-nums">{formatBytes(s.bytes)}</span>
+            </li>
+          ))}
+        </ul>
+      </ListCard>
+      <p className="text-[13px] text-muted">
         Tip: each person recorded in Full HD adds about 3.6 GB per hour (1.8 GB in Standard), plus the processed files.
         Deleting a recording frees its space right away.
       </p>
-    </Card>
+    </>
   );
 }
 
@@ -206,36 +204,51 @@ function useNow(ms: number | null) {
 /** What guests' tech checks found, newest first: "All good", or what to sort out before the session. */
 function TechChecks({ checks }: { checks: TechCheck[] }) {
   return (
-    <Card className="flex flex-col gap-3.5">
-      <h2 className="text-[19px] font-semibold">Tech checks</h2>
-      <ul className="flex flex-col divide-y divide-border">
-        {checks.map((c) => {
-          const issues = c.checks.filter((x) => x.tone !== "ok");
-          return (
-            <li key={c.id} className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0" data-testid="tech-check">
-              <span className="flex flex-wrap items-baseline justify-between gap-x-3 text-[15px]">
-                <span>
-                  <span className="font-medium">{c.name}</span>
-                  <span className="text-muted"> · {c.browser}</span>
+    <section className="flex flex-col gap-2.5">
+      <h2 className="font-medium">Tech checks</h2>
+      <ListCard>
+        <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,.8fr)_minmax(0,1.3fr)] gap-4 border-b border-border py-2.5 text-[13px] text-muted sm:grid">
+          <span>Guest</span>
+          <span>Checked</span>
+          <span>Result</span>
+        </div>
+        <ul className="flex flex-col">
+          {checks.map((c) => {
+            const issues = c.checks.filter((x) => x.tone !== "ok");
+            return (
+              <li
+                key={c.id}
+                className="grid grid-cols-1 items-center gap-x-4 gap-y-1.5 border-b border-divider py-3 last:border-0 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,.8fr)_minmax(0,1.3fr)]"
+                data-testid="tech-check"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <Avatar name={c.name} className="size-7 text-[11px]" />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate font-medium">{c.name}</span>
+                    <span className="truncate text-[13px] text-muted">{c.browser}</span>
+                  </span>
                 </span>
-                <span className="text-[13px] text-subtle">{timeAgo(c.checkedAt)}</span>
-              </span>
-              {issues.length === 0 ? (
-                <span className="text-sm text-ok-strong">✓ All good</span>
-              ) : (
-                <ul className="flex flex-col gap-1 text-sm">
-                  {issues.map((x) => (
-                    <li key={x.id} className={x.tone === "danger" ? "text-danger" : "text-warn-strong"}>
-                      ! {x.label}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
+                <span className="text-muted">{timeAgo(c.checkedAt)}</span>
+                {issues.length === 0 ? (
+                  <span className="flex items-center gap-[7px] whitespace-nowrap text-ok-strong">
+                    <Icon name="shield" /> All good
+                  </span>
+                ) : (
+                  <ul className="flex flex-col gap-1 text-[13.5px]">
+                    {issues.map((x) => (
+                      <li key={x.id} className={cn("flex items-start gap-[7px]", x.tone === "danger" ? "text-danger" : "text-warn-strong")}>
+                        <Icon name="alert" size={15} className="mt-0.5" />
+                        {x.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </ListCard>
+    </section>
   );
 }
 
