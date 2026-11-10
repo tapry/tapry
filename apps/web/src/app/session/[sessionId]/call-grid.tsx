@@ -1,10 +1,12 @@
 "use client";
 
+import type { TrackFilters } from "@tapry/shared";
 import type { RemoteAudioTrack, RemoteVideoTrack } from "livekit-client";
 import { useEffect, useRef, useState } from "react";
 import { Avatar as Initials, cn } from "@/components/ui";
 import type { RemotePeer } from "@/lib/client/call";
 import { Icon, ICON } from "./icons";
+import { SelfVideo } from "./self-video";
 
 export type Layout = "grid" | "speaker" | "side";
 
@@ -29,6 +31,8 @@ export function CallGrid({
   selfMicMuted,
   selfCameraOff,
   selfSpeaking,
+  selfFilters,
+  selfMirror,
   peers,
   recording,
   layout = "grid",
@@ -41,6 +45,9 @@ export function CallGrid({
   selfMicMuted: boolean;
   selfCameraOff: boolean;
   selfSpeaking: boolean;
+  /** Your own tile shows your picture filters, as the others get them, and your mirror choice. */
+  selfFilters?: TrackFilters;
+  selfMirror?: boolean;
   peers: RemotePeer[];
   recording: boolean;
   layout?: Layout;
@@ -94,7 +101,12 @@ export function CallGrid({
         testId="self-tile"
         {...tile(selfId)}
       >
-        {stream.getVideoTracks().length > 0 && !selfCameraOff ? <StreamVideo stream={stream} /> : <Avatar name={selfName} />}
+        {stream.getVideoTracks().length > 0 && !selfCameraOff ? (
+          // Your own view is mirrored, like a mirror (unless you turned that off); others see you unmirrored.
+          <SelfVideo stream={stream} filters={selfFilters} mirror={selfMirror} />
+        ) : (
+          <Avatar name={selfName} />
+        )}
       </Tile>
       {peers.map((p) => (
         <Tile
@@ -208,15 +220,6 @@ function Tile({
       )}
     </div>
   );
-}
-
-function StreamVideo({ stream }: { stream: MediaStream }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.srcObject = stream;
-  }, [stream]);
-  // Your own view is mirrored, like a mirror; others see you unmirrored.
-  return <video ref={ref} autoPlay playsInline muted className="size-full -scale-x-100 object-cover" />;
 }
 
 function TrackVideo({ track }: { track: RemoteVideoTrack }) {

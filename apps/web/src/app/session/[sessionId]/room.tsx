@@ -4,18 +4,20 @@ import type { UploadProgress } from "@tapry/recorder";
 import { STALE_REPORT_MS, type OwnRecordings, type RecapStatus, type SessionState, type SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
 import { OwnFiles } from "@/components/own-files";
-import { Avatar, Button, cn, Mark, Notice, StatusDot } from "@/components/ui";
+import { Avatar, Button, cn, LogoMark, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { mb } from "@/lib/format";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
+import { createFilterSync, onTrackRegistered, useFilterPrefs, type FilterSync } from "@/lib/client/filters";
 import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid, type Layout } from "./call-grid";
+import { FiltersPanel, filtersOn, useFiltersPanel } from "./filters-panel";
 import { eqAnimation, Icon, ICON } from "./icons";
 import { RecapEmail } from "./recap-email";
 import { followSession, type ConnectionStatus } from "@/lib/client/session-events";
-import type { ReadyToJoin } from "./green-room";
+import { FilterDot, type ReadyToJoin } from "./green-room";
 
 /**
  * The room after the green room: live session state, host controls, and this
@@ -35,8 +37,30 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const ended = state?.session.status === "ended";
-  const call = useCall(ticket, ready.stream, !ended);
+  // Filters are for the call's copies, this person's own tile and the finished files. The stream
+  // from the green room goes to the recorder as it is.
+  const [prefs, setPrefs] = useFilterPrefs();
+  const call = useCall(ticket, ready.stream, !ended, prefs.filters);
   const hasCamera = ready.stream.getVideoTracks().length > 0;
+  const filtersPanel = useFiltersPanel(true);
+
+  // A change of filters during the session goes to the server a moment later (new tracks carry
+  // theirs when they start). Never waited for; a failed send goes again with the next change.
+  const filterSync = useRef<FilterSync | null>(null);
+  useEffect(() => {
+    const sync = createFilterSync(ticket, prefs.filters);
+    filterSync.current = sync;
+    // A track that reached the server late missed any change made before it: send the choice again.
+    const off = onTrackRegistered((sessionId, filters) => sessionId === ticket.sessionId && sync.registered(filters));
+    return () => {
+      off();
+      sync.stop();
+    };
+    // Only where it starts from: later changes come through the effect below.
+  }, [ticket]);
+  useEffect(() => {
+    if (!ended) filterSync.current?.set(prefs.filters);
+  }, [prefs.filters, ended]);
 
   useEffect(() => followSession(ticket.sessionId, ticket.token, setState, setConnection), [ticket]);
 
@@ -312,6 +336,20 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           <Icon d={cameraOff ? ICON.camOff : ICON.cam} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
         </StageButton>
       )}
+      <StageButton
+        ref={filtersPanel.button}
+        size={size}
+        active={false}
+        className={cn("relative", filtersPanel.open && "ring-2 ring-white/50")}
+        aria-expanded={filtersPanel.open}
+        aria-controls="room-filters"
+        aria-label={filtersOn(prefs.filters, hasCamera && !cameraOff) ? "Filters (on)" : "Filters"}
+        title="Filters"
+        onClick={filtersPanel.toggle}
+      >
+        <Icon d={ICON.sliders} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
+        {filtersOn(prefs.filters, hasCamera && !cameraOff) && <FilterDot />}
+      </StageButton>
       {/* The layouts only differ once someone else is in the call. On a phone the full-screen bar keeps to one row. */}
       {call.peers.length > 0 && (
         <span className={cn("flex items-center gap-1.5", fullOpen && "gap-2 max-sm:hidden")}>
@@ -346,9 +384,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     <div className="flex min-h-dvh flex-col">
       <header inert={fullOpen} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-[clamp(14px,3vw,28px)] py-3">
         <span className="flex min-w-0 flex-wrap items-center gap-3">
-          <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
-            <Mark className="size-[15px]" />
-          </span>
+          <LogoMark className="size-[26px]" />
           <span className="truncate text-[15px] font-medium">{ticket.studio.name}</span>
           <RecPill clock={clock} />
         </span>
@@ -403,9 +439,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                 {fullOpen && (
                   <div className="flex shrink-0 items-center justify-between gap-4 px-[18px] py-3.5">
                     <span className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-[26px] shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
-                        <Mark className="size-[15px]" />
-                      </span>
+                      <LogoMark className="size-[26px]" />
                       <span className="truncate text-[15px] font-medium">{ticket.studio.name}</span>
                     </span>
                     <span className="flex items-center gap-2.5">
@@ -461,6 +495,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     selfMicMuted={micMuted}
                     selfCameraOff={cameraOff}
                     selfSpeaking={call.localSpeaking}
+                    selfFilters={prefs.filters}
+                    selfMirror={prefs.mirror}
                     peers={call.peers}
                     recording={!!recording}
                     layout={layout}
@@ -509,6 +545,22 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                       </button>
                     </span>
                   </div>
+                )}
+                {/* Inside the stage, so it works in full screen too (everything outside is inert there). */}
+                {filtersPanel.open && (
+                  <FiltersPanel
+                    id="room-filters"
+                    panelRef={filtersPanel.panel}
+                    prefs={prefs}
+                    onChange={setPrefs}
+                    hasCamera={hasCamera && !cameraOff}
+                    tone="stage"
+                    onClose={filtersPanel.close}
+                    className={cn(
+                      "absolute z-10 w-[min(330px,calc(100%-24px))] animate-fade-up overflow-auto",
+                      fullOpen ? "right-[18px] bottom-[92px] max-h-[calc(100%-104px)]" : "right-3 bottom-[62px] max-h-[calc(100%-74px)]",
+                    )}
+                  />
                 )}
               </section>
 
@@ -761,10 +813,12 @@ function StageButton({
   size,
   active,
   className,
+  ref,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { size: "md" | "lg"; active: boolean }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { size: "md" | "lg"; active: boolean; ref?: React.Ref<HTMLButtonElement> }) {
   return (
     <button
+      ref={ref}
       type="button"
       className={cn(
         "grid cursor-pointer place-items-center rounded-full transition-colors",

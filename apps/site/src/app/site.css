@@ -186,7 +186,8 @@ select {
   color: #fff;
   transition: background 0.35s, color 0.35s, border-color 0.35s;
 }
-.site-nav-overlay .nav-brand svg { color: inherit; }
+/* Over the hero the logo is reversed: a white tile with terracotta tracks. */
+.site-nav-overlay { --logo-tile: #fff; --logo-track: #c43c25; }
 .site-nav-overlay a:hover { color: inherit; opacity: 0.8; }
 .site-nav-overlay .nav-cta { background: rgba(255, 255, 255, 0.2); }
 .site-nav-overlay .nav-cta:hover { background: rgba(255, 255, 255, 0.3); opacity: 1; }
@@ -200,8 +201,8 @@ select {
   color: #0b0b0f;
 }
 .site-nav-overlay[data-open] { background: #fff; }
-.site-nav-overlay[data-scrolled] .nav-brand svg,
-.site-nav-overlay[data-open] .nav-brand svg { color: #e8553d; }
+.site-nav-overlay[data-scrolled],
+.site-nav-overlay[data-open] { --logo-tile: #e8553d; --logo-track: #fff; }
 .site-nav-overlay[data-scrolled] a:hover,
 .site-nav-overlay[data-open] a:hover { color: #c43c25; opacity: 1; }
 .site-nav-overlay[data-scrolled] .nav-cta,

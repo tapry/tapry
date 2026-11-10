@@ -1,7 +1,7 @@
 // The guest screens' frame (the "Tapry Guest" design): a framed card on the terracotta backdrop,
 // with the studio's name and the step chips in its header. No hooks: used by server and client pages.
 import type { ReactNode } from "react";
-import { cn, Mark } from "@/components/ui";
+import { cn, LogoMark } from "@/components/ui";
 
 export function GuestShell({ title, right, children }: { title: ReactNode; right?: ReactNode; children: ReactNode }) {
   return (
@@ -9,9 +9,7 @@ export function GuestShell({ title, right, children }: { title: ReactNode; right
       <main className="ember-card flex w-full max-w-[920px] flex-col overflow-hidden rounded-[19px] bg-canvas text-text">
         <div className="flex items-center justify-between gap-3 border-b border-border px-[22px] py-3.5">
           <span className="flex min-w-0 items-center gap-[9px] text-[15px] font-medium">
-            <span className="grid size-6 shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
-              <Mark className="size-3.5" />
-            </span>
+            <LogoMark className="size-6" />
             <span className="truncate">{title}</span>
           </span>
           {right}

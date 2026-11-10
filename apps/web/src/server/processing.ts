@@ -45,6 +45,12 @@ export interface RecordingSummary {
   bytes: number;
   /** The original uploads were removed after the retention period; only the processed files remain. */
   rawDeleted: boolean;
+  /** Someone in it chose filters (look, touch-up, noise removal), so the files can be made with or without. */
+  hasFilters: boolean;
+  /** Whether processing applies people's filters (default), or leaves the files as recorded. */
+  applyFilters: boolean;
+  /** Files of the last run that are as recorded because that person's filters couldn't be applied. */
+  filtersFailed: Array<{ name: string; kind: "audio" | "video" }>;
   /** Everyone who recorded in it, host first, with how far their upload got. */
   people: Array<{
     participantId: string;
@@ -130,13 +136,21 @@ export class ProcessingService {
   }
 
   /** Host presses "Process now": go ahead without the tracks that never finished uploading. */
-  async processNow(owner: User, studioId: string, recordingId: string) {
+  async processNow(owner: User, studioId: string, recordingId: string, opts: { filters?: boolean } = {}) {
     const rec = await this.ownedRecording(owner, studioId, recordingId);
     if (rec.status !== "stopped") throw new ApiError(409, "still_recording", "Stop the recording first");
     if (rec.raw_deleted_at) {
       throw new ApiError(409, "originals_removed", "The original uploads were removed after the retention period, so this recording can't be processed again");
     }
-    await this.enqueue(recordingId);
+    if (opts.filters !== undefined) {
+      const [changed] = await this.db.query<{ session_id: string }>(
+        "UPDATE recordings SET apply_filters = $2 WHERE id = $1 AND apply_filters <> $2 RETURNING session_id",
+        [recordingId, opts.filters],
+      );
+      if (changed) this.onChange(changed.session_id);
+    }
+    // A run already under way read the old choice when it started, so it goes again after.
+    await this.enqueue(recordingId, { rerunIfRunning: opts.filters !== undefined });
   }
 
   /**
@@ -190,11 +204,15 @@ export class ProcessingService {
       tracks: number;
       incomplete: number;
       bytes: number;
+      apply_filters: boolean;
+      has_filters: boolean;
+      filters_failed: RecordingSummary["filtersFailed"];
     }>(
       `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
+              r.apply_filters, r.filters_failed, EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.filters IS NOT NULL) AS has_filters,
               ${RECORDING_BYTES} AS bytes
        FROM recordings r
        JOIN sessions s ON s.id = r.session_id
@@ -217,7 +235,7 @@ export class ProcessingService {
       `SELECT o.id, o.recording_id, o.kind, o.file_name, o.bytes, o.duration_ms
        FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
        WHERE o.recording_id = ANY($1::text[])
-       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, o.file_name`,
+       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, ${ORIGINAL_LAST}, o.file_name`,
       [rows.map((r) => r.id)],
     );
     const people = await this.db.query<{
@@ -245,6 +263,9 @@ export class ProcessingService {
       studioName: r.studio_name,
       number: r.number ?? 0,
       rawDeleted: r.raw_deleted_at !== null,
+      hasFilters: r.has_filters,
+      applyFilters: r.apply_filters,
+      filtersFailed: r.filters_failed,
       people: people
         .filter((p) => p.recording_id === r.id)
         .map((p) => ({
@@ -338,7 +359,7 @@ export class ProcessingService {
       `SELECT o.file_name, o.bytes, o.storage_key, o.created_at
        FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
        WHERE o.recording_id = $1
-       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, o.file_name`,
+       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, ${ORIGINAL_LAST}, o.file_name`,
       [recordingId],
     );
     const started = new Date(rec.started_at).toISOString(); // 2026-10-30T19:59:…Z
@@ -385,7 +406,7 @@ export class ProcessingService {
           ? []
           : await this.db.query<{ kind: "audio" | "video"; file_name: string; content_type: string; storage_key: string; bytes: string }>(
               `SELECT kind, file_name, content_type, storage_key, bytes FROM outputs
-               WHERE recording_id = $1 AND participant_id = $2 AND kind IN ('audio', 'video') ORDER BY kind`,
+               WHERE recording_id = $1 AND participant_id = $2 AND kind IN ('audio', 'video') ORDER BY kind, ${ORIGINAL_LAST.replace("o.", "")}`,
               [r.id, p.id],
             );
       out.push({
@@ -417,6 +438,9 @@ export class ProcessingService {
 }
 
 const ms = (d: Date | null) => (d ? new Date(d).getTime() : null);
+
+/** ORDER BY term (outputs as o): a person's sound before noise removal ("… - audio (original).wav") after their cleaned file. */
+const ORIGINAL_LAST = "(o.file_name LIKE '% - audio (original).%')";
 
 /** Bytes a recording (alias r) takes in storage: its uploaded chunks plus its processed files. */
 export const RECORDING_BYTES = `(

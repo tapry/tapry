@@ -25,7 +25,7 @@ export const IC = {
   plus: "M5 12h14M12 5v14",
   copy: "M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2zM4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2",
   link: "M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6l-1 1M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6l1-1",
-  logo: "M12 3v18M5 8l7 4l7-4M5 16l7-4l7 4",
+  logo: "M8 9v4M12 9v7.5M16 9v15M20 9v7.5M24 9v4",
 };
 
 export function Icon({
@@ -48,11 +48,16 @@ export function Icon({
   );
 }
 
-/** The Tapry mark. */
-export function LogoMark({ size = 22, color = "currentColor" }: { size?: number; color?: string }) {
+/**
+ * The Tapry mark, "hanging tracks": white tracks on the terracotta tile. `reversed` is for
+ * terracotta backgrounds: a white tile with dark terracotta tracks. Colours come from
+ * --logo-tile / --logo-track when a parent sets them (the landing nav switches as it scrolls).
+ */
+export function LogoMark({ size = 22, reversed = false }: { size?: number; reversed?: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={2.6} strokeLinecap="round">
-      <path d={IC.logo} />
+    <svg aria-hidden="true" className="logo-mark" viewBox="0 0 32 32" width={size} height={size} style={{ flexShrink: 0 }}>
+      <rect width="32" height="32" rx="8" fill={`var(--logo-tile, ${reversed ? "#fff" : "#e8553d"})`} />
+      <path d={IC.logo} fill="none" stroke={`var(--logo-track, ${reversed ? "#c43c25" : "#fff"})`} strokeWidth={size <= 16 ? 3 : 2.6} strokeLinecap="round" />
     </svg>
   );
 }

@@ -1,7 +1,8 @@
 import { createReadStream, createWriteStream } from "node:fs";
-import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
+import { BRIGHTNESS_VALUES, LOOK_VALUES, type TrackFilters } from "@tapry/shared";
 import { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";
 
 export interface TrackInput {
@@ -15,6 +16,11 @@ export interface TrackInput {
   offsetMs: number;
   /** A chunk is missing from the middle: time the sound by its timestamps, so what follows stays in place. */
   hasGaps?: boolean;
+  /**
+   * What the person chose for how they look and sound. The upload is untouched: these are
+   * applied here, to their files. Left out: the files are as recorded.
+   */
+  filters?: TrackFilters;
 }
 
 /** A track or file left out because ffmpeg couldn't read or render it. */
@@ -26,9 +32,18 @@ export interface SkippedTrack {
   reason: string;
 }
 
+/** A person's file that came out as recorded, because ffmpeg couldn't run their filters on it. */
+export interface FilterFailure {
+  participantId: string;
+  name: string;
+  kind: "audio" | "video";
+}
+
 export interface PipelineOptions {
   /** A track was left out and the rest rendered without it. */
   onSkipped?: (skipped: SkippedTrack) => void;
+  /** A person's filters couldn't be applied to one of their files, which is as recorded instead. Once per file. */
+  onFilterFailed?: (failed: FilterFailure) => void;
   ffmpeg: string;
   ffprobe: string;
   /** Scratch folder for outputs; the caller uploads and deletes it. */
@@ -77,6 +92,8 @@ export interface OutputFile {
   durationMs: number | null;
   /** Gain applied to level the audio (dB), when loudness levelling is on and the file has sound. */
   gainDb?: number;
+  /** The person's sound before noise removal ("Sam - audio (original).wav"), kept next to the cleaned file. */
+  original?: boolean;
 }
 
 const FPS = 30;
@@ -141,6 +158,173 @@ export function alignmentFilters(
   ]
     .filter(Boolean)
     .join(",");
+}
+
+/** ffmpeg prints numbers its own way; ours are short and exact ("1.08", never "1.0799999"). */
+const num = (n: number) => String(Math.round(n * 1000) / 1000);
+
+/**
+ * The picture filters a person chose, as an ffmpeg filter chain; "" when there are none, so a
+ * track without filters is rendered with exactly the command it always was. The numbers come
+ * from the shared tables the live preview uses too.
+ * - brightness and look: eq (light, contrast, gamma, saturation; black and white is saturation 0);
+ * - warm / cool: colortemperature (not for black and white);
+ * - touch-up: a bilateral filter on the luma, which smooths skin and keeps edges.
+ * All three exist in ffmpeg 5.1 (Debian bookworm, the Docker image) and later.
+ */
+export function videoLookFilters(filters: TrackFilters | undefined): string {
+  if (!filters) return "";
+  const light = BRIGHTNESS_VALUES[filters.brightness];
+  const look = LOOK_VALUES[filters.look];
+  const chain: string[] = [];
+  if (light.brightness !== 0 || light.contrast !== 1 || light.gamma !== 1 || look.saturation !== 1) {
+    chain.push(`eq=brightness=${num(light.brightness)}:contrast=${num(light.contrast)}:gamma=${num(light.gamma)}:saturation=${num(look.saturation)}`);
+  }
+  if (look.saturation !== 0 && look.temperature !== 6500) chain.push(`colortemperature=temperature=${num(look.temperature)}`);
+  if (filters.touchUp) chain.push(TOUCH_UP);
+  return chain.join(",");
+}
+
+/** Touch-up: small sigmas, luma only, so skin evens out while eyes, hair and edges stay sharp. */
+const TOUCH_UP = "bilateral=sigmaS=3:sigmaR=0.05:planes=1";
+
+/** What was measured for noise removal: the track's own noise floor, and how much this ffmpeg's filter delays sound. */
+export interface NoiseMeasurement {
+  /** RMS of the quietest stretches (dBFS); null or left out: not known, a usual room is assumed. */
+  noiseFloorDb?: number | null;
+  /** Samples (48 kHz) the filter holds sound back by; taken off again so nothing moves. */
+  delaySamples?: number;
+}
+
+/** Most the noise is turned down (dB): enough to take a fan or hiss out of the way, never the voice with it. */
+const NOISE_REDUCTION_DB = 12;
+/**
+ * afftdn's noise floor setting, from the measured one. It expects the level of the noise it
+ * should treat as noise; measured on white, pink and low rumbling noise, 20 dB over the RMS of
+ * the quiet stretches takes 9 to 12 dB off each, while a tone 10 dB above the noise loses under 1 dB.
+ * Capped, so a track with no quiet stretch (someone talking throughout) isn't treated as noise.
+ */
+const NOISE_FLOOR_MARGIN_DB = 20;
+const NOISE_FLOOR_MAX_DB = -25;
+const NOISE_FLOOR_DEFAULT_DB = -50;
+const DENOISE = "afftdn";
+
+/**
+ * Noise removal as an ffmpeg filter chain; "" when it's off. afftdn takes steady noise (fans,
+ * hiss) out by its spectrum. Its noise floor comes from the track itself (`measureNoiseFloor`):
+ * the filter's own tracking barely acts on real rooms. Some ffmpeg versions delay the sound by
+ * a few ms in this filter (6.0: 25 ms), so that is measured (`filterDelaySamples`) and taken off.
+ */
+export function audioCleanFilters(filters: TrackFilters | undefined, measured: NoiseMeasurement = {}): string {
+  if (!filters?.noiseRemoval) return "";
+  const floor = measured.noiseFloorDb;
+  const nf = floor === null || floor === undefined
+    ? NOISE_FLOOR_DEFAULT_DB
+    : Math.max(-80, Math.min(NOISE_FLOOR_MAX_DB, Math.round(floor + NOISE_FLOOR_MARGIN_DB)));
+  const delay = Math.max(0, Math.round(measured.delaySamples ?? 0));
+  return [
+    // Room at the end for what the delay would otherwise push out.
+    delay ? `apad=pad_len=${delay}` : "",
+    `${DENOISE}=nr=${NOISE_REDUCTION_DB}:nf=${nf}`,
+    delay ? `atrim=start_sample=${delay},asetpts=N/SR/TB` : "",
+  ]
+    .filter(Boolean)
+    .join(",");
+}
+
+/**
+ * The noise floor of one of our WAVs (16-bit mono): the RMS of its quietest tenth of 100 ms
+ * windows, in dBFS. Digital silence (padding before a late start, a muted mic) doesn't count.
+ * null when there is nothing to measure.
+ */
+export async function measureNoiseFloor(wavPath: string): Promise<number | null> {
+  const WINDOW = 4800;
+  const levels: number[] = [];
+  let header = Buffer.alloc(0);
+  let dataLeft = -1; // bytes of the data chunk still to read; -1 until its header is found
+  let carry: Buffer | null = null;
+  let sum = 0;
+  let count = 0;
+  for await (const piece of createReadStream(wavPath, { highWaterMark: 1 << 20 }) as AsyncIterable<Buffer>) {
+    let buf = piece;
+    if (dataLeft < 0) {
+      // Walk the RIFF chunks to "data" (ffmpeg writes a LIST chunk first).
+      header = Buffer.concat([header, piece]);
+      if (header.length < 12 || header.subarray(0, 4).toString("latin1") !== "RIFF") {
+        if (header.length >= 12) return null;
+        continue;
+      }
+      let at = 12;
+      while (at + 8 <= header.length && header.subarray(at, at + 4).toString("latin1") !== "data") at += 8 + header.readUInt32LE(at + 4);
+      if (at + 8 > header.length) {
+        if (header.length > 1 << 22) return null;
+        continue;
+      }
+      dataLeft = header.readUInt32LE(at + 4);
+      buf = header.subarray(at + 8);
+    }
+    if (carry) {
+      buf = Buffer.concat([carry, buf]);
+      carry = null;
+    }
+    if (buf.length > dataLeft) buf = buf.subarray(0, dataLeft);
+    dataLeft -= buf.length - (buf.length % 2);
+    if (buf.length % 2) carry = buf.subarray(buf.length - 1);
+    for (let i = 0; i + 1 < buf.length; i += 2) {
+      const x = buf.readInt16LE(i);
+      sum += x * x;
+      if (++count === WINDOW) {
+        const rms = Math.sqrt(sum / WINDOW);
+        if (rms >= 1) levels.push(rms); // under one step of 16 bits: nothing was recorded there
+        sum = 0;
+        count = 0;
+      }
+    }
+    if (dataLeft <= 0) break;
+  }
+  if (levels.length === 0) return null;
+  levels.sort((a, b) => a - b);
+  const quiet = levels[Math.floor(levels.length * 0.1)]!;
+  return Math.round(200 * Math.log10(quiet / 32768)) / 10;
+}
+
+const filterDelays = new Map<string, Promise<number>>();
+
+/**
+ * How many samples (48 kHz) this ffmpeg's `filter` holds sound back by: a tone that starts at
+ * 0.5 s goes through it, and where it starts in the output is compared with the input.
+ * Measured once per ffmpeg and filter, since it depends on the version, not the recording.
+ */
+export function filterDelaySamples(ffmpeg: string, filter: string, workDir: string, timeoutMs?: number): Promise<number> {
+  const key = `${ffmpeg}\u0000${filter}`;
+  let known = filterDelays.get(key);
+  if (!known) {
+    known = (async () => {
+      const ref = join(workDir, "delay-ref.raw");
+      const out = join(workDir, "delay-out.raw");
+      try {
+        await run(
+          ffmpeg,
+          ["-y", "-hide_banner", "-nostdin", "-f", "lavfi", "-i", "aevalsrc='if(gte(t,0.5),0.5*sin(2*PI*1000*t),0)':s=48000:d=1",
+            "-filter_complex", `[0:a]asplit[r][x];[x]${filter}[c]`,
+            "-map", "[r]", "-c:a", "pcm_s16le", "-f", "s16le", ref, "-map", "[c]", "-c:a", "pcm_s16le", "-f", "s16le", out],
+          { timeoutMs },
+        );
+        const onset = async (path: string) => {
+          const buf = await readFile(path);
+          for (let i = 0; i + 1 < buf.length; i += 2) if (Math.abs(buf.readInt16LE(i)) > 8192) return i / 2;
+          return -1;
+        };
+        const [before, after] = [await onset(ref), await onset(out)];
+        return before < 0 || after < before ? 0 : after - before;
+      } finally {
+        await Promise.all([rm(ref, { force: true }), rm(out, { force: true })]);
+      }
+    })();
+    filterDelays.set(key, known);
+    known.catch(() => filterDelays.delete(key));
+  }
+  return known;
 }
 
 /**
@@ -210,8 +394,18 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   // Each person's gain comes from their WAV and also applies to the sound in their video,
   // so audio files are rendered first; outputs keep the tracks' order.
   const gains = new Map<string, number>();
+  // Likewise the noise floor measured on a person's WAV serves the sound in their video (the same microphone).
+  const floors = new Map<string, number | null>();
+  const unfiltered = new Set<string>();
+  const filterFailed = (t: TrackInput) => {
+    const key = `${t.participantId}\u0000${t.kind}`;
+    if (unfiltered.has(key)) return;
+    unfiltered.add(key);
+    opts.onFilterFailed?.({ participantId: t.participantId, name: t.participantName, kind: t.kind });
+  };
+  const ctx = { opts, duration, timeoutMs, filterFailed };
   const groups = groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`);
-  const byGroup = new Map<TrackInput[], OutputFile>();
+  const byGroup = new Map<TrackInput[], OutputFile[]>();
   let firstFailure: FfmpegError | undefined;
   const skip = (t: TrackInput, err: FfmpegError) => {
     firstFailure ??= err;
@@ -231,13 +425,13 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     let hasAudio: boolean;
     try {
       if (pieces.length === 1) {
-        hasAudio = await renderPiece(first, path, { opts, duration, timeoutMs, multi: false, gainDb });
+        hasAudio = await renderPiece(first, path, { ...ctx, multi: false, gainDb, noiseFloorDb: floors.get(first.participantId) });
       } else {
         const parts: Array<{ path: string; hasAudio: boolean }> = [];
         for (const piece of pieces) {
           const partPath = join(opts.workDir, `${piece.trackId}.part.${ext}`);
           try {
-            parts.push({ path: partPath, hasAudio: await renderPiece(piece, partPath, { opts, duration, timeoutMs, multi: true }) });
+            parts.push({ path: partPath, hasAudio: await renderPiece(piece, partPath, { ...ctx, multi: true, noiseFloorDb: floors.get(first.participantId) }) });
           } catch (err) {
             if (!(err instanceof FfmpegError)) throw err;
             skip(piece, err);
@@ -261,13 +455,38 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
       contentType: first.kind === "audio" ? "audio/wav" : "video/mp4",
       durationMs: await probeDurationMs(opts.ffprobe, path),
     };
+    const files = [output];
+    // Noise removal comes before levelling, so the gain is worked out on the cleaned sound.
+    // The aligned sound as recorded stays, as a second file, exactly as it would be without filters.
+    const cleaned = first.kind === "audio" ? pieces.find((p) => p.filters?.noiseRemoval)?.filters : undefined;
+    if (cleaned) {
+      const originalPath = join(opts.workDir, `${first.trackId}.original.wav`);
+      await rename(path, originalPath);
+      try {
+        const noiseFloorDb = await measureNoiseFloor(originalPath);
+        floors.set(first.participantId, noiseFloorDb);
+        const clean = audioCleanFilters(cleaned, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
+        await run(
+          opts.ffmpeg,
+          ["-y", "-hide_banner", "-nostdin", "-i", originalPath, "-af", `${clean},apad`, "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", path],
+          { timeoutMs },
+        );
+        files.push({ ...output, path: originalPath, fileName: `${base} - audio (original).wav`, original: true });
+        output.durationMs = await probeDurationMs(opts.ffprobe, path);
+      } catch (err) {
+        if (!(err instanceof FfmpegError)) throw err;
+        // A filter must never cost someone their file: it stays as recorded, and the host is told.
+        await rename(originalPath, path);
+        filterFailed(first);
+      }
+    }
     if (opts.loudness && first.kind === "audio") {
       output.gainDb = await levelWav(path, opts.loudness, { opts, duration, timeoutMs });
       gains.set(first.participantId, output.gainDb);
     } else if (gainDb !== undefined && hasAudio) {
       output.gainDb = gainDb;
     }
-    byGroup.set(pieces, output);
+    byGroup.set(pieces, files);
   }
   const outputs = groups.flatMap((g) => byGroup.get(g) ?? []);
   // Nothing readable at all: more likely the machine than the media, so the job fails and retries.
@@ -310,7 +529,14 @@ interface RenderContext {
   timeoutMs: number;
   /** Volume change for the sound (a person's levelling gain, applied to their video). */
   gainDb?: number;
+  /** The person's noise floor, measured on their WAV, for noise removal on their video's sound. */
+  noiseFloorDb?: number | null;
+  /** This track's file is as recorded, because its filters couldn't be run. */
+  filterFailed?: (track: TrackInput) => void;
 }
+
+/** How far this ffmpeg's noise removal delays sound (measured once). */
+const denoiseDelay = ({ opts, timeoutMs }: RenderContext) => filterDelaySamples(opts.ffmpeg, `${DENOISE}=nr=${NOISE_REDUCTION_DB}:nf=${NOISE_FLOOR_DEFAULT_DB}`, opts.workDir, timeoutMs);
 
 /** Measure a rendered WAV and rewrite it at the target loudness. Returns the gain applied. */
 async function levelWav(path: string, target: LoudnessTarget, { opts, duration, timeoutMs }: RenderContext) {
@@ -332,7 +558,8 @@ async function levelWav(path: string, target: LoudnessTarget, { opts, duration, 
  * `multi`: it's one piece of several for the same person, so pad with black rather than
  * freezing the last frame, and use a fixed 16:9 frame so the pieces can be merged.
  */
-async function renderPiece(track: TrackInput, path: string, { opts, duration, timeoutMs, multi, gainDb }: RenderContext & { multi: boolean }) {
+async function renderPiece(track: TrackInput, path: string, ctx: RenderContext & { multi: boolean }): Promise<boolean> {
+  const { opts, duration, timeoutMs, multi, gainDb } = ctx;
   if (track.kind === "audio") {
     await run(
       opts.ffmpeg,
@@ -343,20 +570,53 @@ async function renderPiece(track: TrackInput, path: string, { opts, duration, ti
     return true;
   }
   const hasAudio = (await probeStreams(opts.ffprobe, track.rawPath, RAW_FORMATS)).includes("audio");
+  // The look goes on the camera's own frames, before alignment: the black that fills a late
+  // start or the gap between pieces has to stay black (brightness would turn it grey, and
+  // merging pieces relies on it). Noise removal: on the aligned sound, like the person's WAV.
+  const look = videoLookFilters(track.filters);
   const h = opts.videoHeight;
   const frame = multi
     ? `scale=${even((h * 16) / 9)}:${h}:force_original_aspect_ratio=decrease,pad=${even((h * 16) / 9)}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`
     : `scale=-2:${h}`;
-  await run(
-    opts.ffmpeg,
-    [...INPUT_FLAGS, "-i", track.rawPath,
-      "-vf", `${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
-      ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps), volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
-      // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
-      "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(opts.videoHeight)), "-r", String(FPS),
-      ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
-    { timeoutMs },
-  );
+  try {
+    let clean = "";
+    if (hasAudio && track.filters?.noiseRemoval) {
+      let noiseFloorDb = ctx.noiseFloorDb;
+      if (noiseFloorDb === undefined) {
+        // No WAV of theirs to go by (the camera track carries the only sound): measure this track's.
+        const sound = `${path}.sound.wav`;
+        try {
+          await run(
+            opts.ffmpeg,
+            [...INPUT_FLAGS, "-i", track.rawPath, "-vn", "-af", alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps),
+              "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", sound],
+            { timeoutMs },
+          );
+          noiseFloorDb = await measureNoiseFloor(sound);
+        } finally {
+          await rm(sound, { force: true });
+        }
+      }
+      clean = audioCleanFilters(track.filters, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
+    }
+    await run(
+      opts.ffmpeg,
+      [...INPUT_FLAGS, "-i", track.rawPath,
+        "-vf", `${look ? `${look},` : ""}${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
+        ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps), clean, volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
+        // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
+        "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(opts.videoHeight)), "-r", String(FPS),
+        ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
+      { timeoutMs },
+    );
+  } catch (err) {
+    // A filter this ffmpeg can't run must never cost someone their file: render it as recorded.
+    if (!(err instanceof FfmpegError) || !(look || track.filters?.noiseRemoval)) throw err;
+    const rendered = await renderPiece({ ...track, filters: undefined }, path, ctx);
+    // Only now: had it failed again, the track is unreadable (skipped), not the filters.
+    ctx.filterFailed?.(track);
+    return rendered;
+  }
   return hasAudio;
 }
 
@@ -484,7 +744,7 @@ async function renderCombined(
   for (const [i, pid] of participants.entries()) {
     const tile = tiles[i]!;
     const video = rendered.find((o) => o.participantId === pid && o.kind === "video");
-    const audio = rendered.find((o) => o.participantId === pid && o.kind === "audio");
+    const audio = rendered.find((o) => o.participantId === pid && o.kind === "audio" && !o.original);
     const name = tracks.find((t) => t.participantId === pid)!.participantName;
     // Name tag like in the room: bottom-left on a camera, centred on an audio-only tile.
     const label = font ? await nameLabel(font, name, tile, !video, join(opts.workDir, `label-${i}.txt`)) : "";
@@ -552,7 +812,7 @@ async function renderCombined(
 
 /** Nobody had video (an audio-only show, or everyone's camera off): everyone's voices mixed into one WAV. */
 async function renderMix(rendered: OutputFile[], opts: PipelineOptions, timeoutMs: number): Promise<OutputFile | null> {
-  const voices = rendered.filter((o) => o.kind === "audio").map((o) => o.path);
+  const voices = rendered.filter((o) => o.kind === "audio" && !o.original).map((o) => o.path);
   if (voices.length === 0) return null;
   const duration = sec(opts.durationMs);
   const inputs = voices.flatMap((p) => ["-i", p]);

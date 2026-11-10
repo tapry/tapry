@@ -5,6 +5,17 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Filters.** Each person can brighten their picture, pick a look (warm, cool, black & white),
+  add a light touch-up and take steady noise out of their microphone, from a Filters button in
+  the green room and the room. The recording itself stays untouched: filters show live in the
+  call and are applied to the finished files, where the host can also process a recording again
+  without them. With noise removal, the untouched sound is kept as a second file ("… (original)").
+  A filter applies to a person's whole file, whenever it was switched on. "Mirror my view" only
+  flips your own preview. If a filter can't be applied, the file is kept as recorded and the
+  host is told. Database: `tracks.filters`, `recordings.apply_filters`, `recordings.filters_failed`
+  (added automatically on start).
+- **New logo**, "hanging tracks": separate tracks hanging from one line.
+
 - **New design.** The app and the website follow one design: grey neutrals, a terracotta accent
   and Geist type (still served from your own server), in light and dark. Sign-in, the dashboard
   with its folding sidebar, the studio page, the guest invite and green room, the recording room

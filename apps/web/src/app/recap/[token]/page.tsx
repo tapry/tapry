@@ -23,7 +23,7 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
     <EmberPage>
       <main className="w-full max-w-[560px]">
         <EmberCard className="flex animate-fade-up flex-col gap-[22px] p-[clamp(22px,5vw,36px)]">
-          <Logo className="text-[15px]" tile="size-6 rounded-[7px]" />
+          <Logo className="text-[15px]" mark="size-6" />
           {found ? (
             <>
               <div className="flex flex-col gap-1.5">

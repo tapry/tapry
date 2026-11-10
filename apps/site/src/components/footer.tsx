@@ -34,7 +34,7 @@ export function Footer({ landing = false }: { landing?: boolean }) {
         }}
       >
         <a href={landing ? "#top" : "/"} className="foot-link" style={{ display: "flex", alignItems: "center", gap: 9, alignSelf: "start", fontSize: 19, fontWeight: 600, letterSpacing: "-.03em", color: "#fff" }}>
-          <LogoMark size={20} />
+          <LogoMark size={22} reversed />
           Tapry
         </a>
         {cols.map(([title, links]) => (

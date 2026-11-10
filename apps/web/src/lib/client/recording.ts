@@ -18,6 +18,7 @@ import {
 } from "@tapry/recorder";
 import type { SessionTicket } from "@tapry/shared";
 import { loadTicket } from "./api";
+import { getFilterPrefs, parseFilters, trackRegistered } from "./filters";
 import { localNow } from "./clock";
 
 // ── Transport ────────────────────────────────────────────────────────────────
@@ -49,13 +50,15 @@ class AppTransport implements ChunkTransport {
     const key = `${info.sessionId}/${info.trackId}`;
     let p = this.registered.get(key);
     if (!p) {
-      p = this.post(info, `/tracks`, {
-        trackId: info.trackId,
-        recordingId: info.meta?.recordingId,
-        kind: info.kind,
-        mimeType: info.mimeType,
-        startedAt: Math.round(info.startedAt),
-      }).catch((err) => {
+      const request = trackRequest(info);
+      p = this.post(info, `/tracks`, request)
+        // Never part of the upload: it only lets a change of filters made meanwhile be sent again.
+        .then(() => {
+          try {
+            trackRegistered(info.sessionId, request.filters);
+          } catch {}
+        })
+        .catch((err) => {
         this.registered.delete(key); // let the queue's retry try again
         throw err;
       });
@@ -80,6 +83,24 @@ class AppTransport implements ChunkTransport {
     if (res.status === 410) throw new TrackGoneError("The host deleted this recording");
     if (!res.ok) throw new Error(`register track → ${res.status}`);
   }
+}
+
+/**
+ * What registers a track with the server. `filters` are the person's when the track started
+ * (kept with the track, so a track sent after a crash or a reload still says what it was
+ * recorded with); tracks from before filters existed leave them out. The recording itself is
+ * the untouched camera and mic either way: the server applies filters to the finished files.
+ */
+export function trackRequest(info: TrackInfo) {
+  const filters = parseFilters(info.meta?.filters);
+  return {
+    trackId: info.trackId,
+    recordingId: info.meta?.recordingId,
+    kind: info.kind,
+    mimeType: info.mimeType,
+    startedAt: Math.round(info.startedAt),
+    ...(filters && { filters }),
+  };
 }
 
 /**
@@ -234,7 +255,13 @@ export class RecordingController {
       // The same clock the offset was measured on (Date.now() can jump if the system clock is
       // adjusted), in whole milliseconds like every timestamp the server takes.
       now: () => Math.round(localNow() + clockOffsetMs),
-      meta: { recordingId: active.recordingId, participantId: ticket.participantId, token: ticket.token },
+      meta: {
+        recordingId: active.recordingId,
+        participantId: ticket.participantId,
+        token: ticket.token,
+        // Only noted for the server; the recorder gets the plain stream, as always.
+        filters: JSON.stringify(getFilterPrefs().filters),
+      },
       onError: this.opts.onError,
       onRecovered: this.opts.onRecovered,
       onUnexpectedStop: () => this.restart(active, p),

@@ -1,5 +1,8 @@
 import {
   chunkStorageKey,
+  hasAudioFilters,
+  hasVideoFilters,
+  type TrackFilters,
   type commitChunkBody,
   type completeTrackBody,
   type createTrackBody,
@@ -108,11 +111,12 @@ export class UploadService {
       const [known] = await this.db.query("SELECT 1 FROM tracks WHERE id = $1 AND participant_id = $2", [trackId, p.id]);
       if (!known) throw new ApiError(429, "too_many_tracks", "Too many tracks for one person in this recording");
     }
+    // A retry of the same registration changes nothing, so filters set since then stay.
     const inserted = await this.db.query(
-      `INSERT INTO tracks (id, session_id, recording_id, participant_id, kind, mime_type, started_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO tracks (id, session_id, recording_id, participant_id, kind, mime_type, started_at, filters)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO NOTHING RETURNING id`,
-      [trackId, p.sessionId, body.recordingId, p.id, body.kind, body.mimeType, body.startedAt],
+      [trackId, p.sessionId, body.recordingId, p.id, body.kind, body.mimeType, body.startedAt, storedFilters(body.filters)],
     );
     if (inserted.length === 0) {
       // A retry of the same registration is fine; anything else is an id collision or misuse.
@@ -126,6 +130,22 @@ export class UploadService {
     }
     this.onProgress(p.sessionId);
     return { trackId };
+  }
+
+  /**
+   * A person changes their filters during a session: kept on their own tracks in recordings
+   * that are still running, whole on each (a camera track's sound takes noise removal too).
+   * Only what processing does with the files changes: the uploads are never touched, so
+   * nothing here is refused, whatever state the recordings are in.
+   */
+  async setFilters(p: Participant, filters: TrackFilters) {
+    await this.db.query(
+      `UPDATE tracks t SET filters = $3 FROM recordings r
+       WHERE r.id = t.recording_id AND t.session_id = $1 AND t.participant_id = $2
+         AND r.status = 'recording' AND r.deleted_at IS NULL`,
+      [p.sessionId, p.id, storedFilters(filters)],
+    );
+    return { filters };
   }
 
   async createUploadUrl(
@@ -274,6 +294,9 @@ export class UploadService {
     return row;
   }
 }
+
+/** How filters are kept on a track: null when nothing is switched on. */
+const storedFilters = (f: TrackFilters | undefined) => (f && (hasVideoFilters(f) || hasAudioFilters(f)) ? JSON.stringify(f) : null);
 
 /**
  * The host deleted the recording, or its originals were removed after the retention period

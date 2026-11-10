@@ -185,22 +185,25 @@ export function Avatar({ name, className }: { name: string; className?: string }
   );
 }
 
-/** The Tapry glyph: three strokes meeting, like tracks joining into one. */
-export function Mark({ className, strokeWidth = 2.6 }: { className?: string; strokeWidth?: number }) {
+/**
+ * The Tapry mark, "hanging tracks": separate tracks hanging from one line, the moment Record
+ * was pressed; together they read as a T. White tracks on the terracotta tile, the same in
+ * light and dark (brand colours, not theme tokens). Tiles of 16px or less get a heavier stroke.
+ */
+export function LogoMark({ className = "size-[26px]", small = false }: { className?: string; small?: boolean }) {
   return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" className={className}>
-      <path d="M12 3v18M5 8l7 4l7-4M5 16l7-4l7 4" />
+    <svg aria-hidden viewBox="0 0 32 32" className={cn("shrink-0", className)}>
+      <rect width="32" height="32" rx="8" fill="#e8553d" />
+      <path d="M8 9v4M12 9v7.5M16 9v15M20 9v7.5M24 9v4" fill="none" stroke="#fff" strokeWidth={small ? 3 : 2.6} strokeLinecap="round" />
     </svg>
   );
 }
 
-/** The Tapry logo: the glyph on a terracotta tile, then the name. */
-export function Logo({ className, tile = "size-[26px] rounded-[7px]" }: { className?: string; tile?: string }) {
+/** The Tapry logo: the mark, then the name. */
+export function Logo({ className, mark = "size-[26px]" }: { className?: string; mark?: string }) {
   return (
     <span className={cn("flex items-center gap-[9px] text-base font-medium", className)}>
-      <span className={cn("grid shrink-0 place-items-center bg-accent text-accent-text", tile)}>
-        <Mark className="size-[58%]" />
-      </span>
+      <LogoMark className={mark} />
       Tapry
     </span>
   );

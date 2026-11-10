@@ -55,7 +55,7 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
       <form onSubmit={submit} className="ember-card flex animate-fade-up flex-col gap-[22px] rounded-[19px] bg-canvas p-[clamp(22px,5vw,36px)] text-text">
         <div className="flex items-center justify-between gap-3">
           <Link href="/studios" aria-label="Tapry home" className="text-text hover:text-text">
-            <Logo className="text-[15px]" tile="size-6 rounded-[7px]" />
+            <Logo className="text-[15px]" mark="size-6" />
           </Link>
           {!firstStudio && (
             <Link href="/studios" className="flex items-center gap-1.5 text-[13px] text-muted hover:text-text">

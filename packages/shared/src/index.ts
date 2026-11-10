@@ -230,12 +230,61 @@ export const recapBody = z.object({ email });
 /** Track ids are chosen by the client so recording can start before the server is reachable. */
 export const trackIdPattern = /^trk_[A-Za-z0-9_-]{16,40}$/;
 
+// ── Filters ───────────────────────────────────────────────────────────────────
+//
+// What a person chooses for how they look and sound. The recorder never applies them: it keeps
+// the untouched camera and microphone. They are shown live on the call's copies, and the worker
+// applies them to that person's finished files (processing can also leave them out).
+// "Mirror my view" isn't here: it only flips a person's own preview, on their device.
+
+export const BRIGHTNESS_LEVELS = [0, 1, 2] as const; // 0: as it is, 1: brighter, 2: for a dark room
+export const LOOKS = ["none", "warm", "cool", "mono"] as const;
+export type Look = (typeof LOOKS)[number];
+
+export const trackFilters = z.object({
+  brightness: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
+  look: z.enum(LOOKS).default("none"),
+  /** Softens skin a little. */
+  touchUp: z.boolean().default(false),
+  /** Takes steady background noise (fans, hiss) out of the microphone. */
+  noiseRemoval: z.boolean().default(false),
+});
+export type TrackFilters = z.infer<typeof trackFilters>;
+
+export const NO_FILTERS: TrackFilters = { brightness: 0, look: "none", touchUp: false, noiseRemoval: false };
+
+/** Does anything here change the picture / the sound? */
+export const hasVideoFilters = (f: TrackFilters) => f.brightness !== 0 || f.look !== "none" || f.touchUp;
+export const hasAudioFilters = (f: TrackFilters) => f.noiseRemoval;
+
+/**
+ * The numbers behind the picture filters, one table for the live preview (canvas) and the
+ * worker (ffmpeg), so both look alike. brightness: added light (-1..1 scale of ffmpeg's eq);
+ * gamma lifts shadows; saturation 0 is black and white; temperature in kelvin (6500 neutral).
+ */
+export const BRIGHTNESS_VALUES: Record<TrackFilters["brightness"], { brightness: number; contrast: number; gamma: number }> = {
+  0: { brightness: 0, contrast: 1, gamma: 1 },
+  1: { brightness: 0.04, contrast: 1.03, gamma: 1.15 },
+  2: { brightness: 0.08, contrast: 1.06, gamma: 1.35 },
+};
+export const LOOK_VALUES: Record<Look, { saturation: number; temperature: number }> = {
+  none: { saturation: 1, temperature: 6500 },
+  warm: { saturation: 1.08, temperature: 5200 },
+  cool: { saturation: 1.02, temperature: 8200 },
+  mono: { saturation: 0, temperature: 6500 },
+};
+
+/** A person changes their filters during a session: applies to their tracks in recordings still open. */
+export const setFiltersBody = z.object({ filters: trackFilters });
+
 export const createTrackBody = z.object({
   trackId: z.string().regex(trackIdPattern).optional(),
   recordingId: z.string().min(1).max(100),
   kind: trackKind,
   mimeType,
   startedAt: serverTime,
+  /** The person's filters when this track started (absent: none). */
+  filters: trackFilters.optional(),
 });
 
 export const uploadUrlBody = z.object({

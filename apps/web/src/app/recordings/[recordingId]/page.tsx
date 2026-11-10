@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { RecordingFilters } from "@/components/recording-filters";
 import { RecordingTimeline } from "@/components/recording-timeline";
 import { describeOutput, outputUrl, phase, shortStatus } from "@/components/recordings";
 import { Icon, PageTitle, Spinner } from "@/components/ui-extra";
@@ -113,6 +114,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
             .
           </p>
         )}
+        {ready && r.hasFilters && <RecordingFilters studioId={r.studioId} recordingId={r.id} applyFilters={r.applyFilters} filtersFailed={r.filtersFailed} rawDeleted={r.rawDeleted} />}
         {r.rawDeleted && (
           <p className="text-[13px] text-muted">The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.</p>
         )}

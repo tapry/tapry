@@ -6,6 +6,7 @@ import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { formatBytes, formatClock, formatDuration, formatWhen } from "@/lib/format";
 import type { RecordingSummary } from "@/server/processing";
 import { ConfirmAction } from "./confirm-action";
+import { RecordingFilters } from "./recording-filters";
 import { describeOutput, phase, STATUS } from "./recordings";
 import { RecordingTimeline } from "./recording-timeline";
 import { Icon } from "./ui-extra";
@@ -78,6 +79,9 @@ export function RecordingList({
               levelLoudness={levelLoudness}
               onToggle={() => setOpen(open === e.id ? null : e.id)}
               onProcessNow={() => processNow(e)}
+              onFiltersQueued={(applyFilters) =>
+                onChange((list) => list.map((x) => (x.id === e.id ? { ...x, processing: "queued", applyFilters } : x)))
+              }
               onRemove={() => remove(e)}
             />
           ))}
@@ -95,6 +99,7 @@ function RecordingRow({
   levelLoudness,
   onToggle,
   onProcessNow,
+  onFiltersQueued,
   onRemove,
 }: {
   studioId: string;
@@ -104,6 +109,7 @@ function RecordingRow({
   levelLoudness: boolean;
   onToggle: () => void;
   onProcessNow: () => void;
+  onFiltersQueued: (applyFilters: boolean) => void;
   onRemove: () => Promise<void>;
 }) {
   const p = phase(e);
@@ -184,6 +190,10 @@ function RecordingRow({
           {e.processing === "pending" && e.people.length > 0 && <PeopleProgress recording={e} />}
 
           {e.processing === "ready" && <Downloads studioId={studioId} recording={e} />}
+
+          {e.processing === "ready" && e.hasFilters && (
+            <RecordingFilters studioId={studioId} recordingId={e.id} applyFilters={e.applyFilters} filtersFailed={e.filtersFailed} rawDeleted={e.rawDeleted} onQueued={onFiltersQueued} />
+          )}
 
           {e.status === "stopped" && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider pt-4">

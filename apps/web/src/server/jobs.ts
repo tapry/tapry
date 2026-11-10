@@ -1,13 +1,14 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { studioSettings } from "@tapry/shared";
+import { studioSettings, trackFilters, type TrackFilters } from "@tapry/shared";
 import {
   concatChunks,
   FfmpegError,
   mergeSpeakers,
   PODCAST_LOUDNESS,
   renderRecording,
+  type FilterFailure,
   type SkippedTrack,
   toDocx,
   toSrt,
@@ -26,6 +27,8 @@ import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./wor
 
 /** "Sam - audio.wav" or "Sam - audio.flac" → the speaker. */
 const AUDIO_SUFFIX = / - audio\.(wav|flac)$/;
+/** "Sam - audio (original).wav": the same person before noise removal, never a second speaker. */
+const ORIGINAL_AUDIO = / - audio \(original\)\.(wav|flac)$/;
 
 /** How often a runner says it's alive (the health page calls it gone after 3 missed beats). */
 export const HEARTBEAT_MS = 30_000;
@@ -407,7 +410,7 @@ export class JobRunner {
   }
 
   private async processRecording(rec: RecordingRow, work: string, job: JobRow) {
-    const { outputs, skipped } = await this.render(rec, work);
+    const { outputs, skipped, filtersFailed } = await this.render(rec, work);
     const { replaced, rerun } = await this.db.transaction(async (tx) => {
       // Locked first, so a track finishing right now either asks for a rerun before we read it or finds the job done.
       const [row] = await tx.query<{ rerun_requested: boolean }>("SELECT rerun_requested FROM recordings WHERE id = $1 FOR UPDATE", [rec.id]);
@@ -419,8 +422,8 @@ export class JobRunner {
       ]);
       for (const o of outputs) await insertOutput(tx, rec.id, o);
       await tx.query(
-        `UPDATE recordings SET processing = $2, processed_at = now(), processing_error = NULL, skipped_tracks = $3, rerun_requested = false WHERE id = $1`,
-        [rec.id, rerun ? "queued" : "ready", JSON.stringify(skipped)],
+        `UPDATE recordings SET processing = $2, processed_at = now(), processing_error = NULL, skipped_tracks = $3, filters_failed = $4, rerun_requested = false WHERE id = $1`,
+        [rec.id, rerun ? "queued" : "ready", JSON.stringify(skipped), JSON.stringify(filtersFailed)],
       );
       await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
       if (rerun) {
@@ -458,11 +461,13 @@ export class JobRunner {
     const processedAt = async (q: Queryable, lock = "") =>
       (await q.query<{ at: string | null }>(`SELECT processed_at::text AS at FROM recordings WHERE id = $1 ${lock}`, [rec.id]))[0]?.at ?? null;
     const audioFrom = await processedAt(this.db);
-    const audio = await this.db.query<{ storage_key: string; file_name: string }>(
-      `SELECT o.storage_key, o.file_name FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
-       WHERE o.recording_id = $1 AND o.kind = 'audio' ORDER BY p.created_at`,
-      [rec.id],
-    );
+    const audio = (
+      await this.db.query<{ storage_key: string; file_name: string }>(
+        `SELECT o.storage_key, o.file_name FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
+         WHERE o.recording_id = $1 AND o.kind = 'audio' ORDER BY p.created_at`,
+        [rec.id],
+      )
+    ).filter((a) => !ORIGINAL_AUDIO.test(a.file_name));
     const speakers: SpeakerTranscript[] = [];
     for (const [i, a] of audio.entries()) {
       const speaker = a.file_name.replace(AUDIO_SUFFIX, "");
@@ -536,9 +541,10 @@ export class JobRunner {
   }
 
   private async render(rec: RecordingRow, work: string) {
-    const tracks = await this.db.query<{ id: string; participant_id: string; display_name: string; kind: "audio" | "video"; started_at: number }>(
-      `SELECT t.id, t.participant_id, p.display_name, t.kind, t.started_at
-       FROM tracks t JOIN participants p ON p.id = t.participant_id
+    const tracks = await this.db.query<{ id: string; participant_id: string; display_name: string; kind: "audio" | "video"; started_at: number; filters: unknown }>(
+      `SELECT t.id, t.participant_id, p.display_name, t.kind, t.started_at,
+              CASE WHEN r.apply_filters THEN t.filters END AS filters
+       FROM tracks t JOIN recordings r ON r.id = t.recording_id JOIN participants p ON p.id = t.participant_id
        WHERE t.recording_id = $1 AND EXISTS (SELECT 1 FROM chunks c WHERE c.track_id = t.id)
        ORDER BY p.created_at, t.kind`,
       [rec.id],
@@ -574,17 +580,21 @@ export class JobRunner {
         rawPath,
         offsetMs: t.started_at - rec.started_at,
         hasGaps,
+        ...filtersFor(t.filters),
       });
     }
 
     const settings = studioSettings.parse(rec.settings);
     const skipped: Array<{ name: string; kind: "audio" | "video" }> = [];
+    const filtersFailed: Array<{ name: string; kind: "audio" | "video" }> = [];
     const files = await renderRecording(inputs, {
       // Metadata in the log, never the name. One bad upload must not cost everyone their files.
       onSkipped: (s: SkippedTrack) => {
         console.error(`[worker] left ${s.kind} ${s.trackId ?? ""} out of ${rec.id}: ${s.reason.slice(0, 500)}`);
         if (s.kind !== "combined" && s.participantName) skipped.push({ name: s.participantName, kind: s.kind });
       },
+      // The file is there, as recorded: the host is told whose, the log only what kind.
+      onFilterFailed: (f: FilterFailure) => filtersFailed.push({ name: f.name, kind: f.kind }),
       ffmpeg: this.opts.ffmpeg,
       ffprobe: this.opts.ffprobe,
       workDir: join(work, "out"),
@@ -605,8 +615,19 @@ export class JobRunner {
       const bytes = await this.storage.uploadFrom(key, f.path, f.contentType);
       uploaded.push({ ...f, id, key, bytes });
     }
-    return { outputs: uploaded, skipped };
+    for (const kind of ["audio", "video"] as const) {
+      const count = filtersFailed.filter((f) => f.kind === kind).length;
+      if (count) console.error(`[worker] filters couldn't be applied in ${rec.id}: ${count} ${kind} file(s) left as recorded`);
+    }
+    return { outputs: uploaded, skipped, filtersFailed };
   }
+}
+
+/** A track's stored filters for the pipeline; nothing when there are none, or they can't be read (then: as recorded). */
+function filtersFor(stored: unknown): { filters?: TrackFilters } {
+  if (stored === null || stored === undefined) return {};
+  const parsed = trackFilters.safeParse(typeof stored === "string" ? JSON.parse(stored) : stored);
+  return parsed.success ? { filters: parsed.data } : {};
 }
 
 async function insertOutput(

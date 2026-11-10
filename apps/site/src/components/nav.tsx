@@ -55,7 +55,7 @@ export function Nav({ active, overlay = false }: { active?: NavId; overlay?: boo
     <header className={overlay ? "site-nav site-nav-overlay" : "site-nav"} data-open={open ? "" : undefined} suppressHydrationWarning>
       <div style={inner}>
         <a href={overlay ? "#top" : "/"} className="nav-brand" style={brand} aria-label={overlay ? "Tapry, back to top" : "Tapry, home"}>
-          <LogoMark />
+          <LogoMark size={24} />
           Tapry
         </a>
         <nav className="nav-links" aria-label="Main" style={{ gap: 30, fontSize: 15 }}>

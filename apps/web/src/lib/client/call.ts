@@ -1,6 +1,6 @@
 "use client";
 
-import type { CallToken, SessionTicket } from "@tapry/shared";
+import { hasVideoFilters, NO_FILTERS, type CallToken, type SessionTicket, type TrackFilters } from "@tapry/shared";
 import {
   ConnectionState,
   LocalAudioTrack,
@@ -14,6 +14,7 @@ import {
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
+import { canPreviewFilters, startFilteredTrack, type FilteredTrack } from "./filter-picture";
 
 export type CallStatus = "off" | "connecting" | "connected" | "reconnecting" | "failed";
 
@@ -38,15 +39,36 @@ export interface CallState {
 
 const CALL_VIDEO = { width: 640, height: 360, frameRate: 24 };
 
+/** What the call holds of this person: the published tracks, and the camera/mic copies behind them. */
+interface LocalTracks {
+  audio?: LocalAudioTrack;
+  video?: LocalVideoTrack;
+  /** The call's own copies (clones) of the mic and camera. Filters only ever touch these. */
+  mic?: MediaStreamTrack;
+  cam?: MediaStreamTrack;
+  /** While the person has picture filters: the camera copy drawn with them, sent instead of it. */
+  picture?: FilteredTrack;
+  /** Noise removal on the mic copy: whether it is on, and what the copy had before. */
+  noise?: { on: boolean; before: boolean | undefined };
+  /** This browser can't give the mic copy its own noise removal: the live part is skipped. */
+  noiseUnavailable?: boolean;
+  /** Filter changes, one after the other. */
+  chain?: Promise<void>;
+}
+
 /**
  * The live call. It runs beside the recording and never touches it: what goes to
  * LiveKit are clones of the camera and mic tracks, scaled down for the call, so a
  * bad connection only degrades the call while the local recording stays full quality.
+ * The person's filters are shown on those clones only (picture: drawn on a canvas; noise
+ * removal: the browser's own, on the mic clone); the recorder's tracks are never involved.
  */
-export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boolean) {
+export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boolean, filters: TrackFilters = NO_FILTERS) {
   const [state, setState] = useState<CallState>({ status: "off", peers: [], localSpeaking: false, audioBlocked: false });
   const room = useRef<Room | null>(null);
-  const local = useRef<{ audio?: LocalAudioTrack; video?: LocalVideoTrack }>({});
+  const local = useRef<LocalTracks>({});
+  const wanted = useRef(filters);
+  wanted.current = filters;
 
   useEffect(() => {
     if (!enabled) return;
@@ -85,6 +107,8 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
         previous.removeAllListeners();
         void previous.disconnect();
       }
+      // This effect's tracks: after cleanup, `local.current` is the next effect's.
+      const tracks = local.current;
       try {
         const t = await apiFetch<CallToken>(`/sessions/${ticket.sessionId}/call-token`, { body: {}, token: ticket.token });
         if (cancelled) return;
@@ -122,9 +146,14 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
         const relayOnly = new URLSearchParams(window.location.search).get("relay") === "1";
         await r.connect(t.url, t.token, relayOnly ? { rtcConfig: { iceTransportPolicy: "relay" } } : undefined);
         if (cancelled) return void r.disconnect();
-        await publish(r, stream, local.current);
+        releasePicture(tracks); // a rejoin starts from fresh clones
+        await publish(r, stream, tracks, wanted.current);
+        // Whatever changed while this was publishing (nothing to do when there are no filters).
+        await syncFilters(tracks, stream, () => wanted.current);
+        if (cancelled) return releasePicture(tracks);
         snapshot(r);
       } catch (err) {
+        releasePicture(tracks);
         if (cancelled) return;
         console.error("[call]", err);
         setState((s) => ({ ...s, status: "failed" }));
@@ -137,10 +166,16 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
       cancelled = true;
       clearTimeout(retry);
       void current?.disconnect(); // stops the call clones only; the recording's tracks are untouched
+      releasePicture(local.current);
       room.current = null;
       local.current = {};
     };
   }, [ticket, stream, enabled]);
+
+  // The person changed their filters: show them on the call's copies.
+  useEffect(() => {
+    void syncFilters(local.current, stream, () => wanted.current);
+  }, [filters, stream]);
 
   const startAudio = useCallback(() => void room.current?.startAudio(), []);
 
@@ -159,6 +194,8 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
       for (const t of stream.getVideoTracks()) t.enabled = !off;
       const video = local.current.video;
       if (video) await (off ? video.mute() : video.unmute());
+      // With picture filters the call sends the canvas, not the camera copy: keep the copy in step.
+      if (local.current.picture && local.current.cam) local.current.cam.enabled = !off;
     },
     [stream],
   );
@@ -166,12 +203,14 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
   return { ...state, startAudio, setMicMuted, setCameraOff };
 }
 
-async function publish(r: Room, stream: MediaStream, local: { audio?: LocalAudioTrack; video?: LocalVideoTrack }) {
+async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters: TrackFilters) {
   const mic = stream.getAudioTracks()[0];
   const cam = stream.getVideoTracks()[0];
   if (mic) {
     const clone = mic.clone();
     clone.enabled = mic.enabled;
+    local.mic = clone;
+    local.noise = undefined;
     local.audio = new LocalAudioTrack(clone, undefined, true);
     await r.localParticipant.publishTrack(local.audio, { source: Track.Source.Microphone, dtx: true, red: true });
   }
@@ -182,7 +221,10 @@ async function publish(r: Room, stream: MediaStream, local: { audio?: LocalAudio
     await clone
       .applyConstraints({ width: { ideal: CALL_VIDEO.width }, height: { ideal: CALL_VIDEO.height }, frameRate: { max: CALL_VIDEO.frameRate } })
       .catch(() => {});
-    local.video = new LocalVideoTrack(clone, undefined, true);
+    local.cam = clone;
+    // With picture filters, the others never see the plain picture, not even for a moment.
+    if (hasVideoFilters(filters) && canPreviewFilters()) local.picture = filteredCopy(clone, filters);
+    local.video = new LocalVideoTrack(local.picture?.track ?? clone, undefined, true);
     await r.localParticipant.publishTrack(local.video, {
       source: Track.Source.Camera,
       simulcast: false,
@@ -190,9 +232,103 @@ async function publish(r: Room, stream: MediaStream, local: { audio?: LocalAudio
     });
     // Firefox ignores those constraints on a cloned camera track and keeps its full size. Then
     // the encoder scales the call's copy down instead (the camera itself is left alone).
-    const height = clone.getSettings().height ?? 0;
+    // (The filtered picture is drawn at the call's size already.)
+    const height = local.picture ? 0 : (clone.getSettings().height ?? 0);
     if (height > CALL_VIDEO.height * 1.1) await scaleDown(local.video, height / CALL_VIDEO.height);
   }
+}
+
+// ── Filters on the call's copies ─────────────────────────────────────────────
+
+const filteredCopy = (clone: MediaStreamTrack, filters: TrackFilters) =>
+  startFilteredTrack(clone, { maxHeight: CALL_VIDEO.height, frameRate: CALL_VIDEO.frameRate, filters });
+
+/** Stops the canvas picture, and the camera copy behind it (LiveKit only stops the track it holds). */
+function releasePicture(local: LocalTracks) {
+  if (!local.picture) return;
+  local.picture.stop();
+  local.picture = undefined;
+  local.cam?.stop();
+}
+
+/**
+ * Brings the call's copies in line with the person's filters: one change after the other, each
+ * reading the latest choice when its turn comes. Without filters, and none before, it does nothing.
+ */
+function syncFilters(local: LocalTracks, stream: MediaStream, latest: () => TrackFilters) {
+  local.chain = (local.chain ?? Promise.resolve())
+    .then(async () => {
+      const filters = latest();
+      await syncPicture(local, filters);
+      await syncNoise(local, stream, filters.noiseRemoval);
+    })
+    .catch((err) => console.warn("[call] could not show the filters in the call", err));
+  return local.chain;
+}
+
+async function syncPicture(local: LocalTracks, filters: TrackFilters) {
+  const { video, cam } = local;
+  if (!video || !cam || !video.sender) return;
+  const want = hasVideoFilters(filters) && canPreviewFilters() && cam.readyState === "live";
+  if (want && local.picture) return local.picture.setFilters(filters);
+  if (want) {
+    const picture = filteredCopy(cam, filters);
+    cam.enabled = !video.isMuted;
+    try {
+      await video.replaceTrack(picture.track, true); // the camera copy keeps running, into the canvas
+    } catch (err) {
+      picture.stop();
+      throw err;
+    }
+    if (local.video !== video) return picture.stop(); // the call was rejoined meanwhile
+    local.picture = picture;
+    await scaleDown(video, 1);
+  } else if (local.picture) {
+    // Back to no filters: the plain copy again, exactly as it is published without filters.
+    const picture = local.picture;
+    await video.replaceTrack(cam, true);
+    picture.stop();
+    if (local.picture === picture) local.picture = undefined;
+    const height = cam.getSettings().height ?? 0;
+    if (height > CALL_VIDEO.height * 1.1) await scaleDown(video, height / CALL_VIDEO.height);
+  }
+}
+
+/**
+ * Noise removal in the call: the browser's own noise suppression, asked for on the mic's clone.
+ * Whether a clone can have its own setting depends on the browser, so the recorder's track is
+ * checked before and after: if it changed with the clone, or the clone didn't take the setting,
+ * the clone is put back and the live part is skipped on this device (the files still get it).
+ * The recorder's track itself is never constrained here.
+ */
+async function syncNoise(local: LocalTracks, stream: MediaStream, on: boolean) {
+  const clone = local.mic;
+  const original = stream.getAudioTracks()[0];
+  if (!clone || clone.readyState !== "live" || local.noiseUnavailable) return;
+  if (!on && !local.noise?.on) return;
+  if (on && local.noise?.on) return;
+  if (!on) {
+    const before = local.noise!.before;
+    local.noise = { on: false, before };
+    await clone.applyConstraints({ ...clone.getConstraints(), noiseSuppression: before ?? false }).catch(() => {});
+    return;
+  }
+  const before = clone.getSettings().noiseSuppression;
+  if (before === true) return; // already on for this mic (the studio's echo setting): nothing to add
+  const recorderBefore = original?.getSettings().noiseSuppression;
+  const applied = await clone.applyConstraints({ ...clone.getConstraints(), noiseSuppression: true }).then(
+    () => true,
+    () => false,
+  );
+  const took = applied && clone.getSettings().noiseSuppression === true;
+  const leaked = !!original && original.getSettings().noiseSuppression !== recorderBefore;
+  if (took && !leaked) {
+    local.noise = { on: true, before };
+    return;
+  }
+  local.noiseUnavailable = true;
+  // Undo on the clone only; where the two share one setting, that puts the recorder's back too.
+  if (applied) await clone.applyConstraints({ ...clone.getConstraints(), noiseSuppression: before ?? false }).catch(() => {});
 }
 
 async function scaleDown(track: LocalVideoTrack, factor: number) {

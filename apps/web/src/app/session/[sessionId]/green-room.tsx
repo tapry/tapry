@@ -1,13 +1,16 @@
 "use client";
 
 import { checkStorage, requestPersistentStorage } from "@tapry/recorder";
-import type { SessionTicket, StudioSettings } from "@tapry/shared";
+import { NO_FILTERS, type SessionTicket, type StudioSettings, type TrackFilters } from "@tapry/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, cn, Field, Notice, RecDot, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/client/api";
 import { estimateClock, type ClockEstimate } from "@/lib/client/clock";
+import { useFilterPrefs } from "@/lib/client/filters";
 import { useDevices, useLocalMedia, useMicLevel, useStoredState, type Devices } from "@/lib/media/hooks";
+import { FiltersPanel, filtersOn, useFiltersPanel } from "./filters-panel";
 import { eqAnimation, Icon, ICON } from "./icons";
+import { SelfVideo } from "./self-video";
 import {
   browserChecks,
   buildConstraints,
@@ -43,6 +46,10 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   const [clock, setClock] = useState<ClockEstimate | null>(null);
   const [joining, setJoining] = useState(false);
   const [measuring, setMeasuring] = useState(true);
+  // How this person looks and sounds to the others and in the files; the stream opened here stays untouched.
+  const [prefs, setPrefs] = useFilterPrefs();
+  const filtersPanel = useFiltersPanel(false);
+  const hasPicture = !settings.audioOnly && !choice.cameraOff && !!stream && stream.getVideoTracks().length > 0;
 
   // Headphones: pre-tick when the default output looks like a headset. Guests can untick.
   const detected = useRef(false);
@@ -97,7 +104,41 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
           failed={status === "error"}
           level={{ db: level.rmsDb, state: level.state, live: status === "live", suspended: level.suspended }}
           onToggleCamera={() => setChoice({ ...choice, cameraOff: !choice.cameraOff })}
+          filters={prefs.filters}
+          mirror={prefs.mirror}
+          controls={
+            status === "live" && (
+              <button
+                ref={filtersPanel.button}
+                type="button"
+                onClick={filtersPanel.toggle}
+                aria-expanded={filtersPanel.open}
+                aria-controls="green-room-filters"
+                aria-label={filtersOn(prefs.filters, hasPicture) ? "Filters (on)" : "Filters"}
+                title="Filters"
+                className={cn(
+                  "relative grid size-9 cursor-pointer place-items-center rounded-full text-white transition-colors",
+                  filtersPanel.open ? "bg-black/80" : "bg-black/55 hover:bg-black/70",
+                )}
+              >
+                <Icon d={ICON.sliders} />
+                {filtersOn(prefs.filters, hasPicture) && <FilterDot />}
+              </button>
+            )
+          }
         />
+        {filtersPanel.open && (
+          <FiltersPanel
+            id="green-room-filters"
+            panelRef={filtersPanel.panel}
+            prefs={prefs}
+            onChange={setPrefs}
+            hasCamera={hasPicture}
+            tone="page"
+            onClose={filtersPanel.close}
+            className="animate-fade-up"
+          />
+        )}
         <LevelAdvice state={level.state} live={status === "live"} suspended={level.suspended} />
         {problem && (
           <Notice tone="danger">
@@ -274,6 +315,9 @@ export function Preview({
   failed,
   level,
   onToggleCamera,
+  filters = NO_FILTERS,
+  mirror = true,
+  controls,
 }: {
   stream: MediaStream | null;
   cameraOff: boolean;
@@ -281,11 +325,12 @@ export function Preview({
   failed: boolean;
   level?: { db: number; state: LevelState; live: boolean; suspended: boolean };
   onToggleCamera?: () => void;
+  /** This person's picture filters and mirror choice, shown on the preview only (the stream stays as it is). */
+  filters?: TrackFilters;
+  mirror?: boolean;
+  /** More round buttons for the bottom right corner, before the camera one (Filters). */
+  controls?: React.ReactNode;
 }) {
-  const video = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    if (video.current) video.current.srcObject = stream;
-  }, [stream]);
   const hasCamera = !!stream && stream.getVideoTracks().length > 0;
   const hasVideo = hasCamera && !cameraOff;
   const fraction = level ? meterFraction(level.db) : 0;
@@ -293,12 +338,11 @@ export function Preview({
   return (
     // Dark in both themes, so the focus ring is light here.
     <div className="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-[#18181b] [--ring:#fafafa]">
-      <video
-        ref={video}
-        autoPlay
-        playsInline
-        muted
-        className={cn("size-full -scale-x-100 object-cover transition-opacity duration-300", !hasVideo && "opacity-0")}
+      <SelfVideo
+        stream={stream}
+        filters={hasVideo ? filters : NO_FILTERS}
+        mirror={mirror}
+        className={cn("transition-opacity duration-300", !hasVideo && "opacity-0")}
       />
       {!hasVideo && (
         <div className="absolute inset-0 grid place-items-center px-5 text-center text-[14.5px] text-white">
@@ -353,22 +397,30 @@ export function Preview({
         for the whole session, so it says so (it is not the room's camera on/off). Not offered when
         there is no camera to choose. The words avoid "camera": that is the picker's label.
       */}
-      {onToggleCamera && !audioOnly && stream && (hasCamera || cameraOff) && (
-        <button
-          type="button"
-          onClick={onToggleCamera}
-          aria-label={cameraOff ? "Record with video" : "Record without video (audio only)"}
-          title={cameraOff ? "Record with video" : "Record without video (audio only)"}
-          className={cn(
-            "absolute right-3 bottom-3 grid size-9 cursor-pointer place-items-center rounded-full transition-colors",
-            cameraOff ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-black/55 text-white hover:bg-black/70",
-          )}
-        >
-          <Icon d={cameraOff ? ICON.camOff : ICON.cam} />
-        </button>
-      )}
+      <span className="absolute right-3 bottom-3 flex items-center gap-2 empty:hidden">
+        {controls}
+        {onToggleCamera && !audioOnly && stream && (hasCamera || cameraOff) && (
+          <button
+            type="button"
+            onClick={onToggleCamera}
+            aria-label={cameraOff ? "Record with video" : "Record without video (audio only)"}
+            title={cameraOff ? "Record with video" : "Record without video (audio only)"}
+            className={cn(
+              "grid size-9 cursor-pointer place-items-center rounded-full transition-colors",
+              cameraOff ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-black/55 text-white hover:bg-black/70",
+            )}
+          >
+            <Icon d={cameraOff ? ICON.camOff : ICON.cam} />
+          </button>
+        )}
+      </span>
     </div>
   );
+}
+
+/** The small terracotta dot on a Filters button: something is on. */
+export function FilterDot() {
+  return <span aria-hidden data-testid="filters-on" className="absolute top-0.5 right-0.5 size-2.5 rounded-full border-2 border-[#18181b] bg-accent" />;
 }
 
 /** Under the preview: what to do about the level, when it isn't right yet. */

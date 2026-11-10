@@ -360,9 +360,7 @@ function HeroStudio() {
         <div className="hero-side" style={{ display: "flex", minWidth: 0, flexDirection: "column", gap: 2, borderRight: "1px solid #e4e4e7", padding: "14px 12px", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px 12px" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 500 }}>
-              <span style={{ display: "grid", width: 22, height: 22, placeItems: "center", borderRadius: 6, background: "#c43c25" }}>
-                <LogoMark size={13} color="#fff" />
-              </span>
+              <LogoMark size={22} />
               Tapry
             </span>
             <span style={{ display: "grid", width: 26, height: 26, placeItems: "center", border: "1px solid #e4e4e7", borderRadius: 6, background: "#fff", color: "#71717a" }}>

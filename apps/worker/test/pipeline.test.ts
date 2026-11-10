@@ -1,22 +1,28 @@
 // Runs against a real ffmpeg: set FFMPEG_PATH / FFPROBE_PATH, or have them on PATH.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { NO_FILTERS, type TrackFilters } from "@tapry/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import { FfmpegError, run } from "../src/ffmpeg.js";
 import {
   alignmentFilters,
+  audioCleanFilters,
   concatChunks,
+  filterDelaySamples,
+  measureNoiseFloor,
   findFont,
   gridLayout,
   loudnessGain,
   measureLoudness,
   PODCAST_LOUDNESS,
   renderRecording,
+  type FilterFailure,
   type SkippedTrack,
   type TrackInput,
   VIDEO_MAX_BITRATE,
+  videoLookFilters,
 } from "../src/pipeline.js";
 
 const ffmpeg = process.env.FFMPEG_PATH ?? "ffmpeg";
@@ -41,6 +47,45 @@ describe("alignmentFilters", () => {
       "fps=30,tpad=start_duration=1.500:start_mode=add:color=black,tpad=stop=-1:stop_mode=clone",
     );
     expect(alignmentFilters("video", -40)).toBe("trim=start=0.040,setpts=PTS-STARTPTS,fps=30,tpad=stop=-1:stop_mode=clone");
+  });
+});
+
+describe("filters as ffmpeg chains", () => {
+  const with_ = (f: Partial<TrackFilters>): TrackFilters => ({ ...NO_FILTERS, ...f });
+
+  it("adds nothing at all when a person chose no filters, so the command is what it always was", () => {
+    expect(videoLookFilters(undefined)).toBe("");
+    expect(videoLookFilters(NO_FILTERS)).toBe("");
+    expect(videoLookFilters(with_({ noiseRemoval: true }))).toBe(""); // sound only
+    expect(audioCleanFilters(undefined)).toBe("");
+    expect(audioCleanFilters(NO_FILTERS)).toBe("");
+    expect(audioCleanFilters(with_({ brightness: 2, look: "mono", touchUp: true }))).toBe(""); // picture only
+  });
+
+  it("writes each setting from the shared tables", () => {
+    expect(videoLookFilters(with_({ brightness: 1 }))).toBe("eq=brightness=0.04:contrast=1.03:gamma=1.15:saturation=1");
+    expect(videoLookFilters(with_({ brightness: 2 }))).toBe("eq=brightness=0.08:contrast=1.06:gamma=1.35:saturation=1");
+    expect(videoLookFilters(with_({ look: "warm" }))).toBe("eq=brightness=0:contrast=1:gamma=1:saturation=1.08,colortemperature=temperature=5200");
+    expect(videoLookFilters(with_({ look: "cool" }))).toBe("eq=brightness=0:contrast=1:gamma=1:saturation=1.02,colortemperature=temperature=8200");
+    // Black and white: no colour left to warm or cool.
+    expect(videoLookFilters(with_({ look: "mono" }))).toBe("eq=brightness=0:contrast=1:gamma=1:saturation=0");
+    expect(videoLookFilters(with_({ touchUp: true }))).toBe("bilateral=sigmaS=3:sigmaR=0.05:planes=1");
+    expect(videoLookFilters({ brightness: 2, look: "warm", touchUp: true, noiseRemoval: true })).toBe(
+      "eq=brightness=0.08:contrast=1.06:gamma=1.35:saturation=1.08,colortemperature=temperature=5200,bilateral=sigmaS=3:sigmaR=0.05:planes=1",
+    );
+  });
+
+  it("sets noise removal by the track's own noise floor, and takes the filter's delay off again", () => {
+    const on = with_({ noiseRemoval: true });
+    expect(audioCleanFilters(on)).toBe("afftdn=nr=12:nf=-50"); // nothing measured: a usual room
+    expect(audioCleanFilters(on, { noiseFloorDb: -56.2 })).toBe("afftdn=nr=12:nf=-36");
+    expect(audioCleanFilters(on, { noiseFloorDb: -56.2, delaySamples: 1200 })).toBe(
+      "apad=pad_len=1200,afftdn=nr=12:nf=-36,atrim=start_sample=1200,asetpts=N/SR/TB",
+    );
+    // Someone talking throughout has no quiet stretch: their voice isn't taken for noise.
+    expect(audioCleanFilters(on, { noiseFloorDb: -20 })).toBe("afftdn=nr=12:nf=-25");
+    expect(audioCleanFilters(on, { noiseFloorDb: -110 })).toBe("afftdn=nr=12:nf=-80");
+    expect(audioCleanFilters(on, { noiseFloorDb: null })).toBe("afftdn=nr=12:nf=-50");
   });
 });
 
@@ -475,6 +520,280 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       const [shifted] = await renderRecording([track({ rawPath: gapped })], { ...opts, workDir: join(dir, "gap-shifted") });
       const off = beeps(shifted!.path).filter((t) => t > 11);
       expect(off.some((t) => Math.abs(t - Math.round(t / 2) * 2) > 0.2)).toBe(true);
+    });
+  });
+  describe("filters", () => {
+    const with_ = (f: Partial<TrackFilters>): TrackFilters => ({ ...NO_FILTERS, ...f });
+    /** A picture statistic (signalstats: YAVG light, SATAVG colourfulness, UAVG / VAVG tint) of the frame at `t` seconds. */
+    const stat = (file: string, key: string, t = 1.5) =>
+      Number.parseFloat(
+        execFileSync(ffmpeg, ["-v", "error", "-ss", String(t), "-i", file, "-frames:v", "1",
+          "-vf", `signalstats,metadata=print:key=lavfi.signalstats.${key}:file=-`, "-f", "null", "-"])
+          .toString().match(new RegExp(`${key}=([\\d.]+)`))![1]!,
+      );
+    const rms = (s: Int16Array, fromS: number, toS: number) => {
+      let sum = 0;
+      const a = Math.round(fromS * 48000);
+      const b = Math.round(toS * 48000);
+      for (let i = a; i < b; i++) sum += s[i]! * s[i]!;
+      return Math.sqrt(sum / (b - a));
+    };
+    const video = (filters?: TrackFilters, offsetMs = 0): TrackInput =>
+      ({ trackId: "trk_v", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs, filters });
+    const renderVideo = async (name: string, filters?: TrackFilters, offsetMs = 0) =>
+      (await renderRecording([video(filters, offsetMs)], { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoHeight: 720 }))[0]!;
+    /** What must not change, whatever the filters: size, frame rate, frame count, length. */
+    const shape = (file: string) => probe(file, "stream=codec_name,width,height,r_frame_rate,nb_frames");
+
+    let plain: Awaited<ReturnType<typeof renderVideo>>;
+    beforeAll(async () => {
+      plain = await renderVideo("look-plain");
+    });
+
+    it("makes the picture black and white, brighter, warmer or cooler, in the same frame and length", async () => {
+      const mono = await renderVideo("look-mono", with_({ look: "mono" }));
+      expect(stat(plain.path, "SATAVG")).toBeGreaterThan(20); // the test pattern is colourful
+      expect(stat(mono.path, "SATAVG")).toBeLessThan(1.5);
+
+      const bright = await renderVideo("look-bright", with_({ brightness: 2 }));
+      const brighter = await renderVideo("look-brighter", with_({ brightness: 1 }));
+      expect(stat(brighter.path, "YAVG")).toBeGreaterThan(stat(plain.path, "YAVG") + 3);
+      expect(stat(bright.path, "YAVG")).toBeGreaterThan(stat(brighter.path, "YAVG") + 3);
+
+      // Warm leans red (V up, U down), cool leans blue.
+      const warm = await renderVideo("look-warm", with_({ look: "warm" }));
+      const cool = await renderVideo("look-cool", with_({ look: "cool" }));
+      expect(stat(warm.path, "VAVG")).toBeGreaterThan(stat(cool.path, "VAVG") + 2);
+      expect(stat(warm.path, "UAVG")).toBeLessThan(stat(cool.path, "UAVG") - 2);
+
+      for (const o of [mono, bright, brighter, warm, cool]) {
+        expect(shape(o.path), o.path).toBe(shape(plain.path));
+        expect(o.durationMs).toBe(plain.durationMs);
+        expect(o.fileName).toBe("Sam - video.mp4");
+      }
+    });
+
+    it("touch-up smooths the picture a little and keeps its size and length", async () => {
+      // A grainy camera: the test pattern with noise, which is what smoothing evens out.
+      const grainy = join(dir, "grainy.webm");
+      await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=3,noise=alls=14:allf=t",
+        "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "3M", "-an", grainy]);
+      const render = async (name: string, filters?: TrackFilters) =>
+        (await renderRecording([{ ...video(filters), rawPath: grainy }], { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoHeight: 720 }))[0]!;
+      const before = await render("touch-off");
+      const after = await render("touch-on", with_({ touchUp: true }));
+      const psnr = Number.parseFloat(
+        (await run(ffmpeg, ["-hide_banner", "-nostdin", "-i", after.path, "-i", before.path, "-lavfi", "psnr", "-f", "null", "-"], { stderr: true }))
+          .match(/average:([\d.]+|inf)/)![1]!.replace("inf", "Infinity"),
+      );
+      expect(psnr).toBeLessThan(45); // it changed the picture...
+      expect(psnr).toBeGreaterThan(24); // ...gently
+      expect(shape(after.path)).toBe(shape(before.path));
+      expect(after.durationMs).toBe(before.durationMs);
+    });
+
+    it("keeps the black before a late start black, and the picture where it belongs", async () => {
+      const late = await renderVideo("look-late", with_({ brightness: 2, look: "warm", touchUp: true }), 1000);
+      const latePlain = await renderVideo("look-late-plain", undefined, 1000);
+      expect(stat(late.path, "YAVG", 0.5)).toBeLessThan(20); // not lifted to grey
+      expect(stat(late.path, "YAVG", 0.5)).toBe(stat(latePlain.path, "YAVG", 0.5));
+      expect(stat(late.path, "YAVG", 1.5)).toBeGreaterThan(stat(latePlain.path, "YAVG", 1.5) + 3);
+      expect(shape(late.path)).toBe(shape(latePlain.path));
+      expect(Math.abs(late.durationMs! - 3000)).toBeLessThan(80);
+    });
+
+    it("shows the filtered picture in the combined video too", async () => {
+      const tracks = (filters?: TrackFilters): TrackInput[] => [video(filters)];
+      const opts = { ffmpeg, ffprobe, durationMs: 3000, videoHeight: 720 as const, font: null };
+      const colour = (await renderRecording(tracks(), { ...opts, workDir: join(dir, "grid-plain") })).find((o) => o.kind === "combined")!;
+      const mono = (await renderRecording(tracks(with_({ look: "mono" })), { ...opts, workDir: join(dir, "grid-mono") })).find((o) => o.kind === "combined")!;
+      expect(stat(colour.path, "SATAVG")).toBeGreaterThan(20);
+      expect(stat(mono.path, "SATAVG")).toBeLessThan(1.5);
+    });
+
+    describe("noise removal", () => {
+      let noisy: string;
+      const audio = (filters?: TrackFilters, offsetMs = 0): TrackInput =>
+        ({ trackId: "trk_a", participantId: "par_s", participantName: "Sam", kind: "audio", rawPath: noisy, offsetMs, filters });
+      const opts = (name: string) => ({ ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 6000, videoHeight: 720 as const });
+      /** First sample of the tone (well above the noise). */
+      const onset = (s: Int16Array) => s.findIndex((x) => Math.abs(x) > 6000);
+
+      // A voice stand-in (a tone for 2 s) over steady hiss that goes on for 6 s.
+      beforeAll(async () => {
+        noisy = join(dir, "noisy.webm");
+        await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2",
+          "-f", "lavfi", "-i", "anoisesrc=color=pink:amplitude=0.008:sample_rate=48000:duration=6:seed=7",
+          "-filter_complex", "[0:a]volume=3,apad=whole_dur=6[t];[t][1:a]amix=inputs=2:normalize=0[a]", "-map", "[a]",
+          "-c:a", "libopus", "-b:a", "128k", noisy]);
+      });
+
+      it("lowers the noise floor, keeps the voice, and keeps the sound as recorded next to it", async () => {
+        const asRecorded = await renderRecording([audio()], opts("noise-off"));
+        const outputs = await renderRecording([audio(with_({ noiseRemoval: true }))], opts("noise-on"));
+        expect(outputs.map((o) => [o.kind, o.fileName])).toEqual([
+          ["audio", "Sam - audio.wav"],
+          ["audio", "Sam - audio (original).wav"],
+          ["combined", "Combined.wav"],
+        ]);
+        const cleaned = samples(outputs[0]!.path);
+        const original = samples(outputs[1]!.path);
+        // The hiss alone (after the tone): at least 6 dB quieter.
+        expect(rms(original, 4, 5.5)).toBeGreaterThan(30);
+        expect(rms(cleaned, 4, 5.5)).toBeLessThan(rms(original, 4, 5.5) / 2);
+        // The tone is still there at its level.
+        expect(peak(cleaned, 0.5, 1.5) / peak(original, 0.5, 1.5)).toBeGreaterThan(0.8);
+        expect(peak(cleaned, 0.5, 1.5) / peak(original, 0.5, 1.5)).toBeLessThan(1.1);
+        // The original is sample for sample what a render without filters gives.
+        expect(Buffer.from(original.buffer).equals(Buffer.from(samples(asRecorded[0]!.path).buffer))).toBe(true);
+        expect(outputs[1]).toMatchObject({ original: true, participantId: "par_s", trackId: "trk_a", contentType: "audio/wav" });
+        // Same length, to the sample; and the mix is the cleaned sound, not the original.
+        expect([cleaned.length, original.length]).toEqual([288_000, 288_000]);
+        expect(Buffer.from(samples(outputs[2]!.path).buffer).equals(Buffer.from(cleaned.buffer))).toBe(true);
+      });
+
+      it("measures the hiss between words as the noise floor, and how long this ffmpeg's filter holds sound back", async () => {
+        const [late] = await renderRecording([audio(undefined, 500)], opts("noise-floor"));
+        const floor = (await measureNoiseFloor(late!.path))!;
+        expect(floor).toBeGreaterThan(-62); // pink noise at about -56 dBFS; the 500 ms of padding isn't counted
+        expect(floor).toBeLessThan(-50);
+        const silent = join(dir, "digital-silence.wav");
+        await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", "1", "-c:a", "pcm_s16le", silent]);
+        expect(await measureNoiseFloor(silent)).toBeNull();
+        const delay = await filterDelaySamples(ffmpeg, "afftdn=nr=12:nf=-50", dir);
+        expect(delay).toBeGreaterThanOrEqual(0);
+        expect(delay).toBeLessThan(4800);
+        expect(await filterDelaySamples(ffmpeg, "anull", dir)).toBe(0);
+      });
+
+      it("doesn't move the sound: a late track's voice starts where it does without filters", async () => {
+        const asRecorded = samples((await renderRecording([audio(undefined, 500)], opts("noise-late-off")))[0]!.path);
+        const cleaned = samples((await renderRecording([audio(with_({ noiseRemoval: true }), 500)], opts("noise-late-on")))[0]!.path);
+        expect(cleaned.length).toBe(288_000);
+        expect(onset(asRecorded)).toBeGreaterThan(24_000 - 48);
+        // ffmpeg 6.0's afftdn alone would bring it 25 ms late: that is measured and taken off.
+        expect(Math.abs(onset(cleaned) - onset(asRecorded))).toBeLessThanOrEqual(24); // within half a millisecond
+        expect(peak(cleaned, 0, 0.45)).toBeLessThan(50); // the silence before it is still silence
+      });
+
+      it("levels the cleaned sound, not the noisy one, and leaves the original as recorded", async () => {
+        const plainLevel = await renderRecording([audio()], { ...opts("noise-level-off"), loudness: PODCAST_LOUDNESS });
+        const outputs = await renderRecording([audio(with_({ noiseRemoval: true }))], { ...opts("noise-level-on"), loudness: PODCAST_LOUDNESS, audioFormat: "flac" });
+        expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.flac", "Sam - audio (original).flac", "Combined.flac"]);
+        expect((await measureLoudness(ffmpeg, outputs[0]!.path)).integrated!).toBeCloseTo(-16, 0);
+        // Less hiss counted as loudness, so the voice is raised a little more than with the hiss in.
+        expect(outputs[0]!.gainDb!).toBeGreaterThanOrEqual(plainLevel[0]!.gainDb!);
+        expect(outputs[1]!.gainDb).toBeUndefined();
+        expect(outputs[1]!.contentType).toBe("audio/flac");
+      });
+
+      it("cleans the sound in the person's video as well", async () => {
+        const cam = join(dir, "noisy-cam.webm");
+        await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc=size=320x240:rate=24:duration=6", "-i", noisy,
+          "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "500k", "-c:a", "copy", "-shortest", cam]);
+        const render = async (name: string, filters?: TrackFilters) => {
+          const [out] = await renderRecording([{ ...video(filters), rawPath: cam }], opts(name));
+          const wav = join(dir, `${name}.wav`);
+          await run(ffmpeg, ["-y", "-i", out!.path, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", wav]);
+          return { out: out!, sound: samples(wav) };
+        };
+        const before = await render("noise-cam-off");
+        const after = await render("noise-cam-on", with_({ noiseRemoval: true }));
+        expect(rms(after.sound, 4, 5.5)).toBeLessThan(rms(before.sound, 4, 5.5) / 2);
+        expect(shape(after.out.path)).toBe(shape(before.out.path));
+        expect(after.out.durationMs).toBe(before.out.durationMs);
+      });
+    });
+
+    describe("the commands themselves", () => {
+      /** An ffmpeg that writes down the filters it was asked for, then runs the real one (or fails on `failOn`). */
+      function spy(name: string, failOn = "") {
+        const log = join(dir, `${name}.log`);
+        const path = join(dir, `${name}.sh`);
+        writeFileSync(
+          path,
+          `#!/bin/sh\nprev=""\nfor a in "$@"; do\n  case "$prev" in -vf|-af|-filter_complex) echo "$prev $a" >> "${log}";; esac\n  prev="$a"\ndone\n` +
+            (failOn ? `case "$*" in *${failOn}*) echo "No such filter" >&2; exit 1;; esac\n` : "") +
+            `exec "${ffmpeg}" "$@"\n`,
+        );
+        chmodSync(path, 0o755);
+        return { path, lines: () => readFileSync(log, "utf8").trim().split("\n") };
+      }
+      const tracks = (filters?: TrackFilters): TrackInput[] => [
+        { trackId: "trk_a", participantId: "par_s", participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 500, filters },
+        { trackId: "trk_v", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 500, filters },
+      ];
+      const options = (name: string, bin: string) => ({ ffmpeg: bin, ffprobe, workDir: join(dir, "same"), durationMs: 3000, videoHeight: 720 as const, font: null });
+
+      it("are exactly today's when there are no filters (the sync measurements were made with them)", async () => {
+        const none = spy("spy-none");
+        const off = spy("spy-off");
+        await renderRecording(tracks(), options("spy-none", none.path));
+        await renderRecording(tracks(NO_FILTERS), options("spy-off", off.path));
+        expect(off.lines()).toEqual(none.lines());
+        expect(none.lines().slice(0, 3)).toEqual([
+          "-af aresample=48000,asetpts=N/SR/TB,adelay=500:all=1,apad",
+          "-vf fps=30,tpad=start_duration=0.500:start_mode=add:color=black,tpad=stop=-1:stop_mode=clone,scale=-2:720,format=yuv420p",
+          "-af aresample=48000,asetpts=N/SR/TB,adelay=500:all=1,apad",
+        ]);
+        expect(none.lines().join("\n")).not.toMatch(/eq=|colortemperature|bilateral|afftdn/);
+      });
+
+      it("put the look before alignment and noise removal after it", async () => {
+        const on = spy("spy-on");
+        await renderRecording(tracks({ brightness: 1, look: "cool", touchUp: true, noiseRemoval: true }), options("spy-on", on.path));
+        const lines = on.lines().filter((l) => !l.includes("asplit")); // the one-off measurement of the filter's delay
+        const clean = /(apad=pad_len=\d+,)?afftdn=nr=12:nf=-\d+(,atrim=start_sample=\d+,asetpts=N\/SR\/TB)?/.source;
+        expect(lines[0]).toBe("-af aresample=48000,asetpts=N/SR/TB,adelay=500:all=1,apad"); // the WAV as recorded first...
+        expect(lines[1]).toMatch(new RegExp(`^-af ${clean},apad$`)); // ...then cleaned from it
+        expect(lines[3]).toMatch(new RegExp(`^-af aresample=48000,asetpts=N/SR/TB,adelay=500:all=1,apad,${clean}$`));
+        expect(lines.slice(2, 3)).toEqual([
+          "-vf eq=brightness=0.04:contrast=1.03:gamma=1.15:saturation=1.02,colortemperature=temperature=8200,bilateral=sigmaS=3:sigmaR=0.05:planes=1," +
+            "fps=30,tpad=start_duration=0.500:start_mode=add:color=black,tpad=stop=-1:stop_mode=clone,scale=-2:720,format=yuv420p",
+        ]);
+      });
+
+      it("never lose a file to a filter this ffmpeg can't run: it is rendered as recorded, and says so", async () => {
+        const old = spy("spy-old", "bilateral");
+        const skipped: SkippedTrack[] = [];
+        const failed: FilterFailure[] = [];
+        const outputs = await renderRecording(tracks(with_({ touchUp: true })), {
+          ...options("spy-old", old.path), onSkipped: (s) => skipped.push(s), onFilterFailed: (f) => failed.push(f),
+        });
+        expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam - video.mp4", "Combined.mp4"]);
+        expect(skipped).toEqual([]);
+        // The video only: touch-up has nothing to do with their sound.
+        expect(failed).toEqual([{ participantId: "par_s", name: "Sam", kind: "video" }]);
+
+        const deaf = spy("spy-deaf", "afftdn");
+        failed.length = 0;
+        const sound = await renderRecording([tracks(with_({ noiseRemoval: true }))[0]!], { ...options("spy-deaf", deaf.path), onFilterFailed: (f) => failed.push(f) });
+        expect(sound.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Combined.wav"]);
+        expect(samples(sound[0]!.path).length).toBe(144_000);
+        expect(failed).toEqual([{ participantId: "par_s", name: "Sam", kind: "audio" }]);
+      });
+
+      it("says it once per file when a rejoined person's pieces all fall back, and not at all when filters work or a track is unreadable", async () => {
+        const pieces = (filters?: TrackFilters): TrackInput[] => [
+          { trackId: "trk_v1", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 0, filters },
+          { trackId: "trk_v2", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 3000, filters },
+        ];
+        const failed: FilterFailure[] = [];
+        const old = spy("spy-old-pieces", "bilateral");
+        await renderRecording(pieces(with_({ touchUp: true })), { ...options("", old.path), workDir: join(dir, "fail-pieces"), durationMs: 6000, onFilterFailed: (f) => failed.push(f) });
+        expect(failed).toEqual([{ participantId: "par_s", name: "Sam", kind: "video" }]);
+
+        failed.length = 0;
+        const skipped: SkippedTrack[] = [];
+        const junk = join(dir, "filter-junk.raw");
+        writeFileSync(junk, "this is not media");
+        await renderRecording(
+          [...tracks(with_({ touchUp: true, noiseRemoval: true })), { trackId: "trk_bad", participantId: "par_b", participantName: "Bo", kind: "video", rawPath: junk, offsetMs: 0, filters: with_({ touchUp: true }) }],
+          { ffmpeg, ffprobe, workDir: join(dir, "fail-none"), durationMs: 3000, videoHeight: 720, font: null, onFilterFailed: (f) => failed.push(f), onSkipped: (s) => skipped.push(s) },
+        );
+        expect(failed).toEqual([]);
+        expect(skipped.map((s) => s.trackId)).toEqual(["trk_bad"]);
+      });
     });
   });
 });

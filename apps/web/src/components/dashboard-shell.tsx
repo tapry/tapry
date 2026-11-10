@@ -9,7 +9,7 @@ import { PageNav, RecentNav, type PageLink, type RecentItem } from "./recent-nav
 import { CopyGuestLink, OpenStudioAction } from "./studio-actions";
 import { LogOutButton } from "./studio-forms";
 import type { IconName } from "./ui-extra";
-import { Avatar, Mark } from "./ui";
+import { Avatar, LogoMark } from "./ui";
 
 export type NavKey = "recordings" | "guests" | "transcripts" | "studios" | "storage" | "settings" | "health";
 
@@ -69,9 +69,7 @@ export async function DashboardShell({
     <div className="flex h-full w-[248px] flex-col gap-0.5 overflow-x-hidden overflow-y-auto border-r border-border px-3 pt-3.5">
       <div className="flex items-center justify-between gap-2 px-1 pt-0.5 pb-3.5 whitespace-nowrap">
         <Link href="/studios" aria-label="Tapry home" className="flex items-center gap-[9px] text-[15px] font-medium text-text hover:text-text">
-          <span className="grid size-6 shrink-0 place-items-center rounded-[7px] bg-accent text-accent-text">
-            <Mark className="size-3.5" />
-          </span>
+          <LogoMark className="size-6" />
           Tapry
         </Link>
         <span className="flex gap-1">
