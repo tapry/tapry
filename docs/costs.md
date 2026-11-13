@@ -54,10 +54,11 @@ CPU-minutes of processing. 720p roughly halves the video sizes and the encoding 
    | Originals removed after 7 days, files kept 90 days | ~550–575 GB | ~$8–9 | same |
    | Originals removed after 7 days, files kept 30 days | ~200–215 GB | ~$3 | same |
 
-   At $9/month, Creator only pays at full use with shorter retention, smaller video files, or
-   both. Average use (plan v2 expects 30–40%) leaves room either way. Bring-your-own-storage moves
-   the storage line to the customer, leaving processing, which is cheap per hour but should still
-   have a fair-use limit.
+   The first plan ($9 for 20 h, everything kept 90 days) cost more than it earned at full use.
+   Pricing v4 (`docs/plan/06-monetization.md`) is built on the last row: hosted plans remove the
+   originals after 7 days and keep the files 30–90 days, which leaves every plan with a margin
+   even when every hour is used. Bring-your-own-storage moves the storage line to the customer,
+   leaving processing, which is cheap per hour but should still have a fair-use limit.
 
 ## Re-run it
 

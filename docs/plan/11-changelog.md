@@ -73,3 +73,15 @@
 4. New `14-riverside-parity.md`: every Riverside feature sorted into match / do differently / later / skip (skip: webinars, full editor, voice cloning, dubbing, eye contact, AI B-roll).
 5. `02-product-spec.md` and `08-roadmap.md` updated with these items; Week 0 added (domain, GitHub, waitlist).
 6. README: realistic first-4-months cash after launch ($3–10k total, mostly lifetime deals) added to goals.
+
+---
+
+# Pricing v4 (13 Nov 2026)
+
+1. `06-monetization.md` rewritten after a pricing benchmark (new `15-pricing-benchmark.md`). The $9 / $19 plans lost money at full use on the measured costs and sat far below every metered competitor.
+2. Cloud: Creator **$19** (15 h, files kept 30 days), Studio **$39** (40 h, 3 seats, 60 days), new Team **$149** (80 h, 5 seats, 90 days, EU hosting, data agreement); Own storage **$12** (was $6); Free cloud 2 h a month, files kept 7 days (was 5 h, 30 days). Hosted plans remove originals after 7 days.
+3. Organisations: Business from **$4,800 a year** (was from $99 a month); self-hosted Organisation support **$2,400 a year** and licence **$6,000 a year** (was $1–5k); the separate Research team plan is folded into Team.
+4. Founding offers: lifetime only for Own storage ($149, 200 seats); a price lock ($15 / $29) for the first 100 Creator or Studio subscribers.
+5. Education and non-profit discount 30% (was 50%). Projections revised down for year one.
+6. Not yet carried into `01-market-and-competition.md`, `07-go-to-market.md` and `08-roadmap.md`, which may still quote the old prices: `06` wins.
+
