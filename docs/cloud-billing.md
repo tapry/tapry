@@ -55,7 +55,7 @@ instead of the Paddle token: the address must carry the account's id as custom d
 3. **Developer tools → Authentication:** create a client-side token → `BILLING_PADDLE_CLIENT_TOKEN`.
 4. **Events → Notifications → New destination** (in some accounts under Developer tools): type webhook, URL `https://<the app's address>/api/billing/webhook`, and these events: `subscription.created`, `subscription.updated`, `subscription.canceled`, `customer.created`, `customer.updated`, `transaction.completed`. Save, open it, and copy its **secret key** (`pdl_ntfset_…`) → `BILLING_WEBHOOK_SECRET`. This destination is permanent: deliveries stop without it.
 4a. **Developer tools → Authentication → API keys:** a key with permission to create customer portal sessions (read customers, subscriptions; write customer portal sessions) → `BILLING_PADDLE_API_KEY`. Put it in the server's `.env` only.
-5. **Checkout → Checkout settings:** set the default payment link to the app's address, and add the app's domain to the approved domains (Paddle only opens its checkout on approved domains).
+5. **My account → Settings → Website approval:** add `tapry.app` and `studio.tapry.app`, and wait for approval. **Checkout → Checkout settings:** set the default payment link to `https://studio.tapry.app/pay`, the app's page that opens Paddle's checkout for invoice links and Paddle's "update your card" emails.
 6. The customer portal's address (Paddle gives one per seller) → `BILLING_MANAGE_URL`.
 7. Buy a plan with Paddle's test card, and check the Plan tab changes within a minute.
 

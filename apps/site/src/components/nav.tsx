@@ -71,7 +71,7 @@ export function Nav({ active, overlay = false }: { active?: NavId; overlay?: boo
           </a>
           {HAS_CLOUD && (
             <a href={LOGIN_URL} className="nav-github">
-              Log in
+              Studio
             </a>
           )}
           <a href={GET_STARTED} className="nav-cta" style={{ display: "inline-flex", height: 38, alignItems: "center", borderRadius: 10, padding: "0 16px", fontWeight: 500, whiteSpace: "nowrap" }}>
@@ -91,7 +91,7 @@ export function Nav({ active, overlay = false }: { active?: NavId; overlay?: boo
           </a>
         ))}
         <a href={GITHUB}>GitHub</a>
-        {HAS_CLOUD && <a href={LOGIN_URL}>Log in</a>}
+        {HAS_CLOUD && <a href={LOGIN_URL}>Studio</a>}
         {HAS_CLOUD && <a href={GET_STARTED}>Create an account</a>}
       </nav>
       {overlay && <script dangerouslySetInnerHTML={{ __html: SCROLL_SCRIPT }} />}

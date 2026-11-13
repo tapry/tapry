@@ -243,6 +243,15 @@ export class BillingService {
     };
   }
 
+  /**
+   * What the payment-link page (/pay) needs: Paddle's public client token, or null where this
+   * server doesn't sell through Paddle. The token is public by design (it runs in the browser).
+   */
+  paddleClient(): { clientToken: string; sandbox: boolean } | null {
+    const paddle = this.opts.cloud ? this.opts.paddle : null;
+    return paddle ? { clientToken: paddle.clientToken, sandbox: paddle.sandbox } : null;
+  }
+
   /** What the checkout page needs for one plan. The owner's to open; 404 where the plan isn't sold this way. */
   checkout(user: User, planId: string, yearly: boolean): PaddleCheckout {
     this.requireCloud();

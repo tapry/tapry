@@ -12,6 +12,7 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   and Get Started, the pricing page's plan buttons open each plan's checkout in the app (monthly
   or yearly), and the privacy and terms pages describe Tapry Cloud. Without the variable the
   site describes Tapry Cloud as planned, as before.
+- **Paddle's payment-link page** at `/pay`: Paddle sends people there from invoices and its "update your card" emails, and it opens the right checkout. Set it as the default payment link in Paddle.
 - **From a plan button to its checkout.** Someone without an account who opens a checkout is
   sent to sign up, then back to that checkout; log in and sign up take a `next` path on the same
   server only.
