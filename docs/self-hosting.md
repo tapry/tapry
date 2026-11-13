@@ -135,8 +135,20 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   can never come up with empty volumes by mistake. `OPENTAKE_IMAGES` and `OPENTAKE_VERSION` are
   no longer read: use `TAPRY_IMAGES` and `TAPRY_VERSION`.
 - **Logs:** `docker compose logs -f web worker`. Logs never contain media, only ids and errors.
-- **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
-  storage provider's replication). Recordings are useless without the database that indexes them.
+- **Backups:** two things need keeping, and each is of little use without the other.
+  - *The database and `.env`:* `deploy/compose/backup.sh` writes a `pg_dump` of the database
+    and a copy of `.env` into `/var/backups/tapry` (root only: they hold personal data and every
+    secret), checks the dump can be read back, and removes backups older than 14 days
+    (`BACKUP_DIR`, `KEEP_DAYS`). Run it nightly, for example with a line in `/etc/cron.d`:
+    `17 3 * * * root /opt/tapry/deploy/compose/backup.sh >> /var/log/tapry-backup.log 2>&1`.
+    To restore: `docker compose stop web worker`, then
+    `docker compose exec -T postgres pg_restore -U "$DATA_NAME" -d "$DATA_NAME" --clean --if-exists < db-<time>.dump`,
+    then `docker compose start web worker`.
+  - *The recordings' media* (the `seaweedfs-data` volume, or your S3 bucket) is not in that
+    backup: it is large, and a copy on the same disk protects against nothing. Use your
+    provider's server backups or snapshots, or your bucket's replication.
+  - A backup on the server's own disk doesn't survive losing the server. Copy
+    `/var/backups/tapry` somewhere else too, or rely on whole-server backups for both.
 - **Health:** `GET /api/health` returns `{"ok":true,"version":"0.3.0"}` when the app and its database are up.
   Signed in as the admin, **Server health** (link in the sidebar, `/admin/health`)
   checks everything else: storage (it writes, reads and deletes a test file), the workers and
