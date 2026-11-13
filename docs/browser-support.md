@@ -23,6 +23,13 @@ isn't Safari: codecs and permission prompts can differ), Edge (Chromium-based), 
 real cameras and microphones. Recording on phones also stops when the tab is backgrounded;
 the green room warns about it.
 
+## Screen sharing
+
+Tested end to end in Chromium only (Chrome for Testing 156, host shares, guest watches, the
+screen is recorded and processed: `e2e/screen.spec.ts`). Firefox and Safari have the same
+browser features (`getDisplayMedia`, MediaRecorder) but have not been tried. Phones can't share
+a screen from the browser, so the button isn't shown there.
+
 ## Live call
 
 `e2e/call.spec.ts`: the host in each engine with a guest in Chromium, plus Firefox and WebKit

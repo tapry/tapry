@@ -38,6 +38,7 @@ export function CallGrid({
   layout = "grid",
   variant = "stage",
   badges,
+  screen,
 }: {
   stream: MediaStream;
   selfId: string;
@@ -54,19 +55,26 @@ export function CallGrid({
   variant?: "stage" | "full";
   /** Small warning on someone's tile (the host's view of an upload falling behind), by participant id. */
   badges?: Map<string, string>;
+  /**
+   * A screen being shared: the big tile above everyone. `track` is another person's; your own
+   * isn't shown back to you (a screen showing itself is a hall of mirrors), only that it's shared.
+   */
+  screen?: { label: string; track?: RemoteVideoTrack } | null;
 }) {
   const count = peers.length + 1;
-  const speaker = useSpotlight(peers, layout === "speaker");
+  // A shared screen takes the big tile; the speaker layout is back when it ends.
+  const spot = useSpotlight(peers, layout === "speaker");
+  const speaker = screen ? null : spot;
 
   const full = variant === "full";
   const cols =
     count === 1
       ? "grid-cols-1"
-      : layout === "side"
+      : layout === "side" && !screen
         ? count === 2
           ? "grid-cols-2"
           : "grid-cols-2 sm:grid-cols-3"
-        : layout === "speaker"
+        : layout === "speaker" || screen
           ? count <= 3
             ? "grid-cols-2"
             : "grid-cols-3"
@@ -74,7 +82,7 @@ export function CallGrid({
             ? "grid-cols-1 sm:grid-cols-2"
             : "grid-cols-2 lg:grid-cols-3";
   const aspect = (id: string) =>
-    full ? "min-h-0" : count === 1 ? "aspect-video" : layout === "side" ? "aspect-[3/4]" : id === speaker ? "aspect-[21/9]" : "aspect-video";
+    full ? "min-h-0" : count === 1 || screen ? "aspect-video" : layout === "side" ? "aspect-[3/4]" : id === speaker ? "aspect-[21/9]" : "aspect-video";
   const tile = (id: string) => ({
     full,
     className: aspect(id),
@@ -88,10 +96,28 @@ export function CallGrid({
         "grid",
         cols,
         full ? "min-h-0 min-w-0 flex-1 auto-rows-[minmax(0,1fr)] gap-2.5" : "gap-2",
-        full && speaker && "grid-rows-[minmax(0,2fr)_minmax(0,1fr)]",
-        !full && layout === "side" && count > 1 && "mx-auto w-full max-w-[640px]",
+        full && (speaker || screen) && "grid-rows-[minmax(0,2fr)_minmax(0,1fr)]",
+        !full && layout === "side" && !screen && count > 1 && "mx-auto w-full max-w-[640px]",
       )}
     >
+      {screen && (
+        <div
+          data-testid="screen-tile"
+          data-name={screen.label}
+          className={cn("relative order-first col-span-full overflow-hidden bg-black text-white", full ? "min-h-0 rounded-[14px]" : "aspect-video rounded-lg")}
+        >
+          {screen.track ? (
+            <TrackVideo track={screen.track} contain />
+          ) : (
+            <div className="grid size-full place-items-center px-6 text-center text-sm text-white/75">
+              {recording ? "You're sharing your screen. It is being recorded." : "You're sharing your screen. It is recorded while a recording runs."}
+            </div>
+          )}
+          <span className={cn("absolute flex max-w-[calc(100%-20px)] items-center bg-black/60", full ? "bottom-3 left-3 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 rounded-[7px] px-[9px] py-1 text-[13px]")}>
+            <span className="truncate">{screen.label}</span>
+          </span>
+        </div>
+      )}
       <Tile
         name={`${selfName} (you)`}
         label={selfName}
@@ -222,7 +248,7 @@ function Tile({
   );
 }
 
-function TrackVideo({ track }: { track: RemoteVideoTrack }) {
+function TrackVideo({ track, contain = false }: { track: RemoteVideoTrack; /** Show all of it (a screen), not a filled tile (a face). */ contain?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -232,7 +258,7 @@ function TrackVideo({ track }: { track: RemoteVideoTrack }) {
       track.detach(el);
     };
   }, [track]);
-  return <video ref={ref} autoPlay playsInline muted className="size-full object-cover" />;
+  return <video ref={ref} autoPlay playsInline muted className={cn("size-full", contain ? "object-contain" : "object-cover")} />;
 }
 
 function TrackAudio({ track }: { track: RemoteAudioTrack }) {

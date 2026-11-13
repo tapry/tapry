@@ -9,7 +9,11 @@ export interface TrackInput {
   trackId: string;
   participantId: string;
   participantName: string;
-  kind: "audio" | "video";
+  /**
+   * "screen": what the person shared from their display, picture only. Each time they shared is
+   * a track of its own; together they become one file, black while nothing was shared.
+   */
+  kind: "audio" | "video" | "screen";
   /** The track's chunks concatenated in seq order (WebM or MP4 as MediaRecorder wrote it). */
   rawPath: string;
   /** Track start minus recording start, server clock. Positive: the track started late. */
@@ -44,7 +48,7 @@ export interface SkippedTrack {
   trackId?: string;
   participantId?: string;
   participantName?: string;
-  kind: "audio" | "video" | "combined";
+  kind: "audio" | "video" | "screen" | "combined";
   reason: string;
 }
 
@@ -103,7 +107,9 @@ export interface LoudnessMeasurement {
 }
 
 export interface OutputFile {
-  kind: "audio" | "video" | "combined";
+  kind: "audio" | "video" | "screen" | "combined";
+  /** A shared screen: when it was shared, in seconds from the recording's start. */
+  intervals?: Array<[number, number]>;
   trackId?: string;
   participantId?: string;
   path: string;
@@ -117,6 +123,8 @@ export interface OutputFile {
 }
 
 const FPS = 30;
+/** The frame a shared screen is kept in (1920×1080), whatever the window's shape. */
+const SCREEN_HEIGHT = 1080;
 
 /**
  * Most bits per second a person's processed video may use: what the browser recorded at
@@ -131,6 +139,8 @@ function cappedVideo(height: VideoHeight) {
   return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", String(max), "-bufsize", String(max * 2)];
 }
 const TILE_BG = "0x202020";
+/** The sharer's camera in the corner of the combined video while their screen fills it. */
+const PIP = { w: 352, h: 198, margin: 28 };
 
 /** Join chunk files into one, in the order given. MediaRecorder chunks are byte-continuous. */
 export async function concatChunks(chunkPaths: string[], outPath: string) {
@@ -471,7 +481,7 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     const key = `${t.participantId}\u0000${t.kind}`;
     if (unfiltered.has(key)) return;
     unfiltered.add(key);
-    opts.onFilterFailed?.({ participantId: t.participantId, name: t.participantName, kind: t.kind });
+    opts.onFilterFailed?.({ participantId: t.participantId, name: t.participantName, kind: t.kind === "audio" ? "audio" : "video" });
   };
   const shared = { opts, duration, timeoutMs, filterFailed };
   const groups = groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`);
@@ -481,7 +491,8 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     firstFailure ??= err;
     opts.onSkipped?.({ trackId: t.trackId, participantId: t.participantId, participantName: t.participantName, kind: t.kind, reason: failureReason(err) });
   };
-  const audioFirst = [...groups].sort((a, b) => Number(a[0]!.kind === "video") - Number(b[0]!.kind === "video"));
+  const ORDER = { audio: 0, video: 1, screen: 2 } as const;
+  const audioFirst = [...groups].sort((a, b) => ORDER[a[0]!.kind] - ORDER[b[0]!.kind]);
 
   // One file per person per kind. A person can have several tracks of a kind when they
   // rejoined during the recording (tab crash, reload): those pieces are merged in place.
@@ -493,11 +504,14 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     const path = join(opts.workDir, `${first.trackId}.${ext}`);
     const gainDb = first.kind === "video" ? gains.get(first.participantId) : undefined;
     // In a 4K studio a person's video keeps their camera's size: the tallest of their pieces.
-    const videoHeight = first.kind === "video" ? await personVideoHeight(pieces, opts) : undefined;
+    // A shared screen is always a Full HD frame: windows come in every shape.
+    const isScreen = first.kind === "screen";
+    const videoHeight = isScreen ? SCREEN_HEIGHT : first.kind === "video" ? await personVideoHeight(pieces, opts) : undefined;
     const ctx = { ...shared, videoHeight };
     let hasAudio: boolean;
     try {
-      if (pieces.length === 1) {
+      // A screen goes the way of pieces even when it is one: black before and after it was shared.
+      if (pieces.length === 1 && !isScreen) {
         hasAudio = await renderPiece(first, path, { ...ctx, multi: false, gainDb, noiseFloorDb: floors.get(first.participantId) });
       } else {
         const parts: Array<{ path: string; hasAudio: boolean }> = [];
@@ -511,7 +525,7 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
           }
         }
         if (parts.length === 0) continue;
-        await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs, gainDb, videoHeight });
+        await mergePieces(first.kind === "audio" ? "audio" : "video", parts, path, { opts, duration, timeoutMs, gainDb, videoHeight });
         hasAudio = parts.some((p) => p.hasAudio);
       }
     } catch (err) {
@@ -527,6 +541,7 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
       fileName: `${base} - ${first.kind}.${ext}`,
       contentType: first.kind === "audio" ? "audio/wav" : "video/mp4",
       durationMs: await probeDurationMs(opts.ffprobe, path),
+      ...(isScreen && { intervals: pieces.map((p): [number, number] => [Math.max(0, p.offsetMs) / 1000, Math.min(opts.durationMs, p.endOffsetMs ?? opts.durationMs) / 1000]).filter(([a, b]) => b > a) }),
     };
     const files = [output];
     // Noise removal comes before levelling, so the gain is worked out on the cleaned sound.
@@ -565,7 +580,7 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
   // Nothing readable at all: more likely the machine than the media, so the job fails and retries.
   if (outputs.length === 0) throw firstFailure ?? new Error("No tracks to render");
 
-  const hasVideo = outputs.some((o) => o.kind === "video");
+  const hasVideo = outputs.some((o) => o.kind === "video" || o.kind === "screen");
   opts.onProgress?.({ done: groups.length, total: groups.length + 1, current: hasVideo ? "Side-by-side video" : "Everyone, mixed" });
   // Only people with a file get a tile. People's own files matter most, so a failure here doesn't lose them.
   const rendered = tracks.filter((t) => outputs.some((o) => o.participantId === t.participantId));
@@ -666,7 +681,11 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   const wide = even((h * 16) / 9);
   const pad = `pad=${wide}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
   const frame = multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease,${pad}` : `scale=-2:${h}`;
-  const align = alignmentFilters("video", track.offsetMs, multi ? "black" : "clone");
+  // A shared screen that stands still sends few frames, so its last one is held to the moment
+  // sharing really ended (the last chunk's time) and the picture is black from there.
+  const isScreen = track.kind === "screen";
+  const shareEnd = isScreen && track.endOffsetMs !== undefined ? `,drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='gte(t,${sec(Math.max(0, track.endOffsetMs))})'` : "";
+  const align = alignmentFilters("video", track.offsetMs, multi && !isScreen ? "black" : "clone");
   // Background blur needs a mask that covers this video; without one the file is made without it.
   const wantsBlur = track.filters?.background === "blur";
   const mask = wantsBlur ? await usableMask(track, ctx) : null;
@@ -700,7 +719,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
             frame: multi ? pad : "",
           }),
           "-map", "[v]", ...(hasAudio ? ["-map", "0:a:0"] : [])]
-      : ["-vf", `${look ? `${look},` : ""}${align},${frame},format=yuv420p`];
+      : ["-vf", `${look ? `${look},` : ""}${align},${frame}${shareEnd},format=yuv420p`];
     await run(
       opts.ffmpeg,
       [...INPUT_FLAGS, "-i", track.rawPath,
@@ -860,7 +879,7 @@ async function renderCombined(
 ): Promise<OutputFile | null> {
   const participants = [...new Set(tracks.map((t) => t.participantId))];
   if (participants.length === 0) return null;
-  if (!rendered.some((o) => o.kind === "video")) return renderMix(rendered, opts, timeoutMs);
+  if (!rendered.some((o) => o.kind === "video" || o.kind === "screen")) return renderMix(rendered, opts, timeoutMs);
   const tiles = gridLayout(participants.length);
   const duration = sec(opts.durationMs);
   const args: string[] = [];
@@ -892,6 +911,24 @@ async function renderCombined(
     filters.push(`[${canvas}][t${i}]overlay=x=${tile.x}:y=${tile.y}:shortest=0[c${i}]`);
     canvas = `c${i}`;
     if (audio) voices.push(audio.path);
+  }
+  // While someone shares their screen it fills the frame, with their camera small in a corner;
+  // the grid is back when they stop. (The screen's file is black outside those times.)
+  for (const [j, screen] of rendered.filter((o) => o.kind === "screen" && o.intervals?.length).entries()) {
+    const when = screen.intervals!.map(([a, b]) => `between(t,${num(a)},${num(b)})`).join("+");
+    args.push("-i", screen.path);
+    filters.push(`[${input}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[s${j}]`);
+    filters.push(`[${canvas}][s${j}]overlay=x=0:y=0:shortest=0:enable='${when}'[cs${j}]`);
+    canvas = `cs${j}`;
+    input++;
+    const camera = rendered.find((o) => o.participantId === screen.participantId && o.kind === "video");
+    if (camera) {
+      args.push("-i", camera.path);
+      filters.push(`[${input}:v]scale=${PIP.w}:${PIP.h}:force_original_aspect_ratio=decrease,pad=${PIP.w}:${PIP.h}:(ow-iw)/2:(oh-ih)/2:color=${TILE_BG},setsar=1[p${j}]`);
+      filters.push(`[${canvas}][p${j}]overlay=x=${1920 - PIP.w - PIP.margin}:y=${1080 - PIP.h - PIP.margin}:shortest=0:enable='${when}'[cp${j}]`);
+      canvas = `cp${j}`;
+      input++;
+    }
   }
   // Voices go in after the cameras, so their input numbers follow.
   if (!opts.loudness) {

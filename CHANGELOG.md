@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Screen sharing.** Anyone in a session (on a computer) can share a screen or window. The
+  others see it as the big tile in the call; while a recording runs it is recorded on the
+  sharer's device as a track of its own, picture only, and uploaded like the camera. Each person
+  who shared gets "<name> - screen.mp4" (1080p, black while nothing was shared), and the
+  combined video shows the screen across the frame, with the sharer's camera in a corner, for as
+  long as it was shared. One person shares at a time. Tested in Chromium.
+
 - **4K.** A studio's video quality can be "4K": each person's camera is recorded at its own
   best, up to 3840×2160 (24 Mbit/s; 1440p cameras at 14). Nothing is upscaled: a Full HD webcam
   in a 4K studio is a Full HD file at Full HD's size. Per-person files keep the camera's size;

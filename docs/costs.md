@@ -27,6 +27,9 @@ the numbers below are per recorded hour. Two runs bracket real cameras: heavy se
 | Processing (render, level, align) | 111 CPU-min (14 min wall) | 142 CPU-min (16 min wall) | 149 CPU-min |
 | Transcription (whisper.cpp base) | 2 CPU-min | 2 CPU-min | 2 CPU-min |
 
+**Screen sharing (computed):** a shared screen is recorded at up to 4 Mbit/s, so up to about
+1.8 GB per hour of sharing, usually far less (a still screen compresses to almost nothing).
+
 **4K studios (computed from the bitrates, not yet measured):** a 4K camera records at up to
 24 Mbit/s (1440p: 14), so up to about 11 GB uploaded per person and hour and as much again
 processed, three times Full HD; encoding takes several times longer. A Full HD webcam in a 4K

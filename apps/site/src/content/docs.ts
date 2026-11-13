@@ -143,6 +143,7 @@ export const DOCS: DocPage[] = [
       T([
         ["<name> - audio.wav", "48 kHz, 16-bit; or .flac when the studio’s audio setting is FLAC"],
         ["<name> - video.mp4", "H.264 and AAC at the studio’s quality (1080p or 720p; in a 4K studio, each camera’s own size up to 4K), aligned to Record"],
+        ["<name> - screen.mp4", "Only for someone who shared their screen: 1080p, picture only, black while nothing was shared"],
       ]),
       H("Per recording"),
       T([

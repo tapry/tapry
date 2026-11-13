@@ -25,6 +25,8 @@ export interface RemotePeer {
   name: string;
   video?: RemoteVideoTrack;
   audio?: RemoteAudioTrack;
+  /** What they are sharing from their screen, while they are. */
+  screen?: RemoteVideoTrack;
   micMuted: boolean;
   cameraOff: boolean;
   speaking: boolean;
@@ -55,6 +57,8 @@ interface LocalTracks {
   noiseUnavailable?: boolean;
   /** Filter changes, one after the other. */
   chain?: Promise<void>;
+  /** The call's copy of the shared screen, while one is shared. */
+  screen?: LocalVideoTrack;
 }
 
 /**
@@ -70,6 +74,8 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
   const local = useRef<LocalTracks>({});
   const wanted = useRef(filters);
   wanted.current = filters;
+  /** The screen the person is sharing (the recorder's track: the call only ever gets a copy). */
+  const sharing = useRef<MediaStreamTrack | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -126,6 +132,9 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
           RoomEvent.ParticipantDisconnected,
           RoomEvent.TrackSubscribed,
           RoomEvent.TrackUnsubscribed,
+          // A screen share comes and goes while the call runs.
+          RoomEvent.TrackPublished,
+          RoomEvent.TrackUnpublished,
           RoomEvent.TrackMuted,
           RoomEvent.TrackUnmuted,
           RoomEvent.ActiveSpeakersChanged,
@@ -151,6 +160,8 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
         await publish(r, stream, tracks, wanted.current);
         // Whatever changed while this was publishing (nothing to do when there are no filters).
         await syncFilters(tracks, stream, () => wanted.current);
+        // Sharing a screen when the call (re)connected: the others get it again.
+        await publishScreen(r, tracks, sharing.current).catch((err) => console.warn("[call] screen", err));
         if (cancelled) return releasePicture(tracks);
         snapshot(r);
       } catch (err) {
@@ -201,7 +212,39 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     [stream],
   );
 
-  return { ...state, startAudio, setMicMuted, setCameraOff };
+  /**
+   * Show the others this screen (null: stop). The call sends a small copy; the track itself is
+   * the recorder's and is never constrained or stopped here. Without a call nothing is sent.
+   */
+  const setScreen = useCallback(async (track: MediaStreamTrack | null) => {
+    sharing.current = track;
+    const r = room.current;
+    if (r?.state === ConnectionState.Connected) await publishScreen(r, local.current, track).catch((err) => console.warn("[call] screen", err));
+  }, []);
+
+  return { ...state, startAudio, setMicMuted, setCameraOff, setScreen };
+}
+
+/** What the call sends of a shared screen: readable text matters more than motion. */
+const CALL_SCREEN = { height: 1080, frameRate: 12, maxBitrate: 1_500_000 };
+
+/** Replace the call's copy of the shared screen with a copy of `track` (null: just remove it). */
+async function publishScreen(r: Room, local: LocalTracks, track: MediaStreamTrack | null) {
+  const previous = local.screen;
+  local.screen = undefined;
+  // Unpublishing stops the copy (stopLocalTrackOnUnpublish), never the screen track it was cloned from.
+  if (previous) await r.localParticipant.unpublishTrack(previous).catch(() => {});
+  if (!track || track.readyState !== "live") return;
+  const clone = track.clone();
+  clone.contentHint = "detail";
+  await clone.applyConstraints({ height: { ideal: CALL_SCREEN.height }, frameRate: { max: CALL_SCREEN.frameRate } }).catch(() => {});
+  const published = new LocalVideoTrack(clone, undefined, true);
+  local.screen = published;
+  await r.localParticipant.publishTrack(published, {
+    source: Track.Source.ScreenShare,
+    simulcast: false,
+    videoEncoding: { maxBitrate: CALL_SCREEN.maxBitrate, maxFramerate: CALL_SCREEN.frameRate },
+  });
 }
 
 async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters: TrackFilters) {
@@ -354,10 +397,18 @@ function toPeer(p: RemoteParticipant): RemotePeer {
     name: p.name || "Guest",
     video: cam?.videoTrack as RemoteVideoTrack | undefined,
     audio: mic?.audioTrack as RemoteAudioTrack | undefined,
+    screen: remoteScreen(p),
     micMuted: !mic || mic.isMuted,
     cameraOff: !cam || cam.isMuted,
     speaking: p.isSpeaking,
   };
+}
+
+/** The screen someone is sharing right now: published, not muted, and arriving. */
+function remoteScreen(p: RemoteParticipant) {
+  const pub = p.getTrackPublication(Track.Source.ScreenShare);
+  if (!pub || pub.isMuted || !pub.videoTrack || pub.videoTrack.mediaStreamTrack.readyState !== "live") return undefined;
+  return pub.videoTrack as RemoteVideoTrack;
 }
 
 function statusOf(s: ConnectionState): CallStatus {

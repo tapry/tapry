@@ -195,10 +195,18 @@ export interface RecordingOptions {
    * camera and mic are recording as they were. The app turns blur off and says so.
    */
   onMaskProblem?: (err: unknown) => void;
+  /**
+   * The shared screen couldn't be recorded (or stopped being). Never reported through onError:
+   * the camera and mic are recording as they were.
+   */
+  onScreenProblem?: (err: unknown) => void;
 }
 
 /** A mask is a small picture, a few frames a second: this is plenty. */
 export const MASK_BITRATE = 150_000;
+
+/** A shared screen: mostly still, mostly text. Enough to keep it sharp at up to 1080p. */
+export const SCREEN_BITRATE = 4_000_000;
 
 /** The recorder's video bitrate: the studio's tier, or in a 4K studio the tier of what this camera delivers. */
 export const videoBitrate = (quality: VideoQuality, sourceHeight?: number | null) => videoTier(quality, sourceHeight).bitrate;
@@ -215,10 +223,12 @@ interface PlannedTrack {
 
 /** Starts and stops this participant's local recorders as the host presses Record and Stop. */
 export class RecordingController {
-  private active: { recordingId: string; recorders: TrackRecorder[]; restarts: number; hasVideo: boolean; mask?: TrackRecorder; maskOf?: MediaStream } | null = null;
+  private active: { recordingId: string; recorders: TrackRecorder[]; restarts: number; hasVideo: boolean; mask?: TrackRecorder; maskOf?: MediaStream; screen?: TrackRecorder; screenOf?: MediaStream } | null = null;
   private chain: Promise<unknown> = Promise.resolve();
   /** Where the person is, as a video to record beside the camera; null when blur is off or not ready. */
   private maskStream: MediaStream | null = null;
+  /** What the person is sharing from their screen right now; null when nothing. */
+  private screenStream: MediaStream | null = null;
 
   constructor(private opts: RecordingOptions) {}
 
@@ -260,6 +270,74 @@ export class RecordingController {
       })
       .catch((err) => this.opts.onMaskProblem?.(err));
     return this.chain;
+  }
+
+  /**
+   * The person started sharing their screen (record it from now on, as a track of its own) or
+   * stopped (finish that track). Sharing again later is a new track; processing puts a person's
+   * screen tracks into one file. Nothing here can fail the camera and mic recorders.
+   */
+  setScreen(stream: MediaStream | null) {
+    this.screenStream = stream;
+    this.chain = this.chain
+      .then(async () => {
+        const active = this.active;
+        if (!active) return;
+        if (active.screenOf !== stream) await this.stopScreen(active);
+        if (stream) await this.startScreen(active);
+      })
+      .catch((err) => this.opts.onScreenProblem?.(err));
+    return this.chain;
+  }
+
+  /** Records the shared screen beside the camera and mic, through the same upload queue. Never throws. */
+  private async startScreen(active: NonNullable<RecordingController["active"]>) {
+    const stream = this.screenStream;
+    if (!stream || active.screen || this.active !== active) return;
+    if (!stream.getVideoTracks().some((t) => t.readyState === "live")) return;
+    const { ticket, clockOffsetMs, onScreenProblem } = this.opts;
+    try {
+      const { store, queue, transport } = await getPipeline();
+      const trackId = newTrackId();
+      const recorder: TrackRecorder = new TrackRecorder({
+        sessionId: ticket.sessionId,
+        trackId,
+        kind: "screen",
+        // Picture only: what is said is in everyone's own audio.
+        stream: new MediaStream(stream.getVideoTracks()),
+        store,
+        queue,
+        mimeType: pickMimeType("screen"),
+        videoBitsPerSecond: SCREEN_BITRATE,
+        // The same clock as the camera's track, so the worker knows when it was shared.
+        now: () => Math.round(localNow() + clockOffsetMs),
+        meta: trackMeta(ticket, active.recordingId),
+        // A screen that stands still can encode to nothing for a while: that isn't a stalled recording.
+        stallMs: 0,
+        onError: (err) => console.warn("[recording] screen", err),
+        onUnexpectedStop: () => {
+          if (active.screen !== recorder) return;
+          active.screen = active.screenOf = undefined;
+          // The browser's own "Stop sharing" ends the track: that is a normal end, not a problem.
+          if (stream.getVideoTracks().some((t) => t.readyState === "live")) onScreenProblem?.(new Error("The screen recorder stopped"));
+        },
+      });
+      active.screen = recorder;
+      active.screenOf = stream;
+      await recorder.start();
+      const info = await store.getTrack(ticket.sessionId, trackId);
+      if (info) transport.register(info).catch(() => {});
+    } catch (err) {
+      active.screen = active.screenOf = undefined;
+      onScreenProblem?.(err);
+    }
+  }
+
+  /** Finishes the screen's track: what it recorded uploads and completes like any other. */
+  private async stopScreen(active: NonNullable<RecordingController["active"]>) {
+    const screen = active.screen;
+    active.screen = active.screenOf = undefined;
+    if (screen) await screen.stop().catch((err) => console.warn("[recording] screen", err));
   }
 
   /** Records the mask as a third, small track of this recording. Never throws. */
@@ -327,6 +405,8 @@ export class RecordingController {
     // With background blur on: the mask, from the same moment as the camera (it can't throw).
     await this.startMask(active);
     await this.register(trackIds);
+    // Already sharing a screen when Record was pressed: it is recorded from here (it can't throw).
+    await this.startScreen(active);
   }
 
   private async startTrack(active: NonNullable<RecordingController["active"]>, p: PlannedTrack) {
@@ -388,7 +468,8 @@ export class RecordingController {
     this.active = null;
     this.stopMask(active); // not waited for: the mask never holds up the real tracks
     try {
-      await Promise.all(active.recorders.map((r) => r.stop()));
+      // The screen is a real track of the recording: its end is waited for like the others'.
+      await Promise.all([...active.recorders.map((r) => r.stop()), this.stopScreen(active)]);
     } finally {
       this.opts.onLocalActive?.(false);
     }
