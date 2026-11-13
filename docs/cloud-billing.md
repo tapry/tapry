@@ -58,6 +58,39 @@ instead of the Paddle token: the address must carry the account's id as custom d
 The founding offer is a one-time price, which the webhook doesn't read (it follows subscriptions):
 sell it with a Paddle payment link and set the buyer's plan by hand in the Plan tab.
 
+### The live prices (created 13 Nov 2026)
+
+In the live Paddle account (not the sandbox), tax category SaaS, quantity 1. Price ids aren't
+secret: the checkout page sends them to the browser.
+
+| Plan | Monthly | Yearly |
+|---|---|---|
+| Own storage, $12 / $120 | `pri_01m79f71pse6kaqwk5zvh2we26` | `pri_01m79f7pjvxrjagzge8c1z55c7` |
+| Creator, $19 / $190 | `pri_01m79er3538jn4a8pfs74h959s` | `pri_01m79ese1xv5g21e7nkf17qt1b` |
+| Studio, $39 / $390 | `pri_01m79f3sbb5r30bzh4xpt9v2qk` | `pri_01m79f4dh1y8yjzapav2d0909t` |
+| Team, $149 / $1,490 | `pri_01m79f59cpfws36hqe51wkhbjc` | `pri_01m79f5y2hms6x7g71k57m0kgd` |
+
+The line for the live server's `.env`:
+
+```
+BILLING_PRICES=pri_01m79f71pse6kaqwk5zvh2we26=own_storage,pri_01m79f7pjvxrjagzge8c1z55c7=own_storage:yearly,pri_01m79er3538jn4a8pfs74h959s=creator,pri_01m79ese1xv5g21e7nkf17qt1b=creator:yearly,pri_01m79f3sbb5r30bzh4xpt9v2qk=studio,pri_01m79f4dh1y8yjzapav2d0909t=studio:yearly,pri_01m79f59cpfws36hqe51wkhbjc=team,pri_01m79f5y2hms6x7g71k57m0kgd=team:yearly
+```
+
+The live client-side token (public by design: Paddle's script sends it from the browser):
+
+```
+BILLING_PADDLE_CLIENT_TOKEN=live_662d6ecb28a4249bbe78e479837
+```
+
+Tried on 13 Nov 2026 from the local app with these live values: the token was accepted and
+Paddle's checkout opened for the Team price, then Paddle answered
+`transaction_checkout_not_enabled`. The account can't take payments until Paddle has verified
+the business and approved the website. The checkout page shows a plain message when that happens.
+
+Still needed from Paddle: account verification and website approval, the webhook's secret (once
+the app has a public address), and the app's domain approved for checkout. A sandbox copy of
+these prices is needed to test with a fake card.
+
 ## Not built yet
 
 | Missing | Why it matters | Blocks |
