@@ -245,7 +245,8 @@ describe("how long a plan keeps a recording", () => {
   });
 });
 
-describe("the payment provider's webhook", () => {
+// Paddle's webhooks are tested in paddle.test.ts, through its SDK.
+describe("the payment provider's webhook (Lemon Squeezy)", () => {
   const post = (t: Awaited<ReturnType<typeof setup>>, hook: { body: string; headers: Headers }) =>
     t.fetchFor()("https://app.test/api/billing/webhook", { method: "POST", body: hook.body, headers: hook.headers });
   const userId = async (t: Awaited<ReturnType<typeof setup>>) => ((await t.db.query<{ id: string }>("SELECT id FROM users")) as [{ id: string }])[0].id;
@@ -253,69 +254,6 @@ describe("the payment provider's webhook", () => {
 
   // These use the real clock: the webhook checks the signed time against it.
   const realClock = () => setup(new FakeStorage(), { billing: { cloud: true, checkoutUrls: CHECKOUT, manageUrl: "https://pay.test/portal" }, billingWebhook: PADDLE, clockStart: Date.now() });
-
-  it("refuses a wrong or old signature, and a request without one", async () => {
-    const t = await realClock();
-    const id = await userId(t);
-    expect((await post(t, paddle(subscription(id), { secret: "someone else's" }))).status).toBe(401);
-    expect((await post(t, paddle(subscription(id), { ts: Math.floor(Date.now() / 1000) - 3600 }))).status).toBe(401);
-    expect((await post(t, { body: JSON.stringify(subscription(id)), headers: new Headers() })).status).toBe(401);
-    // A body changed after signing.
-    const signed = paddle(subscription(id));
-    expect((await post(t, { body: signed.body.replace("pri_creator", "pri_studio"), headers: signed.headers })).status).toBe(401);
-    expect((await billing(t)).plan.id).toBe("free");
-  });
-
-  it("puts the account on the plan its price stands for, once", async () => {
-    const t = await realClock();
-    const id = await userId(t);
-    const event = subscription(id);
-    const res = await post(t, paddle(event));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ result: "applied" });
-    const b = await billing(t);
-    expect(b).toMatchObject({ plan: { id: "creator" }, status: "active", endsAt: null, manageUrl: "https://pay.test/portal" });
-    expect(b.periodStart).toBe(event.data.current_billing_period.starts_at);
-    expect(b.upgrades.map((u: any) => u.plan.id)).toEqual(["studio"]);
-    // The same event again changes nothing.
-    expect(await (await post(t, paddle(event))).json()).toEqual({ result: "duplicate" });
-    // An admin can't override a subscription by hand.
-    expect((await t.hostBrowser.put(`/admin/accounts/${id}/plan`, { plan: "team" }, { origin: "https://app.test" })).status).toBe(409);
-  });
-
-  it("follows a change of plan, a failed payment, a cancellation and the end", async () => {
-    const t = await realClock();
-    const id = await userId(t);
-    const later = (s: number) => ({ occurred_at: new Date(Date.now() + s * 1000).toISOString() });
-    await post(t, paddle(subscription(id)));
-
-    await post(t, paddle(subscription(id, { items: [{ price: { id: "pri_studio" } }] }, later(1))));
-    expect((await billing(t)).plan.id).toBe("studio");
-
-    await post(t, paddle(subscription(id, { items: [{ price: { id: "pri_studio" } }], status: "past_due" }, later(2))));
-    expect(await billing(t)).toMatchObject({ plan: { id: "studio" }, status: "past_due" });
-
-    const ends = new Date(Date.now() + 10 * DAY).toISOString();
-    await post(t, paddle(subscription(id, { items: [{ price: { id: "pri_studio" } }], scheduled_change: { action: "cancel", effective_at: ends } }, later(3))));
-    expect(await billing(t)).toMatchObject({ plan: { id: "studio" }, status: "canceled", endsAt: ends });
-
-    // An older event arriving late doesn't undo the newer state.
-    expect(await (await post(t, paddle(subscription(id, {}, later(-60))))).json()).toEqual({ result: "stale" });
-    expect((await billing(t)).status).toBe("canceled");
-
-    await post(t, paddle(subscription(id, { status: "canceled" }, { ...later(4), event_type: "subscription.canceled" })));
-    expect(await billing(t)).toMatchObject({ plan: { id: "free" }, status: "active", endsAt: null, manageUrl: null });
-  });
-
-  it("ignores other events, unknown prices and unknown accounts without failing", async () => {
-    const t = await realClock();
-    const id = await userId(t);
-    expect(await (await post(t, paddle({ event_id: "evt_x", event_type: "transaction.completed", occurred_at: new Date().toISOString(), data: {} }))).json()).toEqual({ result: "ignored" });
-    expect(await (await post(t, paddle(subscription(id, { items: [{ price: { id: "pri_other" } }] })))).json()).toEqual({ result: "unknown_plan" });
-    expect(await (await post(t, paddle(subscription("usr_nobody"))))!.json()).toEqual({ result: "unknown_user" });
-    expect((await post(t, paddle("not an object" as unknown as object))).status).toBe(200);
-    expect((await billing(t)).plan.id).toBe("free");
-  });
 
   it("reads Lemon Squeezy's format too", () => {
     const now = Date.now();
@@ -364,9 +302,11 @@ describe("configuration", () => {
       manageUrl: "https://pay.test/portal",
       webhook: { provider: "lemonsqueezy", secret: "a-long-secret", prices: { "501": "creator", "502": "studio" } },
       paddle: null,
+      paddleApiKey: null,
+      paddleSandbox: false,
     });
     expect(cfg.worker.cloud).toBe(true);
-    expect(loadConfig({ ...base, TAPRY_CLOUD: "true" }).cloud).toEqual({ checkoutUrls: {}, manageUrl: null, webhook: null, paddle: null });
+    expect(loadConfig({ ...base, TAPRY_CLOUD: "true" }).cloud).toEqual({ checkoutUrls: {}, manageUrl: null, webhook: null, paddle: null, paddleApiKey: null, paddleSandbox: false });
     expect(() => loadConfig({ ...base, TAPRY_CLOUD: "true", BILLING_PRICES: "501=gold" })).toThrow(/not a plan/);
   });
 

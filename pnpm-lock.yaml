@@ -215,6 +215,9 @@ importers:
       '@mediapipe/tasks-vision':
         specifier: 0.10.21
         version: 0.10.21
+      '@paddle/paddle-node-sdk':
+        specifier: ^3.11.1
+        version: 3.11.1
       '@tapry/recorder':
         specifier: workspace:*
         version: link:../../packages/recorder
@@ -966,6 +969,10 @@ packages:
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
+
+  '@paddle/paddle-node-sdk@3.11.1':
+    resolution: {integrity: sha512-TxAyuJS3xgSzw8mVEIG0K4tPLEbBZeIQH9msVYOT5AStp/0fNkJ3mo6vhKcHyaITgHVzxBskPFxPJRphmYJydg==}
+    engines: {node: '>=20'}
 
   '@playwright/test@1.64.1':
     resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
@@ -2346,6 +2353,8 @@ snapshots:
 
   '@next/swc-win32-x64-msvc@15.5.28':
     optional: true
+
+  '@paddle/paddle-node-sdk@3.11.1': {}
 
   '@playwright/test@1.64.1':
     dependencies:

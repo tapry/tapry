@@ -45,6 +45,15 @@ export function getServices(): Promise<Services> {
       ownStorage: config.ownStorage,
       billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl, paddle: config.cloud?.paddle },
       billingWebhook: config.cloud?.webhook ?? null,
+      paddle:
+        config.cloud && (config.cloud.webhook?.provider === "paddle" || config.cloud.paddleApiKey)
+          ? {
+              webhookSecret: config.cloud.webhook?.provider === "paddle" ? config.cloud.webhook.secret : null,
+              prices: config.cloud.webhook?.prices ?? {},
+              apiKey: config.cloud.paddleApiKey,
+              sandbox: config.cloud.paddleSandbox,
+            }
+          : null,
       serverInfo: {
         storage: { endpoint: config.storage.endpoint ?? null, region: config.storage.region, bucket: config.storage.bucket, accessKeyId: config.storage.accessKeyId },
         rawRetentionDays: config.worker.rawRetentionMs === undefined ? null : config.worker.rawRetentionMs / 86_400_000,

@@ -21,6 +21,11 @@ export interface BillingOptions {
   manageUrl?: string | null;
   /** Paddle's checkout, opened from this server's own page (/checkout/<plan>). */
   paddle?: PaddleCheckoutConfig | null;
+  /**
+   * The customer portal is minted per visit (`POST /api/billing/portal`) instead of a fixed
+   * address; `scheduledChange` reads a subscription's planned cancellation from the mirror.
+   */
+  portal?: { scheduledChange: (accountId: string) => Promise<{ action: string; at: Date } | null> } | null;
   now?: () => number;
 }
 
@@ -64,7 +69,11 @@ export interface BillingEvent {
   occurredAt: Date;
 }
 
+/** Where the Plan tab posts to open Paddle's customer portal. */
+export const PORTAL_PATH = "/api/billing/portal";
+
 interface PlanRow {
+  billing_customer?: string | null;
   plan: string;
   plan_status: string;
   plan_ends_at: Date | null;
@@ -72,7 +81,7 @@ interface PlanRow {
   billing_subscription: string | null;
 }
 
-const PLAN_COLUMNS = "plan, plan_status, plan_ends_at, plan_period_start, billing_subscription";
+const PLAN_COLUMNS = "plan, plan_status, plan_ends_at, plan_period_start, billing_subscription, billing_customer";
 
 /** The plan an account has right now: a plan past its end is Free. */
 export function effectivePlan(row: Pick<PlanRow, "plan" | "plan_ends_at">, now: number): Plan {
@@ -220,15 +229,17 @@ export class BillingService {
         upgrades.push({ plan: PLANS[id], url: link.replaceAll("{user_id}", encodeURIComponent(user.accountId)).replaceAll("{email}", encodeURIComponent(user.email)) });
       }
     }
+    // A subscription has no end date of its own: one set to cancel shows the date Paddle will.
+    const scheduled = row.billing_subscription && this.opts.portal ? await this.opts.portal.scheduledChange(user.accountId) : null;
     return {
       plan,
       status: plan.id === "free" ? "active" : (row.plan_status as PlanStatus),
-      endsAt: plan.id === "free" ? null : (row.plan_ends_at?.toISOString() ?? null),
+      endsAt: plan.id === "free" ? null : (row.plan_ends_at?.toISOString() ?? (scheduled?.action === "cancel" ? scheduled.at.toISOString() : null)),
       periodStart: new Date(period.start).toISOString(),
       periodEnd: new Date(period.end).toISOString(),
       usedMs: await this.usedMs(user.accountId, period.start),
       upgrades,
-      manageUrl: owner && row.billing_subscription ? (this.opts.manageUrl ?? null) : null,
+      manageUrl: owner && (row.billing_subscription || row.billing_customer) ? (this.opts.portal ? PORTAL_PATH : (row.billing_subscription ? (this.opts.manageUrl ?? null) : null)) : null,
     };
   }
 
@@ -364,7 +375,7 @@ export class BillingService {
  * A bigger plan keeps files longer, and that holds for what is already recorded. A smaller plan
  * never shortens it: what was promised when a recording was made stands.
  */
-async function extendKeeping(tx: Queryable, ownerId: string, plan: Plan) {
+export async function extendKeeping(tx: Queryable, ownerId: string, plan: Plan) {
   await tx.query(
     `UPDATE recordings r SET keep_until = CASE WHEN $2::float8 IS NULL THEN NULL ELSE r.processed_at + make_interval(secs => $2::float8) END,
             expiry_warned_at = NULL

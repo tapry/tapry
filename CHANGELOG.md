@@ -19,6 +19,11 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   out. The answer is the same whether or not the address has an account. Without email it isn't
   offered. On Tapry Cloud, new accounts also confirm their address before they can create or
   open a studio. Database: `users.email_verified_at`, `account_tokens` (added automatically).
+- **Paddle fulfilment (Tapry Cloud).** Webhooks are verified with Paddle's Node SDK and mirrored
+  into `billing_customers` and `billing_subscriptions` (added automatically); each account's plan
+  follows its subscriptions. A scheduled cancellation no longer ends access early: the plan stays
+  until Paddle reports the subscription canceled. With `BILLING_PADDLE_API_KEY` set, the Plan
+  tab's "Card, invoices and cancelling" opens Paddle's customer portal for the account.
 - **Paddle checkout (Tapry Cloud).** With Paddle's client token set, plans are bought on the
   server's own `/checkout/<plan>` page, by the month or the year; `BILLING_PRICES` marks yearly
   prices with `:yearly`. Paddle's script loads on that page only.

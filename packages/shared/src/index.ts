@@ -422,7 +422,10 @@ export interface BillingOverview {
   usedMs: number;
   /** Plans that can be bought from here, with the address of their checkout. */
   upgrades: Array<{ plan: Plan; url: string; /** The same plan paid by the year (ten months' price), where it is sold that way. */ yearlyUrl?: string }>;
-  /** Where to change the card, see invoices or cancel; null when there is no subscription. */
+  /**
+   * Where to change the card, see invoices or cancel; null when there is nothing to manage.
+   * "/api/billing/portal" is posted to (it mints a portal session); anything else is a link.
+   */
   manageUrl: string | null;
 }
 

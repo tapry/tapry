@@ -365,4 +365,40 @@ CREATE TABLE account_invites (
 );
 CREATE INDEX account_invites_account ON account_invites (account_id);
 `,
+  `
+-- Paddle's customers and subscriptions, mirrored from verified webhooks and upserted by Paddle's
+-- id. Live state: never deleted to tidy up. paddle_updated_at is the entity's own updated_at, so
+-- an older delivery arriving late never overwrites a newer state. account_id is the Tapry account
+-- the checkout named (its custom data), once known.
+CREATE TABLE billing_customers (
+  customer_id text PRIMARY KEY,
+  -- Null until the customer's own event arrives: a subscription can be delivered first.
+  email text,
+  account_id text REFERENCES users(id) ON DELETE SET NULL,
+  paddle_updated_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX billing_customers_account ON billing_customers (account_id) WHERE account_id IS NOT NULL;
+
+CREATE TABLE billing_subscriptions (
+  subscription_id text PRIMARY KEY,
+  customer_id text NOT NULL REFERENCES billing_customers(customer_id),
+  account_id text REFERENCES users(id) ON DELETE SET NULL,
+  status text NOT NULL,
+  price_id text NOT NULL,
+  product_id text NOT NULL,
+  -- The Tapry plan the price sells (BILLING_PRICES); null for a price this server doesn't know.
+  plan text,
+  scheduled_change_action text,
+  scheduled_change_at timestamptz,
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  paddle_updated_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX billing_subscriptions_account ON billing_subscriptions (account_id) WHERE account_id IS NOT NULL;
+CREATE INDEX billing_subscriptions_customer ON billing_subscriptions (customer_id);
+`,
 ];

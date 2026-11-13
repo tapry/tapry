@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createApiHandlers } from "../src/server/api";
 import type { BillingOptions } from "../src/server/billing";
 import type { WebhookConfig } from "../src/server/billing-webhooks";
+import type { PaddleOptions } from "../src/server/paddle";
 import { openDb } from "../src/server/db";
 import type { Mailer } from "../src/server/mail";
 import { ROUTES } from "../src/server/routes";
@@ -85,7 +86,7 @@ const ROUTE_PATTERNS = ROUTES.map(([method, path, name]) => {
 });
 
 /** A fresh in-memory server: services, handlers, and a fetch that routes like Next.js. */
-export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; setupToken?: string; speedTestOrigins?: string[]; mailer?: Mailer; bytesPerSecondCap?: number; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig; guestPromoUrl?: string; appUrl?: string; ownStorage?: Parameters<typeof createServices>[2] extends infer O ? (O extends { ownStorage?: infer S } ? S : never) : never; /** Where the server's clock starts (ms). */ clockStart?: number } = {}) {
+export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; setupToken?: string; speedTestOrigins?: string[]; mailer?: Mailer; bytesPerSecondCap?: number; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig; paddle?: PaddleOptions; guestPromoUrl?: string; appUrl?: string; ownStorage?: Parameters<typeof createServices>[2] extends infer O ? (O extends { ownStorage?: infer S } ? S : never) : never; /** Where the server's clock starts (ms). */ clockStart?: number } = {}) {
   const db = await openDb("pglite://memory");
   let clock = opts.clockStart ?? 1_000_000;
   const services = createServices(db, storage, {
@@ -96,6 +97,7 @@ export async function createServer(storage: Storage = new FakeStorage(), opts: {
     mailer: opts.mailer,
     billing: opts.billing,
     billingWebhook: opts.billingWebhook,
+    paddle: opts.paddle,
     guestPromoUrl: opts.guestPromoUrl,
     appUrl: opts.appUrl,
     ownStorage: opts.ownStorage,

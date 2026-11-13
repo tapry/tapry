@@ -39,6 +39,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["GET", "/api/admin/settings", "workspaceSettings"],
   ["GET", "/api/billing", "billing"],
   ["POST", "/api/billing/webhook", "billingWebhook"],
+  ["POST", "/api/billing/portal", "billingPortal"],
   ["GET", "/api/admin/accounts", "adminAccounts"],
   ["PUT", "/api/admin/accounts/[userId]/plan", "adminSetPlan"],
 

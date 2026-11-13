@@ -23,7 +23,10 @@ no limits, no Plan tab, and the billing endpoints answer 404.
 | **Seats** | An account's owner invites people by link (Settings, Members); members see the account's studios and recordings and can host. The plan sets the seats (Studio 3, Team 5), counting open invitations; a smaller plan removes nobody. The plan, the bucket and the member list stay with the owner |
 | **Own storage** | An account connects its own S3-compatible bucket on the Storage page (needs `STORAGE_SECRET_KEY`); its sessions then record there. The Own storage plan has no other storage, no hour limit and no deletion by us; Business may use it; other plans can't |
 | **Checkout** (`/checkout/<plan>`) | With Paddle's client token set, each plan that has a price is bought on this page: it loads Paddle's script (only here) and opens the checkout with the account's id attached, by the month or the year. The owner's only |
-| **Webhook** (`POST /api/billing/webhook`) | Paddle Billing and Lemon Squeezy: signature checked, each event applied once, older events never overwrite newer state. Follows new subscriptions, plan changes, failed payments, cancellations and the end |
+| **Webhook** (`POST /api/billing/webhook`) | Paddle: verified with Paddle's Node SDK (`webhooks.unmarshal`) on the raw body with the signing secret; a bad signature gets 401, a body that verified but isn't an event 400, a failure while applying 5xx, so Paddle retries. Handles `subscription.created/updated/canceled`, `customer.created/updated`, `transaction.completed`; other types are answered 200 and ignored. Each event applied once, rows upserted by Paddle's id, an older state never overwriting a newer one. Lemon Squeezy keeps its own reader |
+| **Mirror** (`billing_customers`, `billing_subscriptions`) | Paddle's customers and subscriptions as last reported, tied to the Tapry account the checkout named. The account's plan is the biggest one among its subscriptions that grant access |
+| **Access** (`grantsAccess`, `src/server/paddle.ts`) | `active`, `trialing` and `past_due` give access (past due: Paddle is retrying the payment); `paused` and `canceled` don't. A scheduled cancellation or pause changes nothing until Paddle reports the subscription canceled; the Plan tab shows its date |
+| **Customer portal** (`POST /api/billing/portal`) | With the API key set: signed in, the account's owner, its Paddle customer looked up from our database (never from the request), a portal session minted with the SDK, and a redirect to it. The Plan tab's "Card, invoices and cancelling" posts there |
 
 ## Setting it up
 
@@ -50,7 +53,8 @@ instead of the Paddle token: the address must carry the account's id as custom d
 1. Test first in the sandbox (a separate account at sandbox-vendors.paddle.com).
 2. **Catalog → Products:** one product per plan (Own storage, Creator, Studio, Team), each with a monthly and a yearly recurring price in USD: 12/120, 19/190, 39/390, 149/1,490. Copy each price id (`pri_…`) into `BILLING_PRICES`.
 3. **Developer tools → Authentication:** create a client-side token → `BILLING_PADDLE_CLIENT_TOKEN`.
-4. **Developer tools → Notifications:** a webhook destination at `https://<the app's address>/api/billing/webhook`, with the `subscription.*` events. Copy its secret key → `BILLING_WEBHOOK_SECRET`.
+4. **Events → Notifications → New destination** (in some accounts under Developer tools): type webhook, URL `https://<the app's address>/api/billing/webhook`, and these events: `subscription.created`, `subscription.updated`, `subscription.canceled`, `customer.created`, `customer.updated`, `transaction.completed`. Save, open it, and copy its **secret key** (`pdl_ntfset_…`) → `BILLING_WEBHOOK_SECRET`. This destination is permanent: deliveries stop without it.
+4a. **Developer tools → Authentication → API keys:** a key with permission to create customer portal sessions (read customers, subscriptions; write customer portal sessions) → `BILLING_PADDLE_API_KEY`. Put it in the server's `.env` only.
 5. **Checkout → Checkout settings:** set the default payment link to the app's address, and add the app's domain to the approved domains (Paddle only opens its checkout on approved domains).
 6. The customer portal's address (Paddle gives one per seller) → `BILLING_MANAGE_URL`.
 7. Buy a plan with Paddle's test card, and check the Plan tab changes within a minute.
@@ -87,8 +91,13 @@ Paddle's checkout opened for the Team price, then Paddle answered
 `transaction_checkout_not_enabled`. The account can't take payments until Paddle has verified
 the business and approved the website. The checkout page shows a plain message when that happens.
 
-Still needed from Paddle: account verification and website approval, the webhook's secret (once
-the app has a public address), and the app's domain approved for checkout. A sandbox copy of
+Still needed from Paddle: account verification and website approval, the notification destination
+and its signing secret (once the app has a public address), an API key for the portal, and the
+app's domain approved for checkout.
+
+**Never delete, as "cleanup":** the notification destination and its secret, the products and
+prices above, or any customer, subscription or transaction, in Paddle or in `billing_customers` /
+`billing_subscriptions`. They are the running fulfilment path and live state. A sandbox copy of
 these prices is needed to test with a fake card.
 
 ## Not built yet

@@ -243,6 +243,22 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     // ── Tapry Cloud: plans and billing (404 on a self-hosted server) ────────────
     /** The signed-in host's plan, what they have used of it, and where to change it. */
     billing: asUser(async (svc, user) => json(200, await svc.billing.overview(user))),
+    /**
+     * Open Paddle's customer portal: a session minted for the signed-in account's own customer,
+     * then a redirect to it. A form posts here from the Plan tab; problems go back there.
+     */
+    billingPortal: asUser(async (svc, user) => {
+      const back = (code: string) => new Response(null, { status: 303, headers: { location: `/settings?tab=plan&portal=${code}` } });
+      if (!svc.paddle?.portalAvailable) throw new ApiError(404, "not_found", "Not found");
+      try {
+        return new Response(null, { status: 303, headers: { location: await svc.paddle.portalUrl(user), "cache-control": "no-store" } });
+      } catch (err) {
+        if (isApiError(err)) return back(err.code);
+        // Paddle's message can name the customer: its class only.
+        console.error(`[billing] portal session failed: ${err instanceof Error ? err.name : "unknown"}`);
+        return back("unavailable");
+      }
+    }),
     /** Accounts and their plans (admins). */
     adminAccounts: asUser(async (svc, user) => json(200, { accounts: await svc.billing.accounts(user) })),
     /** Put an account on a plan by hand: a founding member, an organisation paying by invoice (admins). */
@@ -257,8 +273,15 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
      */
     billingWebhook: handler(async (svc, req) => {
       if (!svc.billing.cloud || !svc.billingWebhook) throw new ApiError(404, "not_found", "Not found");
+      // The raw text, exactly as signed: parsing it first would break the signature check.
       const raw = await req.text();
       if (raw.length > 1_000_000) throw new ApiError(413, "too_large", "Webhook body too large");
+      if (svc.billingWebhook.provider === "paddle") {
+        if (!svc.paddle) throw new ApiError(404, "not_found", "Not found");
+        const { type, result } = await svc.paddle.handleWebhook(raw, req.headers.get("paddle-signature"));
+        console.log(`[billing] paddle ${type}: ${result}`);
+        return json(200, { result });
+      }
       let event;
       try {
         event = readWebhook(svc.billingWebhook, raw, req.headers, Date.now());

@@ -101,6 +101,11 @@ const env = z.object({
    * server's own checkout page (/checkout/<plan>), which opens Paddle's checkout.
    */
   BILLING_PADDLE_CLIENT_TOKEN: unsetIfEmpty(z.string().min(8)),
+  /**
+   * Paddle's API key, for customer portal sessions (Settings, Plan: card, invoices, cancelling).
+   * A secret: server-side only. Unset: the portal falls back to BILLING_MANAGE_URL, if any.
+   */
+  BILLING_PADDLE_API_KEY: unsetIfEmpty(z.string().min(10)),
   /** Use Paddle's sandbox (test payments) instead of live. */
   BILLING_PADDLE_SANDBOX: bool("false"),
 });
@@ -160,6 +165,9 @@ export interface Config {
     webhook: WebhookConfig | null;
     /** Paddle's checkout on this server's own page; null without a client token. */
     paddle: PaddleCheckoutConfig | null;
+    /** Paddle's API key (portal sessions); null when unset. */
+    paddleApiKey: string | null;
+    paddleSandbox: boolean;
   } | null;
 }
 
@@ -229,6 +237,8 @@ export function loadConfig(source: Record<string, string | undefined> = process.
                   prices: prices.reduce<PaddleCheckoutConfig["prices"]>((all, [id, p]) => ({ ...all, [p.plan]: { ...all[p.plan], [p.yearly ? "yearly" : "monthly"]: id } }), {}),
                 }
               : null,
+          paddleApiKey: cfg.BILLING_PADDLE_API_KEY ?? null,
+          paddleSandbox: cfg.BILLING_PADDLE_SANDBOX,
         }))(pairs(cfg.BILLING_PRICES, "BILLING_PRICES").map(([k, v]) => [k, planPrice(v, "BILLING_PRICES")] as const))
       : null,
   };
