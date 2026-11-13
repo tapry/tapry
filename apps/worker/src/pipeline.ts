@@ -2,7 +2,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
-import { BRIGHTNESS_VALUES, LOOK_VALUES, VIDEO_TIERS, videoTier, type TrackFilters, type VideoHeight, type VideoQuality } from "@tapry/shared";
+import { BRIGHTNESS_VALUES, LOOK_VALUES, VIDEO_TIERS, ffmpegFrameRate, videoTier, type FrameRate, type TrackFilters, type VideoHeight, type VideoQuality } from "@tapry/shared";
 import { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, probeVideoHeight, run } from "./ffmpeg.js";
 
 export interface TrackInput {
@@ -75,6 +75,8 @@ export interface PipelineOptions {
    * each person's video keeps the size their camera delivered, up to 4K and never under 1080p.
    */
   videoQuality: VideoQuality;
+  /** Frames a second of every video file. Left out: 30. */
+  frameRate?: FrameRate;
   /** Per ffmpeg invocation. Default: 10× real time, at least 2 minutes. */
   timeoutMs?: number;
   /** Font for names on the combined video's tiles. Unset: found automatically; null: no names. */
@@ -122,7 +124,10 @@ export interface OutputFile {
   original?: boolean;
 }
 
-const FPS = 30;
+/** The frame rate of the video files unless the studio chose another. */
+const FPS = "30";
+/** The studio's frame rate as ffmpeg takes it. */
+const rate = (opts: Pick<PipelineOptions, "frameRate">) => (opts.frameRate ? ffmpegFrameRate(opts.frameRate) : FPS);
 /** The frame a shared screen is kept in (1920×1080), whatever the window's shape. */
 const SCREEN_HEIGHT = 1080;
 
@@ -162,6 +167,8 @@ export function alignmentFilters(
   /** How video ends: freeze the last frame (a whole track), or black (one piece of several). */
   videoEnd: "clone" | "black" = "clone",
   hasGaps = false,
+  /** Frames a second, as ffmpeg takes it. */
+  fps: string = FPS,
 ): string {
   const late = Math.max(0, Math.round(offsetMs));
   const early = Math.max(0, Math.round(-offsetMs));
@@ -182,7 +189,7 @@ export function alignmentFilters(
   return [
     early ? `trim=start=${sec(early)},setpts=PTS-STARTPTS` : "",
     // MediaRecorder writes variable frame rate; editors want constant.
-    `fps=${FPS}`,
+    `fps=${fps}`,
     late ? `tpad=start_duration=${sec(late)}:start_mode=add:color=black` : "",
     videoEnd === "clone" ? "tpad=stop=-1:stop_mode=clone" : "tpad=stop=-1:stop_mode=add:color=black",
   ]
@@ -239,14 +246,14 @@ export const MASK_MAX_GAP_MS = 1000;
  *   the colour planes correctly); where it is fully white the pixels are the camera's own.
  * `frame` is what follows for a piece of several (the padding to 16:9), or "".
  */
-export function backgroundBlurGraph(o: { look: string; align: string; scale: string; frame: string; maskOffsetMs: number; height: number }): string {
+export function backgroundBlurGraph(o: { look: string; align: string; scale: string; frame: string; maskOffsetMs: number; height: number; fps?: string }): string {
   const late = Math.max(0, Math.round(o.maskOffsetMs));
   const early = Math.max(0, Math.round(-o.maskOffsetMs));
   const mask = [
     "format=gray",
     early ? `trim=start=${sec(early)},setpts=PTS-STARTPTS` : "",
     // From 0, so the first frames of the picture never wait for the mask's first frame.
-    `fps=${FPS}:start_time=0`,
+    `fps=${o.fps ?? FPS}:start_time=0`,
     late ? `tpad=start_duration=${sec(late)}:start_mode=add:color=black` : "",
     "tpad=stop=-1:stop_mode=add:color=black",
     // Video compression leaves the white a little grey and the black a little light.
@@ -685,7 +692,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   // sharing really ended (the last chunk's time) and the picture is black from there.
   const isScreen = track.kind === "screen";
   const shareEnd = isScreen && track.endOffsetMs !== undefined ? `,drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='gte(t,${sec(Math.max(0, track.endOffsetMs))})'` : "";
-  const align = alignmentFilters("video", track.offsetMs, multi && !isScreen ? "black" : "clone");
+  const align = alignmentFilters("video", track.offsetMs, multi && !isScreen ? "black" : "clone", false, rate(opts));
   // Background blur needs a mask that covers this video; without one the file is made without it.
   const wantsBlur = track.filters?.background === "blur";
   const mask = wantsBlur ? await usableMask(track, ctx) : null;
@@ -713,7 +720,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
     const picture = mask
       ? [...RAW_INPUT_FLAGS, "-i", mask.rawPath,
           "-filter_complex", backgroundBlurGraph({
-            look, align, height: h, maskOffsetMs: mask.offsetMs,
+            look, align, height: h, maskOffsetMs: mask.offsetMs, fps: rate(opts),
             // An even size before the padding, for the colour planes of the mask.
             scale: multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2` : frame,
             frame: multi ? pad : "",
@@ -726,7 +733,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
         ...picture,
         ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps), clean, volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
         // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
-        "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(h)), "-r", String(FPS),
+        "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(h)), "-r", rate(opts),
         ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
       { timeoutMs },
     );
@@ -811,7 +818,7 @@ async function mergePieces(
     // One piece left (the others were unreadable): nothing to blend, so its video is mapped straight.
     ["-y", "-hide_banner", "-nostdin", ...inputs, ...(filters.length ? ["-filter_complex", filters.join(";")] : []), "-map", parts.length > 1 ? video : "0:v",
       ...(audioLabels.length ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : []),
-      "-t", duration, ...cappedVideo(videoHeight ?? videoTier(opts.videoQuality).height), "-r", String(FPS),
+      "-t", duration, ...cappedVideo(videoHeight ?? videoTier(opts.videoQuality).height), "-r", rate(opts),
       "-pix_fmt", "yuv420p", "-movflags", "+faststart", out],
     { timeoutMs },
   );
@@ -883,7 +890,7 @@ async function renderCombined(
   const tiles = gridLayout(participants.length);
   const duration = sec(opts.durationMs);
   const args: string[] = [];
-  const filters: string[] = [`color=c=black:s=1920x1080:r=${FPS}:d=${duration}[base]`];
+  const filters: string[] = [`color=c=black:s=1920x1080:r=${rate(opts)}:d=${duration}[base]`];
   const audioLabels: string[] = [];
   const voices: string[] = [];
   let input = 0;
@@ -906,7 +913,7 @@ async function renderCombined(
       );
       input++;
     } else {
-      filters.push(`color=c=${TILE_BG}:s=${tile.w}x${tile.h}:r=${FPS}:d=${duration}${label}[t${i}]`);
+      filters.push(`color=c=${TILE_BG}:s=${tile.w}x${tile.h}:r=${rate(opts)}:d=${duration}${label}[t${i}]`);
     }
     filters.push(`[${canvas}][t${i}]overlay=x=${tile.x}:y=${tile.y}:shortest=0[c${i}]`);
     canvas = `c${i}`;
@@ -970,7 +977,7 @@ async function renderCombined(
     opts.ffmpeg,
     ["-y", "-hide_banner", "-nostdin", ...args, "-filter_complex", filters.join(";"), "-map", `[${canvas}]`,
       ...(mixAudio ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : []),
-      "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-r", String(FPS),
+      "-t", duration, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-r", rate(opts),
       "-pix_fmt", "yuv420p", "-movflags", "+faststart", path],
     { timeoutMs },
   );

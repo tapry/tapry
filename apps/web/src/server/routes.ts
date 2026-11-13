@@ -31,6 +31,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["POST", "/api/studios/[studioId]/recordings/[recordingId]/process", "processRecording"],
   ["GET", "/api/studios/[studioId]/recordings/[recordingId]/outputs/[outputId]", "downloadOutput"],
   ["GET", "/api/studios/[studioId]/recordings/[recordingId]/zip", "downloadZip"],
+  ["GET", "/api/studios/[studioId]/recordings/[recordingId]/timeline/[format]", "downloadTimeline"],
   ["GET", "/api/studios/[studioId]/recordings/[recordingId]/consent", "consentRecord"],
 
   ["POST", "/api/join", "join"],
@@ -81,6 +82,14 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["GET", "/api/sessions/[sessionId]/my-recordings", "ownRecordings"],
   ["GET", "/api/sessions/[sessionId]/recap", "recapStatus"],
   ["POST", "/api/sessions/[sessionId]/recap", "requestRecap"],
+  ["PUT", "/api/sessions/[sessionId]/producer", "setProducer"],
+  ["GET", "/api/sessions/[sessionId]/guide", "sessionGuide"],
+  ["POST", "/api/sessions/[sessionId]/markers", "addMarker"],
+  ["GET", "/api/studios/[studioId]/solo", "getSolo"],
+  ["PUT", "/api/studios/[studioId]/solo", "setSolo"],
+  ["POST", "/api/solo", "soloJoin"],
+  ["GET", "/api/studios/[studioId]/guide", "getGuide"],
+  ["PUT", "/api/studios/[studioId]/guide", "setGuide"],
 
   ["POST", "/api/sessions/[sessionId]/tracks", "createTrack"],
   ["POST", "/api/sessions/[sessionId]/tracks/[trackId]/chunks/[seq]/upload-url", "uploadUrl"],

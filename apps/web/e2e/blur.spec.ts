@@ -130,7 +130,8 @@ test("background blur: a mask track beside the untouched camera, and a blurred f
     const picture = guest.getByTestId("filtered-picture");
     await expect(picture).toBeVisible();
     await expect.poll(() => detail(picture), { timeout: 15_000 }).toBeLessThan(sharp * 0.5);
-    expect(await detail(guest.locator("video").first())).toBeGreaterThan(sharp * 0.7);
+    // Waited for: the camera's own element may not have painted a frame yet when the blurred picture already has.
+    await expect.poll(() => detail(guest.locator("video").first()), { timeout: 15_000 }).toBeGreaterThan(sharp * 0.7);
     expect(await recorderTracks(guest)).toEqual(before);
 
     await guest.keyboard.press("Escape");

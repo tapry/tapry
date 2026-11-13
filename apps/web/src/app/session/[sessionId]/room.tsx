@@ -1,5 +1,6 @@
 "use client";
 
+import { GuidePanel } from "./guide-panel";
 import type { UploadProgress } from "@tapry/recorder";
 import { STALE_REPORT_MS, type OwnRecordings, type RecapStatus, type SessionState, type SessionTicket } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
@@ -43,7 +44,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   // Filters are for the call's copies, this person's own tile and the finished files. The stream
   // from the green room goes to the recorder as it is.
   const [prefs, setPrefs] = useFilterPrefs();
-  const call = useCall(ticket, ready.stream, !ended, prefs.filters);
+  const call = useCall(ticket, ready.stream, !ended && !ticket.solo, prefs.filters);
   const hasCamera = ready.stream.getVideoTracks().length > 0;
   const filtersPanel = useFiltersPanel(true);
   // Background blur: where the person is, from its own copy of the camera. The mask is drawn
@@ -121,13 +122,15 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   }, [ticket, ready]);
 
   const recording = state?.recording?.status === "recording" ? state.recording : null;
+  // A producer's device records nothing: it never follows the recording.
+  const producer = !!ready.producer;
   // Before following the recording, so a recording that starts now has the mask from its first moment.
   useEffect(() => {
     void controller.current?.setMask(blur.maskStream);
   }, [blur.maskStream]);
   useEffect(() => {
-    if (state) void controller.current?.sync(recording?.id ?? null);
-  }, [state, recording?.id]);
+    if (state && !producer) void controller.current?.sync(recording?.id ?? null);
+  }, [state, recording?.id, producer]);
   // The finished file is only blurred when the mask covers the recording from its start.
   const blurAtStart = useRef<{ id: string; covered: boolean } | null>(null);
   if (recording && blurAtStart.current?.id !== recording.id) blurAtStart.current = { id: recording.id, covered: blur.status === "ready" };
@@ -147,6 +150,9 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   }, [unsent]);
 
   const isHost = ticket.role === "host";
+  // Recording alone on a solo link: no call, and this person starts and stops their own recording.
+  const solo = !!ticket.solo;
+  const canRecord = isHost || solo;
   const selfName = state?.participants.find((p) => p.id === ticket.participantId)?.displayName ?? "You";
   const present =
     call.status === "connected" ? new Set([ticket.participantId, ...call.peers.map((p) => p.id)]) : null;
@@ -197,7 +203,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
       setFlash(micMuted ? "Unmuted" : "Muted");
       return true;
     }
-    if (!isHost || !state) return false;
+    if (!canRecord || !state) return false;
     if (key === "r") {
       if (busy || (!recording && connection !== "live")) return true;
       void (recording ? hostAction(`/recordings/${recording.id}/stop`) : hostAction("/recordings"));
@@ -259,6 +265,16 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const clock = useElapsed(recording?.startedAt ?? null, offsetMs);
   const recordDisabled = busy || (!recording && connection !== "live");
   const toggleRecording = () => void (recording ? hostAction(`/recordings/${recording.id}/stop`) : hostAction("/recordings"));
+  // A solo recording stops by itself at its limit.
+  const soloLimitMs = ticket.solo ? ticket.solo.maxMinutes * 60_000 : null;
+  const soloRecordingId = soloLimitMs !== null ? (recording?.id ?? null) : null;
+  const soloStartedAt = recording?.startedAt ?? 0;
+  useEffect(() => {
+    if (!soloRecordingId || soloLimitMs === null) return;
+    const id = setTimeout(() => void hostAction(`/recordings/${soloRecordingId}/stop`), Math.max(0, soloStartedAt + soloLimitMs - (localNow() + offsetMs)));
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soloRecordingId, soloLimitMs, soloStartedAt, offsetMs]);
   function toggleCamera() {
     setCameraOff(!cameraOff);
     void call.setCameraOff(!cameraOff);
@@ -328,7 +344,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         if (present && !present.has(p.id)) reasons.push("Not connected");
         if (staleIds.has(p.id)) reasons.push("Not reporting");
         else if (report) reasons.push(...report.alerts.filter((a) => a !== "no_headphones").map((a) => alertLabel(a, report.uploadBehindS)));
-        if (recording && pastLateStart && !state?.uploads.some((u) => u.participantId === p.id)) reasons.push("Not recording yet");
+        if (recording && pastLateStart && !p.producer && !state?.uploads.some((u) => u.participantId === p.id)) reasons.push("Not recording yet");
         return reasons.length > 0 ? [{ id: p.id, name: p.displayName, reasons }] : [];
       });
 
@@ -461,7 +477,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
       {invite}
     </>
   );
-  const recLabel = isHost ? (recording ? "Stop recording" : "Start recording") : recording ? "Recording" : "Waiting to record";
+  const recLabel = canRecord ? (recording ? "Stop recording" : "Start recording") : recording ? "Recording" : "Waiting to record";
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -592,8 +608,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                   <div className="flex shrink-0 justify-center px-[18px] pt-3.5 pb-[18px]">
                     <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-[32px] border border-white/10 bg-white/7 px-2.5 py-2 backdrop-blur-md">
                       <span className="flex items-center gap-3 pr-2.5 pl-0.5">
-                        <RecControl recording={!!recording} size={44} onClick={isHost ? toggleRecording : undefined} disabled={recordDisabled} />
-                        <span className={cn("text-sm font-medium whitespace-nowrap", isHost && "max-sm:hidden")}>{recLabel}</span>
+                        <RecControl recording={!!recording} size={44} onClick={canRecord ? toggleRecording : undefined} disabled={recordDisabled} />
+                        <span className={cn("text-sm font-medium whitespace-nowrap", canRecord && "max-sm:hidden")}>{recLabel}</span>
                       </span>
                       <StageSeparator tall />
                       {stageControls}
@@ -606,14 +622,14 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                       <RecControl
                         recording={!!recording}
                         size={40}
-                        onClick={isHost ? toggleRecording : undefined}
+                        onClick={canRecord ? toggleRecording : undefined}
                         disabled={recordDisabled}
                         duplicate
                       />
                       <span className="flex flex-col leading-[1.3]">
                         <span className="text-sm font-medium whitespace-nowrap">{recLabel}</span>
                         {/* A guest's clock only runs while they're recorded; the host's sits at 00:00 beside Record. */}
-                        {(isHost || clock) && <span className="text-xs text-white/60 tabular-nums">{clock ?? "00:00"}</span>}
+                        {(canRecord || clock) && <span className="text-xs text-white/60 tabular-nums">{clock ?? "00:00"}</span>}
                       </span>
                     </span>
                     <span className="flex flex-wrap items-center gap-1.5">
@@ -665,7 +681,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         ))}
                       <BigRecordButton
                         recording={!!recording}
-                        onClick={isHost ? toggleRecording : undefined}
+                        onClick={canRecord ? toggleRecording : undefined}
                         disabled={recordDisabled}
                       />
                     </span>
@@ -695,9 +711,9 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         </span>
                       </span>
                       <span className="text-[36px] leading-[1.1] font-medium tracking-[-.03em] tabular-nums">{clock ?? "00:00"}</span>
-                      {isHost ? (
+                      {canRecord ? (
                         <span className="text-[12.5px] whitespace-nowrap text-muted">
-                          {recording ? "Press to stop recording for everyone" : "Press to start recording everyone"}
+                          {solo ? (recording ? "Press to stop when you're done" : "Press to start recording yourself") : recording ? "Press to stop recording for everyone" : "Press to start recording everyone"}
                         </span>
                       ) : (
                         <span className="text-[13.5px] font-medium text-text-2">
@@ -735,7 +751,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
 
                 {isHost &&
                   state &&
-                  participants.map((p) => {
+                  // The recording card lists who is recorded: a producer isn't.
+                  participants.filter((p) => !p.producer).map((p) => {
                     const self = p.id === ticket.participantId;
                     const peer = peerById.get(p.id);
                     return (
@@ -817,7 +834,11 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                             </span>
                             {shares && <TalkShare share={shares.get(p.id) ?? 0} />}
                           </span>
-                          {isHost && state?.recording ? (
+                          {p.producer ? (
+                            <span className="text-[13.5px] text-muted" data-testid="producer-row">
+                              Producer · not recorded
+                            </span>
+                          ) : isHost && state?.recording ? (
                             <ParticipantUpload
                               upload={state.uploads.find((u) => u.participantId === p.id)}
                               stopped={state.recording.status === "stopped"}
@@ -844,6 +865,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     );
                   })}
                 </ul>
+                {(isHost || solo) && <GuidePanel ticket={ticket} recordingId={recording?.id ?? null} title={solo ? "Questions" : "Guide"} />}
                 {!isHost && (
                   <div className="flex flex-col gap-[9px] rounded-xl border border-border bg-surface p-3.5 text-sm leading-normal text-text-2">
                     <span>• If your internet drops, keep talking. Your recording is saved here first.</span>
@@ -860,6 +882,11 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     onClick={() => confirm("End the session for everyone?") && hostAction("/end")}
                   >
                     End session for everyone
+                  </Button>
+                )}
+                {solo && !isHost && (
+                  <Button variant="secondary" size="sm" className="mt-auto w-full" disabled={busy || !!recording} onClick={() => hostAction("/end")} data-testid="solo-finish">
+                    I&apos;m finished
                   </Button>
                 )}
               </div>

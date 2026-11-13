@@ -389,6 +389,18 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     expect(size(byName(hd, "Uhd - video.mp4"))).toBe("1920,1080");
   });
 
+  it("makes the video files at the studio's frame rate, the combined one too", { timeout: 120_000 }, async () => {
+    const tracks: TrackInput[] = [{ trackId: "v", participantId: "p", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 0 }];
+    const rates = async (frameRate: "24" | "25" | "29.97" | undefined) => {
+      const out = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, `fps-${frameRate ?? "default"}`), durationMs: 2000, videoQuality: "720p", font: null, frameRate });
+      return out.map((o) => probe(o.path, "stream=r_frame_rate").split("\n")[0]);
+    };
+    expect(await rates(undefined)).toEqual(["30/1", "30/1"]);
+    expect(await rates("25")).toEqual(["25/1", "25/1"]);
+    expect(await rates("24")).toEqual(["24/1", "24/1"]);
+    expect(await rates("29.97")).toEqual(["30000/1001", "30000/1001"]);
+  });
+
   it("a shared screen: one file per person, black when nothing was shared, and the frame of the combined video while it was", { timeout: 300_000 }, async () => {
     // A still, white window: two frames a second for one second, though it was shared for 1.5 s.
     const still = join(dir, "screen.webm");

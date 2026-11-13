@@ -14,6 +14,8 @@ const card = { display: "flex", flexDirection: "column", border: "1px solid #ece
 export default function ResourcesPage() {
   const tools = [
     { href: "/mic-test/", title: "Mic & camera test", body: "Check your level, hear yourself back and see your camera’s real resolution. Send it to guests before any call, Tapry or not.", cta: "Open the test →" },
+    { href: "/recorder/", title: "Voice & video recorder", body: "Record yourself in the browser and save the file to your own computer. Nothing is uploaded.", cta: "Open the recorder →" },
+    { href: "/consent-form/", title: "Consent form generator", body: "A plain-language recording consent form for interviews, podcasts and research, ready to copy.", cta: "Make a form →" },
     ...(HAS_SPEED_TEST
       ? [{ href: "/upload-speed-test/", title: "Upload speed test", body: "Measures the direction that matters for recording and tells you whether sound only, 720p or 1080p will keep up.", cta: "Run the test →" }]
       : []),

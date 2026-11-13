@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 /** Prefixed random ids, e.g. "trk_3fJ8…", so a stray id in a log says what it is. */
-export function newId(prefix: "usr" | "std" | "ses" | "par" | "rec" | "trk" | "job" | "out" | "wrk" | "stg" | "inv") {
+export function newId(prefix: "usr" | "std" | "ses" | "par" | "rec" | "trk" | "job" | "out" | "wrk" | "stg" | "inv" | "mrk") {
   return `${prefix}_${randomBytes(12).toString("base64url")}`;
 }
 

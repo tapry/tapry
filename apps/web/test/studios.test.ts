@@ -138,6 +138,7 @@ describe("studios", () => {
       guestDownloads: true,
       consentText: "",
       audioFormat: "wav",
+      frameRate: "30",
     });
     expect(updated.body.name).toBe("Weekly Studio");
 

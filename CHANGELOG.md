@@ -5,6 +5,25 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Two more free tools on the website.** `/recorder`: record your voice (and camera) in the
+  browser and save the file to your own computer; nothing is uploaded. `/consent-form`: a
+  plain-language recording consent form from a few answers, to copy or save.
+
+- **Solo links.** A studio can have a link where one person records alone, with no host and no
+  call: they see your questions, agree to be recorded, and start and stop it themselves (up to
+  30 minutes). Each one arrives as a recording of the studio. Off until you turn it on in the
+  studio's settings; 10 an hour per address.
+- **Producer seat.** A host can join as producer: in the call and at the controls, never
+  recorded and not in the files.
+- **Guide and markers.** A studio's guide (run of show) is the host's plan, one question or
+  segment per line; hosts see it beside the call and tick items off. A tick during a recording,
+  or the Mark button, sets a marker at that moment. Guests never receive the guide.
+- **Timeline exports.** Each finished recording has project files that lay its files out on a
+  timeline with its markers: OpenTimelineIO, Final Cut XML and REAPER. On the recording's page
+  and in the zip. The OpenTimelineIO file is checked against the OpenTimelineIO library; the
+  other two have not been opened in their editors yet.
+- **Frame rate.** A studio's video files can be 30, 29.97, 25 or 24 frames a second.
+
 - **A backup script.** `deploy/compose/backup.sh` dumps the database, checks the dump can be
   read back, keeps a copy of `.env`, and removes backups older than 14 days. The self-hosting
   guide says how to schedule and restore it, and what it doesn't cover (the recordings' media).

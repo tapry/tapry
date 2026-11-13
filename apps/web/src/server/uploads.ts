@@ -94,6 +94,8 @@ export class UploadService {
       [body.recordingId, p.sessionId, p.id],
     );
     if (!recording) throw new ApiError(404, "recording_not_found", "Recording not found");
+    // A producer is in the call, never in the recording.
+    if (p.producer) throw new ApiError(409, "not_recorded", "A producer isn't recorded");
     if (recording.deleted_at) throw recordingGone();
     this.checkOpen(recording);
     // A track began while the recording ran: not before Record (clock error aside), not after Stop.

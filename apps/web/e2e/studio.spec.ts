@@ -318,7 +318,8 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
       file,
     ]).toString();
     // Every file, then the consent record (who agreed, when, to what).
-    expect(JSON.parse(listed)).toEqual([...names, "Consent record - Recording 1.txt"]);
+    // The media, then the timeline projects for editors, and last the consent record.
+    expect(JSON.parse(listed)).toEqual([...names, "Timeline.otio", "Timeline.fcpxml", "Timeline.rpp", "Consent record - Recording 1.txt"]);
     await studioPage.close();
   });
 

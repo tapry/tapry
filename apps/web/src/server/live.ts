@@ -8,6 +8,10 @@ export interface Participant {
   id: string;
   sessionId: string;
   role: "host" | "guest";
+  /** A host who is never recorded. */
+  producer: boolean;
+  /** Recording alone in a solo session: they start and stop their own recording. */
+  solo: boolean;
 }
 
 type Listener = (state: SessionState) => void;
@@ -62,17 +66,37 @@ export class LiveService {
   /** Resolve a participant bearer token for this session. */
   async authenticate(token: string | undefined, sessionId: string): Promise<Participant> {
     if (!token) throw new ApiError(401, "unauthorized", "Missing bearer token");
-    const [row] = await this.db.query<{ id: string; session_id: string; role: Participant["role"] }>(
-      "SELECT id, session_id, role FROM participants WHERE token_hash = $1",
+    const [row] = await this.db.query<{ id: string; session_id: string; role: Participant["role"]; producer: boolean; solo: boolean }>(
+      // Solo for good: ending the session doesn't take the person's own recording away from them.
+      `SELECT p.id, p.session_id, p.role, p.producer,
+              (s.status = 'solo' OR NOT EXISTS (SELECT 1 FROM participants h WHERE h.session_id = s.id AND h.role = 'host')) AS solo
+       FROM participants p JOIN sessions s ON s.id = p.session_id WHERE p.token_hash = $1`,
       [hashToken(token)],
     );
     if (!row) throw new ApiError(401, "unauthorized", "Unknown token");
     if (row.session_id !== sessionId) throw new ApiError(403, "forbidden", "Token is for a different session");
-    return { id: row.id, sessionId: row.session_id, role: row.role };
+    return { id: row.id, sessionId: row.session_id, role: row.role, producer: row.producer, solo: row.solo };
+  }
+
+  /**
+   * A host chooses to be a producer (in the call and at the controls, never recorded) or to be
+   * recorded. Not while they have a track in a running recording: that would cut their file.
+   */
+  async setProducer(p: Participant, producer: boolean) {
+    if (p.role !== "host") throw new ApiError(403, "forbidden", "Only a host can be a producer");
+    if (producer) {
+      const [busy] = await this.db.query(
+        "SELECT 1 FROM tracks t JOIN recordings r ON r.id = t.recording_id WHERE t.participant_id = $1 AND r.status = 'recording' LIMIT 1",
+        [p.id],
+      );
+      if (busy) throw new ApiError(409, "recording", "You're being recorded right now. Stop the recording first.");
+    }
+    await this.db.query("UPDATE participants SET producer = $2 WHERE id = $1", [p.id, producer]);
+    await this.publish(p.sessionId);
   }
 
   async state(sessionId: string): Promise<SessionState> {
-    const [session] = await this.db.query<{ id: string; studio_id: string; status: "open" | "ended" }>(
+    const [session] = await this.db.query<{ id: string; studio_id: string; status: "open" | "solo" | "ended" }>(
       "SELECT id, studio_id, status FROM sessions WHERE id = $1",
       [sessionId],
     );
@@ -87,8 +111,8 @@ export class LiveService {
        ORDER BY (status = 'recording') DESC, started_at DESC LIMIT 1`,
       [sessionId],
     );
-    const participants = await this.db.query<{ id: string; display_name: string; role: "host" | "guest" }>(
-      "SELECT id, display_name, role FROM participants WHERE session_id = $1 ORDER BY created_at",
+    const participants = await this.db.query<{ id: string; display_name: string; role: "host" | "guest"; producer: boolean }>(
+      "SELECT id, display_name, role, producer FROM participants WHERE session_id = $1 ORDER BY created_at",
       [sessionId],
     );
     const uploads = recording
@@ -114,7 +138,7 @@ export class LiveService {
       recording: recording
         ? { id: recording.id, status: recording.status, startedAt: recording.started_at, stoppedAt: recording.stopped_at }
         : null,
-      participants: participants.map((p) => ({ id: p.id, displayName: p.display_name, role: p.role })),
+      participants: participants.map((p) => ({ id: p.id, displayName: p.display_name, role: p.role, producer: p.producer })),
       health: [...(this.hub.health.get(sessionId)?.values() ?? [])].filter((h) => participants.some((p) => p.id === h.participantId)),
       serverTime: this.now(),
     };
@@ -165,7 +189,7 @@ export class LiveService {
         "UPDATE recordings SET status = 'stopped', stopped_at = $2 WHERE session_id = $1 AND status = 'recording' RETURNING id",
         [host.sessionId, this.now()],
       );
-      await tx.query("UPDATE sessions SET status = 'ended', ended_at = now() WHERE id = $1 AND status = 'open'", [
+      await tx.query("UPDATE sessions SET status = 'ended', ended_at = now() WHERE id = $1 AND status IN ('open', 'solo')", [
         host.sessionId,
       ]);
       return rows;
@@ -242,10 +266,11 @@ export class LiveService {
 
   private async requireOpen(sessionId: string) {
     const [s] = await this.db.query<{ status: string }>("SELECT status FROM sessions WHERE id = $1", [sessionId]);
-    if (s?.status !== "open") throw new ApiError(409, "session_ended", "This session has ended");
+    if (s?.status !== "open" && s?.status !== "solo") throw new ApiError(409, "session_ended", "This session has ended");
   }
 }
 
+/** The host, or the one person of a solo session, who is their own host. */
 function requireHost(p: Participant) {
-  if (p.role !== "host") throw new ApiError(403, "host_only", "Only the host can do this");
+  if (p.role !== "host" && !p.solo) throw new ApiError(403, "host_only", "Only the host can do this");
 }

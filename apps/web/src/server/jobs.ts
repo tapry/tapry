@@ -801,6 +801,7 @@ export class JobRunner {
       workDir: join(work, "out"),
       durationMs: Math.max(1000, (rec.stopped_at ?? lastEnd) - rec.started_at),
       videoQuality: settings.videoQuality,
+      frameRate: settings.frameRate,
       font: this.opts.font,
       loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
       audioFormat: settings.audioFormat,
