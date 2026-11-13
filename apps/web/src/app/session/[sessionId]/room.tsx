@@ -37,6 +37,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const controller = useRef<RecordingController | null>(null);
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [screen, setScreen] = useState<MediaStream | null>(null);
+  const [screenNote, setScreenNote] = useState<string | null>(null);
   const ended = state?.session.status === "ended";
   // Filters are for the call's copies, this person's own tile and the finished files. The stream
   // from the green room goes to the recorder as it is.
@@ -103,6 +105,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
       onMaskProblem: (err) => {
         console.warn("[recording] mask", err);
         blurGiveUp.current("recorder");
+      },
+      onScreenProblem: (err) => {
+        console.warn("[recording] screen", err);
+        setScreenNote("Your screen is shared, but it couldn't be recorded.");
       },
     });
     return () => {
@@ -258,6 +264,45 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     void call.setCameraOff(!cameraOff);
   }
 
+  // Sharing a screen: the browser asks which, the others see a copy in the call, and while a
+  // recording runs it is recorded on this device as a track of its own (picture only).
+  const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
+  const otherSharing = call.peers.find((p) => p.screen);
+  async function toggleScreen() {
+    setScreenNote(null);
+    if (screen) {
+      screen.getTracks().forEach((t) => t.stop());
+      setScreen(null);
+      return;
+    }
+    try {
+      const shared = await navigator.mediaDevices.getDisplayMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 15, max: 30 } }, audio: false });
+      // The browser's own "Stop sharing" button ends it too.
+      shared.getVideoTracks()[0]?.addEventListener("ended", () => setScreen((now) => (now === shared ? null : now)));
+      setScreen(shared);
+    } catch (err) {
+      // Closing the browser's picker isn't an error.
+      if (!(err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "AbortError"))) setScreenNote("Your screen couldn't be shared.");
+    }
+  }
+  useEffect(() => {
+    void controller.current?.setScreen(screen);
+    void call.setScreen(screen?.getVideoTracks()[0] ?? null);
+  }, [screen, call.setScreen]);
+  // The session ending ends the share.
+  useEffect(() => {
+    if (!ended) return;
+    setScreen((now) => {
+      now?.getTracks().forEach((t) => t.stop());
+      return null;
+    });
+  }, [ended]);
+  // Leaving the room ends the share.
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
+  useEffect(() => () => screenRef.current?.getTracks().forEach((t) => t.stop()), []);
+  const screenTile = screen ? { label: "Your screen" } : otherSharing ? { label: `${otherSharing.name}'s screen`, track: otherSharing.screen } : null;
+
   const participants = state?.participants ?? [];
   const connectedCount = present ? participants.filter((p) => present.has(p.id)).length : null;
   const peerById = new Map(call.peers.map((p) => [p.id, p]));
@@ -299,6 +344,11 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         </Notice>
       )}
       {recorderError && <Notice tone="danger">Recording problem: {recorderError}</Notice>}
+      {screenNote && (
+        <Notice tone="warn" data-testid="screen-note">
+          {screenNote}
+        </Notice>
+      )}
       {error && <Notice tone="danger">{error}</Notice>}
     </>
   );
@@ -354,6 +404,19 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           onClick={toggleCamera}
         >
           <Icon d={cameraOff ? ICON.camOff : ICON.cam} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
+        </StageButton>
+      )}
+      {canShare && (
+        <StageButton
+          size={size}
+          active={!!screen}
+          aria-pressed={!!screen}
+          disabled={!screen && !!otherSharing}
+          aria-label={screen ? "Stop sharing your screen" : "Share your screen"}
+          title={screen ? "Stop sharing your screen" : otherSharing ? `${otherSharing.name} is sharing their screen` : "Share your screen"}
+          onClick={() => void toggleScreen()}
+        >
+          <Icon d={ICON.screen} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
         </StageButton>
       )}
       <StageButton
@@ -522,6 +585,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     layout={layout}
                     variant={fullOpen ? "full" : "stage"}
                     badges={isHost ? badges : undefined}
+                    screen={screenTile}
                   />
                 </div>
                 {fullOpen ? (
@@ -842,7 +906,7 @@ function StageButton({
       ref={ref}
       type="button"
       className={cn(
-        "grid cursor-pointer place-items-center rounded-full transition-colors",
+        "grid cursor-pointer place-items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45",
         size === "lg" ? "size-11" : "size-[38px]",
         active ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-white/12 text-white hover:bg-white/28",
         className,

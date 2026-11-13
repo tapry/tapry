@@ -14,7 +14,10 @@ const mimeType = z.string().min(1).max(200);
 // "mask" is a small black-and-white video of where the person is in their picture, recorded
 // next to the camera when they blur their background. It only ever helps render their video:
 // it is never an output, and a missing or unreadable one costs the blur, never the recording.
-export const trackKind = z.enum(["audio", "video", "mask"]);
+// "screen" is what a person shares from their display: picture only, recorded on their device
+// while they share, like the camera. A person can have several in a recording (they shared,
+// stopped, shared again); together they become one "<name> - screen.mp4".
+export const trackKind = z.enum(["audio", "video", "mask", "screen"]);
 export type TrackKind = z.infer<typeof trackKind>;
 /** The kinds that are a person's recording (and become files). */
 export type MediaKind = Exclude<TrackKind, "mask">;
@@ -251,7 +254,7 @@ export interface OwnRecordings {
     number: number;
     processing: "pending" | "queued" | "processing" | "ready" | "failed";
     /** Signed, short-lived download links; empty until processing is ready. */
-    files: Array<{ kind: "audio" | "video"; fileName: string; bytes: number; url: string }>;
+    files: Array<{ kind: "audio" | "video" | "screen"; fileName: string; bytes: number; url: string }>;
   }>;
   /** "Record your own" link (GUEST_PROMO_URL), or null when the server doesn't set one. */
   promoUrl: string | null;

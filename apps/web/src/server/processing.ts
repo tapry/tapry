@@ -29,7 +29,7 @@ export interface RecordingSummary {
   processing: ProcessingStatus;
   processingError: string | null;
   /** People's tracks left out of the files because they couldn't be read. Their uploads are kept. */
-  skippedTracks: Array<{ name: string; kind: "audio" | "video" }>;
+  skippedTracks: Array<{ name: string; kind: "audio" | "video" | "screen" }>;
   /** off: transcription not configured on this server. */
   transcript: "off" | "queued" | "processing" | "ready" | "failed";
   startedAt: number;
@@ -66,7 +66,7 @@ export interface RecordingSummary {
     completeTracks: number;
     bytes: number;
   }>;
-  outputs: Array<{ id: string; kind: "audio" | "video" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
+  outputs: Array<{ id: string; kind: "audio" | "video" | "screen" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
 /** A recording seen across all of a host's studios (the dashboard's Recordings, Guests, Transcripts). */
@@ -433,9 +433,9 @@ export class ProcessingService {
       const files =
         r.processing !== "ready"
           ? []
-          : await this.db.query<{ kind: "audio" | "video"; file_name: string; content_type: string; storage_key: string; bytes: string }>(
+          : await this.db.query<{ kind: "audio" | "video" | "screen"; file_name: string; content_type: string; storage_key: string; bytes: string }>(
               `SELECT kind, file_name, content_type, storage_key, bytes FROM outputs
-               WHERE recording_id = $1 AND participant_id = $2 AND kind IN ('audio', 'video') ORDER BY kind, ${ORIGINAL_LAST.replace("o.", "")}`,
+               WHERE recording_id = $1 AND participant_id = $2 AND kind IN ('audio', 'video', 'screen') ORDER BY kind, ${ORIGINAL_LAST.replace("o.", "")}`,
               [r.id, p.id],
             );
       out.push({

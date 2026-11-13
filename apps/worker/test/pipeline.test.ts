@@ -389,6 +389,50 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     expect(size(byName(hd, "Uhd - video.mp4"))).toBe("1920,1080");
   });
 
+  it("a shared screen: one file per person, black when nothing was shared, and the frame of the combined video while it was", { timeout: 300_000 }, async () => {
+    // A still, white window: two frames a second for one second, though it was shared for 1.5 s.
+    const still = join(dir, "screen.webm");
+    await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "color=c=white:size=1280x800:rate=2", "-t", "1", "-c:v", "libvpx-vp9", "-b:v", "1M", "-deadline", "realtime", "-cpu-used", "8", "-an", still]);
+    const sam = { participantId: "par_s", participantName: "Sam" };
+    const tracks: TrackInput[] = [
+      { ...sam, trackId: "a", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { ...sam, trackId: "v", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      // Shared from 1 s to 2.5 s, and again from 4 s to 5 s.
+      { ...sam, trackId: "s1", kind: "screen", rawPath: still, offsetMs: 1000, endOffsetMs: 2500 },
+      { ...sam, trackId: "s2", kind: "screen", rawPath: still, offsetMs: 4000, endOffsetMs: 5000 },
+    ];
+    const out = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "screen-out"), durationMs: 6000, videoQuality: "720p", font: null });
+    expect(out.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam - video.mp4", "Sam - screen.mp4", "Combined.mp4"]);
+    const light = (file: string, t: number, crop = "") =>
+      Number(
+        execFileSync(ffmpeg, ["-hide_banner", "-ss", String(t), "-i", file, "-frames:v", "1",
+          "-vf", `${crop}signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-`, "-f", "null", "-"])
+          .toString().match(/YAVG=([\d.]+)/)![1]!,
+      );
+    const screen = out[2]!;
+    expect(screen.kind).toBe("screen");
+    expect(screen.intervals).toEqual([[1, 2.5], [4, 5]]);
+    expect(probe(screen.path, "stream=width,height").split("\n")[0]).toBe("1920,1080");
+    expect(probe(screen.path, "stream=codec_type").trim()).toBe("video"); // picture only
+    expect(screen.durationMs).toBe(6000);
+    expect(light(screen.path, 0.5)).toBeLessThan(25); // not shared yet
+    expect(light(screen.path, 1.3)).toBeGreaterThan(170);
+    expect(light(screen.path, 2.3)).toBeGreaterThan(170); // held past its last frame, to when sharing ended
+    expect(light(screen.path, 3.2)).toBeLessThan(25); // between the two
+    expect(light(screen.path, 4.5)).toBeGreaterThan(170);
+    expect(light(screen.path, 5.6)).toBeLessThan(25);
+
+    // The combined video: the grid, then the screen across the frame with Sam's camera in the corner, then the grid again.
+    const combined = out[3]!;
+    const grid = light(combined.path, 0.5);
+    expect(light(combined.path, 1.5)).toBeGreaterThan(170);
+    expect(Math.abs(light(combined.path, 3.2) - grid)).toBeLessThan(12);
+    expect(light(combined.path, 4.5)).toBeGreaterThan(170);
+    const corner = "crop=300:160:1560:870,";
+    expect(light(combined.path, 1.5, corner)).toBeLessThan(200); // the camera, not the white window
+    expect(light(combined.path, 1.5, "crop=300:160:200:200,")).toBeGreaterThan(220);
+  });
+
   it("merges the pieces of someone who rejoined mid-recording into one file each, gap included", async () => {
     // Recording of 6 s: the guest's tab died at ~3 s and they were back at 4 s.
     const pieces: TrackInput[] = [

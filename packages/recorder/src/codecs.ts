@@ -19,12 +19,14 @@ const AUDIO_TYPES = [
 
 // Picture only, small and cheap to encode: VP8 first, then VP9, then MP4 for Safari.
 const MASK_TYPES = ["video/webm;codecs=vp8", "video/webm;codecs=vp9", "video/webm", "video/mp4;codecs=avc1.42E01E", "video/mp4"];
+// A shared screen: picture only. VP9 keeps text sharp at a low bitrate.
+const SCREEN_TYPES = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4;codecs=avc1.42E01E", "video/mp4"];
 
 export function pickMimeType(
   kind: TrackKind,
   isTypeSupported: (type: string) => boolean = (t) => MediaRecorder.isTypeSupported(t),
 ): string {
-  const candidates = kind === "video" ? VIDEO_TYPES : kind === "mask" ? MASK_TYPES : AUDIO_TYPES;
+  const candidates = kind === "video" ? VIDEO_TYPES : kind === "mask" ? MASK_TYPES : kind === "screen" ? SCREEN_TYPES : AUDIO_TYPES;
   const found = candidates.find((t) => isTypeSupported(t));
   if (!found) throw new Error(`No supported MediaRecorder ${kind} format in this browser`);
   return found;

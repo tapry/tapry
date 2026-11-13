@@ -151,7 +151,7 @@ async function claim(db: Db, token: string): Promise<Due | null> {
       `SELECT q.participant_id, q.session_id, q.email, q.attempts, st.name AS studio_name, st.settings,
               EXISTS (SELECT 1 FROM outputs o JOIN recordings r ON r.id = o.recording_id
                       WHERE o.participant_id = q.participant_id AND r.deleted_at IS NULL AND r.processing = 'ready'
-                        AND o.kind IN ('audio', 'video')) AS has_files
+                        AND o.kind IN ('audio', 'video', 'screen')) AS has_files
        FROM recap_requests q
        JOIN sessions s ON s.id = q.session_id JOIN studios st ON st.id = s.studio_id
        WHERE q.status = 'pending' AND q.run_after <= now() AND q.attempts < $1

@@ -594,7 +594,7 @@ export class JobRunner {
   }
 
   private async render(rec: RecordingRow, work: string) {
-    const tracks = await this.db.query<{ id: string; participant_id: string; display_name: string; kind: "audio" | "video"; started_at: number; filters: unknown }>(
+    const tracks = await this.db.query<{ id: string; participant_id: string; display_name: string; kind: "audio" | "video" | "screen"; started_at: number; filters: unknown }>(
       `SELECT t.id, t.participant_id, p.display_name, t.kind, t.started_at,
               CASE WHEN r.apply_filters THEN t.filters END AS filters
        FROM tracks t JOIN recordings r ON r.id = t.recording_id JOIN participants p ON p.id = t.participant_id
@@ -662,7 +662,8 @@ export class JobRunner {
       await this.progress(rec, { stage: "collecting", done: i, total: tracks.length, current: t.display_name });
       const { rawPath, hasGaps, endTs } = await collect(t.id);
       lastEnd = Math.max(lastEnd, endTs);
-      const { filters } = filtersFor(t.filters);
+      // A shared screen is kept as it was: a person's look is for their camera.
+      const { filters } = t.kind === "screen" ? {} : filtersFor(t.filters);
       const mask = t.kind === "video" && filters?.background === "blur" ? await maskFor(t) : undefined;
       inputs.push({
         trackId: t.id,
@@ -679,7 +680,7 @@ export class JobRunner {
     }
 
     const settings = studioSettings.parse(rec.settings);
-    const skipped: Array<{ name: string; kind: "audio" | "video" }> = [];
+    const skipped: Array<{ name: string; kind: "audio" | "video" | "screen" }> = [];
     const filtersFailed: Array<{ name: string; kind: "audio" | "video" }> = [];
     const files = await renderRecording(inputs, {
       // Metadata in the log, never the name. One bad upload must not cost everyone their files.

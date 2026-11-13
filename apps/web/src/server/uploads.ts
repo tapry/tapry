@@ -110,6 +110,9 @@ export class UploadService {
     if (body.kind === "mask" && !/^video\//i.test(body.mimeType)) {
       throw new ApiError(400, "invalid_mask", "A mask track must be a video");
     }
+    if (body.kind === "screen" && !/^video\//i.test(body.mimeType)) {
+      throw new ApiError(400, "invalid_screen", "A screen track must be a video");
+    }
     const trackId = body.trackId ?? newId("trk");
     if (recording.mine >= MAX_TRACKS_PER_PERSON) {
       const [known] = await this.db.query("SELECT 1 FROM tracks WHERE id = $1 AND participant_id = $2", [trackId, p.id]);

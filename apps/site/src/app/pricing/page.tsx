@@ -33,6 +33,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Audio", "48 kHz WAV or FLAC"],
   ["Video", "Up to 4K, 1080p, 720p or audio only"],
   ["Per-person files + combined video", "✓"],
+  ["Screen sharing, recorded as its own file", "✓"],
   ["Tech-check link and producer alerts", "✓"],
 ];
 

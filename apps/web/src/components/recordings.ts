@@ -47,8 +47,8 @@ export function describeOutput(o: Recording["outputs"][number]): { title: string
   }
   // "Sam Guest - audio (original).wav": their sound before noise removal, kept beside the cleaned file.
   const original = isOriginalAudio(o.fileName);
-  const who = o.fileName.replace(/ - (audio|video)( \(original\))?\.\w+$/, "");
-  return { title: `${who}'s ${o.kind}${original ? " (original)" : ""}`, icon: o.kind === "audio" ? "wave" : "camera", format: ext };
+  const who = o.fileName.replace(/ - (audio|video|screen)( \(original\))?\.\w+$/, "");
+  return { title: `${who}'s ${o.kind}${original ? " (original)" : ""}`, icon: o.kind === "audio" ? "wave" : o.kind === "screen" ? "screen" : "camera", format: ext };
 }
 
 /** A person's audio as recorded, which the worker keeps next to the file with noise removal. */

@@ -24,10 +24,10 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
                   }
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <Icon name={f.kind === "audio" ? "wave" : "camera"} size={15} className="text-muted" />
+                    <Icon name={f.kind === "audio" ? "wave" : f.kind === "screen" ? "screen" : "camera"} size={15} className="text-muted" />
                     <span className="flex min-w-0 flex-col gap-px">
                       <span className="truncate">
-                        {f.kind === "audio" ? "Your audio" : "Your video"}
+                        {f.kind === "audio" ? "Your audio" : f.kind === "screen" ? "Your shared screen" : "Your video"}
                         {isOriginalAudio(f.fileName) && " (original)"}
                       </span>
                       <span className="text-[12.5px] text-muted">

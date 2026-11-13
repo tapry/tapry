@@ -409,4 +409,11 @@ CREATE TABLE waitlist (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 `,
+  `
+-- A shared screen is a track kind of its own, and a person's "screen" file an output kind.
+ALTER TABLE tracks DROP CONSTRAINT tracks_kind_check;
+ALTER TABLE tracks ADD CONSTRAINT tracks_kind_check CHECK (kind IN ('audio', 'video', 'mask', 'screen'));
+ALTER TABLE outputs DROP CONSTRAINT outputs_kind_check;
+ALTER TABLE outputs ADD CONSTRAINT outputs_kind_check CHECK (kind IN ('audio', 'video', 'screen', 'combined', 'transcript'));
+`,
 ];

@@ -21,7 +21,7 @@ Goal: cover ~70% of what most Riverside users actually use, plus what Riverside 
 | Teleprompter / notes | **Interview guide tracker** (smarter) | v1.1 |
 | Collaborators | Team roles + comments | v1.1 |
 | Phone guests | Mobile browser first | v1 / v1.1 |
-| Screen share | Separate track | v1.2 |
+| Screen share | Separate track, own file, fills the combined video while shared | Built 13 Nov 2026 (Chromium tested) |
 | Filler/pause removal | Light, all tracks in sync | v1.2 |
 | Captions | SRT/VTT | v1.2 |
 
