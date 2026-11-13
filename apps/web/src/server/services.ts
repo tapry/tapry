@@ -9,6 +9,7 @@ import type { Db } from "./db";
 import { LibraryService, type ServerInfo } from "./library";
 import { LiveHub, LiveService } from "./live";
 import type { Mailer } from "./mail";
+import { OwnStorageService, RoutedStorage, StorageTargets, type MakeStorage } from "./own-storage";
 import { ProcessingService } from "./processing";
 import { RecapService } from "./recap";
 import type { Storage } from "./storage";
@@ -34,6 +35,8 @@ export interface Services {
   health: HealthService;
   /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
   library: LibraryService;
+  /** Accounts' own buckets: setting one up, and which bucket a new session records into. */
+  ownStorage: OwnStorageService;
   /** A host's account by email: a new password, confirming the address. */
   account: AccountService;
   /** Tapry Cloud's plans and limits; off (`billing.cloud` false) on a self-hosted server. */
@@ -44,11 +47,14 @@ export interface Services {
 
 export function createServices(
   db: Db,
-  storage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; /** This server's public address, for links in email. */ appUrl?: string | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig | null } = {
+  /** The server's own storage; sessions of accounts with their own bucket are routed past it. */
+  serverStorage: Storage,
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; /** This server's public address, for links in email. */ appUrl?: string | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig | null; ownStorage?: { serverKey: string | null; allowPrivate?: boolean; make?: MakeStorage; resolve?: (host: string) => Promise<string[]> } } = {
     auth: { allowSignup: false },
   },
 ): Services {
+  const targets = new StorageTargets(db, opts.ownStorage?.serverKey ?? null, opts.ownStorage?.make);
+  const storage: Storage = new RoutedStorage(serverStorage, targets);
   let processing: ProcessingService;
   // Processing is queued when the last track finishes uploading or the host presses Stop,
   // whichever comes last; both paths check whether everything has arrived.
@@ -57,7 +63,15 @@ export function createServices(
   const billing = new BillingService(db, { cloud: false, ...opts.billing, now: opts.now });
   const live = new LiveService(db, { now: opts.now, hub: opts.hub, onStopped: maybeProcess, beforeRecording: (sessionId) => billing.checkCanRecord(sessionId) });
   processing = new ProcessingService(db, storage, (sessionId) => live.publishSoon(sessionId));
-  const studios = new StudioService(db, live, () => processing.onEnqueue());
+  const ownStorage = new OwnStorageService(db, targets, {
+    serverKey: opts.ownStorage?.serverKey ?? null,
+    allowPrivate: opts.ownStorage?.allowPrivate,
+    resolve: opts.ownStorage?.resolve,
+    // On Tapry Cloud the plan says; a self-hosted server offers it to every account.
+    allowed: async (userId, q) => !billing.cloud || (await billing.planOf(userId, q)).ownStorage !== "no",
+    required: async (userId, q) => billing.cloud && (await billing.planOf(userId, q)).ownStorage === "required",
+  });
+  const studios = new StudioService(db, live, () => processing.onEnqueue(), (tx, ownerId) => ownStorage.targetForNewSession(tx, ownerId));
   const health = new HealthService(db, storage, { ...opts.health, call: opts.call ?? null, mailer: opts.mailer ?? null });
   return {
     db,
@@ -73,6 +87,7 @@ export function createServices(
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
     health,
     library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),
+    ownStorage,
     account: new AccountService(db, {
       mail: opts.mailer && opts.appUrl ? { mailer: opts.mailer, appUrl: opts.appUrl } : null,
       requireVerified: billing.cloud,

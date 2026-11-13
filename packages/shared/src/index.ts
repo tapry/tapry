@@ -368,7 +368,7 @@ export type CallToken =
 // Only a server run as Tapry Cloud (TAPRY_CLOUD=true) uses these. A self-hosted server has no
 // plans and no limits. The figures are docs/plan/06-monetization.md (pricing v4).
 
-export const PLAN_IDS = ["free", "creator", "studio", "team", "business"] as const;
+export const PLAN_IDS = ["free", "own_storage", "creator", "studio", "team", "business"] as const;
 export const planId = z.enum(PLAN_IDS);
 export type PlanId = z.infer<typeof planId>;
 
@@ -385,14 +385,21 @@ export interface Plan {
   originalsDays: number | null;
   /** Guests see "Recorded with Tapry" at the end of a session. */
   badge: boolean;
+  /**
+   * Recording into the account's own bucket: not part of the plan, possible, or the only
+   * storage the plan has (nothing is recorded until a bucket is connected).
+   */
+  ownStorage: "no" | "allowed" | "required";
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true },
-  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false },
-  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false },
-  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false },
-  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false },
+  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no" },
+  // Everything is in the customer's bucket: nothing of ours to meter or to delete.
+  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required" },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no" },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no" },
+  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no" },
+  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed" },
 };
 
 /** Whether moving from one plan to another is an upgrade (more hours or longer keeping). */
@@ -422,3 +429,39 @@ export const setPlanBody = z.object({
   /** When the plan ends and the account goes back to Free (ISO date). Omit: no end. */
   endsAt: z.iso.datetime().nullish(),
 });
+
+// ── Own storage: an account's own S3-compatible bucket ──────────────────────────
+
+export const ownStorageBody = z.object({
+  /** The S3 endpoint (https). Empty for Amazon S3 itself, which is found by region. */
+  endpoint: z.string().trim().max(300).optional(),
+  region: z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9-]+$/, "Letters, digits and dashes only"),
+  bucket: z.string().trim().min(3).max(63).regex(/^[a-z0-9][a-z0-9.-]*[a-z0-9]$/, "A bucket name: lowercase letters, digits, dots and dashes"),
+  accessKeyId: z.string().trim().min(1).max(200),
+  secretAccessKey: z.string().min(1).max(500),
+  /** Addresses like endpoint/bucket/key instead of bucket.endpoint/key (most non-Amazon stores). */
+  forcePathStyle: z.boolean(),
+});
+
+export const confirmStorageCheckBody = z.object({ key: z.string().min(1).max(200) });
+
+/** `GET /api/storage/own`. The secret key is never sent back. */
+export interface OwnStorageView {
+  /** The server offers own storage at all (it has a key to protect secrets with). */
+  enabled: boolean;
+  /** This account may use it (on Tapry Cloud, its plan says). */
+  allowed: boolean;
+  /** This account's plan has no other storage: recording waits for a connected bucket. */
+  required: boolean;
+  target: {
+    endpoint: string | null;
+    region: string;
+    bucket: string;
+    /** The last four characters of the access key id, to recognise it by. */
+    accessKeyEnding: string;
+    forcePathStyle: boolean;
+    /** A test upload from a browser has arrived: new sessions record into this bucket. */
+    verified: boolean;
+    savedAt: string;
+  } | null;
+}

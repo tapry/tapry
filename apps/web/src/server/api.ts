@@ -1,11 +1,13 @@
 import {
   commitChunkBody,
   completeTrackBody,
+  confirmStorageCheckBody,
   createStudioBody,
   createTrackBody,
   forgotPasswordBody,
   joinBody,
   loginBody,
+  ownStorageBody,
   seqParam,
   recapBody,
   resetPasswordBody,
@@ -72,7 +74,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     // ── Host accounts ──────────────────────────────────────────────────────────
     signup: handler(async (svc, req) => {
       checkOrigin(req);
-      const { user, token } = await svc.auth.signup(await parseBody(req, signupBody));
+      const { user, token } = await svc.auth.signup(await parseBody(req, signupBody), clientAddress(req));
       // Where addresses must be confirmed, the link goes out with the welcome. A limit or a
       // mail problem here never undoes the sign-up: they can ask again from the dashboard.
       await svc.account.sendVerification(user).catch(() => false);
@@ -193,6 +195,18 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     storageOverview: asUser(async (svc, user) => json(200, await svc.library.storageOverview(user))),
     /** How this server is set up, read-only (admins only; others get 404). */
     workspaceSettings: asUser(async (svc, user) => json(200, await svc.library.workspace(user))),
+
+    // ── Own storage: the account's own bucket ───────────────────────────────────
+    ownStorage: asUser(async (svc, user) => json(200, await svc.ownStorage.view(user))),
+    /** Save a bucket's settings, once this server could write, read and delete there. */
+    saveOwnStorage: asUser(async (svc, user, req) => json(200, await svc.ownStorage.save(user, await parseBody(req, ownStorageBody)))),
+    removeOwnStorage: asUser(async (svc, user) => json(200, await svc.ownStorage.remove(user))),
+    /** A signed test upload for the browser to try, as a guest's browser would. */
+    ownStorageCheck: asUser(async (svc, user) => json(200, await svc.ownStorage.browserCheck(user))),
+    /** The browser's test upload went through: from now on new sessions record into the bucket. */
+    confirmOwnStorageCheck: asUser(async (svc, user, req) =>
+      json(200, await svc.ownStorage.confirmBrowserCheck(user, (await parseBody(req, confirmStorageCheckBody)).key)),
+    ),
 
     // ── Tapry Cloud: plans and billing (404 on a self-hosted server) ────────────
     /** The signed-in host's plan, what they have used of it, and where to change it. */

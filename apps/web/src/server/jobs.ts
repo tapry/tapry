@@ -20,7 +20,7 @@ import {
   type TrackInput,
   type WhisperOptions,
 } from "@tapry/worker";
-import { planRetention } from "./billing";
+import { EXPIRY_NOTICE_MS, planRetention, warnExpiring } from "./billing";
 import type { Db, Queryable } from "./db";
 import { isApiError } from "./errors";
 import { newId } from "./ids";
@@ -227,10 +227,16 @@ export class JobRunner {
     if (!this.opts.cloud || Date.now() < this.nextExpirySweep) return;
     this.nextExpirySweep = Date.now() + EXPIRY_SWEEP_MS;
     try {
+      // Where the server sends email, the host is told first, and a recording goes only once
+      // that warning is a day old: a mail problem delays deleting, never the other way round.
+      const mail = this.opts.mail;
+      if (mail) await warnExpiring(this.db, mail);
       const due = await this.db.query<{ id: string; session_id: string }>(
         `SELECT id, session_id FROM recordings
          WHERE keep_until IS NOT NULL AND keep_until < now() AND deleted_at IS NULL AND status = 'stopped'
+           AND ($1::float8 IS NULL OR expiry_warned_at < now() - make_interval(secs => $1::float8))
          ORDER BY keep_until LIMIT 50`,
+        [mail ? EXPIRY_NOTICE_MS / 1000 : null],
       );
       for (const r of due) {
         try {

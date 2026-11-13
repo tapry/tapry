@@ -24,6 +24,8 @@ export interface AuthOptions {
   /** Failed logins from one address (any emails) before a cooldown. */
   maxFailuresPerAddress?: number;
   failureWindowMs?: number;
+  /** New accounts from one address in an hour, where sign-up is open. The first account isn't counted. */
+  maxSignupsPerAddress?: number;
   /** The first account must present this, so a stranger can't take over a new install. Unset: no code. */
   setupToken?: string | null;
   now?: () => number;
@@ -57,11 +59,13 @@ export class AuthService {
   }
 
   /** The first account on an install becomes admin; after that, sign-up needs allowSignup. */
-  async signup(body: z.infer<typeof signupBody>): Promise<{ user: User; token: string }> {
+  /** `address`: the client's, so one address can't create accounts without end. */
+  async signup(body: z.infer<typeof signupBody>, address = "unknown"): Promise<{ user: User; token: string }> {
     // Refuse before the (deliberately slow) password hash, so a closed server can't be made to
     // hash for anyone; the transaction checks again under the lock.
     const [{ count: before }] = (await this.db.query<{ count: number }>("SELECT count(*)::int AS count FROM users")) as [{ count: number }];
     this.checkSignup(before, body.setupToken);
+    if (before > 0) this.countSignup(address);
     const passwordHash = await hashPassword(body.password);
     const id = newId("usr");
     const user = await this.db.transaction(async (tx) => {
@@ -143,6 +147,16 @@ export class AuthService {
     ]);
     await this.db.query("DELETE FROM user_sessions WHERE user_id = $1 AND expires_at <= $2", [userId, new Date(this.now())]);
     return token;
+  }
+
+  /** Counted on every attempt, taken or not, like failed logins: an hour's window per address. */
+  private countSignup(address: string) {
+    const key = `signup:${address}`;
+    const recent = (this.failures.get(key) ?? []).filter((t) => t > this.now() - 60 * 60 * 1000);
+    if (recent.length >= (this.opts.maxSignupsPerAddress ?? 5)) {
+      throw new ApiError(429, "too_many_signups", "Too many new accounts from this address. Try again in an hour.");
+    }
+    this.failures.set(key, [...recent, this.now()]);
   }
 
   // In-memory, per process: enough to stop password guessing on a single-node self-host.

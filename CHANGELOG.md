@@ -19,6 +19,19 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   out. The answer is the same whether or not the address has an account. Without email it isn't
   offered. On Tapry Cloud, new accounts also confirm their address before they can create or
   open a studio. Database: `users.email_verified_at`, `account_tokens` (added automatically).
+- **Own storage.** With `STORAGE_SECRET_KEY` set, an account can connect its own S3-compatible
+  bucket on the Storage page, and the sessions it opens from then on record there: uploaded
+  pieces, finished files and transcripts. The secret key is stored encrypted and never shown
+  again. Saving proves the server can write, read and delete in the bucket; a test upload from
+  the browser then proves guests can upload (the bucket's CORS rules). A session stays in the
+  bucket it was opened with, so changing or removing a bucket strands nothing. Endpoints must be
+  public HTTPS addresses unless `OWN_STORAGE_ALLOW_PRIVATE=true`. On Tapry Cloud it comes with
+  the new Own storage plan. Database: `storage_targets`, `sessions.storage_target_id` (added
+  automatically). Unset, nothing changes.
+- **New accounts are limited** to five an hour from one address where sign-up is open.
+- **Tapry Cloud warns before deleting.** Where the server sends email, a host is told by email
+  which recordings are within three days of their plan's date, and none is deleted until a day
+  after that warning went. Database: `recordings.expiry_warned_at` (added automatically).
 - **New pricing** for the planned Tapry Cloud (docs/plan/06-monetization.md, with the benchmark
   behind it in docs/plan/15-pricing-benchmark.md), shown as planned on the website.
 - **Filters.** Each person can brighten their picture, pick a look (warm, cool, black & white),

@@ -30,6 +30,17 @@ x-app-env: &app-env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_FROM: ${SMTP_FROM:-}
   SMTP_INSECURE: ${SMTP_INSECURE:-false}
+  # Each account's own S3 bucket (Storage page): their secret keys are encrypted with this.
+  # Empty: off. Once set, never change it.
+  STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
+  OWN_STORAGE_ALLOW_PRIVATE: ${OWN_STORAGE_ALLOW_PRIVATE:-false}
+  # Tapry Cloud only (plans and billing, docs/cloud-billing.md). Leave off on your own server.
+  TAPRY_CLOUD: ${TAPRY_CLOUD:-false}
+  BILLING_PROVIDER: ${BILLING_PROVIDER:-paddle}
+  BILLING_WEBHOOK_SECRET: ${BILLING_WEBHOOK_SECRET:-}
+  BILLING_PRICES: ${BILLING_PRICES:-}
+  BILLING_CHECKOUT_URLS: ${BILLING_CHECKOUT_URLS:-}
+  BILLING_MANAGE_URL: ${BILLING_MANAGE_URL:-}
 
 services:
   # HTTPS for the public names (app, storage, LiveKit, TURN), certificates from Let's Encrypt.

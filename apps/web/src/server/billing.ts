@@ -5,6 +5,7 @@ import { PLANS, PLAN_IDS, planRank, type BillingOverview, type Plan, type PlanId
 import type { User } from "./auth";
 import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
+import { mailFailureReason, type Mailer, type MailMessage } from "./mail";
 
 const DAY_MS = 86_400_000;
 
@@ -147,6 +148,12 @@ export class BillingService {
     const [row] = await this.db.query<PlanRow>(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1`, [userId]);
     if (!row) throw new ApiError(404, "user_not_found", "No such account");
     return row;
+  }
+
+  /** The plan an account is on right now. */
+  async planOf(userId: string, db: Queryable = this.db): Promise<Plan> {
+    const [row] = await db.query<PlanRow>(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1`, [userId]);
+    return row ? effectivePlan(row, this.now()) : PLANS.free;
   }
 
   /** Milliseconds a host has recorded since `from`: every recording of theirs, deleted ones too, running ones up to now. */
@@ -305,10 +312,72 @@ export class BillingService {
  */
 async function extendKeeping(tx: Queryable, ownerId: string, plan: Plan) {
   await tx.query(
-    `UPDATE recordings r SET keep_until = CASE WHEN $2::float8 IS NULL THEN NULL ELSE r.processed_at + make_interval(secs => $2::float8) END
+    `UPDATE recordings r SET keep_until = CASE WHEN $2::float8 IS NULL THEN NULL ELSE r.processed_at + make_interval(secs => $2::float8) END,
+            expiry_warned_at = NULL
      FROM sessions s JOIN studios st ON st.id = s.studio_id
      WHERE s.id = r.session_id AND st.owner_id = $1 AND r.deleted_at IS NULL AND r.keep_until IS NOT NULL AND r.processed_at IS NOT NULL
        AND ($2::float8 IS NULL OR r.processed_at + make_interval(secs => $2::float8) > r.keep_until)`,
     [ownerId, plan.filesDays === null ? null : (plan.filesDays * DAY_MS) / 1000],
   );
+}
+
+/** How long before its time is over a host is told about a recording. */
+export const EXPIRY_WARNING_MS = 3 * DAY_MS;
+/** A recording is deleted no sooner than this after its warning went out. */
+export const EXPIRY_NOTICE_MS = DAY_MS;
+
+/**
+ * Tapry Cloud, where the server sends email: tell each host, in one email, which of their
+ * recordings will be deleted within three days. Each recording is mentioned once (a bigger plan
+ * resets that). A mail problem leaves them unmarked, so they are neither deleted nor forgotten.
+ */
+export async function warnExpiring(db: Db, mail: { mailer: Mailer; appUrl: string }) {
+  const rows = await db.query<{ id: string; number: number | null; keep_until: Date; studio_name: string; email: string; name: string; owner_id: string }>(
+    `SELECT r.id, r.number, r.keep_until, st.name AS studio_name, u.email, u.name, u.id AS owner_id
+     FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id JOIN users u ON u.id = st.owner_id
+     WHERE r.keep_until IS NOT NULL AND r.keep_until < now() + make_interval(secs => $1) AND r.expiry_warned_at IS NULL
+       AND r.deleted_at IS NULL AND r.status = 'stopped'
+     ORDER BY u.id, r.keep_until LIMIT 500`,
+    [EXPIRY_WARNING_MS / 1000],
+  );
+  const byOwner = new Map<string, typeof rows>();
+  for (const r of rows) byOwner.set(r.owner_id, [...(byOwner.get(r.owner_id) ?? []), r]);
+  for (const list of byOwner.values()) {
+    try {
+      await mail.mailer.send(expiryMessage(list[0]!.email, list[0]!.name, list, mail.appUrl));
+      await db.query("UPDATE recordings SET expiry_warned_at = now() WHERE id = ANY($1) AND expiry_warned_at IS NULL", [list.map((r) => r.id)]);
+    } catch (err) {
+      // By its code only: the message can quote the address.
+      console.error(`[billing] expiry warning not sent: ${mailFailureReason(err)}`);
+    }
+  }
+}
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+export function expiryMessage(
+  to: string,
+  name: string,
+  recordings: Array<{ id: string; number: number | null; keep_until: Date; studio_name: string }>,
+  appUrl: string,
+): MailMessage {
+  const base = appUrl.replace(/\/$/, "");
+  const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const one = recordings.length === 1;
+  const intro = `${one ? "A recording" : `${recordings.length} recordings`} of yours will be deleted soon, because ${one ? "its" : "their"} time under your plan is nearly over.`;
+  const outro = "Download what you want to keep, or move to a bigger plan (Settings, Plan), which keeps recordings longer, these included.";
+  const label = (r: (typeof recordings)[number]) => `${r.studio_name}, recording ${r.number ?? "?"}: deleted after ${day(r.keep_until)}`;
+  const p = 'style="margin:0 0 16px;font:16px/1.5 system-ui,sans-serif;color:#222"';
+  return {
+    to,
+    subject: one ? "A recording will be deleted soon" : `${recordings.length} recordings will be deleted soon`,
+    text: [`Hello ${name},`, intro, ...recordings.map((r) => `- ${label(r)}\n  ${base}/recordings/${r.id}`), outro].join("\n\n"),
+    html: [
+      `<p ${p}>Hello ${escapeHtml(name)},</p>`,
+      `<p ${p}>${intro}</p>`,
+      `<ul ${p}>${recordings.map((r) => `<li><a href="${escapeHtml(`${base}/recordings/${r.id}`)}">${escapeHtml(label(r))}</a></li>`).join("")}</ul>`,
+      `<p ${p}>${outro}</p>`,
+    ].join("\n"),
+  };
 }

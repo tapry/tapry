@@ -103,15 +103,26 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - `PLANS` (packages/shared) is the one table of hours, retention and badge, from `docs/plan/06-monetization.md`; change both together, and the website's pricing page (`apps/site`, its own copy).
 - `BillingService` (`src/server/billing.ts`): hours are counted per recording, deleted ones included, per billing month (`billingPeriod`: calendar month on Free, the subscription's day of the month otherwise). The only refusal is before Record (`LiveService.beforeRecording` → 402 `hours_used_up`): **a running recording is never stopped and an upload is never refused over a plan**.
 - Retention: `planRetention` sets `recordings.keep_until` when files are ready (first time only) and returns the originals' time for `purge_raw`; `JobRunner.expire` deletes past-due recordings through `deleteRecordingIn` (so never one recording or being processed). A bigger plan extends `keep_until` of what exists; a smaller one never shortens it.
+- With email on, `warnExpiring` (run by `JobRunner.expire`) emails each host once about recordings within 3 days of `keep_until` and sets `expiry_warned_at`; deletion then needs that warning to be a day old. A failed email leaves it unset, so nothing is deleted unwarned. Extending `keep_until` clears it.
 - A plan past `plan_ends_at` is Free (`effectivePlan`), with no job needed. Admins set plans by hand (refused when the account has a subscription).
 - Webhook (`billing-webhooks.ts`, Paddle and Lemon Squeezy → `BillingEvent`): signature first, applied once (`billing_events`), an older event never overwrites newer state. The log line says what was done, never whose. Not yet run against a live provider.
-- Not built: seats, own storage, email verification, password reset, extra hours, a warning email before deletion.
+- Not built: seats, extra hours. Legal texts are drafts in `docs/legal-drafts.md`, not on the website.
+
+## Own storage
+- An account's own S3-compatible bucket (`src/server/own-storage.ts`), on only with `STORAGE_SECRET_KEY` (secret keys are AES-256-GCM encrypted with it in `storage_targets`; never returned, never logged; changing the key makes them unreadable).
+- **A session is bound to its storage when it opens** (`sessions.storage_target_id`, set in `openSession`, never changed). Replacing or removing a bucket retires the `storage_targets` row but keeps it, so older sessions still resolve. Never rebind a session.
+- `RoutedStorage` wraps the server's storage in the web server and the worker: every key is `recordings/<session>/…` or `outputs/<session>/…`, so it finds the session's bucket from the key and no caller knows. A new kind of stored object must keep the session id as its second segment, or it lands in the server's storage.
+- Setting up: `save` proves write, head and delete from the server (errors reported by name only), then the browser PUTs a signed test file exactly like a guest's upload and `confirmBrowserCheck` marks the target verified. Only a verified target is used: guests upload straight from browsers, and a bucket without CORS would stall their uploads.
+- Endpoints must be public HTTPS (`assertPublicEndpoint`: no private, loopback or link-local addresses, by IP or by name) unless `OWN_STORAGE_ALLOW_PRIVATE=true`. Checked at save only; a hosted server should also block inward traffic at its firewall.
+- Plans (`Plan.ownStorage`): "required" (Own storage plan: no session opens without a verified bucket, 409 `storage_not_set_up`), "allowed" (Business), "no". A self-hosted server offers it to every account.
+- Verified against a second SeaweedFS as the "customer": browser preflight and PUT, upload, commit and deletion all in the customer's bucket. Not tried on Amazon S3, R2 or B2.
 
 ## Accounts by email
 - `AccountService` (`src/server/account.ts`), on only when the server sends email (`SMTP_HOST`, `APP_URL`). Links are random tokens stored hashed in `account_tokens`, used once; a newer link of a kind replaces the older.
 - New password: `/forgot` → email → `/reset/<token>` (1 h). The answer and its timing are the same whether or not the address has an account (the email isn't awaited); 3 an hour per account (dropped silently past that), 10 an hour per address (429). Setting it signs every device out and confirms the address.
 - Confirming the address: required only where `TAPRY_CLOUD=true` and email is on (`verificationRequired`); then `createStudio` and `openStudio` refuse with 403 `email_unverified` and the dashboard shows `ConfirmEmailNotice`. The first account is confirmed by its setup code. `/verify/<token>` (3 days) confirms on a button press, never on page load: mail scanners open links.
 - Failures are logged by SMTP code only (`mailFailureReason`); the address never reaches a log.
+- Sign-up is limited to 5 an hour per address after the first account (`AuthService.countSignup`, in memory, attempts count).
 
 ## Limits on what a token may do
 - Participant tokens don't expire (the end screen keeps using them), but uploads do: `UploadService.checkOpen` refuses tracks, chunks and completions `UPLOAD_GRACE_DAYS` (7) after Stop with 409 `recording_closed`, never 410, so a device keeps its chunks. A track's `startedAt` must be within clock slack of the recording. `MAX_TRACKS_PER_PERSON` (50) per recording; bytes per person capped at `BYTES_PER_SECOND_CAP` (32 Mbit/s) × (length + 10 min); a completion's `lastSeq` may not run more than 10,000 past the last chunk.
