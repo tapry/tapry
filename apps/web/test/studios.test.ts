@@ -139,6 +139,7 @@ describe("studios", () => {
       consentText: "",
       audioFormat: "wav",
       frameRate: "30",
+      deleteAfterDays: null,
     });
     expect(updated.body.name).toBe("Weekly Studio");
 

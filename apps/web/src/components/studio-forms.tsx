@@ -131,6 +131,7 @@ export function StudioSettingsForm({
             guestDownloads: f.get("guestDownloads") === "on",
             consentText: String(f.get("consentText") ?? ""),
             audioFormat: f.get("audioFormat") === "flac" ? "flac" : "wav",
+            deleteAfterDays: Number(f.get("deleteAfterDays")) > 0 ? Number(f.get("deleteAfterDays")) : null,
             frameRate: (FRAME_RATES as readonly string[]).includes(String(f.get("frameRate"))) ? (String(f.get("frameRate")) as FrameRate) : settings.frameRate,
           },
         },
@@ -218,6 +219,20 @@ export function StudioSettingsForm({
               <option value="29.97">29.97 (NTSC)</option>
               <option value="25">25 (PAL)</option>
               <option value="24">24 (film)</option>
+            </Select>
+          </Row>
+          <Row
+            label={<label htmlFor="delete-after">Delete recordings</label>}
+            help="Each recording is deleted, files and all, this long after its files are ready. For studios that must not keep recordings longer than a set time. Applies to recordings processed from now on."
+          >
+            <Select id="delete-after" name="deleteAfterDays" defaultValue={String(settings.deleteAfterDays ?? 0)} className="sm:w-[280px]">
+              <option value="0">Never (until you delete them)</option>
+              <option value="7">After 7 days</option>
+              <option value="30">After 30 days</option>
+              <option value="90">After 90 days</option>
+              <option value="180">After 180 days</option>
+              <option value="365">After a year</option>
+              {settings.deleteAfterDays && ![7, 30, 90, 180, 365].includes(settings.deleteAfterDays) && <option value={settings.deleteAfterDays}>After {settings.deleteAfterDays} days</option>}
             </Select>
           </Row>
         </div>

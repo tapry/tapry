@@ -1,3 +1,6 @@
+import { CommentsCard } from "@/components/comments-card";
+import { SafeTranscript } from "@/components/safe-transcript";
+import { ClipsCard } from "@/components/clips-card";
 import { NotesCard } from "@/components/notes-card";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -40,19 +43,21 @@ const PILL = {
 /** One recording (the design's "Episode"): its sound, its files and what was said. */
 export default async function RecordingPage({ params }: { params: Promise<{ recordingId: string }> }) {
   const { user, services, recording: r } = await load((await params).recordingId);
-  const [studios, transcript, model, aiNotes, notes, markers] = await Promise.all([
+  const [studios, transcript, model, aiNotes, notes, markers, clips, comments] = await Promise.all([
     services.studios.list(user),
     services.library.transcriptTurns(user, r.id),
     services.library.transcriptsModel(),
     services.notes.view(user),
     services.notes.text(user, r.id),
     services.guide.markers(user, r.id),
+    services.clips.list(user, r.id),
+    services.comments.list(user, r.id),
   ]);
   const studio = studios.find((s) => s.id === r.studioId);
   const now = Date.now();
   const st = shortStatus(r);
   const ready = r.processing === "ready";
-  const media = r.outputs.filter((o) => o.kind !== "transcript" && o.kind !== "notes");
+  const media = r.outputs.filter((o) => o.kind !== "transcript" && o.kind !== "notes" && o.kind !== "clip");
   const transcriptFiles = r.outputs.filter((o) => o.kind === "transcript");
   const sound = r.outputs.find((o) => o.kind === "combined") ?? r.outputs.find((o) => o.kind === "audio");
   const lengthMs = (r.stoppedAt ?? now) - r.startedAt;
@@ -121,7 +126,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
         {ready && r.hasFilters && <RecordingFilters studioId={r.studioId} recordingId={r.id} applyFilters={r.applyFilters} filtersFailed={r.filtersFailed} rawDeleted={r.rawDeleted} />}
         {r.keepUntil !== null && (
           <p className="text-[13px] text-muted" data-testid="kept-until">
-            Kept until {new Date(r.keepUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} on your plan, then deleted. Download what you want to keep.
+            Kept until {new Date(r.keepUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}, then deleted: this studio's setting, or your plan. Download what you want to keep.
           </p>
         )}
         {r.rawDeleted && (
@@ -206,8 +211,37 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
                   </a>
                 ))}
               </span>
+              {r.transcript === "ready" && (
+                <>
+                  <span className="pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+                    The same, with long pauses left out: where nobody speaks for two seconds or more, every track is cut at the same place. Nothing is deleted from the files; undo any cut in your
+                    editor.
+                  </span>
+                  <span className="flex flex-wrap gap-[5px] pt-3" data-testid="timelines-tight">
+                    {(
+                      [
+                        ["otio", "OpenTimelineIO"],
+                        ["fcpxml", "Final Cut XML"],
+                        ...(media.some((o) => o.kind === "audio") ? ([["rpp", "REAPER"]] as const) : []),
+                      ] as const
+                    ).map(([format, name]) => (
+                      <a
+                        key={format}
+                        href={`/api/studios/${r.studioId}/recordings/${r.id}/timeline/${format}?pauses=out`}
+                        data-file-name={`Timeline (pauses removed).${format}`}
+                        className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-text transition-colors hover:bg-surface-2 hover:text-text"
+                      >
+                        {name}
+                      </a>
+                    ))}
+                  </span>
+                </>
+              )}
             </div>
           )}
+          <CommentsCard recordingId={r.id} comments={comments} />
+          {r.transcript === "ready" && transcript.turns && transcript.turns.length > 0 && <SafeTranscript recordingId={r.id} />}
+          {ready && r.outputs.some((o) => o.kind === "combined") && <ClipsCard studioId={r.studioId} recordingId={r.id} clips={clips} lengthMs={lengthMs} />}
           {markers.length > 0 && (
             <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-2" data-testid="markers">
               <span className="pt-3 pb-2 font-medium">Markers</span>

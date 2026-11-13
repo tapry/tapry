@@ -39,11 +39,13 @@ export function MembersPanel({ initial }: { initial: MembersView }) {
   async function invite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const email = String(new FormData(form).get("email") ?? "");
+    const data = new FormData(form);
+    const email = String(data.get("email") ?? "");
+    const role = data.get("role") === "viewer" ? "viewer" : "member";
     setSent(null);
     setCopied(false);
     await act("invite", async () => {
-      const res = await apiFetch<{ link: string; emailed: boolean }>("/members/invites", { body: { email } });
+      const res = await apiFetch<{ link: string; emailed: boolean }>("/members/invites", { body: { email, role } });
       setSent({ email, ...res });
       form.reset();
     });
@@ -72,8 +74,22 @@ export function MembersPanel({ initial }: { initial: MembersView }) {
               </span>
             </span>
             <span className="flex items-center gap-3">
-              <span className="text-[13px] text-text-2">{m.role === "owner" ? "Owner" : "Member"}</span>
-              {m.role === "member" && (view.owner || m.you) && (
+              {view.owner && m.role !== "owner" ? (
+                <select
+                  aria-label={`What ${m.name} may do`}
+                  value={m.role}
+                  disabled={busy !== null}
+                  onChange={(e) => act(`role:${m.id}`, () => apiFetch(`/members/${m.id}`, { method: "PUT", body: { role: e.target.value } }))}
+                  className="h-[30px] rounded-md border border-border bg-surface px-2 text-[13px] text-text"
+                  data-testid="member-role"
+                >
+                  <option value="member">Member</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              ) : (
+                <span className="text-[13px] text-text-2">{m.role === "owner" ? "Owner" : m.role === "viewer" ? "Viewer" : "Member"}</span>
+              )}
+              {m.role !== "owner" && (view.owner || m.you) && (
                 <Button
                   type="button"
                   variant="danger"
@@ -97,7 +113,7 @@ export function MembersPanel({ initial }: { initial: MembersView }) {
           <div key={i.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-divider py-3 last:border-0" data-testid="member-invite">
             <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[2px]">
               <span className="truncate font-medium">{i.email}</span>
-              <span className="text-[13px] text-muted">Invited · the link works until {new Date(i.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}</span>
+              <span className="text-[13px] text-muted">Invited as a {i.role} · the link works until {new Date(i.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}</span>
             </span>
             <Button type="button" variant="secondary" size="sm" disabled={busy !== null} onClick={() => act(`revoke:${i.id}`, () => apiFetch(`/members/invites/${i.id}`, { method: "DELETE" }))}>
               Withdraw
@@ -118,6 +134,13 @@ export function MembersPanel({ initial }: { initial: MembersView }) {
               <label className="flex min-w-0 flex-[1_1_260px] flex-col gap-1.5 text-sm font-medium">
                 Email
                 <Input name="email" type="email" required autoComplete="off" placeholder="colleague@example.com" />
+              </label>
+              <label className="flex flex-col gap-1.5 text-sm font-medium">
+                Can
+                <select name="role" defaultValue="member" className="h-[38px] rounded-md border border-border bg-surface px-2.5 text-sm text-text shadow-xs">
+                  <option value="member">Record and manage (member)</option>
+                  <option value="viewer">Look, download and comment (viewer)</option>
+                </select>
               </label>
               <Button type="submit" disabled={busy !== null}>
                 {busy === "invite" ? "Inviting…" : "Invite"}

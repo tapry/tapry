@@ -70,7 +70,7 @@ export interface RecordingSummary {
     completeTracks: number;
     bytes: number;
   }>;
-  outputs: Array<{ id: string; kind: "audio" | "video" | "screen" | "combined" | "transcript" | "notes"; fileName: string; bytes: number; durationMs: number | null }>;
+  outputs: Array<{ id: string; kind: "audio" | "video" | "screen" | "combined" | "transcript" | "notes" | "clip"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
 /** A recording seen across all of a host's studios (the dashboard's Recordings, Guests, Transcripts). */
@@ -499,8 +499,10 @@ export async function deleteRecordingIn(tx: Queryable, recordingId: string): Pro
   if (rec.deleted_at) return rec.session_id;
   if (rec.status === "recording") throw new ApiError(409, "still_recording", "Stop the recording before deleting it");
 
-  // What the host wrote about it goes with it.
+  // What the host wrote about it goes with it, and the clips cut from it.
   await tx.query("DELETE FROM markers WHERE recording_id = $1", [recordingId]);
+  await tx.query("DELETE FROM clips WHERE recording_id = $1", [recordingId]);
+  await tx.query("DELETE FROM comments WHERE recording_id = $1", [recordingId]);
   // Drop work not started yet. A job a worker claimed meanwhile is 'running' when this
   // re-checks the row, so it survives this and the check below refuses.
   await tx.query(
