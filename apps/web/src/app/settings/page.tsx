@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { PlanPanel } from "@/components/plan-panel";
 import { LogOutButton } from "@/components/studio-forms";
 import { ListCard, PageTitle } from "@/components/ui-extra";
 import { getServices } from "@/server/context";
@@ -9,8 +10,8 @@ import { SettingsTabs } from "./tabs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
 
-type Tab = "recording" | "guests" | "workspace" | "account";
-const TABS: Tab[] = ["recording", "guests", "workspace", "account"];
+type Tab = "recording" | "guests" | "plan" | "workspace" | "account";
+const TABS: Tab[] = ["recording", "guests", "plan", "workspace", "account"];
 
 /** Studio settings (Recording, Guests), how the server is set up (Workspace, admins), and the account. */
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; studio?: string }> }) {
@@ -19,6 +20,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { tab, studio } = await searchParams;
   const studios = await services.studios.list(user);
   const w = user.isAdmin ? await services.library.workspace(user) : null;
+  // Tapry Cloud only: a self-hosted server has no plans, and no Plan tab.
+  const plan = services.billing.cloud ? (
+    <PlanPanel billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} />
+  ) : null;
 
   const workspace = w && (
     <ListCard>
@@ -67,6 +72,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         studios={studios.map((s) => ({ id: s.id, name: s.name, settings: s.settings }))}
         studioId={studio ?? null}
         hostName={user.name}
+        plan={plan}
         workspace={workspace}
         account={account}
       />

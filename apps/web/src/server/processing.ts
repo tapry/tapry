@@ -48,6 +48,8 @@ export interface RecordingSummary {
   bytes: number;
   /** The original uploads were removed after the retention period; only the processed files remain. */
   rawDeleted: boolean;
+  /** Tapry Cloud: when this recording is deleted under its plan (ms since 1970). Null: kept until someone deletes it. */
+  keepUntil: number | null;
   /** Someone in it chose filters (look, touch-up, noise removal), so the files can be made with or without. */
   hasFilters: boolean;
   /** Whether processing applies people's filters (default), or leaves the files as recorded. */
@@ -213,6 +215,7 @@ export class ProcessingService {
       studio_name: string;
       number: number | null;
       raw_deleted_at: Date | null;
+      keep_until: Date | null;
       session_id: string;
       status: "recording" | "stopped";
       processing: ProcessingStatus;
@@ -233,7 +236,7 @@ export class ProcessingService {
       has_filters: boolean;
       filters_failed: RecordingSummary["filtersFailed"];
     }>(
-      `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
+      `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.keep_until, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask') AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask' AND t.status = 'recording') AS incomplete,
@@ -288,6 +291,7 @@ export class ProcessingService {
       studioName: r.studio_name,
       number: r.number ?? 0,
       rawDeleted: r.raw_deleted_at !== null,
+      keepUntil: r.keep_until?.getTime() ?? null,
       hasFilters: r.has_filters,
       applyFilters: r.apply_filters,
       filtersFailed: r.filters_failed,

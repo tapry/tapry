@@ -352,6 +352,11 @@ function Downloads({ studioId, recording: e }: { studioId: string; recording: Re
           </>
         )}
       </span>
+      {e.keepUntil !== null && (
+        <p className="text-[13px] text-muted" data-testid="kept-until">
+          Kept until {new Date(e.keepUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} on your plan, then deleted. Download what you want to keep.
+        </p>
+      )}
       {e.rawDeleted && (
         <p className="text-[13px] text-muted" data-testid="originals-removed">
           The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.

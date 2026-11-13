@@ -3,22 +3,27 @@ import {
   completeTrackBody,
   createStudioBody,
   createTrackBody,
+  forgotPasswordBody,
   joinBody,
   loginBody,
   seqParam,
   recapBody,
+  resetPasswordBody,
   setFiltersBody,
+  setPlanBody,
   telemetryBody,
   techCheckReport,
   SPEED_TEST_MAX_BYTES,
   signupBody,
   updateStudioBody,
   uploadUrlBody,
+  verifyEmailBody,
   type SessionState,
 } from "@tapry/shared";
 import { downloadZip } from "client-zip";
 import { z } from "zod";
 import type { User } from "./auth";
+import { readWebhook } from "./billing-webhooks";
 import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
@@ -68,6 +73,9 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     signup: handler(async (svc, req) => {
       checkOrigin(req);
       const { user, token } = await svc.auth.signup(await parseBody(req, signupBody));
+      // Where addresses must be confirmed, the link goes out with the welcome. A limit or a
+      // mail problem here never undoes the sign-up: they can ask again from the dashboard.
+      await svc.account.sendVerification(user).catch(() => false);
       return withSessionCookie(json(201, { user }), req, token);
     }),
     login: handler(async (svc, req) => {
@@ -85,11 +93,34 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       return user ? json(200, { user }) : json(401, { error: "unauthorized", message: "Not signed in" });
     }),
 
+    /** "I forgot my password": always the same answer, whether or not the address has an account. */
+    forgotPassword: handler(async (svc, req) => {
+      checkOrigin(req);
+      await svc.account.requestReset((await parseBody(req, forgotPasswordBody)).email, clientAddress(req));
+      return json(200, { ok: true });
+    }),
+    /** Set a new password with the emailed link. */
+    resetPassword: handler(async (svc, req) => {
+      checkOrigin(req);
+      const body = await parseBody(req, resetPasswordBody);
+      await svc.account.reset(body.token, body.password);
+      return json(200, { ok: true });
+    }),
+    /** Confirm the address with the emailed link. No sign-in needed: the link is the proof. */
+    verifyEmail: handler(async (svc, req) => {
+      checkOrigin(req);
+      await svc.account.verify((await parseBody(req, verifyEmailBody)).token);
+      return json(200, { ok: true });
+    }),
+    /** Send the "confirm your address" email again. */
+    sendVerification: asUser(async (svc, user) => json(200, { sent: await svc.account.sendVerification(user) })),
+
     // ── Studios ────────────────────────────────────────────────────────────────
     listStudios: asUser(async (svc, user) => json(200, { studios: await svc.studios.list(user) })),
-    createStudio: asUser(async (svc, user, req) =>
-      json(201, await svc.studios.create(user, await parseBody(req, createStudioBody))),
-    ),
+    createStudio: asUser(async (svc, user, req) => {
+      svc.account.requireVerified(user);
+      return json(201, await svc.studios.create(user, await parseBody(req, createStudioBody)));
+    }),
     getStudio: asUser(async (svc, user, _req, params) => json(200, await svc.studios.get(user, params.studioId!))),
     updateStudio: asUser(async (svc, user, req, params) =>
       json(200, await svc.studios.update(user, params.studioId!, await parseBody(req, updateStudioBody))),
@@ -103,9 +134,10 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       json(200, await svc.studios.rotateInvite(user, params.studioId!)),
     ),
     /** Host enters the studio → session ticket (host participant token). */
-    openStudio: asUser(async (svc, user, _req, params) =>
-      json(200, await svc.studios.openAsHost(user, params.studioId!)),
-    ),
+    openStudio: asUser(async (svc, user, _req, params) => {
+      svc.account.requireVerified(user);
+      return json(200, await svc.studios.openAsHost(user, params.studioId!));
+    }),
 
     // ── Recordings (host) ─────────────────────────────────────────────────────
     listRecordings: asUser(async (svc, user, _req, params) =>
@@ -161,6 +193,37 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     storageOverview: asUser(async (svc, user) => json(200, await svc.library.storageOverview(user))),
     /** How this server is set up, read-only (admins only; others get 404). */
     workspaceSettings: asUser(async (svc, user) => json(200, await svc.library.workspace(user))),
+
+    // ── Tapry Cloud: plans and billing (404 on a self-hosted server) ────────────
+    /** The signed-in host's plan, what they have used of it, and where to change it. */
+    billing: asUser(async (svc, user) => json(200, await svc.billing.overview(user))),
+    /** Accounts and their plans (admins). */
+    adminAccounts: asUser(async (svc, user) => json(200, { accounts: await svc.billing.accounts(user) })),
+    /** Put an account on a plan by hand: a founding member, an organisation paying by invoice (admins). */
+    adminSetPlan: asUser(async (svc, user, req, params) => {
+      const body = await parseBody(req, setPlanBody);
+      await svc.billing.setPlan(user, params.userId!, body.plan, body.endsAt ? new Date(body.endsAt) : null);
+      return json(200, { ok: true });
+    }),
+    /**
+     * The payment provider calls this when a subscription starts, changes or ends. Trusted by
+     * its signature alone (no cookie, no origin). The log line says what was done, never whose.
+     */
+    billingWebhook: handler(async (svc, req) => {
+      if (!svc.billing.cloud || !svc.billingWebhook) throw new ApiError(404, "not_found", "Not found");
+      const raw = await req.text();
+      if (raw.length > 1_000_000) throw new ApiError(413, "too_large", "Webhook body too large");
+      let event;
+      try {
+        event = readWebhook(svc.billingWebhook, raw, req.headers, Date.now());
+      } catch (err) {
+        if (isApiError(err)) throw err;
+        throw new ApiError(400, "bad_webhook", "The webhook's body couldn't be read");
+      }
+      const result = event ? await svc.billing.apply(event) : "ignored";
+      console.log(`[billing] webhook ${event?.status ?? "other"}: ${result}`);
+      return json(200, { result });
+    }),
 
     /** The admin health page's checks, as JSON (admins only; others get 404). */
     adminHealth: asUser(async (svc, user) => {
@@ -256,7 +319,9 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       json(200, await svc.uploads.setFilters(p, (await parseBody(req, setFiltersBody)).filters)),
     ),
     /** The end screen: this participant's own files from the session, and the promo link. */
-    ownRecordings: asParticipant(async (svc, p) => json(200, await svc.processing.ownRecordings(p, svc.guestPromoUrl))),
+    ownRecordings: asParticipant(async (svc, p) =>
+      json(200, await svc.processing.ownRecordings(p, await svc.billing.promoFor(p.sessionId, svc.guestPromoUrl))),
+    ),
     /** The end screen's recap email: whether it's offered and how it's going; asking for one. */
     recapStatus: asParticipant(async (svc, p) => json(200, await svc.recaps.status(p))),
     requestRecap: asParticipant(async (svc, p, req) => json(200, await svc.recaps.request(p, (await parseBody(req, recapBody)).email))),

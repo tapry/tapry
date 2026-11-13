@@ -1,5 +1,6 @@
 // The guest's recap email: a link to their own files, sent once they're processed. Asked for on
 // the end screen, so nobody gets one unasked. The address is kept only until the mail has gone.
+import { promoFor } from "./billing";
 import { studioSettings, type RecapStatus } from "@tapry/shared";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
@@ -20,6 +21,8 @@ export interface RecapMail {
   /** This server's public address, for the link. */
   appUrl: string;
   promoUrl: string | null;
+  /** Tapry Cloud: only guests of a Free-plan host get the promo line. */
+  cloud?: boolean;
 }
 
 export class RecapService {
@@ -117,7 +120,7 @@ export async function sendDueRecaps(db: Db, mail: RecapMail) {
       continue;
     }
     try {
-      await mail.mailer.send(recapMessage(due.email, due.studio_name, `${mail.appUrl.replace(/\/$/, "")}/recap/${token}`, mail.promoUrl));
+      await mail.mailer.send(recapMessage(due.email, due.studio_name, `${mail.appUrl.replace(/\/$/, "")}/recap/${token}`, await promoFor(db, due.session_id, { cloud: !!mail.cloud, promoUrl: mail.promoUrl })));
       // token_hash only matches if the guest didn't change the address meanwhile; then the new one is still due.
       await db.query(
         `UPDATE recap_requests SET status = 'sent', email = NULL, error = NULL, finished_at = now(), locked_until = NULL,

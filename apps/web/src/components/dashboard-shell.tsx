@@ -6,6 +6,7 @@ import type { StudioWithUsage } from "@/server/studios";
 import { AppFrame, CollapseSidebar } from "./app-frame";
 import { shortStatus } from "./recordings";
 import { PageNav, RecentNav, type PageLink, type RecentItem } from "./recent-nav";
+import { ConfirmEmailNotice } from "./confirm-email";
 import { CopyGuestLink, OpenStudioAction } from "./studio-actions";
 import { LogOutButton } from "./studio-forms";
 import type { IconName } from "./ui-extra";
@@ -122,6 +123,7 @@ export async function DashboardShell({
         </>
       }
     >
+      {services.account.verificationRequired && !user.emailVerified && <ConfirmEmailNotice email={user.email} />}
       {children}
     </AppFrame>
   );

@@ -25,7 +25,7 @@ async function main() {
   const runner = new JobRunner(db, storage, {
     ...config.worker,
     kind: "worker",
-    mail: config.mail && { mailer: new SmtpMailer(config.mail.smtp), appUrl: config.mail.appUrl, promoUrl: config.guestPromoUrl },
+    mail: config.mail && { mailer: new SmtpMailer(config.mail.smtp), appUrl: config.mail.appUrl, promoUrl: config.guestPromoUrl, cloud: !!config.cloud },
     // Proof of life for the container health check: written after every poll.
     onPoll: () => writeFileSync(HEARTBEAT_FILE, String(Date.now())),
   });

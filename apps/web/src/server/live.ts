@@ -36,12 +36,20 @@ export class LiveHub {
 export class LiveService {
   private hub: LiveHub;
   private onStopped: (recordingId: string) => void | Promise<void>;
+  private beforeRecording: ((sessionId: string) => Promise<void>) | undefined;
   private now: () => number;
 
   constructor(
     private db: Db,
-    opts: { now?: () => number; hub?: LiveHub; onStopped?: (recordingId: string) => void | Promise<void> } = {},
+    opts: {
+      now?: () => number;
+      hub?: LiveHub;
+      onStopped?: (recordingId: string) => void | Promise<void>;
+      /** Asked before a recording starts; throws to refuse it. */
+      beforeRecording?: (sessionId: string) => Promise<void>;
+    } = {},
   ) {
+    this.beforeRecording = opts.beforeRecording;
     this.now = opts.now ?? Date.now;
     this.onStopped = opts.onStopped ?? (() => {});
     this.hub = opts.hub ?? new LiveHub();
@@ -116,6 +124,8 @@ export class LiveService {
   async startRecording(host: Participant) {
     requireHost(host);
     await this.requireOpen(host.sessionId);
+    // Tapry Cloud: the host's recording hours. Only here, before a recording exists.
+    await this.beforeRecording?.(host.sessionId);
     const id = newId("rec");
     const [row] = await this.db.query<{ id: string }>(
       `INSERT INTO recordings (id, session_id, started_at, number)
