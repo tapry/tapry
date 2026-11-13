@@ -12,6 +12,15 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   and Get Started, the pricing page's plan buttons open each plan's checkout in the app (monthly
   or yearly), and the privacy and terms pages describe Tapry Cloud. Without the variable the
   site describes Tapry Cloud as planned, as before.
+- **Prices in the visitor's currency.** The website's pricing page asks Paddle for each plan's
+  price (`@paddle/paddle-js`, `PricePreview`), with Paddle finding the visitor's country, and
+  shows Paddle's totals exactly as formatted. Plans, texts and price ids are edited in
+  `apps/site/src/content/tiers.ts`. The checkout is Paddle's one-page overlay and lands on
+  `/welcome`, which waits for the payment to be confirmed.
+- **The Paddle environment is required.** `BILLING_PADDLE_ENVIRONMENT` (production or sandbox)
+  replaces `BILLING_PADDLE_SANDBOX`; with a Paddle token or API key and no environment, or one
+  that doesn't match the token, the server refuses to start. The website's build does the same
+  with `NEXT_PUBLIC_PADDLE_ENVIRONMENT`.
 - **Paddle's payment-link page** at `/pay`: Paddle sends people there from invoices and its "update your card" emails, and it opens the right checkout. Set it as the default payment link in Paddle.
 - **From a plan button to its checkout.** Someone without an account who opens a checkout is
   sent to sign up, then back to that checkout; log in and sign up take a `next` path on the same

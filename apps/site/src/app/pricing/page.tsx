@@ -107,7 +107,7 @@ export default function PricingPage() {
             </div>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#6b6b70" }}>
-            {HAS_CLOUD ? "Paid yearly, a plan costs ten months’ worth. Prices are in US dollars, without tax." : "Tapry Cloud isn’t available yet: its columns are the plan, not something you can buy today, and may change. Paid yearly, the planned price is ten months’ worth."}
+            {HAS_CLOUD ? "Paid yearly, a plan costs ten months’ worth. The table lists US dollars before tax; the plans above show the price in your currency, as our payment provider Paddle will charge it." : "Tapry Cloud isn’t available yet: its columns are the plan, not something you can buy today, and may change. Paid yearly, the planned price is ten months’ worth."}
           </p>
           <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,250px),1fr))" }}>
             {MORE.map(([name, cost, text, href, label]) => (

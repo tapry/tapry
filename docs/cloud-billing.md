@@ -37,7 +37,7 @@ BILLING_PROVIDER=paddle                 # or lemonsqueezy
 BILLING_WEBHOOK_SECRET=…                # the webhook's signing secret
 BILLING_PRICES=pri_abc=creator,pri_def=creator:yearly,pri_xyz=studio   # price ids → plan; ":yearly" marks the yearly price
 BILLING_PADDLE_CLIENT_TOKEN=…            # Paddle: Developer tools → Authentication → client-side token
-BILLING_PADDLE_SANDBOX=true             # while testing with sandbox-vendors.paddle.com; remove for live
+BILLING_PADDLE_ENVIRONMENT=production   # or sandbox; required, and must match the token
 BILLING_MANAGE_URL=https://…            # the provider's customer portal
 SMTP_HOST=…  SMTP_FROM=…  APP_URL=…     # email: confirming addresses, new passwords, guests' recap
 STORAGE_SECRET_KEY=…                    # own storage: encrypts customers' bucket keys. Never change it

@@ -1,26 +1,14 @@
 "use client";
 
-// Opens Paddle's checkout for one plan, with this account's id attached so Paddle's webhook
-// can say whose subscription it is. Paddle's script is loaded here and nowhere else in the app:
-// only someone buying a plan on Tapry Cloud ever contacts Paddle.
+// Opens Paddle's one-page overlay checkout for exactly one price, with this account's id attached
+// so Paddle's webhook can say whose subscription it is, and the signed-in email filled in.
+// Paddle's script (@paddle/paddle-js) is loaded here, on /pay and nowhere else in the app: only
+// someone buying a plan ever contacts Paddle. Only the public client token reaches the browser;
+// the API key stays on the server.
+import { initializePaddle, type Paddle } from "@paddle/paddle-js";
 import { useEffect, useRef, useState } from "react";
 import { Notice } from "./ui";
 import { Spinner } from "./ui-extra";
-
-interface PaddleJs {
-  Environment: { set(env: "sandbox" | "production"): void };
-  Initialize(opts: { token: string; eventCallback?: (event: { name?: string }) => void }): void;
-  Checkout: {
-    open(opts: {
-      items: Array<{ priceId: string; quantity: number }>;
-      customData?: Record<string, string>;
-      customer?: { email: string };
-      settings?: { displayMode?: "overlay"; successUrl?: string };
-    }): void;
-  };
-}
-
-const SCRIPT = "https://cdn.paddle.com/paddle/v2/paddle.js";
 
 export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email }: { priceId: string; clientToken: string; sandbox: boolean; accountId: string; email: string }) {
   const [state, setState] = useState<"loading" | "open" | "closed" | "failed" | "refused">("loading");
@@ -29,35 +17,30 @@ export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email
   useEffect(() => {
     if (opened.current) return;
     opened.current = true;
-    const done = `${window.location.origin}/settings?tab=plan&paid=1`;
-    const open = () => {
-      const paddle = (window as unknown as { Paddle?: PaddleJs }).Paddle;
-      if (!paddle) return setState("failed");
-      try {
-        if (sandbox) paddle.Environment.set("sandbox");
-        paddle.Initialize({
-          token: clientToken,
-          eventCallback: (event) => {
-            if (event.name === "checkout.completed") window.location.assign(done);
-            // Paddle's own refusal: the price or the seller's account can't take payments (yet).
-            if (event.name === "checkout.error") setState("refused");
-            // Closing its error window doesn't hide what went wrong.
-            if (event.name === "checkout.closed") setState((now) => (now === "refused" ? now : "closed"));
-          },
-        });
+    const done = `${window.location.origin}/welcome`;
+    initializePaddle({
+      token: clientToken,
+      environment: sandbox ? "sandbox" : "production",
+      eventCallback: (event) => {
+        if (event.name === "checkout.completed") window.location.assign(done);
+        // Paddle's own refusal: the price or the seller's account can't take payments (yet).
+        if (event.name === "checkout.error") setState("refused");
+        // Closing its error window doesn't hide what went wrong.
+        if (event.name === "checkout.closed") setState((now) => (now === "refused" ? now : "closed"));
+      },
+    })
+      .then((paddle: Paddle | undefined) => {
+        if (!paddle) return setState("failed");
         // `user_id` is what the webhook reads back: the account this payment is for.
-        paddle.Checkout.open({ items: [{ priceId, quantity: 1 }], customData: { user_id: accountId }, customer: { email }, settings: { displayMode: "overlay", successUrl: done } });
+        paddle.Checkout.open({
+          items: [{ priceId, quantity: 1 }],
+          customData: { user_id: accountId },
+          customer: { email },
+          settings: { displayMode: "overlay", variant: "one-page", successUrl: done },
+        });
         setState("open");
-      } catch {
-        setState("failed");
-      }
-    };
-    const script = document.createElement("script");
-    script.src = SCRIPT;
-    script.async = true;
-    script.onload = open;
-    script.onerror = () => setState("failed");
-    document.head.appendChild(script);
+      })
+      .catch(() => setState("failed"));
   }, [priceId, clientToken, sandbox, accountId, email]);
 
   if (state === "failed") {

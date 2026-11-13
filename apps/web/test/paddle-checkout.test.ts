@@ -21,7 +21,7 @@ describe("Paddle's checkout on our own page", () => {
       BILLING_WEBHOOK_SECRET: "a-long-secret",
       BILLING_PRICES: "pri_cm=creator, pri_cy=creator:yearly, pri_sm=studio",
       BILLING_PADDLE_CLIENT_TOKEN: "test_0123456789abcdef",
-      BILLING_PADDLE_SANDBOX: "true",
+      BILLING_PADDLE_ENVIRONMENT: "sandbox",
     });
     expect(cfg.cloud!.paddle).toEqual({
       clientToken: "test_0123456789abcdef",
@@ -31,8 +31,14 @@ describe("Paddle's checkout on our own page", () => {
     expect(cfg.cloud!.webhook!.prices).toEqual({ pri_cm: "creator", pri_cy: "creator", pri_sm: "studio" });
     // No token, or another provider: no checkout page.
     expect(loadConfig({ ...base, BILLING_PRICES: "pri_cm=creator" }).cloud!.paddle).toBeNull();
-    expect(loadConfig({ ...base, BILLING_PROVIDER: "lemonsqueezy", BILLING_PADDLE_CLIENT_TOKEN: "test_0123456789abcdef" }).cloud!.paddle).toBeNull();
+    expect(loadConfig({ ...base, BILLING_PROVIDER: "lemonsqueezy", BILLING_PADDLE_CLIENT_TOKEN: "test_0123456789abcdef", BILLING_PADDLE_ENVIRONMENT: "sandbox" }).cloud!.paddle).toBeNull();
     expect(() => loadConfig({ ...base, BILLING_PRICES: "pri_cm=gold:yearly" })).toThrow(/not a plan/);
+    // The environment is never guessed: required with a token, and it must match the token.
+    expect(() => loadConfig({ ...base, BILLING_PADDLE_CLIENT_TOKEN: "live_0123456789abcdef" })).toThrow(/BILLING_PADDLE_ENVIRONMENT must be set/);
+    expect(() => loadConfig({ ...base, BILLING_PADDLE_API_KEY: "pdl_live_apikey_x" })).toThrow(/BILLING_PADDLE_ENVIRONMENT must be set/);
+    expect(() => loadConfig({ ...base, BILLING_PADDLE_CLIENT_TOKEN: "live_0123456789abcdef", BILLING_PADDLE_ENVIRONMENT: "sandbox" })).toThrow(/doesn't match/);
+    expect(() => loadConfig({ ...base, BILLING_PADDLE_CLIENT_TOKEN: "test_0123456789abcdef", BILLING_PADDLE_ENVIRONMENT: "production" })).toThrow(/doesn't match/);
+    expect(loadConfig({ ...base, BILLING_PADDLE_CLIENT_TOKEN: "live_0123456789abcdef", BILLING_PADDLE_ENVIRONMENT: "production" }).cloud!.paddle!.sandbox).toBe(false);
   });
 
   it("offers each plan that has a price, by the month and by the year where both exist", async () => {
