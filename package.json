@@ -12,7 +12,7 @@
     "dev": "turbo run dev",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "build:site": "NEXT_PUBLIC_SITE_URL=https://tapry.app NEXT_PUBLIC_PADDLE_ENVIRONMENT=production NEXT_PUBLIC_PADDLE_CLIENT_TOKEN=live_662d6ecb28a4249bbe78e479837 NEXT_PUBLIC_APP_URL=https://studio.tapry.app NEXT_PUBLIC_SPEED_TEST_URL=https://studio.tapry.app pnpm --filter @tapry/site build"
+    "build:site": "NEXT_PUBLIC_SITE_URL=https://tapry.app NEXT_PUBLIC_WAITLIST_URL=https://studio.tapry.app/api/waitlist NEXT_PUBLIC_APP_URL=https://studio.tapry.app NEXT_PUBLIC_SPEED_TEST_URL=https://studio.tapry.app pnpm --filter @tapry/site build"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

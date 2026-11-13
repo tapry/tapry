@@ -16,7 +16,7 @@ export interface WorkerInfo {
 }
 
 /** The version this build reports (set by the release images). */
-export const APP_VERSION = process.env.TAPRY_VERSION ?? process.env.OPENTAKE_VERSION ?? "dev";
+export const APP_VERSION = process.env.TAPRY_VERSION ?? "dev";
 
 function versionLine(bin: string) {
   return new Promise<string | null>((resolve) => {

@@ -129,6 +129,11 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Update:** `git pull && docker compose up -d --build` (or, with release images, set the new
   `TAPRY_VERSION` in `.env` and `docker compose pull && docker compose up -d --no-build`).
   Database migrations run on start. Read the [changelog](../CHANGELOG.md) first.
+- **Updating an install made before 0.4:** add `DATA_NAME=opentake` to `.env` first. It names
+  the Compose project (so the volumes), the database and the bucket; new installs get
+  `DATA_NAME=tapry` from `setup.sh`, and Compose refuses to start without it, so an older install
+  can never come up with empty volumes by mistake. `OPENTAKE_IMAGES` and `OPENTAKE_VERSION` are
+  no longer read: use `TAPRY_IMAGES` and `TAPRY_VERSION`.
 - **Logs:** `docker compose logs -f web worker`. Logs never contain media, only ids and errors.
 - **Backups:** back up the `postgres-data` and `seaweedfs-data` volumes (or `pg_dump` + your
   storage provider's replication). Recordings are useless without the database that indexes them.

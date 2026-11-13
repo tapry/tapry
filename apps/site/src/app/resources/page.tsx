@@ -111,7 +111,7 @@ export default function ResourcesPage() {
         <div style={{ margin: "0 auto", display: "grid", maxWidth: 1180, gap: "40px 64px", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,420px),1fr))" }}>
           <h2 style={{ ...H2, lineHeight: 1.2, textWrap: "balance" }}>An open-source studio you can read to the last line</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, fontSize: 17, lineHeight: 1.55, color: "#3a3a3c", textWrap: "pretty" }}>
-            <p style={{ margin: 0 }}>Tapry, formerly OpenTake, is an open-source remote recording studio: guests join by link, everyone is recorded on their own computer, and the files land on a server you run.</p>
+            <p style={{ margin: 0 }}>Tapry is an open-source remote recording studio: guests join by link, everyone is recorded on their own computer, and the files land on a server you run.</p>
             <p style={{ margin: 0 }}>
               The server is AGPL-3.0 so improvements stay shared; the recorder core is MIT so anyone can build on it. Tapry Cloud, the same software without running a server, {HAS_CLOUD ? "is open, and starts free" : "is planned"}. <a href="/about/" style={{ textDecoration: "underline", textUnderlineOffset: 3, textDecorationColor: "#e8553d" }}>About Tapry</a>
             </p>

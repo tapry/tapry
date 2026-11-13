@@ -54,15 +54,17 @@ export function clientAddress(req: Request) {
   return forwarded?.split(",").at(-1)?.trim() || "direct";
 }
 
-/** CORS headers for an allowed origin (the project website), or none. */
-export function speedTestCors(req: Request, allowed: string[]): Record<string, string> {
+/** CORS headers for an allowed origin (the project website), or none. `credentials`: the browser may send our cookie. */
+export function siteCors(req: Request, allowed: string[], opts: { methods?: string; credentials?: boolean } = {}): Record<string, string> {
   const origin = req.headers.get("origin");
-  if (!origin || !allowed.includes(origin)) return {};
+  if (!origin || !allowed.includes(origin)) return { vary: "origin" };
   return {
     "access-control-allow-origin": origin,
-    "access-control-allow-methods": "POST, OPTIONS",
+    "access-control-allow-methods": opts.methods ?? "POST, OPTIONS",
     "access-control-allow-headers": "content-type",
     "access-control-max-age": "86400",
+    ...(opts.credentials ? { "access-control-allow-credentials": "true" } : {}),
     vary: "origin",
   };
 }
+export const speedTestCors = (req: Request, allowed: string[]) => siteCors(req, allowed);

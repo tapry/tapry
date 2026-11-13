@@ -1,4 +1,4 @@
-import { isLockHeld, trackLockName } from "./locks.js";
+import { isLockHeld, legacyTrackLockName, trackLockName } from "./locks.js";
 import { isTrackGone, type ChunkMeta, type ChunkStore, type ChunkTransport, type CompletedTrack, type StoredChunk, type TrackInfo } from "./types.js";
 
 export interface UploadProgress {
@@ -114,6 +114,7 @@ export class UploadQueue {
     for (const track of await this.store.listTracks()) {
       if (opts.only && !opts.only(track)) continue;
       if (await isLockHeld(trackLockName(track.sessionId, track.trackId))) continue;
+      if (await isLockHeld(legacyTrackLockName(track.sessionId, track.trackId))) continue;
       const key = trackKey(track.sessionId, track.trackId);
       this.mimeTypes.set(key, track.mimeType);
       const chunks = await this.store.listChunks(track.sessionId, track.trackId);

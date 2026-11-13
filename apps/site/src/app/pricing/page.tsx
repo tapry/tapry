@@ -1,12 +1,13 @@
 import { Faq } from "@/components/faq";
 import { CtaRow, DarkBtn, H2, OutlineBtn, SectionHead, Shell } from "@/components/ui";
 import { checkoutUrl, CLOUD_NEWS, CONTACT_EMAIL, HAS_CLOUD, pageMeta, SIGNUP_URL } from "@/content/site";
+import { HAS_CHECKOUT } from "@/content/tiers";
 import { Plans } from "./pricing";
 
 export const metadata = pageMeta({
   title: "Pricing: free to self-host · Tapry",
   description: HAS_CLOUD
-    ? "Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, the hosted version, starts free and has plans from $19 a month."
+    ? `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, the hosted version, starts free${HAS_CHECKOUT ? " and has plans from $19 a month" : "; paid plans from $19 a month open soon"}.`
     : `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, a hosted version, is planned and not open yet: ${CLOUD_NEWS} to hear when it is.`,
   path: "/pricing/",
 });
@@ -38,12 +39,12 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
 // A link only where the offer can be taken up today; the rest say how to ask.
 const MORE: Array<[string, string, string, string | null, string | null]> = [
   ["Free cloud", "$0", "2 recording hours a month, finished files kept 7 days. Guests see a “Record your own” link at the end.", HAS_CLOUD ? SIGNUP_URL : null, "Start free"],
-  ["Own storage", "$12 a month", "Tapry Cloud runs the studio and records into your own S3 or R2 bucket, with no limit on hours within fair use.", HAS_CLOUD ? checkoutUrl("own_storage", false) : null, "Choose Own storage"],
+  ["Own storage", "$12 a month", "Tapry Cloud runs the studio and records into your own S3 or R2 bucket, with no limit on hours within fair use.", HAS_CHECKOUT ? checkoutUrl("own_storage", false) : null, "Choose Own storage"],
   ["Support for self-hosting", "$2,400 a year", "For an organisation running Tapry on its own server: email support, help with updates and the documents a data-protection review asks for.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
   ["Business", "From $4,800 a year", "Hosted, with single sign-on, an audit log and retention policies. These features aren’t built yet.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
 ];
 /** Which of those exist today, for the "planned" label. */
-const AVAILABLE = new Set(HAS_CLOUD ? ["Free cloud", "Own storage", "Support for self-hosting"] : []);
+const AVAILABLE = new Set(HAS_CLOUD ? ["Free cloud", ...(HAS_CHECKOUT ? ["Own storage"] : []), "Support for self-hosting"] : []);
 
 const FAQ: Array<[string, string]> = [
   ["Is self-hosting really free?", "Yes. Tapry’s server is AGPL-3.0 and the recorder core is MIT. You pay for your own machine and storage, nothing to Tapry."],
@@ -62,7 +63,12 @@ const FAQ: Array<[string, string]> = [
     "Per recording, not per person: an hour with four people is one hour. The cloud plans keep the original uploads for 7 days after processing and the finished files for the plan’s period; download what you want to keep longer. Each recording shows its date.",
   ],
   ["Is there a discount for schools and non-profits?", `Education and non-profit organisations get 30% off the Creator, Studio and Team plans: write to ${CONTACT_EMAIL} from your organisation’s address. Self-hosting is free for everyone.`],
-  ...(HAS_CLOUD
+  ...(HAS_CLOUD && !HAS_CHECKOUT
+    ? ([
+        ["When can I buy a paid plan?", "Soon. The free plan is open now. Join the waitlist on the plan you want and you get one email when it can be bought; the prices above are the ones planned and may still change."],
+      ] as Array<[string, string]>)
+    : []),
+  ...(HAS_CHECKOUT
     ? ([
         ["How do I pay, and can I cancel?", "Plans are sold through Paddle, our payment provider, which takes the payment and sends the invoice. You can cancel at any time from Settings, Plan: the plan then runs to the end of the period you paid for."],
       ] as Array<[string, string]>)
@@ -107,7 +113,7 @@ export default function PricingPage() {
             </div>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#6b6b70" }}>
-            {HAS_CLOUD ? "Paid yearly, a plan costs ten months’ worth. The table lists US dollars before tax; the plans above show the price in your currency, as our payment provider Paddle will charge it." : "Tapry Cloud isn’t available yet: its columns are the plan, not something you can buy today, and may change. Paid yearly, the planned price is ten months’ worth."}
+            {HAS_CHECKOUT ? "Paid yearly, a plan costs ten months’ worth. The table lists US dollars before tax; the plans above show the price in your currency, as our payment provider Paddle will charge it." : HAS_CLOUD ? "The free plan is open now; the paid plans aren’t on sale yet, and their prices, in US dollars before tax, may still change. Paid yearly, a plan costs ten months’ worth." : "Tapry Cloud isn’t available yet: its columns are the plan, not something you can buy today, and may change. Paid yearly, the planned price is ten months’ worth."}
           </p>
           <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,250px),1fr))" }}>
             {MORE.map(([name, cost, text, href, label]) => (

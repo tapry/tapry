@@ -4,6 +4,17 @@ const DB_VERSION = 1;
 const TRACKS = "tracks";
 const CHUNK_META = "chunkMeta";
 const CHUNK_DATA = "chunkData";
+export const DB_NAME = "tapry-recorder";
+export const LEGACY_DB_NAME = "opentake-recorder";
+
+async function defaultName(idb: IDBFactory) {
+  if (typeof idb.databases !== "function") return LEGACY_DB_NAME;
+  try {
+    return (await idb.databases()).some((d) => d.name === LEGACY_DB_NAME) ? LEGACY_DB_NAME : DB_NAME;
+  } catch {
+    return LEGACY_DB_NAME;
+  }
+}
 
 /**
  * Durable chunk store on IndexedDB.
@@ -19,9 +30,14 @@ const CHUNK_DATA = "chunkData";
 export class IndexedDBChunkStore implements ChunkStore {
   private constructor(private db: IDBDatabase) {}
 
-  // The database is named from before the rename to Tapry: renaming it would orphan unsent chunks.
-  static async open(name = "opentake-recorder", idb: IDBFactory = indexedDB): Promise<IndexedDBChunkStore> {
-    const req = idb.open(name, DB_VERSION);
+  /**
+   * Opens the store. With no name given it is `tapry-recorder`, unless this browser already
+   * has the database from before the rename (`opentake-recorder`): that one may hold chunks
+   * not yet uploaded, so it stays in use and nothing is moved or orphaned. Where the browser
+   * can't list its databases, the old name is used: the safe guess.
+   */
+  static async open(name?: string, idb: IDBFactory = indexedDB): Promise<IndexedDBChunkStore> {
+    const req = idb.open(name ?? (await defaultName(idb)), DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       db.createObjectStore(TRACKS, { keyPath: ["sessionId", "trackId"] });

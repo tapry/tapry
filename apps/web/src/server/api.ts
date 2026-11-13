@@ -14,7 +14,9 @@ import {
   recapBody,
   resetPasswordBody,
   setFiltersBody,
+  removeWaitlistBody,
   setPlanBody,
+  waitlistBody,
   telemetryBody,
   techCheckReport,
   SPEED_TEST_MAX_BYTES,
@@ -31,7 +33,7 @@ import { readWebhook } from "./billing-webhooks";
 import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
-import { clientAddress, drainBody, speedTestCors } from "./speed-test";
+import { clientAddress, drainBody, siteCors, speedTestCors } from "./speed-test";
 import { APP_VERSION } from "./worker-info";
 import { contentDisposition } from "./storage";
 
@@ -95,6 +97,35 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     me: handler(async (svc, req) => {
       const user = await svc.auth.userForToken(readCookie(req, SESSION_COOKIE));
       return user ? json(200, { user }) : json(401, { error: "unauthorized", message: "Not signed in" });
+    }),
+
+    /**
+     * Whether this browser is signed in: all the project website learns, so its menu can show
+     * "Open studio" instead of Log in and Get Started. The website is another origin on the same
+     * site, so the session cookie comes along; only SITE_ORIGINS may read the answer.
+     */
+    authStatus: handler(async (svc, req) => {
+      const user = await svc.auth.userForToken(readCookie(req, SESSION_COOKIE));
+      return json(200, { signedIn: !!user }, { ...siteCors(req, svc.siteOrigins, { methods: "GET", credentials: true }), "cache-control": "no-store" });
+    }),
+    /** The website's waitlist for paid plans. The same answer whether or not the address was already on it. */
+    joinWaitlist: handler(async (svc, req) => {
+      const cors = siteCors(req, svc.siteOrigins);
+      try {
+        const body = await parseBody(req, waitlistBody);
+        await svc.waitlist.join(body.email, body.plan, clientAddress(req));
+        return json(200, { ok: true }, cors);
+      } catch (err) {
+        const res = errorResponse(err);
+        for (const [k, v] of Object.entries(cors)) res.headers.set(k, v); // readable by the website too
+        return res;
+      }
+    }),
+    waitlistPreflight: handler(async (svc, req) => new Response(null, { status: 204, headers: siteCors(req, svc.siteOrigins) })),
+    adminWaitlist: asUser(async (svc, user) => json(200, { entries: await svc.waitlist.list(user) })),
+    adminRemoveWaitlist: asUser(async (svc, user, req) => {
+      await svc.waitlist.remove(user, (await parseBody(req, removeWaitlistBody)).email);
+      return json(200, { ok: true });
     }),
 
     /** "I forgot my password": always the same answer, whether or not the address has an account. */

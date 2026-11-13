@@ -1,7 +1,5 @@
 # Tapry
 
-_Formerly OpenTake._
-
 Studio-quality remote recording you can host yourself. Guests join from a link in their
 browser; everyone is recorded **on their own device** at full quality, uploaded while you talk,
 and turned into separate tracks you can edit. Open source, with recordings in your own storage.

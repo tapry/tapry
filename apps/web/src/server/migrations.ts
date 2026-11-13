@@ -401,4 +401,12 @@ CREATE TABLE billing_subscriptions (
 CREATE INDEX billing_subscriptions_account ON billing_subscriptions (account_id) WHERE account_id IS NOT NULL;
 CREATE INDEX billing_subscriptions_customer ON billing_subscriptions (customer_id);
 `,
+  `
+-- People who asked on the website to hear when Tapry Cloud's paid plans open.
+CREATE TABLE waitlist (
+  email text PRIMARY KEY,
+  plan text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+`,
 ];

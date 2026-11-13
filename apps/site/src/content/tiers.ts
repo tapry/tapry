@@ -58,4 +58,6 @@ if (PADDLE_TOKEN && ENV !== "production" && ENV !== "sandbox") {
 if (PADDLE_TOKEN && (ENV === "production") !== PADDLE_TOKEN.startsWith("live_")) {
   throw new Error("NEXT_PUBLIC_PADDLE_CLIENT_TOKEN doesn't match NEXT_PUBLIC_PADDLE_ENVIRONMENT (live_ tokens are for production, test_ for sandbox)");
 }
+/** Paid plans can be bought: the hosted app is there and Paddle is set. Otherwise they take a waitlist. */
+export const HAS_CHECKOUT = !!process.env.NEXT_PUBLIC_APP_URL && !!PADDLE_TOKEN;
 export const PADDLE_ENVIRONMENT = (ENV ?? null) as "production" | "sandbox" | null;

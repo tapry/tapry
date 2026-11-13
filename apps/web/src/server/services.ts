@@ -1,3 +1,4 @@
+import { WaitlistService } from "./waitlist";
 import { HealthService, type HealthOptions } from "./health";
 import { SpeedTestLimiter } from "./speed-test";
 import { AccountService } from "./account";
@@ -33,6 +34,10 @@ export interface Services {
   guestPromoUrl: string | null;
   /** The public upload-speed test: per-address limits, and other sites allowed to use it. */
   speedTest: { limiter: SpeedTestLimiter; origins: string[] };
+  /** The project website's origins: allowed to ask "signed in?" and to post to the waitlist. */
+  siteOrigins: string[];
+  /** Tapry Cloud's waitlist for paid plans. */
+  waitlist: WaitlistService;
   /** The admin health page's checks. */
   health: HealthService;
   /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
@@ -55,7 +60,7 @@ export function createServices(
   db: Db,
   /** The server's own storage; sessions of accounts with their own bucket are routed past it. */
   serverStorage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; /** This server's public address, for links in email. */ appUrl?: string | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig | null; paddle?: PaddleOptions | null; ownStorage?: { serverKey: string | null; allowPrivate?: boolean; make?: MakeStorage; resolve?: (host: string) => Promise<string[]> } } = {
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; /** This server's public address, for links in email. */ appUrl?: string | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; siteOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig | null; paddle?: PaddleOptions | null; ownStorage?: { serverKey: string | null; allowPrivate?: boolean; make?: MakeStorage; resolve?: (host: string) => Promise<string[]> } } = {
     auth: { allowSignup: false },
   },
 ): Services {
@@ -97,6 +102,8 @@ export function createServices(
     recaps: new RecapService(db, !!opts.mailer, () => processing.onEnqueue()),
     guestPromoUrl: opts.guestPromoUrl ?? null,
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
+    siteOrigins: opts.siteOrigins ?? [],
+    waitlist: new WaitlistService(db, { cloud: billing.cloud, now: opts.now }),
     health,
     library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),
     members: new MembersService(db, {

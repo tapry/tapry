@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { cn, Notice } from "./ui";
 import { ListCard } from "./ui-extra";
 import { PlanAccounts, type Account } from "./plan-accounts";
+import { WaitlistPanel, type WaitlistRow } from "./waitlist-panel";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -22,11 +23,14 @@ const keeps = (days: number | null) => (days === null ? "Until you delete them" 
 export function PlanPanel({
   billing,
   accounts,
+  waitlist = null,
   justPaid = false,
   portalProblem = null,
 }: {
   billing: BillingOverview;
   accounts: Account[] | null;
+  /** The website's waitlist, for the admin. */
+  waitlist?: WaitlistRow[] | null;
   /** Back from the checkout. */
   justPaid?: boolean;
   /** Back from a portal that couldn't open: its code. */
@@ -150,6 +154,7 @@ export function PlanPanel({
       )}
 
       {accounts && <PlanAccounts accounts={accounts} />}
+      {waitlist && <WaitlistPanel entries={waitlist} />}
     </>
   );
 }

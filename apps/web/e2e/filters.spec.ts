@@ -93,7 +93,7 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
     await expect(panel(guest)).toHaveCount(0);
     await expect(filtersButton(guest)).toBeFocused();
     // Remembered on this device.
-    expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("opentake:filters")!).filters.look)).toBe("mono");
+    expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("tapry:filters")!).filters.look)).toBe("mono");
   });
 
   await test.step("in the room: the guest's own tile is filtered, and the others see it that way", async () => {

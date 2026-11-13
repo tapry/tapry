@@ -8,7 +8,8 @@ import { Footer } from "@/components/footer";
 import { IC, Icon, LogoMark } from "@/components/icons";
 import { Nav } from "@/components/nav";
 import { customers } from "@/content/customers";
-import { CLOUD_NEWS, GET_STARTED, HAS_CLOUD } from "@/content/site";
+import { StartLink } from "@/components/account-links";
+import { CLOUD_NEWS, HAS_CLOUD } from "@/content/site";
 
 const G = "#12924f";
 const A = "#a16207";
@@ -107,9 +108,7 @@ export function Landing() {
                 Every guest is recorded on their own computer and uploaded while you talk. A bad connection blurs the call, never the recording. Open source, on your server.
               </p>
               <div style={{ display: "flex", alignItems: "center", gap: 26, fontSize: 16, fontWeight: 500 }}>
-                <a href={GET_STARTED} className="btn-white" style={{ display: "inline-flex", height: 44, alignItems: "center", borderRadius: 12, background: "#fff", padding: "0 20px", color: "#0b0b0f", transition: "transform .2s" }}>
-                  Get Started
-                </a>
+                <StartLink className="btn-white" style={{ display: "inline-flex", height: 44, alignItems: "center", borderRadius: 12, background: "#fff", padding: "0 20px", color: "#0b0b0f", transition: "transform .2s" }} />
                 <a href="/self-hosting/" className="link-white" style={{ color: "#fff" }}>
                   Self-host it
                 </a>
@@ -218,9 +217,7 @@ export function Landing() {
                 : `Start with an interview, a podcast or a research study. Host Tapry yourself today. Tapry Cloud is planned: to hear when it opens, ${CLOUD_NEWS}.`}
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 26, fontSize: 16, fontWeight: 500, marginTop: 6 }}>
-              <a href={GET_STARTED} className="btn-white-flat" style={{ display: "inline-flex", height: 44, alignItems: "center", borderRadius: 12, background: "#fff", padding: "0 20px", color: "#0b0b0f" }}>
-                Get Started
-              </a>
+              <StartLink className="btn-white-flat" style={{ display: "inline-flex", height: 44, alignItems: "center", borderRadius: 12, background: "#fff", padding: "0 20px", color: "#0b0b0f" }} />
               <a href="/self-hosting/" className="link-white" style={{ color: "#fff" }}>
                 Self-host it
               </a>

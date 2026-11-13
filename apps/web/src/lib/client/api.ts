@@ -1,3 +1,4 @@
+import { readStored, removeStored, writeStored } from "./stored";
 import type { SessionTicket } from "@tapry/shared";
 
 export class ApiRequestError extends Error {
@@ -46,14 +47,13 @@ export async function apiFetch<T = unknown>(
 // the same participant (and doesn't use up another seat). Storage can be missing or
 // throw (private mode, blocked site data), so every access is guarded.
 
-// Named before the rename to Tapry; kept so data saved by older versions is still found.
-const ticketKey = (sessionId: string) => `opentake:ticket:${sessionId}`;
-const inviteKey = (inviteCode: string) => `opentake:invite:${inviteCode}`;
+const ticketKey = (sessionId: string) => `ticket:${sessionId}`;
+const inviteKey = (inviteCode: string) => `invite:${inviteCode}`;
 
 export function saveTicket(ticket: SessionTicket, inviteCode?: string) {
   try {
-    localStorage.setItem(ticketKey(ticket.sessionId), JSON.stringify(ticket));
-    if (inviteCode) localStorage.setItem(inviteKey(inviteCode), ticket.sessionId);
+    writeStored(ticketKey(ticket.sessionId), JSON.stringify(ticket));
+    if (inviteCode) writeStored(inviteKey(inviteCode), ticket.sessionId);
   } catch {
     // Without storage the guest simply joins again after a reload.
   }
@@ -61,7 +61,7 @@ export function saveTicket(ticket: SessionTicket, inviteCode?: string) {
 
 export function loadTicket(sessionId: string): SessionTicket | null {
   try {
-    const raw = localStorage.getItem(ticketKey(sessionId));
+    const raw = readStored(ticketKey(sessionId));
     return raw ? (JSON.parse(raw) as SessionTicket) : null;
   } catch {
     return null;
@@ -71,7 +71,7 @@ export function loadTicket(sessionId: string): SessionTicket | null {
 /** The ticket from an earlier join through this invite link, if any. */
 export function loadTicketForInvite(inviteCode: string): SessionTicket | null {
   try {
-    const sessionId = localStorage.getItem(inviteKey(inviteCode));
+    const sessionId = readStored(inviteKey(inviteCode));
     return sessionId ? loadTicket(sessionId) : null;
   } catch {
     return null;
@@ -80,6 +80,6 @@ export function loadTicketForInvite(inviteCode: string): SessionTicket | null {
 
 export function forgetTicket(sessionId: string) {
   try {
-    localStorage.removeItem(ticketKey(sessionId));
+    removeStored(ticketKey(sessionId));
   } catch {}
 }

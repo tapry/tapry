@@ -1,13 +1,14 @@
 "use client";
 
-// The Tapry Cloud waitlist: a button that opens an email field in place, posting the email to
-// NEXT_PUBLIC_WAITLIST_URL (a form service). Unset, it points to GitHub releases instead.
+// The waitlist for Tapry Cloud's paid plans: a button that opens an email field in place and
+// posts `{ email, plan }` to NEXT_PUBLIC_WAITLIST_URL (the hosted app's /api/waitlist, which
+// keeps the list on our own server). Unset, it points to GitHub releases instead.
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { RELEASES_URL, WAITLIST_URL } from "@/content/site";
 
-export function WaitlistButton({ dark, label = "Join the waitlist" }: { dark: boolean; label?: string }) {
+export function WaitlistButton({ dark, label = "Join the waitlist", plan = null }: { dark: boolean; label?: string; /** The plan asked about. */ plan?: string | null }) {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<"idle" | "sending" | "joined" | "error">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "joined" | "error" | "limited">("idle");
   const btn: CSSProperties = {
     display: "inline-flex",
     height: 36,
@@ -44,8 +45,9 @@ export function WaitlistButton({ dark, label = "Join the waitlist" }: { dark: bo
     e.preventDefault();
     setState("sending");
     try {
-      const res = await fetch(WAITLIST_URL!, { method: "POST", body: new FormData(e.currentTarget), headers: { accept: "application/json" } });
-      setState(res.ok ? "joined" : "error");
+      const email = String(new FormData(e.currentTarget).get("email") ?? "");
+      const res = await fetch(WAITLIST_URL!, { method: "POST", body: JSON.stringify({ email, ...(plan ? { plan } : {}) }), headers: { "content-type": "application/json", accept: "application/json" } });
+      setState(res.ok ? "joined" : res.status === 429 ? "limited" : "error");
     } catch {
       setState("error");
     }
@@ -68,8 +70,8 @@ export function WaitlistButton({ dark, label = "Join the waitlist" }: { dark: bo
           {state === "joined" ? "✓ On the list" : state === "sending" ? "Joining…" : "Join"}
         </button>
       </div>
-      <span role="status" style={{ fontSize: 13, color: state === "error" ? "#c43c25" : "#6b6b70" }}>
-        {state === "error" ? "That didn’t go through. Try again in a moment." : state === "joined" ? "You’re on the list. You’ll get one email when it opens." : "One email, when Tapry Cloud opens."}
+      <span role="status" style={{ fontSize: 13, color: state === "error" || state === "limited" ? "#c43c25" : "#6b6b70" }}>
+        {state === "error" ? "That didn’t go through. Check the address and try again." : state === "limited" ? "Too many tries from your network. Try again in an hour." : state === "joined" ? "You’re on the list. You’ll get one email when it opens." : "One email, when this plan opens."}
       </span>
     </form>
   );

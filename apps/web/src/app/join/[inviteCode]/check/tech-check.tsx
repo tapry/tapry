@@ -21,7 +21,7 @@ const SAMPLE_SECONDS = 5;
  */
 export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: string; hostName: string; settings: StudioSettings }) {
   // Same saved devices as the green room, so what works here is what they'll join with.
-  const [choice, setChoice] = useStoredState<DeviceChoice>("opentake:devices", { headphones: false });
+  const [choice, setChoice] = useStoredState<DeviceChoice>("devices", { headphones: false });
   const constraints = useMemo(() => buildConstraints(settings, choice), [settings, choice]);
   const { stream, status, problem, retry } = useLocalMedia(constraints);
   const devices = useDevices(status);

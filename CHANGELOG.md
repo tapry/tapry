@@ -5,6 +5,23 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Updating from 0.3 or earlier: add `DATA_NAME=opentake` to `.env` before you update.** The
+  Compose project, database and bucket are now named by `DATA_NAME` (`tapry` for new installs);
+  Compose refuses to start without it, so existing data is never left behind. `OPENTAKE_IMAGES`
+  and `OPENTAKE_VERSION` are no longer read, and releases no longer publish `opentake-*` images.
+- **The old name is gone from browsers too, without losing anything.** Saved tickets, device
+  choices and filters are written as `tapry:…` and still read from `opentake:…`; a browser that
+  already has the `opentake-recorder` database keeps using it (it may hold chunks not yet
+  uploaded), a new one gets `tapry-recorder`.
+- **A waitlist for paid plans (Tapry Cloud).** While Paddle isn't set up, the website's plan
+  buttons take an email address and the plan asked about (`POST /api/waitlist`, kept on the
+  server, 5 an hour per address). The admin sees, copies and removes addresses in Settings, Plan.
+- **The website knows whether you're signed in.** It asks the app yes or no
+  (`GET /api/auth/status`, readable only by `SITE_ORIGINS`) and shows Open Studio in place of
+  Log in and Get Started.
+- **Security headers** from the bundled Caddy (HSTS, nosniff, referrer policy, no framing of the
+  app) and on the website.
+
 - **The app's text is set in Inter**, and all fonts (Inter, Geist, Geist Mono) are bundled from
   npm packages instead of being downloaded from Google when building. A build no longer needs
   that download, which had failed some builds.

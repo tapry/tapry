@@ -42,6 +42,9 @@ export const loginBody = z.object({
 
 /** "I forgot my password": the address to send the link to. */
 export const forgotPasswordBody = z.object({ email });
+/** The website's waitlist for Tapry Cloud's paid plans. */
+export const waitlistBody = z.object({ email, plan: z.enum(["creator", "studio", "team", "own_storage"]).optional() });
+export const removeWaitlistBody = z.object({ email });
 /** The token from an emailed link (a new password, or confirming the address). */
 const emailToken = z.string().min(20).max(200);
 export const resetPasswordBody = z.object({

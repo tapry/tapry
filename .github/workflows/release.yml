@@ -43,8 +43,6 @@ jobs:
           tags: |
             ${{ env.IMAGES }}/tapry-web:${{ env.VERSION }}
             ${{ env.IMAGES }}/tapry-web:latest
-            ${{ env.IMAGES }}/opentake-web:${{ env.VERSION }}
-            ${{ env.IMAGES }}/opentake-web:latest
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ env.VERSION }}
@@ -62,8 +60,6 @@ jobs:
           tags: |
             ${{ env.IMAGES }}/tapry-caddy:${{ env.VERSION }}
             ${{ env.IMAGES }}/tapry-caddy:latest
-            ${{ env.IMAGES }}/opentake-caddy:${{ env.VERSION }}
-            ${{ env.IMAGES }}/opentake-caddy:latest
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ env.VERSION }}

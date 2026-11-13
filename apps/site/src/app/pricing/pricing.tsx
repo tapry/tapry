@@ -3,14 +3,14 @@
 // The plans and the monthly/yearly switch. Self-hosted is the open-source release. The three
 // Tapry Cloud plans come from content/tiers.ts. Their prices are Paddle's, localized to the
 // visitor (components/paddle-prices.ts), shown exactly as Paddle formats them; until they arrive
-// the tier's listed price shows. With the hosted app's address set (HAS_CLOUD) each plan's button
-// leads to its checkout there (sign-up first, so the payment is tied to an account); without it
-// the plans are labelled as planned.
+// the tier's listed price shows. With Paddle set (HAS_CHECKOUT) each plan's button leads to its
+// checkout in the app (sign-up first, so the payment is tied to an account). Without it the
+// button joins that plan's waitlist; without a hosted app the plans are labelled as planned.
 import { useState } from "react";
 import { usePaddlePrices } from "@/components/paddle-prices";
 import { WaitlistButton } from "@/components/waitlist";
 import { checkoutUrl, CLOUD_NEWS, HAS_CLOUD, SIGNUP_URL } from "@/content/site";
-import { TIERS } from "@/content/tiers";
+import { HAS_CHECKOUT, TIERS } from "@/content/tiers";
 
 type Plan = {
   name: string;
@@ -20,7 +20,7 @@ type Plan = {
   features: string[];
   highlight: boolean;
   tag: string | null;
-  cta: { label: string; href: string } | "waitlist";
+  cta: { label: string; href: string } | { waitlist: string | null };
 };
 
 export function Plans() {
@@ -52,9 +52,9 @@ export function Plans() {
         price: paddle?.[id] ?? (yearly ? t.listed.year : t.listed.month),
         per,
         desc: HAS_CLOUD ? t.description : `Planned: ${t.description.charAt(0).toLowerCase()}${t.description.slice(1)}`,
-        cta: HAS_CLOUD ? { label: `Choose ${t.name}`, href: checkoutUrl(t.plan, yearly) } : "waitlist",
+        cta: HAS_CHECKOUT ? { label: `Choose ${t.name}`, href: checkoutUrl(t.plan, yearly) } : { waitlist: t.plan },
         highlight: !!t.highlight,
-        tag: HAS_CLOUD ? null : "Planned",
+        tag: HAS_CHECKOUT ? null : HAS_CLOUD ? "Opening soon" : "Planned",
         features: t.features,
       };
     }),
@@ -85,7 +85,7 @@ export function Plans() {
               <a href={SIGNUP_URL} style={{ color: "#0b0b0f", textDecoration: "underline", textUnderlineOffset: 3 }}>
                 start free
               </a>{" "}
-              with 2 recording hours a month, or choose a plan.
+              with 2 recording hours a month{HAS_CHECKOUT ? ", or choose a plan." : ". The paid plans open soon: join the waitlist of the one you want, and you get one email when it does."}
             </>
           ) : (
             `Self-hosting is free, with no limits on recordings or hours. Tapry Cloud, for people who’d rather not run a server, is planned and not open yet: to hear when it is, ${CLOUD_NEWS}.`
@@ -116,8 +116,8 @@ export function Plans() {
                 <span style={{ fontSize: 14, color: "#6b6b70" }}>{p.per}</span>
               </div>
               <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: "#6b6b70", textWrap: "pretty", minHeight: 46 }}>{p.desc}</p>
-              {p.cta === "waitlist" ? (
-                <WaitlistButton dark={p.highlight} />
+              {"waitlist" in p.cta ? (
+                <WaitlistButton dark={p.highlight} plan={p.cta.waitlist} />
               ) : (
                 <a
                   href={p.cta.href}

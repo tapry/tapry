@@ -55,6 +55,8 @@ const env = z.object({
   UPDATE_CHECK_REPO: unsetIfEmpty(z.string().regex(/^[\w.-]+\/[\w.-]+$/)),
   /** Other sites (comma-separated origins) whose pages may use this server's public upload-speed test. */
   SPEED_TEST_ORIGINS: z.string().default(""),
+  /** The project website's addresses: it may ask whether the visitor is signed in, post to the waitlist and use the speed test. */
+  SITE_ORIGINS: z.string().default(""),
   /** Guests' end screen links here ("Record your own, free"). Unset (default): no such link. */
   GUEST_PROMO_URL: unsetIfEmpty(z.string().url()),
   /** This server's public address, for links in email. Needed with SMTP_HOST. */
@@ -159,6 +161,7 @@ export interface Config {
   guestPromoUrl: string | null;
   mail: { smtp: SmtpConfig; appUrl: string } | null;
   speedTestOrigins: string[];
+  siteOrigins: string[];
   updateRepo: string | null;
   /** Accounts' own buckets: the key their secrets are encrypted with (null: off). */
   ownStorage: { serverKey: string | null; allowPrivate: boolean };
@@ -228,7 +231,8 @@ export function loadConfig(source: Record<string, string | undefined> = process.
           appUrl: cfg.APP_URL!,
         }
       : null,
-    speedTestOrigins: cfg.SPEED_TEST_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
+    speedTestOrigins: [...new Set(`${cfg.SPEED_TEST_ORIGINS},${cfg.SITE_ORIGINS}`.split(",").map((o) => o.trim()).filter(Boolean))],
+    siteOrigins: cfg.SITE_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
     updateRepo: cfg.UPDATE_CHECK_REPO ?? null,
     ownStorage: { serverKey: cfg.STORAGE_SECRET_KEY ?? null, allowPrivate: cfg.OWN_STORAGE_ALLOW_PRIVATE },
     cloud: cfg.TAPRY_CLOUD

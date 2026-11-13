@@ -25,7 +25,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const members = <MembersPanel key="members" initial={await services.members.view(user)} />;
   // Tapry Cloud only: a self-hosted server has no plans, and no Plan tab.
   const plan = services.billing.cloud ? (
-    <PlanPanel key="plan" billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} justPaid={paid === "1"} portalProblem={portal ?? null} />
+    <PlanPanel key="plan" billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} waitlist={user.isAdmin ? await services.waitlist.list(user) : null} justPaid={paid === "1"} portalProblem={portal ?? null} />
   ) : null;
 
   const workspace = w && (

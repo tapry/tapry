@@ -38,7 +38,7 @@ export interface ReadyToJoin {
 export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (ready: ReadyToJoin) => void }) {
   const settings = ticket.studio.settings;
   // Key named before the rename to Tapry, so saved device choices carry over.
-  const [choice, setChoice] = useStoredState<DeviceChoice>("opentake:devices", { headphones: false });
+  const [choice, setChoice] = useStoredState<DeviceChoice>("devices", { headphones: false });
   const constraints = useMemo(() => buildConstraints(settings, choice), [settings, choice]);
   const { stream, status, problem, retry, handOff } = useLocalMedia(constraints);
   const devices = useDevices(status); // re-list once permission makes labels visible

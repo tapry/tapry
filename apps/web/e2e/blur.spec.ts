@@ -134,7 +134,7 @@ test("background blur: a mask track beside the untouched camera, and a blurred f
     expect(await recorderTracks(guest)).toEqual(before);
 
     await guest.keyboard.press("Escape");
-    expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("opentake:filters")!).filters.background)).toBe("blur");
+    expect(await guest.evaluate(() => JSON.parse(localStorage.getItem("tapry:filters")!).filters.background)).toBe("blur");
   });
 
   await test.step("in the room: blur is ready again before recording, on the same untouched tracks", async () => {
