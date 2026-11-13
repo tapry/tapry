@@ -1,0 +1,17 @@
+// The project website (apps/site) on Cloudflare: static files only, no code runs there.
+// Cloudflare builds this repo on every push to main (build command: `pnpm run build:site`)
+// and `npx wrangler deploy` then publishes apps/site/out at tapry.app.
+// The self-hosted app is unaffected: it ships through Docker (deploy/).
+{
+  "name": "tapry",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./apps/site/out",
+    // Pages are exported as /pricing/index.html: /pricing redirects to /pricing/.
+    "html_handling": "auto-trailing-slash",
+    // Unknown addresses get the site's own 404 page.
+    "not_found_handling": "404-page"
+  },
+  // The site sets no cookies and runs no analytics; keep Cloudflare's observability off too.
+  "observability": { "enabled": false }
+}
