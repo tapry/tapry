@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { studioSettings, trackFilters, type TrackFilters } from "@tapry/shared";
@@ -24,6 +24,7 @@ import { EXPIRY_NOTICE_MS, planRetention, warnExpiring } from "./billing";
 import type { Db, Queryable } from "./db";
 import { isApiError } from "./errors";
 import { newId } from "./ids";
+import { NOTES_ERROR_TEXT, NOTES_FILE, NOTES_MAX_CHARS, NotesError, notesModelFor, notesModels, queueNotes, type NotesConfig, type NotesModel } from "./notes";
 import { deleteRecordingIn, type RecordingProgress } from "./processing";
 import { sendDueRecaps, sweepRecaps, type RecapMail } from "./recap";
 import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
@@ -75,10 +76,14 @@ export interface JobRunnerOptions {
   purgeRepeatMs?: number;
   /** Guests' recap emails; leave out when the server doesn't send email. */
   mail?: RecapMail | null;
+  /** AI notes: the models this server may use. Left out: no notes. */
+  notes?: NotesConfig;
+  /** The notes models themselves, instead of building them from `notes` (tests). */
+  notesModels?: { local: NotesModel | null; outside: NotesModel | null };
 }
 
-type JobType = "process_recording" | "transcribe_recording" | "purge_recording" | "purge_raw";
-type MediaJobType = Exclude<JobType, "purge_recording" | "purge_raw">;
+type JobType = "process_recording" | "transcribe_recording" | "purge_recording" | "purge_raw" | "notes_recording";
+type MediaJobType = Exclude<JobType, "purge_recording" | "purge_raw" | "notes_recording">;
 
 interface JobRow {
   id: string;
@@ -171,7 +176,9 @@ export class JobRunner {
        WHERE id = $1 AND status = 'running'`,
       [job.id],
     );
-    if (job.type !== "purge_recording" && job.type !== "purge_raw") {
+    if (job.type === "notes_recording") {
+      await this.db.query("UPDATE recordings SET notes = 'queued' WHERE id = $1", [job.recording_id]);
+    } else if (job.type !== "purge_recording" && job.type !== "purge_raw") {
       await this.db.query(`UPDATE recordings SET ${STATUS_COLUMN[job.type]} = 'queued' WHERE id = $1`, [job.recording_id]);
     }
     return job.id;
@@ -301,6 +308,7 @@ export class JobRunner {
   private async process(job: JobRow) {
     if (job.type === "purge_recording") return this.purge(job);
     if (job.type === "purge_raw") return this.purgeRaw(job);
+    if (job.type === "notes_recording") return this.writeNotes(job);
     const [rec] = await this.db.query<RecordingRow>(
       `SELECT r.id, r.session_id, r.started_at, r.stopped_at, st.settings
        FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
@@ -469,7 +477,8 @@ export class JobRunner {
       ]);
       for (const o of outputs) await insertOutput(tx, rec.id, o);
       await tx.query(
-        `UPDATE recordings SET processing = $2, processed_at = now(), processing_error = NULL, skipped_tracks = $3, filters_failed = $4, rerun_requested = false WHERE id = $1`,
+        // The old notes went with the old files; new ones follow the new transcript.
+        `UPDATE recordings SET processing = $2, processed_at = now(), processing_error = NULL, skipped_tracks = $3, filters_failed = $4, rerun_requested = false, notes = 'off', notes_error = NULL WHERE id = $1`,
         [rec.id, rerun ? "queued" : "ready", JSON.stringify(skipped), JSON.stringify(filtersFailed)],
       );
       await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
@@ -573,10 +582,107 @@ export class JobRunner {
         await tx.query(`INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'transcribe_recording', $2)`, [newId("job"), rec.id]);
         await tx.query("UPDATE recordings SET transcript = 'queued' WHERE id = $1", [rec.id]);
         this.kicked = true;
+      } else if (this.hasNotesModel()) {
+        // Notes are written from this transcript. Whether this account gets them (a local model,
+        // or an outside one its owner allowed) is decided when the job runs.
+        await queueNotes(tx, rec.id);
+        this.kicked = true;
       }
       return old.map((o) => o.storage_key);
     });
     await this.removeReplaced(replaced);
+  }
+
+  private models: { local: NotesModel | null; outside: NotesModel | null } | undefined;
+  private notesModels() {
+    return (this.models ??= this.opts.notesModels ?? notesModels(this.opts.notes));
+  }
+  private hasNotesModel() {
+    const m = this.notesModels();
+    return !!(m.local || m.outside);
+  }
+
+  /**
+   * AI notes from a finished transcript: read Transcript.txt, have the model the account may use
+   * write the notes, and save them as "Notes.md". No model for this account: nothing is written
+   * and nothing is sent anywhere. The transcript's text never reaches a log.
+   */
+  private async writeNotes(job: JobRow) {
+    const finish = (status: "done" | "failed", error: string | null = null) =>
+      this.db.query("UPDATE jobs SET status = $2, finished_at = now(), error = $3 WHERE id = $1", [job.id, status, error]);
+    const [rec] = await this.db.query<{ id: string; session_id: string; transcript: string; transcribed_at: string | null; number: number | null; studio: string }>(
+      `SELECT r.id, r.session_id, r.transcript, r.transcribed_at::text AS transcribed_at, r.number, st.name AS studio
+       FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
+       WHERE r.id = $1 AND r.deleted_at IS NULL`,
+      [job.recording_id],
+    );
+    const [source] = rec
+      ? await this.db.query<{ storage_key: string; bytes: string }>(
+          "SELECT storage_key, bytes FROM outputs WHERE recording_id = $1 AND kind = 'transcript' AND file_name = 'Transcript.txt'",
+          [rec.id],
+        )
+      : [];
+    const model = rec && rec.transcript === "ready" && source ? await notesModelFor(this.db, rec.id, this.notesModels(), { cloud: !!this.opts.cloud, now: Date.now() }) : null;
+    if (!rec || !model || !source) {
+      if (rec) await this.db.query("UPDATE recordings SET notes = 'off', notes_error = NULL WHERE id = $1 AND notes IN ('queued', 'processing')", [rec.id]);
+      await finish("done");
+      if (rec) this.opts.onChange?.(rec.session_id);
+      return;
+    }
+    await this.db.query("UPDATE recordings SET notes = 'processing', notes_error = NULL WHERE id = $1", [rec.id]);
+    this.opts.onChange?.(rec.session_id);
+    const work = await mkdtemp(join(tmpdir(), "tapry-notes-"));
+    const started = Date.now();
+    try {
+      // Checked by size before reading: a transcript too long for the model is never loaded.
+      if (Number(source.bytes) > NOTES_MAX_CHARS * 4) throw new NotesError("too_long", false);
+      const transcriptPath = join(work, "transcript.txt");
+      await this.storage.downloadTo(source.storage_key, transcriptPath);
+      const written = await model.generate({
+        title: `${rec.studio}${rec.number ? `, Recording ${rec.number}` : ""}`,
+        transcript: await readFile(transcriptPath, "utf8"),
+      });
+      const footer = `\n---\n\nA draft written by ${model.where === "local" ? "an AI model on this server" : "an outside AI model"} (${model.name}) from the transcript, which is machine-made too. Check names, quotes and times against the recording before you publish.\n`;
+      const path = join(work, NOTES_FILE);
+      await writeFile(path, written + footer);
+      const id = newId("out");
+      const key = `outputs/${rec.session_id}/${rec.id}/${id}.md`;
+      const type = "text/markdown; charset=utf-8";
+      const bytes = await this.storage.uploadFrom(key, path, type);
+      const replaced = await this.db.transaction(async (tx) => {
+        const [now] = await tx.query<{ transcript: string; transcribed_at: string | null; deleted: boolean }>(
+          "SELECT transcript, transcribed_at::text AS transcribed_at, deleted_at IS NOT NULL AS deleted FROM recordings WHERE id = $1 FOR UPDATE",
+          [rec.id],
+        );
+        // Deleted, or its transcript was redone meanwhile: these notes are of something that is gone.
+        if (!now || now.deleted || now.transcript !== "ready" || now.transcribed_at !== rec.transcribed_at) {
+          await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+          return [key];
+        }
+        const old = await tx.query<{ storage_key: string }>("DELETE FROM outputs WHERE recording_id = $1 AND kind = 'notes' RETURNING storage_key", [rec.id]);
+        await insertOutput(tx, rec.id, { id, key, bytes, kind: "notes", fileName: NOTES_FILE, contentType: type, durationMs: null });
+        await tx.query("UPDATE recordings SET notes = 'ready', notes_error = NULL WHERE id = $1", [rec.id]);
+        await tx.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+        return old.map((o) => o.storage_key);
+      });
+      await this.removeReplaced(replaced);
+      console.log(`[worker] notes_recording ${job.id} for ${rec.id} done in ${((Date.now() - started) / 1000).toFixed(1)} s (${model.where} model)`);
+    } catch (err) {
+      // The reason by code only: an error's message could quote the transcript.
+      const problem = err instanceof NotesError ? err : new NotesError("failed", true, err instanceof Error ? err.name : "unknown");
+      const again = problem.retry && job.attempts < (this.opts.maxAttempts ?? 3);
+      console.error(`[worker] notes_recording ${job.id} attempt ${job.attempts} failed: ${problem.message}`);
+      if (again) {
+        await this.db.query("UPDATE jobs SET status = 'queued', run_after = now() + make_interval(secs => $3), error = $2 WHERE id = $1", [job.id, problem.message, 60 * job.attempts]);
+        await this.db.query("UPDATE recordings SET notes = 'queued' WHERE id = $1", [rec.id]);
+      } else {
+        await finish("failed", problem.message);
+        await this.db.query("UPDATE recordings SET notes = 'failed', notes_error = $2 WHERE id = $1", [rec.id, NOTES_ERROR_TEXT[problem.code]]);
+      }
+    } finally {
+      await rm(work, { recursive: true, force: true });
+      this.opts.onChange?.(rec.session_id);
+    }
   }
 
   /** What the job is doing now, for the host's timeline. Best effort: progress never fails a job. */

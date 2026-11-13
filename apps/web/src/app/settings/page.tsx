@@ -1,3 +1,4 @@
+import { AiNotesSetting } from "@/components/ai-notes-setting";
 import type { ReactNode } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { MembersPanel } from "@/components/members-panel";
@@ -52,7 +53,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     </ListCard>
   );
 
+  const aiNotes = <AiNotesSetting initial={await services.notes.view(user)} />;
   const account = (
+    <>
     <ListCard>
       <Row label="Name" help="Shown to guests on the invite and in the studio." value={user.name} />
       <Row label="Email" help="What you log in with." value={user.email} />
@@ -65,6 +68,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <LogOutButton />
       </div>
     </ListCard>
+    {aiNotes}
+    </>
   );
 
   return (

@@ -1,3 +1,4 @@
+import { NotesCard } from "@/components/notes-card";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
@@ -39,16 +40,18 @@ const PILL = {
 /** One recording (the design's "Episode"): its sound, its files and what was said. */
 export default async function RecordingPage({ params }: { params: Promise<{ recordingId: string }> }) {
   const { user, services, recording: r } = await load((await params).recordingId);
-  const [studios, transcript, model] = await Promise.all([
+  const [studios, transcript, model, aiNotes, notes] = await Promise.all([
     services.studios.list(user),
     services.library.transcriptTurns(user, r.id),
     services.library.transcriptsModel(),
+    services.notes.view(user),
+    services.notes.text(user, r.id),
   ]);
   const studio = studios.find((s) => s.id === r.studioId);
   const now = Date.now();
   const st = shortStatus(r);
   const ready = r.processing === "ready";
-  const media = r.outputs.filter((o) => o.kind !== "transcript");
+  const media = r.outputs.filter((o) => o.kind !== "transcript" && o.kind !== "notes");
   const transcriptFiles = r.outputs.filter((o) => o.kind === "transcript");
   const sound = r.outputs.find((o) => o.kind === "combined") ?? r.outputs.find((o) => o.kind === "audio");
   const lengthMs = (r.stoppedAt ?? now) - r.startedAt;
@@ -177,6 +180,17 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
             </span>
             <TranscriptBody state={transcript.state} turns={transcript.turns} ready={ready} on={model !== null} />
           </div>
+          {(aiNotes.mode !== "off" || r.notes !== "off" || notes) && (
+            <NotesCard
+              studioId={r.studioId}
+              recordingId={r.id}
+              state={r.notes}
+              error={r.notesError}
+              text={notes?.text ?? null}
+              downloadHref={notes ? outputUrl(r.studioId, r.id, notes.outputId) : null}
+              canWrite={aiNotes.mode !== "off" && r.transcript === "ready"}
+            />
+          )}
         </div>
       </div>
     </DashboardShell>

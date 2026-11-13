@@ -32,6 +32,10 @@ export interface RecordingSummary {
   skippedTracks: Array<{ name: string; kind: "audio" | "video" | "screen" }>;
   /** off: transcription not configured on this server. */
   transcript: "off" | "queued" | "processing" | "ready" | "failed";
+  /** AI notes (written from the transcript). off: none asked for, or not turned on. */
+  notes: "off" | "queued" | "processing" | "ready" | "failed";
+  /** Why the notes couldn't be written, in words; null otherwise. */
+  notesError: string | null;
   startedAt: number;
   stoppedAt: number | null;
   tracks: number;
@@ -66,7 +70,7 @@ export interface RecordingSummary {
     completeTracks: number;
     bytes: number;
   }>;
-  outputs: Array<{ id: string; kind: "audio" | "video" | "screen" | "combined" | "transcript"; fileName: string; bytes: number; durationMs: number | null }>;
+  outputs: Array<{ id: string; kind: "audio" | "video" | "screen" | "combined" | "transcript" | "notes"; fileName: string; bytes: number; durationMs: number | null }>;
 }
 
 /** A recording seen across all of a host's studios (the dashboard's Recordings, Guests, Transcripts). */
@@ -222,6 +226,8 @@ export class ProcessingService {
       processing_error: string | null;
       skipped_tracks: RecordingSummary["skippedTracks"];
       transcript: RecordingSummary["transcript"];
+      notes: RecordingSummary["notes"];
+      notes_error: string | null;
       started_at: number;
       stopped_at: number | null;
       uploaded_at: Date | null;
@@ -236,7 +242,7 @@ export class ProcessingService {
       has_filters: boolean;
       filters_failed: RecordingSummary["filtersFailed"];
     }>(
-      `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.keep_until, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
+      `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.keep_until, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.notes, r.notes_error, r.started_at, r.stopped_at,
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask') AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask' AND t.status = 'recording') AS incomplete,
@@ -263,7 +269,7 @@ export class ProcessingService {
       `SELECT o.id, o.recording_id, o.kind, o.file_name, o.bytes, o.duration_ms
        FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
        WHERE o.recording_id = ANY($1::text[])
-       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, ${ORIGINAL_LAST}, o.file_name`,
+       ORDER BY (o.kind = 'combined') DESC, (o.kind IN ('transcript', 'notes')), p.created_at, o.kind, ${ORIGINAL_LAST}, o.file_name`,
       [rows.map((r) => r.id)],
     );
     const people = await this.db.query<{
@@ -311,6 +317,8 @@ export class ProcessingService {
       processingError: r.processing_error,
       skippedTracks: r.skipped_tracks,
       transcript: r.transcript,
+      notes: r.notes,
+      notesError: r.notes_error,
       startedAt: r.started_at,
       stoppedAt: r.stopped_at,
       uploadedAt: ms(r.uploaded_at),
@@ -388,7 +396,7 @@ export class ProcessingService {
       `SELECT o.file_name, o.bytes, o.storage_key, o.created_at
        FROM outputs o LEFT JOIN participants p ON p.id = o.participant_id
        WHERE o.recording_id = $1
-       ORDER BY (o.kind = 'combined') DESC, (o.kind = 'transcript'), p.created_at, o.kind, ${ORIGINAL_LAST}, o.file_name`,
+       ORDER BY (o.kind = 'combined') DESC, (o.kind IN ('transcript', 'notes')), p.created_at, o.kind, ${ORIGINAL_LAST}, o.file_name`,
       [recordingId],
     );
     const started = new Date(rec.started_at).toISOString(); // 2026-10-30T19:59:…Z

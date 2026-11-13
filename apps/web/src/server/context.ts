@@ -42,6 +42,7 @@ export function getServices(): Promise<Services> {
       appUrl: config.mail?.appUrl,
       speedTestOrigins: config.speedTestOrigins,
       siteOrigins: config.siteOrigins,
+      notes: { local: config.worker.notes?.local?.model, outside: config.worker.notes?.outside?.model },
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
       ownStorage: config.ownStorage,
       billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl, paddle: config.cloud?.paddle },

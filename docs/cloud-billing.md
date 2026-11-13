@@ -24,6 +24,10 @@ To start selling: put the two `NEXT_PUBLIC_PADDLE_*` values back into `build:sit
 `BILLING_PADDLE_CLIENT_TOKEN` (with `BILLING_PADDLE_ENVIRONMENT=production`) into the server's
 `.env`, then write to the waitlist.
 
+## AI notes and cost
+
+AI notes by the outside model run on Tapry Cloud's own Anthropic key (`ANTHROPIC_API_KEY` in the server's `.env`), for accounts on a paid plan whose owner switched them on. One hour of talk is roughly 15,000 tokens in and 2,000 out: about $0.10 a recorded hour on Claude Opus 5.5 at November 2026 prices, charged again each time notes are written again or a recording is re-processed. `AI_NOTES_MODEL` can name a cheaper model.
+
 ## Built
 
 | Part | What it does |

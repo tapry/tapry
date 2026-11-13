@@ -72,7 +72,7 @@ export interface BillingEvent {
 /** Where the Plan tab posts to open Paddle's customer portal. */
 export const PORTAL_PATH = "/api/billing/portal";
 
-interface PlanRow {
+export interface PlanRow {
   billing_customer?: string | null;
   plan: string;
   plan_status: string;

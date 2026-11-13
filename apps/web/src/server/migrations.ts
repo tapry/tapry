@@ -416,4 +416,17 @@ ALTER TABLE tracks ADD CONSTRAINT tracks_kind_check CHECK (kind IN ('audio', 'vi
 ALTER TABLE outputs DROP CONSTRAINT outputs_kind_check;
 ALTER TABLE outputs ADD CONSTRAINT outputs_kind_check CHECK (kind IN ('audio', 'video', 'screen', 'combined', 'transcript'));
 `,
+  `
+-- AI notes: a job of their own after the transcript, a "notes" file, and where each recording's
+-- notes stand. ai_outside_at: when the account's owner allowed transcripts to be sent to an
+-- outside AI model for notes (null: not allowed, the default).
+ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
+ALTER TABLE jobs ADD CONSTRAINT jobs_type_check
+  CHECK (type IN ('process_recording', 'transcribe_recording', 'purge_recording', 'purge_raw', 'notes_recording'));
+ALTER TABLE outputs DROP CONSTRAINT outputs_kind_check;
+ALTER TABLE outputs ADD CONSTRAINT outputs_kind_check CHECK (kind IN ('audio', 'video', 'screen', 'combined', 'transcript', 'notes'));
+ALTER TABLE recordings ADD COLUMN notes text NOT NULL DEFAULT 'off' CHECK (notes IN ('off', 'queued', 'processing', 'ready', 'failed'));
+ALTER TABLE recordings ADD COLUMN notes_error text;
+ALTER TABLE users ADD COLUMN ai_outside_at timestamptz;
+`,
 ];

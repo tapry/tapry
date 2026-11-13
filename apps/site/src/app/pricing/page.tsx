@@ -26,6 +26,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Finished files kept", "You decide", "30 days", "60 days", "90 days"],
   ["Original uploads kept", "You decide", "7 days", "7 days", "7 days"],
   ["Transcripts", "whisper.cpp on your server", "Included", "Included", "Included"],
+  ["AI notes (summary, chapters, quotes)", "With your own model, or your own Claude key", "Opt-in", "Opt-in", "Opt-in"],
   ["Where files live", "Bundled SeaweedFS or your S3 bucket", "Tapry Cloud, in the EU", "Tapry Cloud, in the EU", "Tapry Cloud, in the EU"],
   ["Support", "GitHub issues", "—", "—", "Email"],
   ["The software today"],
