@@ -150,6 +150,11 @@ export class BillingService {
     return row;
   }
 
+  /** How many people an account may hold, its owner included. Null: no limit (and always on a self-hosted server). */
+  async seatsOf(accountId: string, db: Queryable = this.db): Promise<number | null> {
+    return this.opts.cloud ? (await this.planOf(accountId, db)).seats : null;
+  }
+
   /** The plan an account is on right now. */
   async planOf(userId: string, db: Queryable = this.db): Promise<Plan> {
     const [row] = await db.query<PlanRow>(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1`, [userId]);
@@ -170,14 +175,16 @@ export class BillingService {
   /** A host's plan and what they have used of it this billing month. */
   async overview(user: User): Promise<BillingOverview> {
     this.requireCloud();
-    const row = await this.row(user.id);
+    const row = await this.row(user.accountId);
     const now = this.now();
     const plan = effectivePlan(row, now);
     // A plan that has ended counts by the calendar month again, like Free.
     const period = billingPeriod(plan.id === "free" ? null : row.plan_period_start, now);
-    const upgrades = PLAN_IDS.filter((id) => planRank(id) > planRank(plan.id) && this.opts.checkoutUrls?.[id]).map((id) => ({
+    // Buying and the provider's portal are the owner's; a member sees the plan and what is used.
+    const owner = user.accountId === user.id;
+    const upgrades = PLAN_IDS.filter((id) => owner && planRank(id) > planRank(plan.id) && this.opts.checkoutUrls?.[id]).map((id) => ({
       plan: PLANS[id],
-      url: this.opts.checkoutUrls![id]!.replaceAll("{user_id}", encodeURIComponent(user.id)).replaceAll("{email}", encodeURIComponent(user.email)),
+      url: this.opts.checkoutUrls![id]!.replaceAll("{user_id}", encodeURIComponent(user.accountId)).replaceAll("{email}", encodeURIComponent(user.email)),
     }));
     return {
       plan,
@@ -185,9 +192,9 @@ export class BillingService {
       endsAt: plan.id === "free" ? null : (row.plan_ends_at?.toISOString() ?? null),
       periodStart: new Date(period.start).toISOString(),
       periodEnd: new Date(period.end).toISOString(),
-      usedMs: await this.usedMs(user.id, period.start),
+      usedMs: await this.usedMs(user.accountId, period.start),
       upgrades,
-      manageUrl: row.billing_subscription ? (this.opts.manageUrl ?? null) : null,
+      manageUrl: owner && row.billing_subscription ? (this.opts.manageUrl ?? null) : null,
     };
   }
 
@@ -229,8 +236,9 @@ export class BillingService {
     this.requireCloud();
     if (!admin.isAdmin) throw new ApiError(404, "not_found", "Not found");
     await this.db.transaction(async (tx) => {
-      const [row] = await tx.query<PlanRow>(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+      const [row] = await tx.query<PlanRow & { account_id: string | null }>(`SELECT account_id, ${PLAN_COLUMNS} FROM users WHERE id = $1 FOR UPDATE`, [userId]);
       if (!row) throw new ApiError(404, "user_not_found", "No such account");
+      if (row.account_id) throw new ApiError(409, "member_of_account", "This person is a member of someone's account: the plan is the account's");
       if (row.billing_subscription) {
         throw new ApiError(409, "has_subscription", "This account pays by subscription: change the plan with the payment provider");
       }
@@ -247,7 +255,8 @@ export class BillingService {
     this.requireCloud();
     if (!admin.isAdmin) throw new ApiError(404, "not_found", "Not found");
     const rows = await this.db.query<PlanRow & { id: string; email: string; name: string }>(
-      `SELECT id, email, name, ${PLAN_COLUMNS} FROM users ORDER BY created_at`,
+      // Accounts, not people: a member has no plan of their own.
+      `SELECT id, email, name, ${PLAN_COLUMNS} FROM users WHERE account_id IS NULL ORDER BY created_at`,
     );
     const now = this.now();
     return rows.map((r) => {

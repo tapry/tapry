@@ -390,16 +390,18 @@ export interface Plan {
    * storage the plan has (nothing is recorded until a bucket is connected).
    */
   ownStorage: "no" | "allowed" | "required";
+  /** People in the account, its owner included. Null: no limit. */
+  seats: number | null;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no" },
+  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1 },
   // Everything is in the customer's bucket: nothing of ours to meter or to delete.
-  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required" },
-  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no" },
-  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no" },
-  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no" },
-  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed" },
+  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1 },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1 },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3 },
+  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5 },
+  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null },
 };
 
 /** Whether moving from one plan to another is an upgrade (more hours or longer keeping). */
@@ -464,4 +466,24 @@ export interface OwnStorageView {
     verified: boolean;
     savedAt: string;
   } | null;
+}
+
+// ── Seats: several people in one account ────────────────────────────────────────
+
+export const inviteMemberBody = z.object({ email });
+/** Accepting an invitation: someone new sends a name and a password; someone signed in sends nothing. */
+export const acceptInviteBody = z.object({
+  name: plainText(100).optional(),
+  password: z.string().min(10, "Use at least 10 characters").max(200).optional(),
+});
+
+/** `GET /api/members`: the people in the signed-in person's account. */
+export interface MembersView {
+  /** How many people the account may hold, its owner included. Null: no limit. */
+  seats: number | null;
+  /** The signed-in person owns the account (and so may invite and remove). */
+  owner: boolean;
+  members: Array<{ id: string; name: string; email: string; role: "owner" | "member"; you: boolean }>;
+  /** Invitations not yet accepted; only the owner sees them. */
+  invites: Array<{ id: string; email: string; expiresAt: string }>;
 }

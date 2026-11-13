@@ -83,5 +83,5 @@
 3. Organisations: Business from **$4,800 a year** (was from $99 a month); self-hosted Organisation support **$2,400 a year** and licence **$6,000 a year** (was $1–5k); the separate Research team plan is folded into Team.
 4. Founding offers: lifetime only for Own storage ($149, 200 seats); a price lock ($15 / $29) for the first 100 Creator or Studio subscribers.
 5. Education and non-profit discount 30% (was 50%). Projections revised down for year one.
-6. Not yet carried into `01-market-and-competition.md`, `07-go-to-market.md` and `08-roadmap.md`, which may still quote the old prices: `06` wins.
+6. Carried into `00`, `01`, `07` and `08` on the same day: the Riverside "price rise" corrected (a new tier), and "lifetime deal" replaced by the founding offers.
 

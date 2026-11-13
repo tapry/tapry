@@ -20,6 +20,7 @@ import type { User } from "./auth";
 import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
 import { newId } from "./ids";
+import { requireAccountOwner } from "./members";
 import { S3Storage, type PresignedPut, type S3StorageConfig, type Storage, type StoredObject } from "./storage";
 
 // ── The secret key at rest ──────────────────────────────────────────────────────
@@ -246,12 +247,12 @@ export class OwnStorageService {
 
   /** What the Storage page shows: whether the feature is there, and the bucket if one is set. Never the secret. */
   async view(user: User): Promise<OwnStorageView> {
-    const allowed = await this.allowed(user.id);
-    const row = this.enabled ? await this.current(this.db, user.id) : null;
+    const allowed = await this.allowed(user.accountId);
+    const row = this.enabled ? await this.current(this.db, user.accountId) : null;
     return {
       enabled: this.enabled,
       allowed,
-      required: allowed && !!this.opts.required && (await this.opts.required(user.id, this.db)),
+      required: allowed && !!this.opts.required && (await this.opts.required(user.accountId, this.db)),
       target: row && {
         endpoint: row.endpoint,
         region: row.region,
@@ -271,13 +272,14 @@ export class OwnStorageService {
    */
   async save(user: User, body: z.infer<typeof ownStorageBody>): Promise<OwnStorageView> {
     if (!this.enabled) throw new ApiError(404, "not_found", "Not found");
-    if (!(await this.allowed(user.id))) throw new ApiError(403, "plan_without_own_storage", "Your plan doesn't include your own storage");
+    requireAccountOwner(user);
+    if (!(await this.allowed(user.accountId))) throw new ApiError(403, "plan_without_own_storage", "Your plan doesn't include your own storage");
     const endpoint = body.endpoint?.trim() || null;
     if (endpoint && !this.opts.allowPrivate) await assertPublicEndpoint(endpoint, this.opts.resolve);
 
     const row: TargetRow = {
       id: newId("stg"),
-      owner_id: user.id,
+      owner_id: user.accountId,
       endpoint,
       region: body.region,
       bucket: body.bucket,
@@ -290,7 +292,7 @@ export class OwnStorageService {
     await this.serverCheck(this.targets.open(row), row.id);
 
     await this.db.transaction(async (tx) => {
-      await tx.query("UPDATE storage_targets SET retired_at = now() WHERE owner_id = $1 AND retired_at IS NULL", [user.id]);
+      await tx.query("UPDATE storage_targets SET retired_at = now() WHERE owner_id = $1 AND retired_at IS NULL", [user.accountId]);
       await tx.query(
         `INSERT INTO storage_targets (id, owner_id, endpoint, region, bucket, access_key_id, secret_encrypted, force_path_style)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -321,7 +323,8 @@ export class OwnStorageService {
 
   /** A signed upload for the browser to try, exactly like a guest's upload of a recording piece. */
   async browserCheck(user: User): Promise<PresignedPut & { key: string; body: string }> {
-    const row = this.enabled ? await this.current(this.db, user.id) : null;
+    requireAccountOwner(user);
+    const row = this.enabled ? await this.current(this.db, user.accountId) : null;
     if (!row) throw new ApiError(404, "no_storage", "No storage of your own is set up");
     const key = `${CHECK_PREFIX}${row.id}-${randomBytes(9).toString("base64url")}.txt`;
     const put = await this.targets.open(row).presignPut(key, {
@@ -334,7 +337,8 @@ export class OwnStorageService {
 
   /** The browser says its upload went through: look, and from now on new sessions record there. */
   async confirmBrowserCheck(user: User, key: string): Promise<OwnStorageView> {
-    const row = this.enabled ? await this.current(this.db, user.id) : null;
+    requireAccountOwner(user);
+    const row = this.enabled ? await this.current(this.db, user.accountId) : null;
     if (!row || !key.startsWith(`${CHECK_PREFIX}${row.id}-`)) throw new ApiError(404, "no_storage", "No storage of your own is set up");
     const storage = this.targets.open(row);
     const found = await storage.head(key).catch(() => null);
@@ -352,7 +356,8 @@ export class OwnStorageService {
    */
   async remove(user: User): Promise<OwnStorageView> {
     if (!this.enabled) throw new ApiError(404, "not_found", "Not found");
-    await this.db.query("UPDATE storage_targets SET retired_at = now() WHERE owner_id = $1 AND retired_at IS NULL", [user.id]);
+    requireAccountOwner(user);
+    await this.db.query("UPDATE storage_targets SET retired_at = now() WHERE owner_id = $1 AND retired_at IS NULL", [user.accountId]);
     return this.view(user);
   }
 

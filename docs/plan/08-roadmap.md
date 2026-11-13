@@ -33,9 +33,9 @@
 - **Gate B:** 100% of recordings recovered; ≥ 70% of alpha users record a second session.
 
 ## Phase 3 — Open-source launch (late Jan 2027)
-- [ ] Launch week (`07`); founding lifetime deal opens.
+- [ ] Launch week (`07`); founding offers open (`06`).
 - [ ] Daily issue replies; weekly releases.
-- **Gate C (4 weeks after launch):** ≥ 1,000 stars **or** ≥ 100 self-hosted installs **or** ≥ 500 waitlist sign-ups **or** ≥ 50 lifetime deals. None → rethink positioning before building cloud.
+- **Gate C (4 weeks after launch):** ≥ 1,000 stars **or** ≥ 100 self-hosted installs **or** ≥ 500 waitlist sign-ups **or** ≥ 50 founding offers. None → rethink positioning before building cloud.
 
 ## Phase 4 — Cloud beta + privacy (Feb – Apr 2027)
 - [ ] Accounts, workspaces, billing (Paddle/Lemon Squeezy — payouts to Morocco confirmed first), usage limits.

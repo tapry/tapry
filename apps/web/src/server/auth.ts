@@ -13,6 +13,11 @@ export interface User {
   isAdmin: boolean;
   /** The address was confirmed by a link we emailed. Only asked for where that is required. */
   emailVerified: boolean;
+  /**
+   * The account this person works in: their own id, or the owner's when they are a member.
+   * Studios, recordings, the plan and storage are looked up by this, never by `id`.
+   */
+  accountId: string;
 }
 
 export interface AuthOptions {
@@ -191,6 +196,7 @@ interface UserRow {
   password_hash: string;
   is_admin: boolean;
   email_verified_at: Date | null;
+  account_id: string | null;
 }
 
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null });
+const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null, accountId: r.account_id ?? r.id });

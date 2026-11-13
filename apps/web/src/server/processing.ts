@@ -249,7 +249,7 @@ export class ProcessingService {
          AND ($2::text IS NULL OR st.id = $2) AND ($3::text IS NULL OR r.id = $3)
        ORDER BY r.started_at DESC, r.number DESC
        LIMIT $4`,
-      [owner.id, filter.studioId ?? null, filter.recordingId ?? null, filter.limit],
+      [owner.accountId, filter.studioId ?? null, filter.recordingId ?? null, filter.limit],
     );
     if (rows.length === 0) return [];
     const outputs = await this.db.query<{
@@ -340,7 +340,7 @@ export class ProcessingService {
       `SELECT r.number, r.started_at, r.stopped_at, st.name AS studio_name, u.name AS host FROM recordings r
        JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id JOIN users u ON u.id = st.owner_id
        WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
-      [recordingId, studioId, owner.id],
+      [recordingId, studioId, owner.accountId],
     );
     if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
     // Everyone recorded in this recording.
@@ -380,7 +380,7 @@ export class ProcessingService {
       `SELECT r.processing, r.started_at, st.name AS studio_name FROM recordings r
        JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
        WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
-      [recordingId, studioId, owner.id],
+      [recordingId, studioId, owner.accountId],
     );
     if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
     if (rec.processing !== "ready") throw new ApiError(409, "not_ready", "This recording hasn't been processed yet");
@@ -459,7 +459,7 @@ export class ProcessingService {
       `SELECT r.status, r.raw_deleted_at FROM recordings r
        JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
        WHERE r.id = $1 AND st.id = $2 AND st.owner_id = $3 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
-      [recordingId, studioId, owner.id],
+      [recordingId, studioId, owner.accountId],
     );
     if (!rec) throw new ApiError(404, "recording_not_found", "Recording not found");
     return rec;

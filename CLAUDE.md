@@ -106,7 +106,13 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - With email on, `warnExpiring` (run by `JobRunner.expire`) emails each host once about recordings within 3 days of `keep_until` and sets `expiry_warned_at`; deletion then needs that warning to be a day old. A failed email leaves it unset, so nothing is deleted unwarned. Extending `keep_until` clears it.
 - A plan past `plan_ends_at` is Free (`effectivePlan`), with no job needed. Admins set plans by hand (refused when the account has a subscription).
 - Webhook (`billing-webhooks.ts`, Paddle and Lemon Squeezy → `BillingEvent`): signature first, applied once (`billing_events`), an older event never overwrites newer state. The log line says what was done, never whose. Not yet run against a live provider.
-- Not built: seats, extra hours. Legal texts are drafts in `docs/legal-drafts.md`, not on the website.
+- Not built: extra hours and longer keeping as paid add-ons. Legal texts are drafts in `docs/legal-drafts.md`, not on the website.
+
+## Accounts and members
+- An account is its owner's `users` row; a member is a user whose `account_id` points at it. `User.accountId` is the account (own id for an owner). **Anything about studios, recordings, the plan or storage is looked up by `accountId`, never by `id`**; `id` is for who is signed in, their password and email links, and who hosts (`participants.user_id`, so two members can both be hosts of one session). A new owner-scoped query that uses `user.id` hides the account from its members.
+- `MembersService` (`src/server/members.ts`): the owner invites by email; the link (token stored hashed in `account_invites`, 7 days, once) is always returned and also emailed where email is on. Accepting creates a log-in for the invited address even where sign-up is closed, already confirmed; a signed-in person with that address joins only if they have no studios or members of their own.
+- Owner only (`requireAccountOwner`): inviting, removing, buying and the provider's portal, own storage. Members can leave; removing signs them out and leaves them an empty account of their own.
+- Seats: `BillingService.seatsOf` (the plan's `seats` on Tapry Cloud, no limit elsewhere), counted with open invitations under a lock on the owner's row. A smaller plan removes nobody.
 
 ## Own storage
 - An account's own S3-compatible bucket (`src/server/own-storage.ts`), on only with `STORAGE_SECRET_KEY` (secret keys are AES-256-GCM encrypted with it in `storage_targets`; never returned, never logged; changing the key makes them unreadable).

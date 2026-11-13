@@ -57,7 +57,7 @@ export class StudioService {
   async create(owner: User, body: z.infer<typeof createStudioBody>): Promise<Studio> {
     const [row] = await this.db.query<StudioRow>(
       "INSERT INTO studios (id, owner_id, name, invite_code, settings) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [newId("std"), owner.id, body.name, newInviteCode(), studioSettings.parse(body.settings ?? {})],
+      [newId("std"), owner.accountId, body.name, newInviteCode(), studioSettings.parse(body.settings ?? {})],
     );
     return toStudio(row!);
   }
@@ -74,7 +74,7 @@ export class StudioService {
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL
        GROUP BY st.id
        ORDER BY st.created_at DESC`,
-      [owner.id],
+      [owner.accountId],
     );
     return rows.map((r) => ({ ...toStudio(r), recordings: r.recordings, bytes: r.bytes, live: r.live }));
   }
@@ -138,7 +138,7 @@ export class StudioService {
   async openAsHost(owner: User, studioId: string): Promise<SessionTicket> {
     const studio = await this.owned(owner, studioId);
     const ticket = await this.db.transaction(async (tx) => {
-      const sessionId = await openSession(tx, studioId, () => this.storageTargetFor(tx, owner.id));
+      const sessionId = await openSession(tx, studioId, () => this.storageTargetFor(tx, owner.accountId));
       const token = newToken();
       const [existing] = await tx.query<{ id: string }>(
         "UPDATE participants SET token_hash = $3 WHERE session_id = $1 AND user_id = $2 AND role = 'host' RETURNING id",
@@ -269,7 +269,7 @@ export class StudioService {
   private async owned(owner: User, studioId: string) {
     const [row] = await this.db.query<StudioRow>("SELECT * FROM studios WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL", [
       studioId,
-      owner.id,
+      owner.accountId,
     ]);
     // 404 for "not yours" too, so studio ids can't be probed.
     if (!row) throw new ApiError(404, "studio_not_found", "Studio not found");

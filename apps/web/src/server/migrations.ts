@@ -348,4 +348,21 @@ CREATE UNIQUE INDEX storage_targets_current ON storage_targets (owner_id) WHERE 
 -- Where a session's files live: set when the session opens, never changed. Null: the server's storage.
 ALTER TABLE sessions ADD COLUMN storage_target_id text REFERENCES storage_targets(id);
 `,
+  `
+-- Seats: the account a person works in. Null: their own (they are its owner). Studios,
+-- recordings, the plan and storage belong to the account; signing in stays personal.
+ALTER TABLE users ADD COLUMN account_id text REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX users_account ON users (account_id) WHERE account_id IS NOT NULL;
+
+-- Invitations into an account, by a link whose token is kept only hashed. Used once.
+CREATE TABLE account_invites (
+  id text PRIMARY KEY,
+  token_hash text NOT NULL UNIQUE,
+  account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX account_invites_account ON account_invites (account_id);
+`,
 ];

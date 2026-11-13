@@ -4,16 +4,16 @@
 
 | Product | Price | Notes |
 |---|---|---|
-| **Riverside** | Free 2 h (one-time); Pro **$29/mo for 5 h**; Grow $39 (15 h); Webinar $99; Business custom | Top plan raised $34 → $99 (Sep 2026). 17+ AI features (clips, dubbing, translation, eye contact, B-roll, AI agents, MCP). Lock-in to its editor. |
+| **Riverside** | Free 2 h (one-time); Pro **$29/mo** (15 h on its plan card, 5 h in its own comparison table); Grow $39; Webinar $99, a separate tier; Business custom | Checked 13 Nov 2026 (`15-pricing-benchmark.md`); the "$34 → $99 rise" in plan v2 was the new Webinar tier. 17+ AI features (clips, dubbing, translation, eye contact, B-roll, AI agents, MCP). Lock-in to its editor. |
 | **SquadCast** | Free to ~$80/mo | Owned by **Descript** since 2023. "Eventually Descript Rooms will replace SquadCast" — no sunset date. |
 | **Descript Rooms** | Included in Descript plans (counts media minutes) | Recording inside Descript's editor |
 | **Zencastr** | From ~$20/mo | Up to 12 participants |
-| **Iris** | Free 1 h; **from $9/mo** | 4K, 48 kHz, separate tracks |
+| **Iris** | Free 1 h; **from $9/mo for 2 h** | 4K, 48 kHz, separate tracks |
 | **Remotely.fm** | From $19 (audio) / $35 (video) | Auto-mixes tracks |
 | **Ringr** | **From $7.99/mo** | Mobile + web |
 | **Zoom / Meet / Teams** | Already paid by most orgs | Records the compressed call; "good enough" for many — the main free competitor |
 
-**Takeaway:** we can't win on cloud price. Iris ($9) and Ringr ($7.99) are already cheap.
+**Takeaway:** we can't win by being cheapest: Zencastr's page now shows only a free plan, and StreamYard, Zoom and Cleanfeed don't meter hours. Among tools that do meter, the entry band is $15–24 a month for 5–15 h, and Iris's $9 buys 2 h. Our prices (`06`, pricing v4) sit at the low end per recorded hour; the difference we sell is ownership.
 
 ## Open-source landscape
 
