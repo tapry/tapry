@@ -1,5 +1,6 @@
 "use client";
 
+import { SELECTED_CARD, UNSELECTED_CARD } from "./quality-options";
 import { qualityOptions, type QualityChoice } from "./quality-options";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -107,7 +108,7 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
                   onClick={() => setQuality(value)}
                   className={cn(
                     "flex cursor-pointer flex-col disabled:cursor-not-allowed disabled:opacity-60 gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
-                    quality === value ? "border-ink shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border shadow-xs hover:border-border-strong",
+                    quality === value ? SELECTED_CARD : UNSELECTED_CARD,
                   )}
                 >
                   <span className="text-sm font-medium">{label}</span>
@@ -127,12 +128,15 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
               </span>
             </span>
             <span className="flex items-center gap-3">
-              <span aria-hidden className="flex pl-2">
-                <span className="-ml-2 rounded-full border-2 border-canvas">
-                  <Avatar name={hostName} className="size-[26px] text-[10px]" />
-                </span>
+              {/* One seat each: you, then a place for every guest. Decorative: the words beside it say the same. */}
+              <span aria-hidden className="flex flex-wrap items-center gap-1.5" data-testid="seats">
+                <Avatar name={hostName} className="size-7 text-[10.5px]" />
                 {Array.from({ length: guests }, (_, i) => (
-                  <span key={i} className="-ml-2 size-[30px] rounded-full border-2 border-canvas bg-surface-2" />
+                  <span key={i} className="grid size-7 place-items-center rounded-full border border-dashed border-border-strong bg-surface text-subtle">
+                    <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8a4 4 0 0 0 0-8z" />
+                    </svg>
+                  </span>
                 ))}
               </span>
               <Stepper value={guests} min={1} max={MAX_GUESTS} onChange={setGuests} labelledBy="guests-label" />

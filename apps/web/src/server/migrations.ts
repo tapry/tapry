@@ -509,4 +509,43 @@ CREATE TABLE activity (
 );
 CREATE INDEX activity_account ON activity (account_id, seq DESC);
 `,
+  `
+-- For other software: API keys (only their hash is kept) and webhooks with their deliveries.
+CREATE TABLE api_keys (
+  id text PRIMARY KEY,
+  account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  token_hash text NOT NULL UNIQUE,
+  prefix text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  last_used_at timestamptz,
+  revoked_at timestamptz
+);
+CREATE INDEX api_keys_account ON api_keys (account_id) WHERE revoked_at IS NULL;
+CREATE TABLE webhooks (
+  id text PRIMARY KEY,
+  account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  url text NOT NULL,
+  secret text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE webhook_deliveries (
+  id text PRIMARY KEY,
+  seq bigserial,
+  webhook_id text NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+  event text NOT NULL,
+  payload jsonb NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  attempts int NOT NULL DEFAULT 0,
+  next_at timestamptz NOT NULL DEFAULT now(),
+  last_error text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX webhook_deliveries_due ON webhook_deliveries (next_at) WHERE status = 'pending';
+`,
+  `
+-- Share pages: a recording's public page is reachable by this secret (null: not shared).
+ALTER TABLE recordings ADD COLUMN share_code text UNIQUE;
+ALTER TABLE recordings ADD COLUMN share_transcript boolean NOT NULL DEFAULT false;
+`,
 ];

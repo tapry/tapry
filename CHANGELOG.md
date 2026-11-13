@@ -5,6 +5,16 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **API keys and webhooks.** The account's owner makes API keys (Settings, Account): the app's
+  own API for your scripts, with a key instead of a log-in. A key reads what members read and
+  changes studios and recordings; never the plan, members, storage, keys, or hosting. Webhooks
+  send a signed message when a recording's files or transcript are ready. See `docs/api.md`.
+- **Share pages.** A recording can have a public page with its player, and its transcript if
+  you choose, for anyone holding the link; and code to embed the player. Off until turned on;
+  switching it off, making a new link or deleting the recording kills the old link.
+- **Calendar invite.** "Schedule a session" on a studio makes a calendar file with the invite
+  link and the tech-check link.
+
 - **Timelines with long pauses left out.** Beside each timeline export there is a version
   where stretches with nobody speaking for two seconds or more (by the transcript) are cut,
   every track at the same place. Nothing is rendered or deleted: the cuts are in the project

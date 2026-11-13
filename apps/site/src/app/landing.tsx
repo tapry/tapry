@@ -4,6 +4,8 @@
 // flow panels are illustrations of the real app: demo people, but only screens, labels and
 // figures the app really has (dashboard-shell.tsx and room.tsx in apps/web).
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { BrowserIcon, type BrowserName } from "@/components/browser-icons";
+import { HeroVideo } from "@/components/hero-video";
 import { Footer } from "@/components/footer";
 import { IC, Icon, LogoMark } from "@/components/icons";
 import { Nav } from "@/components/nav";
@@ -15,7 +17,7 @@ const G = "#12924f";
 const A = "#a16207";
 const R = "#d6453d";
 const B = "#e8553d";
-// The demo people are drawn as the app draws anyone: initials on a colour. No photos of real people.
+// Initials for demo avatars; the hero's camera-on tiles use locally hosted stock footage.
 const Y = "#c43c25";
 const T = "#3f3f46";
 const N = "#a16207";
@@ -61,7 +63,7 @@ const FORMAT_POINTS: Array<[string, string]> = [
   ["Files your editor opens.", "One WAV and one MP4 per person, all the same length from Record, plus the combined video and the transcript as TXT, DOCX, SRT and VTT."],
 ];
 
-const WORKS_WITH = ["Chrome", "Firefox", "Safari"];
+const WORKS_WITH: Array<[string, BrowserName]> = [["Chrome", "chrome"], ["Firefox", "firefox"], ["Safari", "safari"]];
 
 // Demo people: [name, colour, role, saved so far, upload behind, talk share]. The sizes are what
 // 42 minutes at 1080p comes to (about 3–4 GB per person and hour, docs/costs.md).
@@ -116,9 +118,9 @@ export function Landing() {
             </div>
             <div className="rise" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px 26px", marginTop: 38, fontSize: 15, color: "#fff", animationDelay: ".16s" }}>
               <span style={{ borderRight: "1px solid rgba(255,255,255,.4)", paddingRight: 18 }}>Works in desktop</span>
-              {WORKS_WITH.map((name) => (
+              {WORKS_WITH.map(([name, icon]) => (
                 <span key={name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Icon d={IC.globe} />
+                  <BrowserIcon name={icon} />
                   {name}
                 </span>
               ))}
@@ -331,6 +333,7 @@ function Flow() {
  */
 function HeroStudio() {
   const [secs, setSecs] = useState(2537);
+  const [videosPaused, setVideosPaused] = useState(false);
   const reduced = useReducedMotion();
   useEffect(() => {
     if (reduced) return;
@@ -366,8 +369,8 @@ function HeroStudio() {
     <div className="rise9" style={{ marginTop: 56, borderRadius: "26px 26px 0 0", background: "rgba(255,255,255,.34)", padding: "8px 8px 0", backdropFilter: "blur(8px)", animationDelay: ".24s" }}>
       <div
         className="hero-app"
-        role="img"
-        aria-label="Illustration: the Tapry studio while recording three people, with each person’s upload and share of the talking"
+        role="group"
+        aria-label="Demo: the Tapry studio while recording three people, with each person’s upload and share of the talking"
         style={{ display: "grid", height: 620, overflow: "hidden", borderRadius: "19px 19px 0 0", background: "#fafafa", color: "#18181b", textAlign: "left", fontSize: 13, maskImage: "linear-gradient(#000 72%,transparent 99%)", WebkitMaskImage: "linear-gradient(#000 72%,transparent 99%)" }}
       >
         {/* Left: the sidebar, with the studios */}
@@ -423,12 +426,12 @@ function HeroStudio() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "16px 20px" }}>
             <div style={{ borderRadius: 12, background: "#18181b", padding: 10 }}>
               <div style={{ display: "grid", gap: 6, gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}>
-                {PEOPLE.map(([name, photo], i) => (
+                {PEOPLE.map(([name], i) => (
                   <div key={name} style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", borderRadius: 8, background: "#27272a", transition: "outline-color .4s", outline: `2px solid ${sp === i ? "#ff8f78" : "transparent"}`, outlineOffset: -2 }}>
-                    <Face name={name} color={photo} size={34} tile />
+                    <HeroVideo src={`/media/hero/${name.toLowerCase()}.mp4`} poster={`/media/hero/${name.toLowerCase()}.webp`} paused={videosPaused} />
                     <span style={{ position: "absolute", left: 7, bottom: 7, borderRadius: 5, background: "rgba(0,0,0,.6)", padding: "2px 7px", fontSize: 11.5, color: "#fff" }}>{i === 0 ? "You" : name}</span>
                     {i === 2 && (
-                      <span style={{ position: "absolute", right: 7, top: 7, display: "flex", alignItems: "center", gap: 4, borderRadius: 5, background: "rgba(255,255,255,.94)", padding: "2px 6px", fontSize: 11, whiteSpace: "nowrap", color: "#b45309" }}>
+                      <span className="hero-call-upload" style={{ position: "absolute", right: 7, top: 7, display: "flex", alignItems: "center", gap: 4, borderRadius: 5, background: "rgba(255,255,255,.94)", padding: "2px 6px", fontSize: 11, whiteSpace: "nowrap", color: "#b45309" }}>
                         <Icon d={IC.cloudUp} size={11} />2 min behind
                       </span>
                     )}
@@ -438,17 +441,26 @@ function HeroStudio() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 2px 0", color: "#fff" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Rings size={30} dur="2s" gap=".66s" />
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>Stop recording</span>
+                  <span className="hero-call-stop-label" style={{ fontSize: 13, fontWeight: 500 }}>Stop recording</span>
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <button
+                    type="button"
+                    aria-label={videosPaused ? "Play demo videos" : "Pause demo videos"}
+                    title={videosPaused ? "Play demo videos" : "Pause demo videos"}
+                    onClick={() => setVideosPaused((paused) => !paused)}
+                    style={{ display: "grid", width: 30, height: 30, placeItems: "center", border: 0, borderRadius: "50%", background: "rgba(255,255,255,.12)", color: "#fff", cursor: "pointer" }}
+                  >
+                    <Icon d={videosPaused ? "M9 5l11 7-11 7z" : "M8 5v14M16 5v14"} size={14} />
+                  </button>
                   {[IC.mic, IC.cam].map((d) => (
-                    <span key={d} style={{ display: "grid", width: 30, height: 30, placeItems: "center", borderRadius: "50%", background: "rgba(255,255,255,.12)" }}>
+                    <span className="hero-call-device" key={d} style={{ display: "grid", width: 30, height: 30, placeItems: "center", borderRadius: "50%", background: "rgba(255,255,255,.12)" }}>
                       <Icon d={d} size={14} />
                     </span>
                   ))}
                   <span style={{ display: "inline-flex", height: 30, alignItems: "center", gap: 6, borderRadius: 6, background: "rgba(255,255,255,.12)", padding: "0 10px", fontSize: 12.5, fontWeight: 500 }}>
                     <Icon d={IC.link} size={13} />
-                    Invite
+                    <span className="hero-call-invite-label">Invite</span>
                   </span>
                   <span style={{ display: "inline-flex", height: 30, alignItems: "center", borderRadius: 6, background: "#fff", padding: "0 10px", fontSize: 12.5, fontWeight: 500, color: "#18181b" }}>Leave</span>
                 </span>

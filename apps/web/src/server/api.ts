@@ -15,6 +15,9 @@ import {
   resetPasswordBody,
   setFiltersBody,
   aiNotesBody,
+  shareBody,
+  apiKeyBody,
+  webhookBody,
   commentBody,
   memberRoleBody,
   safeTranscriptBody,
@@ -47,6 +50,7 @@ import { clientAddress, drainBody, siteCors, speedTestCors } from "./speed-test"
 import { APP_VERSION } from "./worker-info";
 import { contentDisposition } from "./storage";
 import { makeSafe, safeFile } from "./redaction";
+import { KEY_PREFIX } from "./integrations";
 import { TIMELINE_FORMATS } from "./timeline-export";
 
 type Params = Record<string, string>;
@@ -80,10 +84,13 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
    * A signed-in person. A viewer (a member who may only look, listen, download and comment) is
    * refused everything that isn't a GET, unless the handler says viewers may (`viewers: true`).
    */
-  const asUser = (fn: (svc: Services, user: User, req: Request, params: Params) => Promise<Response>, opts: { viewers?: boolean; /** What this does, for the account's activity log ("Deleted a studio"). */ log?: string } = {}) =>
+  const asUser = (fn: (svc: Services, user: User, req: Request, params: Params) => Promise<Response>, opts: { viewers?: boolean; /** An API key may do this too. */ keys?: boolean; /** What this does, for the account's activity log ("Deleted a studio"). */ log?: string } = {}) =>
     handler(async (svc, req, params) => {
       if (req.method !== "GET") checkOrigin(req);
-      const user = await svc.auth.requireUser(readCookie(req, SESSION_COOKIE));
+      // An API key instead of a log-in: it reads what a member can read, and changes only what a handler opens to keys.
+      const key = bearerToken(req);
+      const user = key?.startsWith(KEY_PREFIX) ? await svc.apiKeys.userFor(key) : await svc.auth.requireUser(readCookie(req, SESSION_COOKIE));
+      if (user.apiKey && req.method !== "GET" && !opts.keys) throw new ApiError(403, "not_for_keys", "This can't be done with an API key");
       if (user.viewer && req.method !== "GET" && !opts.viewers) throw new ApiError(403, "viewer", "You can look and download in this account, not change it. Its owner can give you more.");
       // Named before it runs: afterwards the thing may be gone.
       const target = opts.log ? await svc.activity.describe(user, params) : "";
@@ -178,17 +185,17 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     createStudio: asUser(async (svc, user, req) => {
       svc.account.requireVerified(user);
       return json(201, await svc.studios.create(user, await parseBody(req, createStudioBody)));
-    }, { log: "Created a studio" }),
+    }, { log: "Created a studio", keys: true }),
     getStudio: asUser(async (svc, user, _req, params) => json(200, await svc.studios.get(user, params.studioId!))),
     updateStudio: asUser(async (svc, user, req, params) =>
-      json(200, await svc.studios.update(user, params.studioId!, await parseBody(req, updateStudioBody))), { log: "Changed a studio" }),
+      json(200, await svc.studios.update(user, params.studioId!, await parseBody(req, updateStudioBody))), { log: "Changed a studio", keys: true }),
     /** Deletes every recording in it (files included) and ends its session. */
     deleteStudio: asUser(async (svc, user, _req, params) => {
       await svc.studios.delete(user, params.studioId!);
       return new Response(null, { status: 204 });
     }, { log: "Deleted a studio and its recordings" }),
     rotateInvite: asUser(async (svc, user, _req, params) =>
-      json(200, await svc.studios.rotateInvite(user, params.studioId!)), { log: "Replaced a studio's invite link" }),
+      json(200, await svc.studios.rotateInvite(user, params.studioId!)), { log: "Replaced a studio's invite link", keys: true }),
     /** Host enters the studio → session ticket (host participant token). */
     openStudio: asUser(async (svc, user, _req, params) => {
       svc.account.requireVerified(user);
@@ -203,7 +210,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     deleteRecording: asUser(async (svc, user, _req, params) => {
       await svc.processing.deleteRecording(user, params.studioId!, params.recordingId!);
       return new Response(null, { status: 204 });
-    }, { log: "Deleted a recording" }),
+    }, { log: "Deleted a recording", keys: true }),
     /** Process now, without tracks that never finished uploading. */
     processRecording: asUser(async (svc, user, req, params) => {
       // The body is optional: `{ "filters": false }` gives the files as recorded, true puts people's filters back.
@@ -211,7 +218,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       const { filters } = text.trim() ? processBody.parse(parseJson(text)) : {};
       await svc.processing.processNow(user, params.studioId!, params.recordingId!, { filters });
       return json(202, { queued: true });
-    }, { log: "Processed a recording again" }),
+    }, { log: "Processed a recording again", keys: true }),
     /** Redirects to a short-lived signed storage URL, so big files never pass through this server. */
     downloadOutput: asUser(async (svc, user, _req, params) => {
       const url = await svc.processing.downloadUrl(user, params.studioId!, params.recordingId!, params.outputId!);
@@ -329,7 +336,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     makeNotes: asUser(async (svc, user, _req, params) => {
       await svc.notes.request(user, params.studioId!, params.recordingId!);
       return json(202, { ok: true });
-    }, { log: "Asked for AI notes" }),
+    }, { log: "Asked for AI notes", keys: true }),
     /** Accounts and their plans (admins). */
     adminAccounts: asUser(async (svc, user) => json(200, { accounts: await svc.billing.accounts(user) })),
     /** Put an account on a plan by hand: a founding member, an organisation paying by invoice (admins). */
@@ -389,16 +396,33 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       if (body.preview) return json(200, { counts: safe.counts, speakers: safe.speakers.length });
       const file = safeFile(safe.lines, body.format, `Transcript: ${source.title}`);
       return new Response(file.body as BodyInit, { headers: { "content-type": file.contentType, "content-disposition": contentDisposition(file.fileName), "cache-control": "no-store" } });
-    }, { viewers: true }), // a download: nothing is changed or stored
+    }, { viewers: true, keys: true }), // a download: nothing is changed or stored
+    /** API keys and webhooks, for the account's owner. A new key or secret is shown only in the answer that makes it. */
+    listApiKeys: asUser(async (svc, user) => json(200, { keys: await svc.apiKeys.list(user) })),
+    createApiKey: asUser(async (svc, user, req) => json(201, await svc.apiKeys.create(user, (await parseBody(req, apiKeyBody)).name)), { log: "Made an API key" }),
+    revokeApiKey: asUser(
+      async (svc, user, _req, params) => {
+        await svc.apiKeys.revoke(user, params.keyId!);
+        return new Response(null, { status: 204 });
+      },
+      { log: "Revoked an API key" },
+    ),
+    listWebhooks: asUser(async (svc, user) => json(200, { webhooks: await svc.webhooks.list(user) })),
+    createWebhook: asUser(async (svc, user, req) => json(201, await svc.webhooks.create(user, (await parseBody(req, webhookBody)).url)), { log: "Added a webhook" }),
+    deleteWebhook: asUser(
+      async (svc, user, _req, params) => {
+        await svc.webhooks.remove(user, params.webhookId!);
+        return new Response(null, { status: 204 });
+      },
+      { log: "Removed a webhook" },
+    ),
     /** Comments on a recording: anyone in the account reads and writes them, viewers too. */
     listComments: asUser(async (svc, user, _req, params) => json(200, { comments: await svc.comments.list(user, params.recordingId!) })),
     addComment: asUser(
       async (svc, user, req, params) => {
         await svc.comments.add(user, params.recordingId!, await parseBody(req, commentBody));
         return json(201, { ok: true });
-      },
-      { viewers: true },
-    ),
+      }, { viewers: true, keys: true }),
     deleteComment: asUser(
       async (svc, user, _req, params) => {
         await svc.comments.remove(user, params.recordingId!, params.commentId!);
@@ -408,13 +432,22 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     ),
     /** The account's activity log, for its owner. */
     listActivity: asUser(async (svc, user) => json(200, { activity: await svc.activity.list(user) })),
+    /** A recording's public share page: on or off, with or without the transcript. */
+    getShare: asUser(async (svc, user, _req, params) => json(200, await svc.share.get(user, params.studioId!, params.recordingId!))),
+    setShare: asUser(async (svc, user, req, params) => json(200, await svc.share.set(user, params.studioId!, params.recordingId!, await parseBody(req, shareBody))), { log: "Changed a recording's share page" }),
+    /** What a share page plays: a redirect to a signed link, for anyone holding the page's link. */
+    sharedMedia: handler(async (svc, _req, params) => {
+      const url = await svc.share.mediaUrl(params.code!);
+      if (!url) throw new ApiError(404, "not_found", "This recording isn't shared");
+      return new Response(null, { status: 302, headers: { location: url, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
+    }),
     /** Clips cut out of a finished recording. */
     listClips: asUser(async (svc, user, _req, params) => json(200, { clips: await svc.clips.list(user, params.recordingId!) })),
-    createClip: asUser(async (svc, user, req, params) => json(201, await svc.clips.create(user, params.studioId!, params.recordingId!, await parseBody(req, clipBody))), { log: "Cut a clip" }),
+    createClip: asUser(async (svc, user, req, params) => json(201, await svc.clips.create(user, params.studioId!, params.recordingId!, await parseBody(req, clipBody))), { log: "Cut a clip", keys: true }),
     deleteClip: asUser(async (svc, user, _req, params) => {
       await svc.clips.remove(user, params.studioId!, params.recordingId!, params.clipId!);
       return new Response(null, { status: 204 });
-    }),
+    }, { keys: true }),
     /** A project file for an editor (OpenTimelineIO, Final Cut XML or REAPER) that lays the recording's files out. */
     downloadTimeline: asUser(async (svc, user, req, params) => {
       const format = TIMELINE_FORMATS.find((f) => f === params.format);
@@ -517,12 +550,12 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     /** The end screen's recap email: whether it's offered and how it's going; asking for one. */
     /** A studio's solo link: where one person records alone. */
     getSolo: asUser(async (svc, user, _req, params) => json(200, await svc.studios.solo(user, params.studioId!))),
-    setSolo: asUser(async (svc, user, req, params) => json(200, await svc.studios.setSolo(user, params.studioId!, await parseBody(req, soloSettingsBody))), { log: "Changed a studio's solo link" }),
+    setSolo: asUser(async (svc, user, req, params) => json(200, await svc.studios.setSolo(user, params.studioId!, await parseBody(req, soloSettingsBody))), { log: "Changed a studio's solo link", keys: true }),
     /** Someone starts recording alone on a solo link. No account. */
     soloJoin: handler(async (svc, req) => json(201, await svc.studios.soloJoin(await parseBody(req, soloJoinBody), clientAddress(req)))),
     /** A studio's guide (run of show), for the people of its account. */
     getGuide: asUser(async (svc, user, _req, params) => json(200, { guide: await svc.guide.get(user, params.studioId!) })),
-    setGuide: asUser(async (svc, user, req, params) => json(200, { guide: await svc.guide.set(user, params.studioId!, (await parseBody(req, guideBody)).guide) }), { log: "Changed a studio's guide" }),
+    setGuide: asUser(async (svc, user, req, params) => json(200, { guide: await svc.guide.set(user, params.studioId!, (await parseBody(req, guideBody)).guide) }), { log: "Changed a studio's guide", keys: true }),
     /** The guide, for a host in the room. */
     sessionGuide: asParticipant(async (svc, p) => json(200, { guide: await svc.guide.forHost(p) })),
     /** Mark this moment of the running recording. */

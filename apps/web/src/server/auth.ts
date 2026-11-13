@@ -20,6 +20,8 @@ export interface User {
   accountId: string;
   /** A member who may only look, listen, download and comment: every other change is refused. */
   viewer?: boolean;
+  /** Not a person: an API key of the account (`id` is the key's, not a user's). */
+  apiKey?: boolean;
 }
 
 export interface AuthOptions {

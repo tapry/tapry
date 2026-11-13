@@ -45,6 +45,11 @@ export const loginBody = z.object({
 
 /** "I forgot my password": the address to send the link to. */
 export const forgotPasswordBody = z.object({ email });
+/** Share a recording on a public page (or stop): with or without its transcript; `newLink` replaces the link. */
+export const shareBody = z.object({ enabled: z.boolean(), transcript: z.boolean(), newLink: z.boolean().optional() });
+/** A new API key's name (what it is for), and a new webhook's address. */
+export const apiKeyBody = z.object({ name: plainText(60) });
+export const webhookBody = z.object({ url: z.string().url().max(500) });
 /** A comment on a recording, optionally at a moment of it (ms from its start). */
 export const commentBody = z.object({ body: z.string().trim().min(1).max(2000), atMs: z.number().min(0).optional() });
 /** A share-safe copy of a transcript: neutral speaker names, contact details and listed words masked. */

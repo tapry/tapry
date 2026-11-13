@@ -1,3 +1,5 @@
+import { ShareService } from "./share";
+import { ApiKeysService, WebhooksService } from "./integrations";
 import { ActivityService, CommentsService } from "./collab";
 import { ClipsService } from "./clips";
 import { TimelineExports } from "./timeline-export";
@@ -55,6 +57,12 @@ export interface Services {
   comments: CommentsService;
   /** The account's activity log. */
   activity: ActivityService;
+  /** API keys for other software. */
+  apiKeys: ApiKeysService;
+  /** Public share pages of recordings. */
+  share: ShareService;
+  /** Webhooks: where to tell other software that a recording is ready. */
+  webhooks: WebhooksService;
   /** The admin health page's checks. */
   health: HealthService;
   /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
@@ -126,6 +134,9 @@ export function createServices(
     clips: new ClipsService(db, storage, () => processing.onEnqueue()),
     comments: new CommentsService(db),
     activity: new ActivityService(db, opts.now),
+    apiKeys: new ApiKeysService(db, opts.now),
+    share: new ShareService(db, storage),
+    webhooks: new WebhooksService(db, { allowPrivate: opts.ownStorage?.allowPrivate, resolve: opts.ownStorage?.resolve, now: opts.now }),
     notes: new NotesService(db, storage, { local: opts.notes?.local ?? null, outside: opts.notes?.outside ?? null, cloud: billing.cloud, now: opts.now, onQueued: () => processing.onEnqueue() }),
     health,
     library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),

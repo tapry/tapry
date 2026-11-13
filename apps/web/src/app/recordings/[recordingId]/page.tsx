@@ -1,3 +1,4 @@
+import { ShareCard } from "@/components/share-card";
 import { CommentsCard } from "@/components/comments-card";
 import { SafeTranscript } from "@/components/safe-transcript";
 import { ClipsCard } from "@/components/clips-card";
@@ -43,7 +44,7 @@ const PILL = {
 /** One recording (the design's "Episode"): its sound, its files and what was said. */
 export default async function RecordingPage({ params }: { params: Promise<{ recordingId: string }> }) {
   const { user, services, recording: r } = await load((await params).recordingId);
-  const [studios, transcript, model, aiNotes, notes, markers, clips, comments] = await Promise.all([
+  const [studios, transcript, model, aiNotes, notes, markers, clips, comments, share] = await Promise.all([
     services.studios.list(user),
     services.library.transcriptTurns(user, r.id),
     services.library.transcriptsModel(),
@@ -52,6 +53,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
     services.guide.markers(user, r.id),
     services.clips.list(user, r.id),
     services.comments.list(user, r.id),
+    services.share.get(user, r.studioId, r.id),
   ]);
   const studio = studios.find((s) => s.id === r.studioId);
   const now = Date.now();
@@ -239,6 +241,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
               )}
             </div>
           )}
+          {ready && sound && <ShareCard studioId={r.studioId} recordingId={r.id} initial={share} hasTranscript={r.transcript === "ready"} video={sound.fileName.endsWith(".mp4")} />}
           <CommentsCard recordingId={r.id} comments={comments} />
           {r.transcript === "ready" && transcript.turns && transcript.turns.length > 0 && <SafeTranscript recordingId={r.id} />}
           {ready && r.outputs.some((o) => o.kind === "combined") && <ClipsCard studioId={r.studioId} recordingId={r.id} clips={clips} lengthMs={lengthMs} />}

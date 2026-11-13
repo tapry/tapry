@@ -26,6 +26,7 @@ import type { Db, Queryable } from "./db";
 import { isApiError } from "./errors";
 import { clipArgs, clipFileName } from "./clips";
 import { newId } from "./ids";
+import { deliverWebhooks, emitWebhook } from "./integrations";
 import { NOTES_ERROR_TEXT, NOTES_FILE, NOTES_MAX_CHARS, NotesError, notesModelFor, notesModels, queueNotes, type NotesConfig, type NotesModel } from "./notes";
 import { deleteRecordingIn, type RecordingProgress } from "./processing";
 import { sendDueRecaps, sweepRecaps, type RecapMail } from "./recap";
@@ -78,6 +79,8 @@ export interface JobRunnerOptions {
   purgeRepeatMs?: number;
   /** Guests' recap emails; leave out when the server doesn't send email. */
   mail?: RecapMail | null;
+  /** How webhooks are sent (tests). */
+  webhookFetch?: typeof fetch;
   /** AI notes: the models this server may use. Left out: no notes. */
   notes?: NotesConfig;
   /** The notes models themselves, instead of building them from `notes` (tests). */
@@ -210,6 +213,7 @@ export class JobRunner {
           }
         }
         if (!this.stopped) await this.recaps();
+        if (!this.stopped) await deliverWebhooks(this.db, this.opts.webhookFetch).catch((err) => console.error("[webhooks] failed:", err instanceof Error ? err.name : "unknown"));
         if (!this.stopped) await this.expire();
       } while (this.kicked && !this.stopped);
     } finally {
@@ -530,6 +534,8 @@ export class JobRunner {
           [newId("job"), rec.id, rawRetentionMs / 1000],
         );
       }
+      // Other software is told once the files are really there (not when they are about to be redone).
+      if (!rerun) await emitWebhook(tx, rec.id, "recording.ready");
       return { replaced: old.map((o) => o.storage_key), rerun };
     });
     await this.removeReplaced(replaced);
@@ -602,7 +608,10 @@ export class JobRunner {
         await tx.query(`INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'transcribe_recording', $2)`, [newId("job"), rec.id]);
         await tx.query("UPDATE recordings SET transcript = 'queued' WHERE id = $1", [rec.id]);
         this.kicked = true;
-      } else if (this.hasNotesModel()) {
+      } else {
+        await emitWebhook(tx, rec.id, "recording.transcribed");
+      }
+      if (!stale && this.hasNotesModel()) {
         // Notes are written from this transcript. Whether this account gets them (a local model,
         // or an outside one its owner allowed) is decided when the job runs.
         await queueNotes(tx, rec.id);
