@@ -30,3 +30,6 @@ apps/worker/test/**/*.d.ts
 
 # MediaPipe's WebAssembly runtime, copied from node_modules (apps/web/scripts/copy-mediapipe.mjs)
 apps/web/public/mediapipe/
+
+# The website packaged for upload to Cloudflare Pages
+tapry-site.zip

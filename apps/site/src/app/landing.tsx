@@ -8,15 +8,30 @@ import { Footer } from "@/components/footer";
 import { IC, Icon, LogoMark } from "@/components/icons";
 import { Nav } from "@/components/nav";
 import { customers } from "@/content/customers";
-import { CLOUD_NEWS, GET_STARTED, PHOTOS } from "@/content/site";
+import { CLOUD_NEWS, GET_STARTED } from "@/content/site";
 
 const G = "#12924f";
 const A = "#a16207";
 const R = "#d6453d";
 const B = "#e8553d";
-const Y = PHOTOS.yasmine;
-const T = PHOTOS.tom;
-const N = PHOTOS.ines;
+// The demo people are drawn as the app draws anyone: initials on a colour. No photos of real people.
+const Y = "#c43c25";
+const T = "#3f3f46";
+const N = "#a16207";
+
+/** A person's initial on their colour: the avatar, or (`tile`) a camera-off video tile. */
+function Face({ name, color, size, tile = false, mirror = false }: { name: string; color: string; size: number; tile?: boolean; mirror?: boolean }) {
+  const circle = (
+    <span
+      aria-hidden="true"
+      style={{ display: "grid", width: size, height: size, flexShrink: 0, placeItems: "center", borderRadius: "50%", background: color, color: "#fff", fontSize: Math.round(size * 0.42), fontWeight: 500, transform: mirror ? "none" : undefined }}
+    >
+      {name[0]}
+    </span>
+  );
+  if (!tile) return circle;
+  return <span style={{ display: "grid", width: "100%", height: "100%", placeItems: "center", background: "#27272a" }}>{circle}</span>;
+}
 const MONO = "var(--mono)";
 const EASE = "cubic-bezier(.2,.7,.2,1)";
 
@@ -47,7 +62,7 @@ const FORMAT_POINTS: Array<[string, string]> = [
 
 const WORKS_WITH = ["Chrome", "Firefox", "Safari"];
 
-// Demo people: [name, photo, role, saved so far, upload behind, talk share]. The sizes are what
+// Demo people: [name, colour, role, saved so far, upload behind, talk share]. The sizes are what
 // 42 minutes at 1080p comes to (about 3–4 GB per person and hour, docs/costs.md).
 const PEOPLE: Array<[string, string, string, string, boolean, number]> = [
   ["Yasmine", Y, "host", "2.6 GB", false, 46],
@@ -387,7 +402,7 @@ function HeroStudio() {
             </span>
           ))}
           <span style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 9, borderTop: "1px solid #e4e4e7", padding: "12px 8px 90px", whiteSpace: "nowrap" }}>
-            <img src={Y} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", objectPosition: "center 30%" }} />
+            <Face name="Yasmine" color={Y} size={24} />
             <span style={{ display: "flex", minWidth: 0, flexDirection: "column" }}>
               <span style={{ fontSize: 13.5 }}>Yasmine</span>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", fontSize: 12, color: "#71717a" }}>Admin · yasmine@example.com</span>
@@ -411,7 +426,7 @@ function HeroStudio() {
               <div style={{ display: "grid", gap: 6, gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}>
                 {PEOPLE.map(([name, photo], i) => (
                   <div key={name} style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", borderRadius: 8, background: "#27272a", transition: "outline-color .4s", outline: `2px solid ${sp === i ? "#ff8f78" : "transparent"}`, outlineOffset: -2 }}>
-                    <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%", transform: i === 0 ? "scaleX(-1)" : "none" }} />
+                    <Face name={name} color={photo} size={34} tile />
                     <span style={{ position: "absolute", left: 7, bottom: 7, borderRadius: 5, background: "rgba(0,0,0,.6)", padding: "2px 7px", fontSize: 11.5, color: "#fff" }}>{i === 0 ? "You" : name}</span>
                     {i === 2 && (
                       <span style={{ position: "absolute", right: 7, top: 7, display: "flex", alignItems: "center", gap: 4, borderRadius: 5, background: "rgba(255,255,255,.94)", padding: "2px 6px", fontSize: 11, whiteSpace: "nowrap", color: "#b45309" }}>
@@ -483,7 +498,9 @@ function HeroStudio() {
                           <span style={{ ...ringStyle, animation: `ring2 1.8s ${EASE} .6s infinite` }} />
                         </>
                       )}
-                      <img src={photo} alt="" style={{ position: "relative", width: 30, height: 30, borderRadius: "50%", objectFit: "cover", objectPosition: "center 30%", boxShadow: `0 0 0 2px ${on ? B : "#fff"}` }} />
+                      <span style={{ position: "relative", display: "flex", borderRadius: "50%", boxShadow: `0 0 0 2px ${on ? B : "#fff"}` }}>
+                        <Face name={name} color={photo} size={30} />
+                      </span>
                       <span style={{ position: "absolute", right: -4, bottom: -4, display: "grid", width: 15, height: 15, placeItems: "center", borderRadius: "50%", border: "2px solid #fff", color: "#fff", background: on ? B : "#a1a1aa" }}>
                         <Icon d={IC.mic} size={8} width={2.8} />
                       </span>
@@ -518,7 +535,7 @@ function HeroStudio() {
           </span>
           {PEOPLE.map(([name, photo, role, , behind, share]) => (
             <div key={name} style={{ display: "flex", gap: 9, border: "1px solid #e4e4e7", borderRadius: 10, background: "#fff", padding: "9px 10px" }}>
-              <img src={photo} alt="" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: "50%", objectFit: "cover", objectPosition: "center 30%" }} />
+              <Face name={name} color={photo} size={28} />
               <span style={{ display: "flex", minWidth: 0, flex: 1, flexDirection: "column", gap: 4 }}>
                 <span style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
                   <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
