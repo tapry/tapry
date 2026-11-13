@@ -23,7 +23,7 @@ interface PaddleJs {
 const SCRIPT = "https://cdn.paddle.com/paddle/v2/paddle.js";
 
 export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email }: { priceId: string; clientToken: string; sandbox: boolean; accountId: string; email: string }) {
-  const [state, setState] = useState<"loading" | "open" | "closed" | "failed">("loading");
+  const [state, setState] = useState<"loading" | "open" | "closed" | "failed" | "refused">("loading");
   const opened = useRef(false);
 
   useEffect(() => {
@@ -39,7 +39,10 @@ export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email
           token: clientToken,
           eventCallback: (event) => {
             if (event.name === "checkout.completed") window.location.assign(done);
-            if (event.name === "checkout.closed") setState("closed");
+            // Paddle's own refusal: the price or the seller's account can't take payments (yet).
+            if (event.name === "checkout.error") setState("refused");
+            // Closing its error window doesn't hide what went wrong.
+            if (event.name === "checkout.closed") setState((now) => (now === "refused" ? now : "closed"));
           },
         });
         // `user_id` is what the webhook reads back: the account this payment is for.
@@ -61,6 +64,13 @@ export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email
     return (
       <Notice tone="danger" data-testid="checkout-failed">
         The checkout couldn&apos;t be opened. A blocker in your browser may be stopping the payment provider&apos;s page: allow it for this site and reload.
+      </Notice>
+    );
+  }
+  if (state === "refused") {
+    return (
+      <Notice tone="danger" data-testid="checkout-refused">
+        The payment provider couldn&apos;t start this checkout, and nothing was charged. Plans can&apos;t be bought right now; write to us and we&apos;ll sort it out.
       </Notice>
     );
   }
