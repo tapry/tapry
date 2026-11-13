@@ -55,8 +55,35 @@ export const verifyEmailBody = z.object({ token: emailToken });
 
 // ── Studios ───────────────────────────────────────────────────────────────────
 
+/**
+ * The sizes a camera is recorded and kept at: frame size and the recorder's bits per second
+ * (the worker never spends more on the finished file). One table for the browser and the worker.
+ */
+export const VIDEO_TIERS = [
+  { height: 720, width: 1280, bitrate: 4_000_000 },
+  { height: 1080, width: 1920, bitrate: 8_000_000 },
+  { height: 1440, width: 2560, bitrate: 14_000_000 },
+  { height: 2160, width: 3840, bitrate: 24_000_000 },
+] as const;
+export type VideoHeight = (typeof VIDEO_TIERS)[number]["height"];
+export type VideoTier = (typeof VIDEO_TIERS)[number];
+export const VIDEO_QUALITIES = ["720p", "1080p", "2160p"] as const;
+export type VideoQuality = (typeof VIDEO_QUALITIES)[number];
+
+/**
+ * The tier a picture is kept at. 720p and 1080p studios: always the studio's own. A 4K studio
+ * ("2160p") means "each camera's best, up to 4K": the smallest tier that holds what the camera
+ * really delivers, never under 1080p, so a Full HD webcam in a 4K studio is a Full HD file at
+ * Full HD's bitrate, not an upscaled one. `sourceHeight` unknown: the studio's own tier.
+ */
+export function videoTier(quality: VideoQuality, sourceHeight?: number | null): VideoTier {
+  const top = VIDEO_TIERS.find((t) => `${t.height}p` === quality)!;
+  if (top.height <= 1080 || !sourceHeight) return top;
+  return VIDEO_TIERS.find((t) => t.height >= 1080 && t.height >= sourceHeight && t.height <= top.height) ?? top;
+}
+
 const settingsFields = {
-  videoQuality: z.enum(["720p", "1080p"]),
+  videoQuality: z.enum(VIDEO_QUALITIES),
   /** Guests besides the host. v1 targets 2–4 people in total. */
   maxGuests: z.number().int().min(1).max(7),
   /** Off gives better audio for guests on headphones. */
@@ -395,16 +422,18 @@ export interface Plan {
   ownStorage: "no" | "allowed" | "required";
   /** People in the account, its owner included. Null: no limit. */
   seats: number | null;
+  /** Studios may record up to 4K. Otherwise Full HD is the most. */
+  video4k: boolean;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1 },
+  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1, video4k: false },
   // Everything is in the customer's bucket: nothing of ours to meter or to delete.
-  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1 },
-  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1 },
-  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3 },
-  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5 },
-  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null },
+  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true },
+  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5, video4k: true },
+  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null, video4k: true },
 };
 
 /** Whether moving from one plan to another is an upgrade (more hours or longer keeping). */

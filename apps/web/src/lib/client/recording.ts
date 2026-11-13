@@ -1,5 +1,6 @@
 "use client";
 
+import { videoTier, type VideoQuality } from "@tapry/shared";
 import {
   createHttpTransport,
   IndexedDBChunkStore,
@@ -199,7 +200,8 @@ export interface RecordingOptions {
 /** A mask is a small picture, a few frames a second: this is plenty. */
 export const MASK_BITRATE = 150_000;
 
-export const VIDEO_BITRATE = { "1080p": 8_000_000, "720p": 4_000_000 } as const;
+/** The recorder's video bitrate: the studio's tier, or in a 4K studio the tier of what this camera delivers. */
+export const videoBitrate = (quality: VideoQuality, sourceHeight?: number | null) => videoTier(quality, sourceHeight).bitrate;
 export const AUDIO_BITRATE = 128_000;
 /** A recorder that keeps dying is reported, not restarted forever. */
 const MAX_RESTARTS = 5;
@@ -315,7 +317,7 @@ export class RecordingController {
     // Audio on its own: the clean track podcasters edit with.
     if (audio) plan.push({ kind: "audio", stream: new MediaStream([audio]) });
     // Camera with sound, so the video file is usable on its own too.
-    if (video) plan.push({ kind: "video", stream, videoBitsPerSecond: VIDEO_BITRATE[ticket.studio.settings.videoQuality] });
+    if (video) plan.push({ kind: "video", stream, videoBitsPerSecond: videoBitrate(ticket.studio.settings.videoQuality, video.getSettings().height) });
 
     const active: NonNullable<RecordingController["active"]> = { recordingId, recorders: [], restarts: 0, hasVideo: !!video };
     this.active = active;

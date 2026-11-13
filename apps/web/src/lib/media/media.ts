@@ -1,6 +1,7 @@
 // Pure green-room logic: no React, no live devices. Unit-tested in test/media.test.ts.
 import { pickMimeType } from "@tapry/recorder";
 import type { StudioSettings } from "@tapry/shared";
+import { videoTier } from "@tapry/shared";
 
 // ── Capture constraints ──────────────────────────────────────────────────────
 
@@ -13,7 +14,8 @@ export interface DeviceChoice {
 }
 
 export function buildConstraints(settings: StudioSettings, choice: DeviceChoice): MediaStreamConstraints {
-  const [width, height] = settings.videoQuality === "1080p" ? [1920, 1080] : [1280, 720];
+  // "ideal": the camera gives its closest. In a 4K studio a Full HD webcam simply delivers Full HD.
+  const { width, height } = videoTier(settings.videoQuality);
   // Browser voice processing helps on speakers but colors the sound; podcasters fix the rest in post.
   const processing = settings.echoCancellation && !choice.headphones;
   return {

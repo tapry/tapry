@@ -1,5 +1,6 @@
 "use client";
 
+import { qualityOptions, type QualityChoice } from "./quality-options";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -12,11 +13,11 @@ const MAX_NAME = 100;
 const MAX_GUESTS = 7;
 
 /** The "New studio" screen: a name, how many guests, video quality and sound options. */
-export function NewStudioForm({ hostName, firstStudio }: { hostName: string; firstStudio: boolean }) {
+export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostName: string; firstStudio: boolean; /** This account may record in 4K. */ can4k?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [guests, setGuests] = useState(3);
-  const [quality, setQuality] = useState<"1080p" | "720p" | "audio">("1080p");
+  const [quality, setQuality] = useState<QualityChoice>("1080p");
   const [echo, setEcho] = useState(true);
   const [level, setLevel] = useState(true);
   const [soundOpen, setSoundOpen] = useState(false);
@@ -96,21 +97,16 @@ export function NewStudioForm({ hostName, firstStudio }: { hostName: string; fir
               Recording
             </span>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2" role="radiogroup" aria-labelledby="quality-label">
-              {(
-                [
-                  ["1080p", "Full HD", "Best quality, larger files"],
-                  ["720p", "Standard", "Smaller files, still sharp"],
-                  ["audio", "Audio only", "Sound only, no cameras"],
-                ] as const
-              ).map(([value, label, sub]) => (
+              {qualityOptions(can4k).map(([value, label, sub, locked]) => (
                 <button
                   key={value}
                   type="button"
                   role="radio"
                   aria-checked={quality === value}
+                  disabled={locked}
                   onClick={() => setQuality(value)}
                   className={cn(
-                    "flex cursor-pointer flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
+                    "flex cursor-pointer flex-col disabled:cursor-not-allowed disabled:opacity-60 gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
                     quality === value ? "border-ink shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border shadow-xs hover:border-border-strong",
                   )}
                 >

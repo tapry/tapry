@@ -56,7 +56,7 @@ const BUCKETS: Array<[string, string, string?]> = [
 ];
 
 const FORMAT_POINTS: Array<[string, string]> = [
-  ["Set formats per studio.", "WAV or FLAC audio; 1080p, 720p or audio only. Change it in the studio’s settings, nothing else moves."],
+  ["Set formats per studio.", "WAV or FLAC audio; video up to 4K, 1080p, 720p, or audio only. Change it in the studio’s settings, nothing else moves."],
   ["Bring your own bucket.", "The bundled SeaweedFS, or an S3-compatible bucket such as AWS S3, Cloudflare R2 or Backblaze B2 that accepts signed uploads. You choose when you install."],
   ["Files your editor opens.", "One WAV and one MP4 per person, all the same length from Record, plus the combined video and the transcript as TXT, DOCX, SRT and VTT."],
 ];

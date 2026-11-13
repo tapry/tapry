@@ -13,6 +13,7 @@ const NEEDS = [
   { kind: "Sound only", mbps: 0.18 },
   { kind: "Standard video (720p)", mbps: 5.0 },
   { kind: "Full HD video (1080p)", mbps: 9.0 },
+  { kind: "4K video", mbps: 25.0 },
 ];
 const FOR_MS = 5_000;
 

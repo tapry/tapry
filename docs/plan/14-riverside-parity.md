@@ -8,7 +8,7 @@ Goal: cover ~70% of what most Riverside users actually use, plus what Riverside 
 | Riverside | Tapry | Phase |
 |---|---|---|
 | Local recording, separate tracks per person | Core | v1 |
-| Up to 4K video, 48 kHz uncompressed WAV | 1080p at launch → 4K | v1 / v1.1 |
+| Up to 4K video, 48 kHz uncompressed WAV | Up to 4K (each camera's best; built 13 Nov 2026, not yet tried with a real 4K camera) | Built |
 | Constant-frame-rate export | Yes | v1 |
 | Join by link, no install | Yes | v1 |
 | Audio-only mode | Yes | v1 |

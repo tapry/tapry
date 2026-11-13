@@ -219,7 +219,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_host_v", participantId: "par_host", participantName: "Host", kind: "video", rawPath: rejoinedVideo, offsetMs: 500 },
       { trackId: "trk_guest_a", participantId: "par_guest", participantName: "Sam/Guest", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
     ];
-    const outputs = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "out"), durationMs: 3000, videoHeight: 720 });
+    const outputs = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "out"), durationMs: 3000, videoQuality: "720p" });
 
     expect(outputs.map((o) => [o.kind, o.fileName])).toEqual([
       ["audio", "Host - audio.wav"],
@@ -257,7 +257,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     ];
     const progress: string[] = [];
     const outputs = await renderRecording(tracks, {
-      ffmpeg, ffprobe, workDir: join(dir, "audio-only"), durationMs: 3000, videoHeight: 720, loudness: PODCAST_LOUDNESS,
+      ffmpeg, ffprobe, workDir: join(dir, "audio-only"), durationMs: 3000, videoQuality: "720p", loudness: PODCAST_LOUDNESS,
       onProgress: (p) => progress.push(`${p.done}/${p.total} ${p.current}`),
     });
     // Told before each file, so the host can see which one it's on.
@@ -280,7 +280,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_a", participantId: "par_a", participantName: "Ana", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
       { trackId: "trk_b", participantId: "par_b", participantName: "Ben", kind: "audio", rawPath: audioWebm, offsetMs: 500 },
     ];
-    const opts = { ffmpeg, ffprobe, durationMs: 3000, videoHeight: 720 as const, loudness: PODCAST_LOUDNESS };
+    const opts = { ffmpeg, ffprobe, durationMs: 3000, videoQuality: "720p" as const, loudness: PODCAST_LOUDNESS };
     const wav = await renderRecording(tracks, { ...opts, workDir: join(dir, "as-wav") });
     const flac = await renderRecording(tracks, { ...opts, workDir: join(dir, "as-flac"), audioFormat: "flac" });
     expect(flac.map((o) => [o.fileName, o.contentType])).toEqual([
@@ -309,9 +309,9 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_quiet", participantId: "par_quiet", participantName: "Quiet", kind: "audio", rawPath: quiet, offsetMs: 0 },
       { trackId: "trk_muted", participantId: "par_muted", participantName: "Muted", kind: "audio", rawPath: silent, offsetMs: 0 },
     ];
-    const plain = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "plain"), durationMs: 3000, videoHeight: 720 });
+    const plain = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "plain"), durationMs: 3000, videoQuality: "720p" });
     const levelled = await renderRecording(tracks, {
-      ffmpeg, ffprobe, workDir: join(dir, "levelled"), durationMs: 3000, videoHeight: 720, loudness: PODCAST_LOUDNESS,
+      ffmpeg, ffprobe, workDir: join(dir, "levelled"), durationMs: 3000, videoQuality: "720p", loudness: PODCAST_LOUDNESS,
     });
     const loudness = async (o: { path: string }) => measureLoudness(ffmpeg, o.path);
     const byName = (list: typeof levelled, name: string) => list.find((o) => o.fileName === name)!;
@@ -354,11 +354,39 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       "-c:v", "libvpx-vp9", "-b:v", "8M", "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1", "-an", noisy]);
     const [video] = await renderRecording(
       [{ trackId: "v", participantId: "p", participantName: "Sam", kind: "video", rawPath: noisy, offsetMs: 0 }],
-      { ffmpeg, ffprobe, workDir: join(dir, "capped"), durationMs: 10_000, videoHeight: 1080 },
+      { ffmpeg, ffprobe, workDir: join(dir, "capped"), durationMs: 10_000, videoQuality: "1080p" },
     );
     const bitrate = Number(probe(video!.path, "stream=bit_rate").split("\n")[0]);
     expect(bitrate).toBeLessThan(VIDEO_MAX_BITRATE[1080] * 1.1);
     expect(probe(video!.path, "stream=height").split("\n")[0]).toBe("1080");
+  });
+
+  it("4K studio: each person's video keeps their camera's size, the combined video stays Full HD", { timeout: 300_000 }, async () => {
+    const source = async (name: string, size: string) => {
+      const path = join(dir, `${name}.webm`);
+      await run(ffmpeg, ["-y", "-f", "lavfi", "-i", `testsrc2=size=${size}:rate=30`, "-t", "2",
+        "-c:v", "libvpx-vp9", "-b:v", "4M", "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1", "-an", path]);
+      return path;
+    };
+    const person = (name: string, rawPath: string) => ({ trackId: name, participantId: name, participantName: name, kind: "video" as const, rawPath, offsetMs: 0 });
+    const tracks = [
+      person("Uhd", await source("uhd", "3840x2160")),
+      person("Qhd", await source("qhd", "2560x1440")),
+      person("Hd", await source("hd", "1920x1080")),
+      person("Small", await source("small", "1280x720")),
+    ];
+    const byName = (list: Array<{ fileName: string; path: string }>, name: string) => list.find((o) => o.fileName === name)!;
+    const size = (o: { path: string }) => probe(o.path, "stream=width,height").split("\n")[0];
+    const out = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "uhd-out"), durationMs: 2000, videoQuality: "2160p", font: null });
+    expect(size(byName(out, "Uhd - video.mp4"))).toBe("3840,2160");
+    expect(size(byName(out, "Qhd - video.mp4"))).toBe("2560,1440");
+    expect(size(byName(out, "Hd - video.mp4"))).toBe("1920,1080"); // not blown up to 4K
+    expect(size(byName(out, "Small - video.mp4"))).toBe("1920,1080"); // never under Full HD, as in a Full HD studio
+    expect(size(byName(out, "Combined.mp4"))).toBe("1920,1080");
+
+    // The same 4K camera in a Full HD studio is a Full HD file, as before.
+    const hd = await renderRecording([tracks[0]!], { ffmpeg, ffprobe, workDir: join(dir, "uhd-as-hd"), durationMs: 2000, videoQuality: "1080p", font: null });
+    expect(size(byName(hd, "Uhd - video.mp4"))).toBe("1920,1080");
   });
 
   it("merges the pieces of someone who rejoined mid-recording into one file each, gap included", async () => {
@@ -369,7 +397,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_v1", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 0 },
       { trackId: "trk_v2", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 4000 },
     ];
-    const outputs = await renderRecording(pieces, { ffmpeg, ffprobe, workDir: join(dir, "rejoin"), durationMs: 6000, videoHeight: 720 });
+    const outputs = await renderRecording(pieces, { ffmpeg, ffprobe, workDir: join(dir, "rejoin"), durationMs: 6000, videoQuality: "720p" });
     expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam - video.mp4", "Combined.mp4"]);
     for (const o of outputs) expect(Math.abs(o.durationMs! - 6000), o.fileName).toBeLessThan(80);
 
@@ -398,7 +426,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_v1", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 0 },
       { trackId: "trk_v2", participantId: "par_g", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 4000 },
     ];
-    const opts = { ffmpeg, ffprobe, durationMs: 6000, videoHeight: 720 as const };
+    const opts = { ffmpeg, ffprobe, durationMs: 6000, videoQuality: "720p" as const };
     const plain = await renderRecording(pieces, { ...opts, workDir: join(dir, "rejoin-plain") });
     const levelled = await renderRecording(pieces, { ...opts, workDir: join(dir, "rejoin-levelled"), loudness: PODCAST_LOUDNESS });
 
@@ -424,7 +452,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       { trackId: "trk_g", participantId: "par_2", participantName: `Zoë "O'Brien": 100% \\ yes`, kind: "audio", rawPath: audioWebm, offsetMs: 0 },
     ];
     const render = async (f: string | null, name: string) =>
-      (await renderRecording(people, { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 2000, videoHeight: 720, font: f })).find(
+      (await renderRecording(people, { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 2000, videoQuality: "720p", font: f })).find(
         (o) => o.kind === "combined",
       )!.path;
     const labelled = await render(font, "labels");
@@ -452,7 +480,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     const tracks: TrackInput[] = ["par_1", "par_2"].map((pid, i) => ({
       trackId: `trk_${i}`, participantId: pid, participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 0,
     }));
-    const outputs = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "dupes"), durationMs: 1000, videoHeight: 720 });
+    const outputs = await renderRecording(tracks, { ffmpeg, ffprobe, workDir: join(dir, "dupes"), durationMs: 1000, videoQuality: "720p" });
     expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam (2) - audio.wav", "Combined.wav"]);
   });
 
@@ -461,7 +489,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     writeFileSync(junk, "definitely not a webm file");
     const err = await renderRecording(
       [{ trackId: "trk_x", participantId: "par_x", participantName: "X", kind: "audio", rawPath: junk, offsetMs: 0 }],
-      { ffmpeg, ffprobe, workDir: join(dir, "junk"), durationMs: 1000, videoHeight: 720 },
+      { ffmpeg, ffprobe, workDir: join(dir, "junk"), durationMs: 1000, videoQuality: "720p" },
     ).catch((e) => e);
     expect(err).toBeInstanceOf(FfmpegError);
     expect(err.stderrTail).toMatch(/Invalid data|could not find|EBML/i);
@@ -485,7 +513,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     const render = (tracks: TrackInput[], name: string) => {
       const skipped: SkippedTrack[] = [];
       const outputs = renderRecording(tracks, {
-        ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoHeight: 720, onSkipped: (s) => skipped.push(s),
+        ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoQuality: "720p", onSkipped: (s) => skipped.push(s),
       });
       return { outputs, skipped };
     };
@@ -534,7 +562,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         }
         return found;
       };
-      const opts = { ffmpeg, ffprobe, durationMs: 30_000, videoHeight: 720 as const };
+      const opts = { ffmpeg, ffprobe, durationMs: 30_000, videoQuality: "720p" as const };
       const [repaired] = await renderRecording([track({ rawPath: gapped, hasGaps: true })], { ...opts, workDir: join(dir, "gap-fixed") });
       const after = beeps(repaired!.path).filter((t) => t > 11);
       expect(after.length).toBeGreaterThan(3); // the gap itself is silent, then the beeps return
@@ -564,7 +592,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
     const video = (filters?: TrackFilters, offsetMs = 0): TrackInput =>
       ({ trackId: "trk_v", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs, filters });
     const renderVideo = async (name: string, filters?: TrackFilters, offsetMs = 0) =>
-      (await renderRecording([video(filters, offsetMs)], { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoHeight: 720 }))[0]!;
+      (await renderRecording([video(filters, offsetMs)], { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoQuality: "720p" }))[0]!;
     /** What must not change, whatever the filters: size, frame rate, frame count, length. */
     const shape = (file: string) => probe(file, "stream=codec_name,width,height,r_frame_rate,nb_frames");
 
@@ -602,7 +630,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=3,noise=alls=14:allf=t",
         "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "3M", "-an", grainy]);
       const render = async (name: string, filters?: TrackFilters) =>
-        (await renderRecording([{ ...video(filters), rawPath: grainy }], { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoHeight: 720 }))[0]!;
+        (await renderRecording([{ ...video(filters), rawPath: grainy }], { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 3000, videoQuality: "720p" }))[0]!;
       const before = await render("touch-off");
       const after = await render("touch-on", with_({ touchUp: true }));
       const psnr = Number.parseFloat(
@@ -627,7 +655,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
 
     it("shows the filtered picture in the combined video too", async () => {
       const tracks = (filters?: TrackFilters): TrackInput[] => [video(filters)];
-      const opts = { ffmpeg, ffprobe, durationMs: 3000, videoHeight: 720 as const, font: null };
+      const opts = { ffmpeg, ffprobe, durationMs: 3000, videoQuality: "720p" as const, font: null };
       const colour = (await renderRecording(tracks(), { ...opts, workDir: join(dir, "grid-plain") })).find((o) => o.kind === "combined")!;
       const mono = (await renderRecording(tracks(with_({ look: "mono" })), { ...opts, workDir: join(dir, "grid-mono") })).find((o) => o.kind === "combined")!;
       expect(stat(colour.path, "SATAVG")).toBeGreaterThan(20);
@@ -638,7 +666,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       let noisy: string;
       const audio = (filters?: TrackFilters, offsetMs = 0): TrackInput =>
         ({ trackId: "trk_a", participantId: "par_s", participantName: "Sam", kind: "audio", rawPath: noisy, offsetMs, filters });
-      const opts = (name: string) => ({ ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 6000, videoHeight: 720 as const });
+      const opts = (name: string) => ({ ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 6000, videoQuality: "720p" as const });
       /** First sample of the tone (well above the noise). */
       const onset = (s: Int16Array) => s.findIndex((x) => Math.abs(x) > 6000);
 
@@ -755,7 +783,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         const failed: FilterFailure[] = [];
         const skipped: SkippedTrack[] = [];
         const outputs = await renderRecording([track], {
-          ffmpeg, ffprobe, workDir: join(dir, name), durationMs, videoHeight: 720, font: null,
+          ffmpeg, ffprobe, workDir: join(dir, name), durationMs, videoQuality: "720p", font: null,
           onFilterFailed: (f) => failed.push(f), onSkipped: (s) => skipped.push(s),
         });
         return { video: outputs[0]!, combined: outputs.find((o) => o.kind === "combined")!, failed, skipped };
@@ -841,7 +869,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
           camera({ trackId: "trk_v2", offsetMs: 4000, mask: { rawPath: leftMask, offsetMs: 4000 } }),
         ];
         const failed: FilterFailure[] = [];
-        const [video] = await renderRecording(pieces, { ffmpeg, ffprobe, workDir: join(dir, "blur-pieces"), durationMs: 7000, videoHeight: 720, font: null, onFilterFailed: (f) => failed.push(f) });
+        const [video] = await renderRecording(pieces, { ffmpeg, ffprobe, workDir: join(dir, "blur-pieces"), durationMs: 7000, videoQuality: "720p", font: null, onFilterFailed: (f) => failed.push(f) });
         expect(failed).toEqual([]);
         for (const t of [1.5, 5.5]) {
           expect(detail(video!.path, "left", t), `left at ${t}`).toBeGreaterThan(20);
@@ -907,7 +935,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
           const failed: FilterFailure[] = [];
           const [video] = await renderRecording(
             [camera({ filters: with_({ background: "blur", look: "mono" }), mask: { rawPath: leftMask, offsetMs: 0 } })],
-            { ffmpeg: bin, ffprobe, workDir: join(dir, "blur-old-ffmpeg"), durationMs: 3000, videoHeight: 720, font: null, onFilterFailed: (f) => failed.push(f) },
+            { ffmpeg: bin, ffprobe, workDir: join(dir, "blur-old-ffmpeg"), durationMs: 3000, videoQuality: "720p", font: null, onFilterFailed: (f) => failed.push(f) },
           );
           expect(failed).toEqual(SAM_VIDEO);
           expect(stat(video!.path, "SATAVG")).toBeLessThan(1.5);
@@ -934,7 +962,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         { trackId: "trk_a", participantId: "par_s", participantName: "Sam", kind: "audio", rawPath: audioWebm, offsetMs: 500, filters },
         { trackId: "trk_v", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: videoWebm, offsetMs: 500, filters },
       ];
-      const options = (name: string, bin: string) => ({ ffmpeg: bin, ffprobe, workDir: join(dir, "same"), durationMs: 3000, videoHeight: 720 as const, font: null });
+      const options = (name: string, bin: string) => ({ ffmpeg: bin, ffprobe, workDir: join(dir, "same"), durationMs: 3000, videoQuality: "720p" as const, font: null });
 
       it("are exactly today's when there are no filters (the sync measurements were made with them)", async () => {
         const none = spy("spy-none");
@@ -1004,7 +1032,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         writeFileSync(junk, "this is not media");
         await renderRecording(
           [...tracks(with_({ touchUp: true, noiseRemoval: true })), { trackId: "trk_bad", participantId: "par_b", participantName: "Bo", kind: "video", rawPath: junk, offsetMs: 0, filters: with_({ touchUp: true }) }],
-          { ffmpeg, ffprobe, workDir: join(dir, "fail-none"), durationMs: 3000, videoHeight: 720, font: null, onFilterFailed: (f) => failed.push(f), onSkipped: (s) => skipped.push(s) },
+          { ffmpeg, ffprobe, workDir: join(dir, "fail-none"), durationMs: 3000, videoQuality: "720p", font: null, onFilterFailed: (f) => failed.push(f), onSkipped: (s) => skipped.push(s) },
         );
         expect(failed).toEqual([]);
         expect(skipped.map((s) => s.trackId)).toEqual(["trk_bad"]);

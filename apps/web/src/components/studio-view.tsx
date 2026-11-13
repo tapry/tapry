@@ -1,5 +1,6 @@
 "use client";
 
+import { recordingLabel } from "@/components/quality-options";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client/api";
 import { formatBytes, formatClock } from "@/lib/format";
@@ -56,7 +57,7 @@ export function StudioView({
         <div className="flex min-w-0 flex-col gap-1.5">
           <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em] break-words">{studio.name}</h1>
           <span className="text-sm text-pretty text-muted">
-            {studio.settings.audioOnly ? "Audio only" : studio.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {studio.settings.maxGuests}{" "}
+            {recordingLabel(studio.settings)} · up to {studio.settings.maxGuests}{" "}
             guest{studio.settings.maxGuests === 1 ? "" : "s"} · started{" "}
             {new Date(studio.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </span>

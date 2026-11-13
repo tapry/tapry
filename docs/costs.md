@@ -27,6 +27,11 @@ the numbers below are per recorded hour. Two runs bracket real cameras: heavy se
 | Processing (render, level, align) | 111 CPU-min (14 min wall) | 142 CPU-min (16 min wall) | 149 CPU-min |
 | Transcription (whisper.cpp base) | 2 CPU-min | 2 CPU-min | 2 CPU-min |
 
+**4K studios (computed from the bitrates, not yet measured):** a 4K camera records at up to
+24 Mbit/s (1440p: 14), so up to about 11 GB uploaded per person and hour and as much again
+processed, three times Full HD; encoding takes several times longer. A Full HD webcam in a 4K
+studio costs what it costs in a Full HD studio. The combined video stays 1080p.
+
 Per person and hour: about 3–4 GB uploaded, about 4.4 GB of processed files, and 55–70
 CPU-minutes of processing. 720p roughly halves the video sizes and the encoding time.
 

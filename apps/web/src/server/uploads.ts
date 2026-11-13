@@ -51,10 +51,10 @@ const UPLOAD_GRACE_MS = UPLOAD_GRACE_DAYS * 86_400_000;
 /** Tracks one person may register in one recording: a restart or rejoin adds a few, never dozens. */
 export const MAX_TRACKS_PER_PERSON = 50;
 /**
- * Bytes one person may upload per second of recording (plus ten minutes' worth): 32 Mbit/s,
- * four times what 1080p video with audio takes. Stops a guest filling the disk.
+ * Bytes one person may upload per second of recording (plus ten minutes' worth): 48 Mbit/s,
+ * twice what 4K video with audio takes (24 Mbit/s), six times Full HD. Stops a guest filling the disk.
  */
-export const BYTES_PER_SECOND_CAP = 4 * 1024 * 1024;
+export const BYTES_PER_SECOND_CAP = 6 * 1024 * 1024;
 const QUOTA_SLACK_S = 600;
 /** The most a "complete" may say was recorded beyond the last committed chunk (missing seqs are listed one by one). */
 const MAX_SEQ_GAP = 10_000;

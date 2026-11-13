@@ -2,6 +2,7 @@
 
 // Host-side forms around a studio (a "studio" in the API): invite link, settings, enter,
 // delete, and logging out. Creating a studio has its own page (new-studio-form.tsx).
+import { qualityOptions, type QualityChoice } from "./quality-options";
 import { defaultConsentText, type SessionTicket, type StudioSettings } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
@@ -92,11 +93,14 @@ export function StudioSettingsForm({
   settings,
   hostName,
   section,
+  can4k = true,
 }: {
   studioId: string;
   name: string;
   settings: StudioSettings;
   hostName: string;
+  /** This account's studios may record in 4K (its plan, on Tapry Cloud; always on a self-hosted server). */
+  can4k?: boolean;
   /**
    * Show only part of the form (the Settings page's Recording and Guests tabs). The rest stays in
    * the form, hidden, so saving always sends every setting as it is.
@@ -104,7 +108,7 @@ export function StudioSettingsForm({
   section?: "recording" | "guests";
 }) {
   const router = useRouter();
-  const [quality, setQuality] = useState<StudioSettings["videoQuality"] | "audio">(settings.audioOnly ? "audio" : settings.videoQuality);
+  const [quality, setQuality] = useState<QualityChoice>(settings.audioOnly ? "audio" : settings.videoQuality);
   const [guests, setGuests] = useState(settings.maxGuests);
   const [status, setStatus] = useState<{ tone: "ok" | "danger"; text: string } | null>(null);
 
@@ -154,18 +158,13 @@ export function StudioSettingsForm({
               <span className="font-medium">Video quality</span>
               <span className="text-[13px] leading-normal text-muted">Each person is recorded on their own device at this quality.</span>
             </span>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {(
-                [
-                  ["1080p", "Full HD", "Best quality, larger files"],
-                  ["720p", "Standard", "Smaller files, still sharp"],
-                  ["audio", "Audio only", "Sound only, no cameras"],
-                ] as const
-              ).map(([value, label, sub]) => (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {qualityOptions(can4k).map(([value, label, sub, locked]) => (
                 <label
                   key={value}
                   className={cn(
-                    "flex cursor-pointer flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] transition-[border-color,box-shadow]",
+                    "flex flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] transition-[border-color,box-shadow]",
+                    locked && quality !== value ? "cursor-not-allowed opacity-60" : "cursor-pointer",
                     "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
                     quality === value ? "border-ink shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border shadow-xs hover:border-border-strong",
                   )}
@@ -175,6 +174,7 @@ export function StudioSettingsForm({
                     name="videoQuality"
                     value={value}
                     checked={quality === value}
+                    disabled={locked && quality !== value}
                     onChange={() => setQuality(value)}
                     className="sr-only"
                   />

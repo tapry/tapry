@@ -693,7 +693,7 @@ export class JobRunner {
       ffprobe: this.opts.ffprobe,
       workDir: join(work, "out"),
       durationMs: Math.max(1000, (rec.stopped_at ?? lastEnd) - rec.started_at),
-      videoHeight: settings.videoQuality === "720p" ? 720 : 1080,
+      videoQuality: settings.videoQuality,
       font: this.opts.font,
       loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
       audioFormat: settings.audioFormat,
