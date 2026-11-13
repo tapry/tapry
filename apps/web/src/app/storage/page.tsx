@@ -1,4 +1,5 @@
 import { DashboardShell } from "@/components/dashboard-shell";
+import { OwnStorage } from "@/components/own-storage";
 import { Icon, ListCard, PageTitle } from "@/components/ui-extra";
 import { cn } from "@/components/ui";
 import { formatBytes } from "@/lib/format";
@@ -14,7 +15,7 @@ const BAR_COLORS = ["bg-ink", "bg-muted", "bg-border-strong", "bg-accent", "bg-w
 export default async function StoragePage() {
   const user = await requireUser();
   const services = await getServices();
-  const [studios, s] = await Promise.all([services.studios.list(user), services.library.storageOverview(user)]);
+  const [studios, s, own] = await Promise.all([services.studios.list(user), services.library.storageOverview(user), services.ownStorage.view(user)]);
   const total = s.pieces.confirmed + s.pieces.missing;
   const pieces = total === 0 ? "—" : s.pieces.missing === 0 ? "100%" : `${(Math.floor((s.pieces.confirmed / total) * 1000) / 10).toFixed(1)}%`;
   const kept = s.recordings - s.originalsRemoved;
@@ -71,6 +72,9 @@ export default async function StoragePage() {
           {s.studios.length === 0 && <li>No studios yet</li>}
         </ul>
       </div>
+
+      {/* Offered where the server can protect a secret key and the account's plan includes it; shown too while a bucket is still connected. */}
+      {own.enabled && (own.allowed || own.target) && <OwnStorage initial={own} />}
 
       {a && (
         <ListCard>

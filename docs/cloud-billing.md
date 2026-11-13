@@ -10,7 +10,7 @@ no limits, no Plan tab, and the billing endpoints answer 404.
 
 | Part | What it does |
 |---|---|
-| **Plans** (`PLANS` in `packages/shared`) | Free, Creator, Studio, Team, Business: recording hours a month, days the finished files and the originals are kept, the guest badge |
+| **Plans** (`PLANS` in `packages/shared`) | Free, Own storage, Creator, Studio, Team, Business: recording hours a month, days the finished files and the originals are kept, the guest badge |
 | **Hours** (`BillingService`, `src/server/billing.ts`) | Counted per recording (not per person), deleted recordings included, per billing month: the calendar month on Free, the subscription's day of the month otherwise |
 | **The limit** | Record is refused (402 `hours_used_up`, shown in the room) once the month's hours are used. A recording that is running is never stopped, and uploads are never refused for it |
 | **Retention** | When a recording's files are ready it gets `keep_until` (the plan's days) and its originals a `purge_raw` job (7 days). The job runner deletes recordings past `keep_until`, the way a host deletes one. A bigger plan extends what is already recorded; a smaller one never shortens it |
@@ -18,6 +18,9 @@ no limits, no Plan tab, and the billing endpoints answer 404.
 | **Plan tab** (Settings) | Plan, hours used this month, what is kept how long, links to buy a bigger plan, the provider's portal. Recordings show "Kept until …" |
 | **Plans by hand** | The admin sets an account's plan in the Plan tab (`PUT /api/admin/accounts/:id/plan`): founding members, organisations paying by invoice. Refused for an account with a subscription |
 | **Confirming the address** | A new account gets a link by email and can't create or open a studio until it is opened (needs `SMTP_HOST`; the first account is exempt). A notice on every dashboard page offers to send it again |
+| **A warning before deletion** | Where the server sends email, each host gets one email listing the recordings within three days of their date, and a recording is deleted only a day or more after its warning went. A mail problem delays deleting; it never skips the warning |
+| **Sign-up limit** | Five new accounts an hour from one address (attempts count), on any server with open sign-up |
+| **Own storage** | An account connects its own S3-compatible bucket on the Storage page (needs `STORAGE_SECRET_KEY`); its sessions then record there. The Own storage plan has no other storage, no hour limit and no deletion by us; Business may use it; other plans can't |
 | **Webhook** (`POST /api/billing/webhook`) | Paddle Billing and Lemon Squeezy: signature checked, each event applied once, older events never overwrite newer state. Follows new subscriptions, plan changes, failed payments, cancellations and the end |
 
 ## Setting it up
@@ -31,6 +34,7 @@ BILLING_PRICES=pri_abc=creator,pri_def=creator,pri_xyz=studio   # monthly and ye
 BILLING_CHECKOUT_URLS=creator=https://…{user_id}…{email},studio=https://…
 BILLING_MANAGE_URL=https://…            # the provider's customer portal
 SMTP_HOST=…  SMTP_FROM=…  APP_URL=…     # email: confirming addresses, new passwords, guests' recap
+STORAGE_SECRET_KEY=…                    # own storage: encrypts customers' bucket keys. Never change it
 GUEST_PROMO_URL=https://tapry.app/      # the Free plan's badge
 ```
 
@@ -44,11 +48,8 @@ checkout address isn't offered. A separate worker reads `TAPRY_CLOUD` too: it do
 |---|---|---|
 | **A live test against the provider** | The webhook readers are written from the published formats and tested with payloads of that shape, never with a real account | The first sale |
 | **Seats** (several people in one account) | Studio and Team list 3 and 5 seats; today an account is one person | Selling Studio and Team as described |
-| **Own storage** (the customer's bucket) | The $12 plan and the founding offer | Selling those |
 | **Extra hours and longer keeping** | The add-ons in the pricing | Nothing: later |
-| **A warning before deletion** | Today the date is on the recording; an email a few days before would be kinder | Nothing, but do it before the first paying customers reach their date |
-| **Sign-up limits** | Per-address limits on new accounts (confirming the address already stops unconfirmed ones from recording) | Opening sign-up |
-| **Terms, privacy policy, data processing agreement** | The legal page is a draft | Taking money |
+| **Terms, refund and privacy pages, data processing agreement** | Drafted in `docs/legal-drafts.md` from what the software does, with the owner's facts left blank; not on the website | The provider's review, and taking money |
 | **SSO, audit log** (`/ee`) | Business and the organisation licence | Selling those |
 
 ## Only the owner can do

@@ -320,4 +320,32 @@ CREATE TABLE account_tokens (
 );
 CREATE INDEX account_tokens_user ON account_tokens (user_id);
 `,
+  `
+-- When the host was told by email that this recording's time under their plan is nearly over.
+-- Where the server sends email, a recording is only deleted a day or more after this.
+ALTER TABLE recordings ADD COLUMN expiry_warned_at timestamptz;
+`,
+  `
+-- Own storage: an account's own S3-compatible bucket. The secret key is encrypted with the
+-- server's STORAGE_SECRET_KEY. One row per saved set of settings: replacing or removing them
+-- retires the row, which stays for the sessions recorded with it.
+CREATE TABLE storage_targets (
+  id text PRIMARY KEY,
+  owner_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint text,
+  region text NOT NULL,
+  bucket text NOT NULL,
+  access_key_id text NOT NULL,
+  secret_encrypted text NOT NULL,
+  force_path_style boolean NOT NULL,
+  -- A test upload from a browser arrived (the bucket's CORS rules let guests upload).
+  verified_at timestamptz,
+  retired_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX storage_targets_current ON storage_targets (owner_id) WHERE retired_at IS NULL;
+
+-- Where a session's files live: set when the session opens, never changed. Null: the server's storage.
+ALTER TABLE sessions ADD COLUMN storage_target_id text REFERENCES storage_targets(id);
+`,
 ];

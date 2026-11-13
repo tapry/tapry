@@ -85,7 +85,7 @@ const ROUTE_PATTERNS = ROUTES.map(([method, path, name]) => {
 });
 
 /** A fresh in-memory server: services, handlers, and a fetch that routes like Next.js. */
-export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; setupToken?: string; speedTestOrigins?: string[]; mailer?: Mailer; bytesPerSecondCap?: number; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig; guestPromoUrl?: string; appUrl?: string; /** Where the server's clock starts (ms). */ clockStart?: number } = {}) {
+export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; setupToken?: string; speedTestOrigins?: string[]; mailer?: Mailer; bytesPerSecondCap?: number; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig; guestPromoUrl?: string; appUrl?: string; ownStorage?: Parameters<typeof createServices>[2] extends infer O ? (O extends { ownStorage?: infer S } ? S : never) : never; /** Where the server's clock starts (ms). */ clockStart?: number } = {}) {
   const db = await openDb("pglite://memory");
   let clock = opts.clockStart ?? 1_000_000;
   const services = createServices(db, storage, {
@@ -98,6 +98,7 @@ export async function createServer(storage: Storage = new FakeStorage(), opts: {
     billingWebhook: opts.billingWebhook,
     guestPromoUrl: opts.guestPromoUrl,
     appUrl: opts.appUrl,
+    ownStorage: opts.ownStorage,
   });
   const api = createApiHandlers(async () => services);
 

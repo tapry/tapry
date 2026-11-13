@@ -49,6 +49,11 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["GET", "/api/guests", "listGuests"],
   ["GET", "/api/transcripts", "listTranscripts"],
   ["GET", "/api/storage", "storageOverview"],
+  ["GET", "/api/storage/own", "ownStorage"],
+  ["PUT", "/api/storage/own", "saveOwnStorage"],
+  ["DELETE", "/api/storage/own", "removeOwnStorage"],
+  ["POST", "/api/storage/own/check", "ownStorageCheck"],
+  ["POST", "/api/storage/own/check/confirm", "confirmOwnStorageCheck"],
 
   ["GET", "/api/sessions/[sessionId]/state", "sessionState"],
   ["GET", "/api/sessions/[sessionId]/events", "sessionEvents"],

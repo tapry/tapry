@@ -50,6 +50,8 @@ export class StudioService {
     private live: LiveService,
     /** A purge job was queued (lets an in-process worker start it now). */
     private onPurgeQueued: () => void = () => {},
+    /** Where a new session of this owner records: their own storage target, or null for the server's. May refuse. */
+    private storageTargetFor: (tx: Queryable, ownerId: string) => Promise<string | null> = async () => null,
   ) {}
 
   async create(owner: User, body: z.infer<typeof createStudioBody>): Promise<Studio> {
@@ -136,7 +138,7 @@ export class StudioService {
   async openAsHost(owner: User, studioId: string): Promise<SessionTicket> {
     const studio = await this.owned(owner, studioId);
     const ticket = await this.db.transaction(async (tx) => {
-      const sessionId = await openSession(tx, studioId);
+      const sessionId = await openSession(tx, studioId, () => this.storageTargetFor(tx, owner.id));
       const token = newToken();
       const [existing] = await tx.query<{ id: string }>(
         "UPDATE participants SET token_hash = $3 WHERE session_id = $1 AND user_id = $2 AND role = 'host' RETURNING id",
@@ -275,14 +277,15 @@ export class StudioService {
   }
 }
 
-async function openSession(tx: Queryable, studioId: string): Promise<string> {
+async function openSession(tx: Queryable, studioId: string, storageTarget: () => Promise<string | null>): Promise<string> {
   await tx.query("SELECT id FROM studios WHERE id = $1 FOR UPDATE", [studioId]);
   const [open] = await tx.query<{ id: string }>("SELECT id FROM sessions WHERE studio_id = $1 AND status = 'open'", [
     studioId,
   ]);
   if (open) return open.id;
   const id = newId("ses");
-  await tx.query("INSERT INTO sessions (id, studio_id) VALUES ($1, $2)", [id, studioId]);
+  // Decided once, here: everything this session records lives in that storage for good.
+  await tx.query("INSERT INTO sessions (id, studio_id, storage_target_id) VALUES ($1, $2, $3)", [id, studioId, await storageTarget()]);
   return id;
 }
 

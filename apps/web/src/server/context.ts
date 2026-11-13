@@ -42,6 +42,7 @@ export function getServices(): Promise<Services> {
       appUrl: config.mail?.appUrl,
       speedTestOrigins: config.speedTestOrigins,
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
+      ownStorage: config.ownStorage,
       billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl },
       billingWebhook: config.cloud?.webhook ?? null,
       serverInfo: {
@@ -58,7 +59,8 @@ export function getServices(): Promise<Services> {
     if (config.worker.inProcess) {
       // Replace the runner too, so worker code edits apply. The old one finishes its current job.
       shared.runner?.stop();
-      const runner = new JobRunner(db, storage, {
+      // The routed storage: jobs of own-storage sessions read and write the account's bucket.
+      const runner = new JobRunner(db, svc.storage, {
         ...config.worker,
         kind: "inprocess",
         mail: mailer && { mailer, appUrl: config.mail!.appUrl, promoUrl: config.guestPromoUrl, cloud: !!config.cloud },

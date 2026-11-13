@@ -6,6 +6,7 @@ import { loadConfig } from "./server/config";
 import { openDb } from "./server/db";
 import { JobRunner } from "./server/jobs";
 import { SmtpMailer } from "./server/mail";
+import { RoutedStorage, StorageTargets } from "./server/own-storage";
 import { S3Storage } from "./server/storage";
 
 const HEARTBEAT_FILE = process.env.WORKER_HEARTBEAT_FILE ?? "/tmp/tapry-worker-heartbeat";
@@ -22,7 +23,8 @@ async function main() {
   await storage.ensureBucket();
   const db = await openDb(config.databaseUrl);
 
-  const runner = new JobRunner(db, storage, {
+  // Sessions of accounts with their own bucket are read and written there.
+  const runner = new JobRunner(db, new RoutedStorage(storage, new StorageTargets(db, config.ownStorage.serverKey)), {
     ...config.worker,
     kind: "worker",
     mail: config.mail && { mailer: new SmtpMailer(config.mail.smtp), appUrl: config.mail.appUrl, promoUrl: config.guestPromoUrl, cloud: !!config.cloud },

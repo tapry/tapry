@@ -72,6 +72,13 @@ const env = z.object({
   LIVEKIT_API_KEY: unsetIfEmpty(z.string()),
   LIVEKIT_API_SECRET: unsetIfEmpty(z.string()),
   /**
+   * Lets accounts record into their own S3-compatible bucket: their secret keys are stored
+   * encrypted with this. Unset (default): own storage is off. Changing it makes saved keys unreadable.
+   */
+  STORAGE_SECRET_KEY: unsetIfEmpty(z.string().min(16)),
+  /** Accept private and plain-HTTP endpoints for own storage (a trusted install on a private network). */
+  OWN_STORAGE_ALLOW_PRIVATE: bool("false"),
+  /**
    * Run this server as Tapry Cloud: accounts have plans with recording hours and file
    * retention (packages/shared PLANS). False (default, every self-hosted server): no plans, no limits.
    */
@@ -127,6 +134,8 @@ export interface Config {
   mail: { smtp: SmtpConfig; appUrl: string } | null;
   speedTestOrigins: string[];
   updateRepo: string | null;
+  /** Accounts' own buckets: the key their secrets are encrypted with (null: off). */
+  ownStorage: { serverKey: string | null; allowPrivate: boolean };
   /** Tapry Cloud: plans, limits and billing. Null on a self-hosted server. */
   cloud: { checkoutUrls: Partial<Record<PlanId, string>>; manageUrl: string | null; webhook: WebhookConfig | null } | null;
 }
@@ -180,6 +189,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       : null,
     speedTestOrigins: cfg.SPEED_TEST_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
     updateRepo: cfg.UPDATE_CHECK_REPO ?? null,
+    ownStorage: { serverKey: cfg.STORAGE_SECRET_KEY ?? null, allowPrivate: cfg.OWN_STORAGE_ALLOW_PRIVATE },
     cloud: cfg.TAPRY_CLOUD
       ? {
           // Read even without a webhook secret, so a mistyped plan is caught at start.
