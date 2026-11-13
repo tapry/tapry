@@ -783,9 +783,11 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         expect(detail(blurred.video.path, "right")).toBeLessThan(detail(asRecorded.video.path, "right") * 0.25);
         // From the very first frame: the picture never waits for the mask.
         expect(detail(blurred.video.path, "right", 0)).toBeLessThan(detail(asRecorded.video.path, "right", 0) * 0.25);
-        // At the seam it is neither: the edge fades.
+        // At the seam it is neither: the edge fades. Measured against the person's side of the same
+        // file: with half the picture blurred the encoder has bits to spare, so the sharp side comes
+        // out a little crisper than in the file as recorded.
         const kept = (part: "left" | "right" | "seam") => detail(blurred.video.path, part) / detail(asRecorded.video.path, part);
-        expect(kept("seam")).toBeLessThan(0.9);
+        expect(kept("seam")).toBeLessThan(kept("left") * 0.9);
         expect(kept("seam")).toBeGreaterThan(kept("right") * 1.5);
         // Same frame, frame rate, frame count and length as without it.
         expect(shape(blurred.video.path)).toBe(shape(asRecorded.video.path));
