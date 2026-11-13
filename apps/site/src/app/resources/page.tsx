@@ -1,7 +1,7 @@
 import { BrandPanel, Chip, DarkBtn, H1, H2, HERO_BG, LEAD, OutlineBtn, SectionHead, Shell } from "@/components/ui";
 import { postHref, posts } from "@/content/blog";
 import { releases } from "@/content/changelog";
-import { BROWSER_REPORT_URL, BUG_REPORT_URL, CHANGELOG_URL, CONTRIBUTING_URL, GITHUB, SECURITY_URL, HAS_SPEED_TEST, pageMeta } from "@/content/site";
+import { BROWSER_REPORT_URL, BUG_REPORT_URL, CHANGELOG_URL, CONTRIBUTING_URL, GITHUB, HAS_CLOUD, SECURITY_URL, HAS_SPEED_TEST, pageMeta } from "@/content/site";
 
 export const metadata = pageMeta({
   title: `Resources: blog, free ${HAS_SPEED_TEST ? "tools" : "mic test"}, changelog and help · Tapry`,
@@ -113,7 +113,7 @@ export default function ResourcesPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 18, fontSize: 17, lineHeight: 1.55, color: "#3a3a3c", textWrap: "pretty" }}>
             <p style={{ margin: 0 }}>Tapry, formerly OpenTake, is an open-source remote recording studio: guests join by link, everyone is recorded on their own computer, and the files land on a server you run.</p>
             <p style={{ margin: 0 }}>
-              The server is AGPL-3.0 so improvements stay shared; the recorder core is MIT so anyone can build on it. Tapry Cloud, the same software without running a server, is planned. <a href="/about/" style={{ textDecoration: "underline", textUnderlineOffset: 3, textDecorationColor: "#e8553d" }}>About Tapry</a>
+              The server is AGPL-3.0 so improvements stay shared; the recorder core is MIT so anyone can build on it. Tapry Cloud, the same software without running a server, {HAS_CLOUD ? "is open, and starts free" : "is planned"}. <a href="/about/" style={{ textDecoration: "underline", textUnderlineOffset: 3, textDecorationColor: "#e8553d" }}>About Tapry</a>
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <DarkBtn href={GITHUB}>GitHub</DarkBtn>

@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+// Geist and Geist Mono from npm packages (OFL-1.1), served with the site: nothing is fetched
+// from a font service, at build time or by visitors.
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "./site.css";
-
-// Downloaded at build time and served with the site: visitors make no requests to Google.
-const geist = Geist({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600"], variable: "--font-geist", display: "swap" });
-const geistMono = Geist_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-geist-mono", display: "swap" });
 
 const title = "Tapry: record any guest in studio quality";
 const description =
@@ -26,7 +25,7 @@ const NO_SCRIPT = ".site-nav-overlay{background:#fff;color:#0b0b0f;border-bottom
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
+    <html lang="en">
       <body>
         <noscript>
           <style>{NO_SCRIPT}</style>

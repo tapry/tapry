@@ -52,3 +52,13 @@ The source of every Debian package in the image is available from
 | [LiveKit server](https://github.com/livekit/livekit) | Apache-2.0 |
 | [PostgreSQL](https://www.postgresql.org) | PostgreSQL License |
 | [SeaweedFS](https://github.com/seaweedfs/seaweedfs) | Apache-2.0 |
+
+## Fonts
+
+Bundled from npm packages by Fontsource, each under the SIL Open Font License 1.1, and served
+with the app and the website (nothing is fetched from a font service):
+
+- **Inter** (the app's text), by Rasmus Andersson: `@fontsource-variable/inter`.
+- **Geist** (the website's text) and **Geist Mono** (timers and figures in both), by Vercel:
+  `@fontsource-variable/geist`, `@fontsource-variable/geist-mono`.
+

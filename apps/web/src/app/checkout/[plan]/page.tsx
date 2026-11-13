@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth-shell";
 import { PaddleCheckout } from "@/components/paddle-checkout";
 import { Notice } from "@/components/ui";
 import { getServices } from "@/server/context";
 import { isApiError } from "@/server/errors";
-import { requireUser } from "@/server/page-auth";
+import { currentUser } from "@/server/page-auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Checkout", robots: { index: false } };
@@ -14,8 +14,9 @@ const link = "font-medium text-text underline underline-offset-[3px] hover:text-
 
 /** Tapry Cloud: buy a plan. Opens the payment provider's checkout for the signed-in account. */
 export default async function CheckoutPage({ params, searchParams }: { params: Promise<{ plan: string }>; searchParams: Promise<{ yearly?: string }> }) {
-  const user = await requireUser();
-  const [{ plan }, { yearly }, services] = await Promise.all([params, searchParams, getServices()]);
+  const [{ plan }, { yearly }, services, user] = await Promise.all([params, searchParams, getServices(), currentUser()]);
+  // Someone arriving from the website's pricing page has no account yet: sign up, then come back here.
+  if (!user) redirect(`/signup?next=${encodeURIComponent(`/checkout/${plan}${yearly === "1" ? "?yearly=1" : ""}`)}`);
   let checkout;
   try {
     checkout = services.billing.checkout(user, plan, yearly === "1");

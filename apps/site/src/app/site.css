@@ -1,8 +1,8 @@
 /* The Tapry website, from the "Tembo" designs. Light by design, whatever the system theme. */
 :root {
   color-scheme: light;
-  --sans: var(--font-geist), "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Geist Variable", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {

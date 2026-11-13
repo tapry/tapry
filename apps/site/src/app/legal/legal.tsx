@@ -1,9 +1,49 @@
 // Privacy and Terms, one after the other on one page (#privacy, #terms), so both are in the
 // static files and the links work without script. A draft for the owner to review: it describes
-// this website and the self-hosted software as they are; Tapry Cloud isn't available yet.
-import { HAS_SPEED_TEST, HAS_WAITLIST } from "@/content/site";
+// this website, the self-hosted software and (with the hosted app's address set) Tapry Cloud as
+// they are. The Cloud sections state what the software does (docs/cloud-billing.md) and who
+// handles data; the fuller texts, with the operator's legal details, are in docs/legal-drafts.md.
+import { CONTACT_EMAIL, HAS_CLOUD, HAS_SPEED_TEST, HAS_WAITLIST } from "@/content/site";
 
 type Doc = { id: "privacy" | "terms"; title: string; sections: Array<[string, string]> };
+
+const CLOUD_PRIVACY: Array<[string, string]> = [
+  [
+    "Tapry Cloud: your account",
+    "To host recordings on Tapry Cloud you create an account with a name, an email address and a password. The password is stored only as a hash. One cookie keeps you signed in. Tapry Cloud runs no analytics, advertising or tracking.",
+  ],
+  [
+    "Tapry Cloud: recordings",
+    "Each person’s sound and picture, the finished files and the transcripts are stored on our servers in Finland. The original uploads are removed 7 days after a recording is processed; the finished files are kept for the number of days your plan says, then the recording is deleted, and each recording shows its date. Transcripts are made on our own servers and are not sent to any AI company. Recordings are never used to train anything, and sound, picture, transcript text and email addresses are never written to logs.",
+  ],
+  [
+    "Tapry Cloud: payments",
+    "Paid plans are sold by Paddle, our payment provider and merchant of record: Paddle takes the payment, handles tax and sends the invoice, under its own privacy policy. No card detail reaches Tapry. We keep Paddle’s identifiers for your customer record and subscription, so your account gets the plan you paid for.",
+  ],
+  [
+    "Who else handles data",
+    "Hetzner hosts the servers and the stored recordings, in Finland. Paddle handles payments. Cloudflare hosts this website and forwards mail sent to our contact address. We don’t sell or share data with anyone else.",
+  ],
+  [
+    "Your rights",
+    `You can see, correct, download and delete what Tapry Cloud holds about you: write to ${CONTACT_EMAIL}. A guest who wants their part of a recording removed should ask the host who recorded them; we help the host do it.`,
+  ],
+];
+
+const CLOUD_TERMS: Array<[string, string]> = [
+  [
+    "Tapry Cloud: plans",
+    "A plan gives you a number of recording hours each billing month and a time your finished files are kept; the pricing page lists them. Hours are counted per recording, not per person, and a deleted recording still counts. When a month’s hours are used up you can’t start a new recording until the next month or a bigger plan. A recording that is running is never cut off.",
+  ],
+  [
+    "Tapry Cloud: how long recordings are kept",
+    "The original uploads are removed 7 days after a recording is processed. The finished files are kept for your plan’s number of days, counted from when they were first ready; then the recording is deleted. Moving to a bigger plan extends the time for recordings you already have; a smaller plan never shortens it. Deleted recordings can’t be recovered: download what you want to keep.",
+  ],
+  [
+    "Tapry Cloud: paying, cancelling and refunds",
+    `Plans are sold through Paddle and renew each month or year until you cancel. You can cancel at any time from Settings, Plan: the plan then runs to the end of the period you paid for and the account moves to the Free plan. If Tapry Cloud isn’t for you, write to ${CONTACT_EMAIL} within 14 days of your first payment and it is refunded in full.`,
+  ],
+];
 
 const DOCS: Doc[] = [
   {
@@ -29,7 +69,9 @@ const DOCS: Doc[] = [
         "Guests",
         "Guests give a name and agree to the studio’s consent text before joining. The exact text and when they agreed are kept with the recording, for the host who runs that server. A guest who sends tech-check results sends their name, browser and the checks’ outcomes, no media. If the host’s server offers a recap email and the guest asks for one, their address is kept on that server only until the email is sent or given up on.",
       ],
-      ["Tapry Cloud", "Tapry Cloud, a hosted version, is not available yet. Before it opens, this policy will say what it stores and where."],
+      ...(HAS_CLOUD
+        ? CLOUD_PRIVACY
+        : ([["Tapry Cloud", "Tapry Cloud, a hosted version, is not available yet. Before it opens, this policy will say what it stores and where."]] as Array<[string, string]>)),
     ],
   },
   {
@@ -39,8 +81,13 @@ const DOCS: Doc[] = [
       ["The software", "Tapry’s server is licensed under AGPL-3.0 and the recorder core under MIT. Those licences govern your use of the code."],
       ["Your recordings", "You own what you record. You are responsible for having each guest’s permission to record them and to publish what you record."],
       ["Acceptable use", "Don’t use Tapry to record people without their knowledge, or to break the law where you or your guests are."],
-      ["Tapry Cloud", "Tapry Cloud isn’t available yet. The plans on the pricing page are planned and may change before it opens; its terms will be published here first."],
-      ["No warranty", "The self-hosted software is provided as is, without warranty. Keep your own backups of anything you can’t afford to lose."],
+      ...(HAS_CLOUD
+        ? CLOUD_TERMS
+        : ([["Tapry Cloud", "Tapry Cloud isn’t available yet. The plans on the pricing page are planned and may change before it opens; its terms will be published here first."]] as Array<[string, string]>)),
+      [
+        "No warranty",
+        `The self-hosted software is provided as is, without warranty. Keep your own backups of anything you can’t afford to lose.${HAS_CLOUD ? " We work to keep Tapry Cloud running and your recordings safe, but don’t promise uninterrupted service." : ""}`,
+      ],
     ],
   },
 ];
