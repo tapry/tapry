@@ -80,7 +80,7 @@ export class RecapService {
        WHERE q.token_hash = $1 AND q.status = 'sent' AND q.expires_at > now() AND st.deleted_at IS NULL`,
       [hashToken(token)],
     );
-    return row ? { id: row.id, sessionId: row.session_id, role: row.role, studioName: row.studio_name } : null;
+    return row ? { id: row.id, sessionId: row.session_id, role: row.role, producer: false, solo: false, studioName: row.studio_name } : null;
   }
 
   /** The studio lets guests have their files, and this person recorded something still here. */

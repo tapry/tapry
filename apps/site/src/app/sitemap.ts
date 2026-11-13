@@ -20,6 +20,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/about/",
     "/tools/",
     "/mic-test/",
+    "/recorder/",
+    "/consent-form/",
     ...(HAS_SPEED_TEST ? ["/upload-speed-test/"] : []),
     ...(posts.length ? ["/blog/", ...posts.map(postHref)] : []),
     ...(customers.length ? ["/customers/", ...customers.map((c) => `/customers/${c.slug}/`)] : []),

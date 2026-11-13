@@ -429,4 +429,32 @@ ALTER TABLE recordings ADD COLUMN notes text NOT NULL DEFAULT 'off' CHECK (notes
 ALTER TABLE recordings ADD COLUMN notes_error text;
 ALTER TABLE users ADD COLUMN ai_outside_at timestamptz;
 `,
+  `
+-- A producer: a host who is in the call and at the controls, and is never recorded.
+ALTER TABLE participants ADD COLUMN producer boolean NOT NULL DEFAULT false;
+`,
+  `
+-- The host's guide for a studio (run of show), and markers: named moments of a recording set
+-- by a host while it runs.
+ALTER TABLE studios ADD COLUMN guide text NOT NULL DEFAULT '';
+CREATE TABLE markers (
+  id text PRIMARY KEY,
+  recording_id text NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  participant_id text REFERENCES participants(id) ON DELETE SET NULL,
+  at_ms bigint NOT NULL,
+  label text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX markers_recording ON markers (recording_id, at_ms);
+`,
+  `
+-- Solo links: one person records alone, with no host and no call. Each visit is a session of
+-- its own in status 'solo' (so it never counts as the studio's one open live session), whose
+-- single participant may start and stop the recording. solo_code is the link's secret (null:
+-- off); solo_prompt is what the person is asked.
+ALTER TABLE sessions DROP CONSTRAINT sessions_status_check;
+ALTER TABLE sessions ADD CONSTRAINT sessions_status_check CHECK (status IN ('open', 'solo', 'ended'));
+ALTER TABLE studios ADD COLUMN solo_code text UNIQUE;
+ALTER TABLE studios ADD COLUMN solo_prompt text NOT NULL DEFAULT '';
+`,
 ];

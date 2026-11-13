@@ -23,10 +23,13 @@ export async function generateMetadata({ params }: { params: Promise<{ studioId:
 
 export default async function StudioPage({ params }: { params: Promise<{ studioId: string }> }) {
   const { user, studio, services } = await load((await params).studioId);
-  const [studios, recordings, checks] = await Promise.all([
+  const [studios, recordings, checks, guide, can4k, solo] = await Promise.all([
     services.studios.list(user),
     services.processing.listForStudio(user, studio.id),
     services.studios.techChecks(user, studio.id),
+    services.guide.get(user, studio.id),
+    services.billing.allows4k(user.accountId),
+    services.studios.solo(user, studio.id),
   ]);
   return (
     <DashboardShell user={user} studios={studios} currentId={studio.id} title={studio.name}>
@@ -35,6 +38,9 @@ export default async function StudioPage({ params }: { params: Promise<{ studioI
         recordings={recordings}
         checks={checks}
         hostName={user.name}
+        guide={guide}
+        solo={solo}
+        can4k={can4k}
         studios={studios.map((s) => ({ id: s.id, name: s.name, bytes: s.bytes }))}
       />
     </DashboardShell>

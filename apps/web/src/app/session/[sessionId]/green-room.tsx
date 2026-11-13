@@ -29,6 +29,8 @@ export interface ReadyToJoin {
   stream: MediaStream;
   choice: DeviceChoice;
   clock: ClockEstimate | null;
+  /** A host who joins without being recorded: in the call and at the controls only. */
+  producer?: boolean;
 }
 
 /**
@@ -83,6 +85,8 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
     };
   }, []);
 
+  const [producer, setProducer] = useState(false);
+  const [producerProblem, setProducerProblem] = useState(false);
   const blocking = checks.some((c) => c.tone === "danger");
   // Waits for the clock estimate: without it this person's recording is placed by their own clock.
   const canJoin = status === "live" && !!stream && !!clock && !blocking && !joining;
@@ -95,7 +99,19 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
     // which would block joining for anyone who ignores it.
     void requestPersistentStorage().catch(() => false);
     // The room owns the stream from here; the green room must not stop it on unmount.
-    onJoin({ stream: handOff() ?? stream, choice, clock });
+    // The server is told first: it refuses a producer's tracks, and the others see who isn't recorded.
+    if (ticket.role === "host") {
+      const ok = await apiFetch(`/sessions/${ticket.sessionId}/producer`, { method: "PUT", body: { producer }, token: ticket.token }).then(
+        () => true,
+        () => false,
+      );
+      if (!ok) {
+        setJoining(false);
+        setProducerProblem(true);
+        return;
+      }
+    }
+    onJoin({ stream: handOff() ?? stream, choice, clock, producer: ticket.role === "host" && producer });
   }
 
   return (
@@ -162,6 +178,14 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
         <HeadphonesBox checked={choice.headphones} onChange={(headphones) => setChoice({ ...choice, headphones })}>
           I&apos;m wearing headphones, so other voices don&apos;t leak into my microphone.
         </HeadphonesBox>
+
+        {ticket.role === "host" && (
+          <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
+            <input type="checkbox" checked={producer} onChange={(e) => setProducer(e.target.checked)} className="mt-0.5 size-4 shrink-0" data-testid="join-as-producer" />
+            <span>Join as producer: I&apos;m in the call and at the controls, but I&apos;m not recorded and not in the files.</span>
+          </label>
+        )}
+        {producerProblem && <Notice tone="danger">That couldn&apos;t be changed right now (a recording of you may be running). Try again.</Notice>}
 
         <CheckList checks={checks} pending={measuring ? ["Checking your storage and connection…"] : []} />
 

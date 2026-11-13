@@ -15,6 +15,11 @@ import {
   resetPasswordBody,
   setFiltersBody,
   aiNotesBody,
+  soloJoinBody,
+  soloSettingsBody,
+  guideBody,
+  markerBody,
+  producerBody,
   removeWaitlistBody,
   setPlanBody,
   waitlistBody,
@@ -37,6 +42,7 @@ import type { Services } from "./services";
 import { clientAddress, drainBody, siteCors, speedTestCors } from "./speed-test";
 import { APP_VERSION } from "./worker-info";
 import { contentDisposition } from "./storage";
+import { TIMELINE_FORMATS } from "./timeline-export";
 
 type Params = Record<string, string>;
 type Handler = (req: Request, params: Params) => Promise<Response>;
@@ -347,18 +353,30 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
         headers: { "content-type": "text/plain; charset=utf-8", "content-disposition": contentDisposition(fileName), "cache-control": "no-store" },
       });
     }),
+    /** A project file for an editor (OpenTimelineIO, Final Cut XML or REAPER) that lays the recording's files out. */
+    downloadTimeline: asUser(async (svc, user, _req, params) => {
+      const format = TIMELINE_FORMATS.find((f) => f === params.format);
+      if (!format) throw new ApiError(404, "not_found", "No such timeline format");
+      const file = await svc.timelines.file(user, params.studioId!, params.recordingId!, format);
+      return new Response(file.body, { headers: { "content-type": file.contentType, "content-disposition": contentDisposition(file.fileName), "cache-control": "no-store" } });
+    }),
     downloadZip: asUser(async (svc, user, req, params) => {
       const { fileName, files, consent } = await svc.processing.zipContents(user, params.studioId!, params.recordingId!);
       const storage = svc.storage;
       const consentBytes = new TextEncoder().encode(consent.body);
+      // Small text files made on the spot: the timeline projects, then the consent record.
+      const made = [
+        ...(await svc.timelines.all(user, params.studioId!, params.recordingId!)).map((t) => ({ name: t.fileName, bytes: new TextEncoder().encode(t.body) })),
+        { name: consent.fileName, bytes: consentBytes },
+      ];
       // Opened one at a time, when the zip reaches each file; the consent record goes last.
       async function* entries() {
         for (const f of files) {
           yield { name: f.name, size: f.size, lastModified: f.lastModified, input: await storage.openRead(f.key, req.signal) };
         }
-        yield { name: consent.fileName, size: consentBytes.byteLength, lastModified: new Date(), input: consentBytes };
+        for (const m of made) yield { name: m.name, size: m.bytes.byteLength, lastModified: new Date(), input: m.bytes };
       }
-      const metadata = [...files.map((f) => ({ name: f.name, size: f.size })), { name: consent.fileName, size: consentBytes.byteLength }];
+      const metadata = [...files.map((f) => ({ name: f.name, size: f.size })), ...made.map((m) => ({ name: m.name, size: m.bytes.byteLength }))];
       const zip = downloadZip(entries(), { metadata });
       return new Response(zip.body, {
         headers: {
@@ -433,6 +451,23 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       json(200, await svc.processing.ownRecordings(p, await svc.billing.promoFor(p.sessionId, svc.guestPromoUrl))),
     ),
     /** The end screen's recap email: whether it's offered and how it's going; asking for one. */
+    /** A studio's solo link: where one person records alone. */
+    getSolo: asUser(async (svc, user, _req, params) => json(200, await svc.studios.solo(user, params.studioId!))),
+    setSolo: asUser(async (svc, user, req, params) => json(200, await svc.studios.setSolo(user, params.studioId!, await parseBody(req, soloSettingsBody)))),
+    /** Someone starts recording alone on a solo link. No account. */
+    soloJoin: handler(async (svc, req) => json(201, await svc.studios.soloJoin(await parseBody(req, soloJoinBody), clientAddress(req)))),
+    /** A studio's guide (run of show), for the people of its account. */
+    getGuide: asUser(async (svc, user, _req, params) => json(200, { guide: await svc.guide.get(user, params.studioId!) })),
+    setGuide: asUser(async (svc, user, req, params) => json(200, { guide: await svc.guide.set(user, params.studioId!, (await parseBody(req, guideBody)).guide) })),
+    /** The guide, for a host in the room. */
+    sessionGuide: asParticipant(async (svc, p) => json(200, { guide: await svc.guide.forHost(p) })),
+    /** Mark this moment of the running recording. */
+    addMarker: asParticipant(async (svc, p, req) => json(201, await svc.guide.mark(p, (await parseBody(req, markerBody)).label ?? "Marker"))),
+    /** A host becomes a producer (never recorded), or someone who is recorded again. */
+    setProducer: asParticipant(async (svc, p, req) => {
+      await svc.live.setProducer(p, (await parseBody(req, producerBody)).producer);
+      return json(200, { ok: true });
+    }),
     recapStatus: asParticipant(async (svc, p) => json(200, await svc.recaps.status(p))),
     requestRecap: asParticipant(async (svc, p, req) => json(200, await svc.recaps.request(p, (await parseBody(req, recapBody)).email))),
     /** LiveKit token for the live call (or enabled: false when no LiveKit is configured). */

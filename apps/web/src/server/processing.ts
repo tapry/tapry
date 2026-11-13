@@ -499,6 +499,8 @@ export async function deleteRecordingIn(tx: Queryable, recordingId: string): Pro
   if (rec.deleted_at) return rec.session_id;
   if (rec.status === "recording") throw new ApiError(409, "still_recording", "Stop the recording before deleting it");
 
+  // What the host wrote about it goes with it.
+  await tx.query("DELETE FROM markers WHERE recording_id = $1", [recordingId]);
   // Drop work not started yet. A job a worker claimed meanwhile is 'running' when this
   // re-checks the row, so it survives this and the check below refuses.
   await tx.query(

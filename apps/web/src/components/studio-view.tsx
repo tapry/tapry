@@ -1,5 +1,7 @@
 "use client";
 
+import { SoloLink } from "./solo-link";
+import { GuideEditor } from "./guide-editor";
 import { recordingLabel } from "@/components/quality-options";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client/api";
@@ -20,9 +22,18 @@ export function StudioView({
   checks,
   studios,
   hostName,
+  guide,
+  solo,
+  can4k = true,
 }: {
   studio: Studio;
   hostName: string;
+  /** The studio's guide (run of show). */
+  guide: string;
+  /** The studio's solo link (its code when on) and its questions. */
+  solo: { code: string | null; prompt: string };
+  /** This account's studios may record in 4K. */
+  can4k?: boolean;
   recordings: RecordingSummary[];
   checks: TechCheck[];
   studios: Array<{ id: string; name: string; bytes: number }>;
@@ -121,7 +132,9 @@ export function StudioView({
 
       {tab === "settings" && (
         <>
-          <StudioSettingsForm studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} />
+          <StudioSettingsForm studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} can4k={can4k} />
+          <GuideEditor studioId={studio.id} initial={guide} />
+          <SoloLink studioId={studio.id} initial={solo} />
           <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-accent-line bg-surface px-[18px] py-4">
             <span className="flex flex-[1_1_260px] flex-col gap-[3px]">
               <span className="font-medium">Delete this studio</span>

@@ -33,7 +33,8 @@ export function buildConstraints(settings: StudioSettings, choice: DeviceChoice)
           ...(choice.videoDeviceId ? { deviceId: { exact: choice.videoDeviceId } } : {}),
           width: { ideal: width },
           height: { ideal: height },
-          frameRate: { ideal: 30, max: 30 },
+          // The nearest whole rate to the studio's; the finished files are made at exactly that rate.
+          frameRate: { ideal: Math.round(Number(settings.frameRate)), max: 30 },
         },
   };
 }

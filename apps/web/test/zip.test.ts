@@ -75,9 +75,11 @@ describe("zip download", () => {
       { name: "Zoë - audio.wav", size: 18, text: "RIFF audio of Zoë" },
       { name: "Transcript.txt", size: 19, text: "[00:00] Zoë: hello" },
     ]);
-    // Last, the consent record, made on the spot (not from storage).
-    expect(entries[3]).toMatchObject({ name: "Consent record - Recording 1.txt", text: expect.stringMatching(/^Consent record: My Podcast, Recording 1/) });
-    expect(entries).toHaveLength(4);
+    // Then what is made on the spot (not from storage): the timeline projects for editors, and last the consent record.
+    expect(entries.slice(3).map((e) => e.name)).toEqual(["Timeline.otio", "Timeline.fcpxml", "Timeline.rpp", "Consent record - Recording 1.txt"]);
+    expect(entries[5]!.text).toContain('FILE "Zoë - audio.wav"');
+    expect(entries[6]).toMatchObject({ name: "Consent record - Recording 1.txt", text: expect.stringMatching(/^Consent record: My Podcast, Recording 1/) });
+    expect(entries).toHaveLength(7);
     expect(storage.reads).toHaveLength(3);
   });
 

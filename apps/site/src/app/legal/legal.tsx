@@ -59,7 +59,7 @@ const DOCS: Doc[] = [
       ],
       [
         "The free tools",
-        `The mic and camera test runs entirely in your browser: nothing it hears or sees is recorded or sent anywhere, and its test recording is gone when you close the tab.${HAS_SPEED_TEST ? " The upload speed test sends throwaway data to a Tapry server, which reads it and discards it; it keeps a short-lived count per network address to limit how much one address can send." : ""}`,
+        `The mic and camera test, the voice and video recorder and the consent form generator run entirely in your browser: nothing they hear, see or are told is sent anywhere, and a recording is gone when you close the tab unless you save it to your own computer.${HAS_SPEED_TEST ? " The upload speed test sends throwaway data to a Tapry server, which reads it and discards it; it keeps a short-lived count per network address to limit how much one address can send." : ""}`,
       ],
       [
         "The waitlist",

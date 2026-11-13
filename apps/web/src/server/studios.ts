@@ -8,6 +8,8 @@ import {
   type TechCheckResult,
   type techCheckReport,
   type updateStudioBody,
+  SOLO_MAX_MINUTES,
+  type soloJoinBody,
 } from "@tapry/shared";
 import type { z } from "zod";
 import type { User } from "./auth";
@@ -43,6 +45,9 @@ export interface StudioWithUsage extends Studio {
 }
 
 export type { SessionTicket };
+
+/** Solo recordings one address may start per hour. */
+export const SOLO_JOINS_PER_ADDRESS = 10;
 
 export class StudioService {
   constructor(
@@ -285,6 +290,78 @@ export class StudioService {
     });
     await this.live.publish(ticket.sessionId);
     return { ...ticket, studio: { name: studio.name, settings } };
+  }
+
+  // ── Solo links: one person records alone, no host, no call ──────────────────
+
+  /** The studio's solo link (its code, or null when off) and what it asks. */
+  async solo(owner: User, studioId: string): Promise<{ code: string | null; prompt: string }> {
+    const [row] = await this.db.query<{ solo_code: string | null; solo_prompt: string }>(
+      "SELECT solo_code, solo_prompt FROM studios WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL",
+      [studioId, owner.accountId],
+    );
+    if (!row) throw new ApiError(404, "studio_not_found", "Studio not found");
+    return { code: row.solo_code, prompt: row.solo_prompt };
+  }
+
+  /** Turn the solo link on (a code is made once and kept) or off (the old link stops working), and set its questions. */
+  async setSolo(owner: User, studioId: string, body: { enabled: boolean; prompt: string }) {
+    const current = await this.solo(owner, studioId);
+    const code = body.enabled ? (current.code ?? newInviteCode()) : null;
+    await this.db.query("UPDATE studios SET solo_code = $2, solo_prompt = $3 WHERE id = $1", [studioId, code, body.prompt]);
+    return { code, prompt: body.prompt };
+  }
+
+  /** What someone sees on a solo link before recording. Null for a link that is wrong or switched off. */
+  async soloPreview(code: string) {
+    const [row] = await this.db.query<{ name: string; host: string; settings: unknown; owner_id: string; solo_prompt: string }>(
+      `SELECT st.name, st.settings, st.owner_id, st.solo_prompt, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
+       WHERE st.solo_code = $1 AND st.deleted_at IS NULL`,
+      [code],
+    );
+    if (!row) return null;
+    const settings = await this.sessionSettings(row.settings, row.owner_id);
+    const consentText = consentTextFor(settings, row.host);
+    return { studioName: row.name, hostName: row.host, settings, prompt: row.solo_prompt, consentText, consentHash: sha256Hex(consentText), maxMinutes: SOLO_MAX_MINUTES };
+  }
+
+  private soloJoins = new Map<string, number[]>();
+
+  /**
+   * Someone starts on a solo link: a session of their own (status 'solo'), in which they are
+   * the only person and start and stop the recording themselves. Limited per address, since
+   * each one can take storage and recording hours from the studio's account.
+   */
+  async soloJoin(body: z.infer<typeof soloJoinBody>, address: string, now = Date.now()): Promise<SessionTicket> {
+    const recent = (this.soloJoins.get(address) ?? []).filter((t) => t > now - 60 * 60 * 1000);
+    if (recent.length >= SOLO_JOINS_PER_ADDRESS) throw new ApiError(429, "slow_down", "Too many recordings started from your address. Try again in an hour.");
+    const [studio] = await this.db.query<StudioRow & { host: string }>(
+      `SELECT st.*, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id WHERE st.solo_code = $1 AND st.deleted_at IS NULL`,
+      [body.code],
+    );
+    if (!studio) throw new ApiError(404, "invite_not_found", "This link is invalid or has been switched off");
+    const settings = await this.sessionSettings(studio.settings, studio.owner_id);
+    const consentText = consentTextFor(settings, studio.host);
+    const consentHash = sha256Hex(consentText);
+    if (body.consentHash && body.consentHash !== consentHash) {
+      throw new ApiError(409, "consent_changed", "What you're agreeing to has just changed. Read it again, then continue.");
+    }
+    this.soloJoins.set(address, [...recent, now]);
+    const ticket = await this.db.transaction(async (tx) => {
+      const sessionId = newId("ses");
+      // Bound to its storage when it opens, like every session.
+      await tx.query("INSERT INTO sessions (id, studio_id, status, storage_target_id) VALUES ($1, $2, 'solo', $3)", [sessionId, studio.id, await this.storageTargetFor(tx, studio.owner_id)]);
+      const participantId = newId("par");
+      const token = newToken();
+      await tx.query("INSERT INTO consent_texts (hash, text) VALUES ($1, $2) ON CONFLICT (hash) DO NOTHING", [consentHash, consentText]);
+      await tx.query(
+        `INSERT INTO participants (id, session_id, display_name, role, token_hash, consented_at, consent_hash)
+         VALUES ($1, $2, $3, 'guest', $4, now(), $5)`,
+        [participantId, sessionId, body.displayName, hashToken(token), consentHash],
+      );
+      return { sessionId, participantId, token, role: "guest" as const };
+    });
+    return { ...ticket, studio: { name: studio.name, settings }, solo: { maxMinutes: SOLO_MAX_MINUTES } };
   }
 
   private async owned(owner: User, studioId: string) {

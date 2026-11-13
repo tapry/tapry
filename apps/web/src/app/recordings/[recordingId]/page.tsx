@@ -40,12 +40,13 @@ const PILL = {
 /** One recording (the design's "Episode"): its sound, its files and what was said. */
 export default async function RecordingPage({ params }: { params: Promise<{ recordingId: string }> }) {
   const { user, services, recording: r } = await load((await params).recordingId);
-  const [studios, transcript, model, aiNotes, notes] = await Promise.all([
+  const [studios, transcript, model, aiNotes, notes, markers] = await Promise.all([
     services.studios.list(user),
     services.library.transcriptTurns(user, r.id),
     services.library.transcriptsModel(),
     services.notes.view(user),
     services.notes.text(user, r.id),
+    services.guide.markers(user, r.id),
   ]);
   const studio = studios.find((s) => s.id === r.studioId);
   const now = Date.now();
@@ -180,6 +181,46 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
             </span>
             <TranscriptBody state={transcript.state} turns={transcript.turns} ready={ready} on={model !== null} />
           </div>
+          {ready && media.some((o) => o.kind === "audio" || o.kind === "video" || o.kind === "screen") && (
+            <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="timelines">
+              <span className="pt-3 pb-2 font-medium">For your editor</span>
+              <span className="border-t border-divider pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+                A project file that lays these files out on a timeline, all lined up{markers.length > 0 ? ", with your markers" : ""}. Download everything, unzip it into one folder and open the project
+                from there.
+              </span>
+              <span className="flex flex-wrap gap-[5px] pt-3">
+                {(
+                  [
+                    ["otio", "OpenTimelineIO"],
+                    ["fcpxml", "Final Cut XML"],
+                    ...(media.some((o) => o.kind === "audio") ? ([["rpp", "REAPER"]] as const) : []),
+                  ] as const
+                ).map(([format, name]) => (
+                  <a
+                    key={format}
+                    href={`/api/studios/${r.studioId}/recordings/${r.id}/timeline/${format}`}
+                    data-file-name={`Timeline.${format}`}
+                    className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-text transition-colors hover:bg-surface-2 hover:text-text"
+                  >
+                    {name}
+                  </a>
+                ))}
+              </span>
+            </div>
+          )}
+          {markers.length > 0 && (
+            <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-2" data-testid="markers">
+              <span className="pt-3 pb-2 font-medium">Markers</span>
+              <div className="flex max-h-[320px] flex-col overflow-y-auto">
+                {markers.map((m) => (
+                  <span key={m.id} className="flex gap-3 border-t border-divider py-2 text-[13.5px]">
+                    <span className="w-14 shrink-0 text-muted tabular-nums">{shortClock(m.atMs)}</span>
+                    <span className="min-w-0 text-pretty text-text-2">{m.label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {(aiNotes.mode !== "off" || r.notes !== "off" || notes) && (
             <NotesCard
               studioId={r.studioId}

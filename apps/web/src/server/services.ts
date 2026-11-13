@@ -1,3 +1,5 @@
+import { TimelineExports } from "./timeline-export";
+import { GuideService } from "./guide";
 import { NotesService } from "./notes";
 import { WaitlistService } from "./waitlist";
 import { HealthService, type HealthOptions } from "./health";
@@ -41,6 +43,10 @@ export interface Services {
   waitlist: WaitlistService;
   /** AI notes: the account's setting, and asking for a recording's notes. */
   notes: NotesService;
+  /** The host's guide for a studio, and markers on recordings. */
+  guide: GuideService;
+  /** Project files for editors that place a recording's files on a timeline. */
+  timelines: TimelineExports;
   /** The admin health page's checks. */
   health: HealthService;
   /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
@@ -107,6 +113,8 @@ export function createServices(
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
     siteOrigins: opts.siteOrigins ?? [],
     waitlist: new WaitlistService(db, { cloud: billing.cloud, now: opts.now }),
+    guide: new GuideService(db, opts.now),
+    timelines: new TimelineExports(db),
     notes: new NotesService(db, storage, { local: opts.notes?.local ?? null, outside: opts.notes?.outside ?? null, cloud: billing.cloud, now: opts.now, onQueued: () => processing.onEnqueue() }),
     health,
     library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),

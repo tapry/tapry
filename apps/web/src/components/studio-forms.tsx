@@ -3,7 +3,7 @@
 // Host-side forms around a studio (a "studio" in the API): invite link, settings, enter,
 // delete, and logging out. Creating a studio has its own page (new-studio-form.tsx).
 import { qualityOptions, type QualityChoice } from "./quality-options";
-import { defaultConsentText, type SessionTicket, type StudioSettings } from "@tapry/shared";
+import { defaultConsentText, type SessionTicket, type StudioSettings, FRAME_RATES, type FrameRate } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
@@ -131,6 +131,7 @@ export function StudioSettingsForm({
             guestDownloads: f.get("guestDownloads") === "on",
             consentText: String(f.get("consentText") ?? ""),
             audioFormat: f.get("audioFormat") === "flac" ? "flac" : "wav",
+            frameRate: (FRAME_RATES as readonly string[]).includes(String(f.get("frameRate"))) ? (String(f.get("frameRate")) as FrameRate) : settings.frameRate,
           },
         },
       });
@@ -206,6 +207,17 @@ export function StudioSettingsForm({
             <Select id="audio-format" name="audioFormat" defaultValue={settings.audioFormat} className="sm:w-[280px]">
               <option value="wav">WAV (opens anywhere)</option>
               <option value="flac">FLAC (lossless, about half the size)</option>
+            </Select>
+          </Row>
+          <Row
+            label={<label htmlFor="frame-rate">Frames a second</label>}
+            help="Of the video files. 30 suits the web; choose 25, 24 or 29.97 to match the timeline you edit in. Applies to recordings processed from now on."
+          >
+            <Select id="frame-rate" name="frameRate" defaultValue={settings.frameRate} className="sm:w-[280px]">
+              <option value="30">30</option>
+              <option value="29.97">29.97 (NTSC)</option>
+              <option value="25">25 (PAL)</option>
+              <option value="24">24 (film)</option>
             </Select>
           </Row>
         </div>

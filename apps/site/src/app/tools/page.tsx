@@ -1,6 +1,7 @@
 import { Shell } from "@/components/ui";
 import { HAS_SPEED_TEST, pageMeta } from "@/content/site";
 import { MicCard } from "./mic-card";
+import { RecorderCard } from "./recorder-card";
 import { SpeedCard } from "./speed-card";
 
 export const metadata = pageMeta({
@@ -18,7 +19,7 @@ export default function ToolsPage() {
             Free tools
           </h1>
           <p style={{ margin: 0, maxWidth: 560, fontSize: 18, lineHeight: 1.5, color: "#5f6470", textWrap: "pretty" }}>
-            Check your setup before any call, Tapry or not. No sign-up, and nothing from your microphone or camera is recorded or sent anywhere.
+            Small tools for anyone who records, Tapry or not. No sign-up, and nothing from your microphone or camera is sent anywhere.
           </p>
         </div>
       </section>
@@ -28,6 +29,19 @@ export default function ToolsPage() {
             <MicCard />
             <a href="/mic-test/" style={{ fontSize: 14, color: "#5f6470", paddingLeft: 4 }}>
               More about the mic test →
+            </a>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <RecorderCard />
+            <a href="/recorder/" style={{ fontSize: 14, color: "#5f6470", paddingLeft: 4 }}>
+              More about the recorder →
+            </a>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <a href="/consent-form/" style={{ display: "flex", flexDirection: "column", gap: 8, border: "1px solid #ececef", borderRadius: 20, padding: 22, color: "#0b0b0f" }}>
+              <span style={{ fontSize: 17, fontWeight: 500 }}>Consent form generator</span>
+              <span style={{ fontSize: 14.5, lineHeight: 1.5, color: "#5f6470" }}>A plain-language recording consent form for interviews, podcasts and research sessions, ready to copy or save.</span>
+              <span style={{ fontSize: 14, fontWeight: 500 }}>Make a form →</span>
             </a>
           </div>
           {HAS_SPEED_TEST && (

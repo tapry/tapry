@@ -45,6 +45,23 @@ export const loginBody = z.object({
 
 /** "I forgot my password": the address to send the link to. */
 export const forgotPasswordBody = z.object({ email });
+/** A studio's solo link: on or off, and what the person is asked to talk about (one question per line). */
+export const soloSettingsBody = z.object({ enabled: z.boolean(), prompt: z.string().max(4000) });
+/** Someone opens a solo link to record alone. */
+export const soloJoinBody = z.object({
+  code: z.string().min(1).max(100),
+  displayName: plainText(60),
+  consent: z.literal(true, { error: "Consent to recording is required" }),
+  consentHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+});
+/** The longest one solo recording runs, in minutes: it stops by itself there. */
+export const SOLO_MAX_MINUTES = 30;
+/** A studio's guide (run of show): the host's plan, one section or question per line. */
+export const guideBody = z.object({ guide: z.string().max(8000) });
+/** A marker on the running recording. No label: "Marker". */
+export const markerBody = z.object({ label: plainText(200).optional() });
+/** A host joins as a producer (in the call, never recorded) or as someone who is recorded. */
+export const producerBody = z.object({ producer: z.boolean() });
 /** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
 export const aiNotesBody = z.object({ outside: z.boolean() });
 /** How AI notes are written for this account, for its settings page. */
@@ -101,8 +118,18 @@ export function videoTier(quality: VideoQuality, sourceHeight?: number | null): 
   return VIDEO_TIERS.find((t) => t.height >= 1080 && t.height >= sourceHeight && t.height <= top.height) ?? top;
 }
 
+/**
+ * Frames a second of the finished video files (cameras are asked for the nearest whole rate).
+ * 30 suits the web; 25 and 24 match PAL and film timelines; 29.97 is broadcast NTSC.
+ */
+export const FRAME_RATES = ["24", "25", "29.97", "30"] as const;
+export type FrameRate = (typeof FRAME_RATES)[number];
+/** The rate as ffmpeg takes it: 29.97 is exactly 30000/1001. */
+export const ffmpegFrameRate = (rate: FrameRate) => (rate === "29.97" ? "30000/1001" : rate);
+
 const settingsFields = {
   videoQuality: z.enum(VIDEO_QUALITIES),
+  frameRate: z.enum(FRAME_RATES),
   /** Guests besides the host. v1 targets 2–4 people in total. */
   maxGuests: z.number().int().min(1).max(7),
   /** Off gives better audio for guests on headphones. */
@@ -129,6 +156,7 @@ export const studioSettings = z.object({
   guestDownloads: settingsFields.guestDownloads.default(true),
   consentText: settingsFields.consentText.default(""),
   audioFormat: settingsFields.audioFormat.default("wav"),
+  frameRate: settingsFields.frameRate.default("30"),
 });
 
 /** The consent text when a studio sets none. */
@@ -235,10 +263,12 @@ export const telemetryBody = z.object({
 // ── Live session state (pushed over SSE, also returned by GET .../state) ─────
 
 export interface SessionState {
-  session: { id: string; studioId: string; status: "open" | "ended" };
+  /** `solo`: one person recording alone on a studio's solo link; they start and stop it themselves. */
+  session: { id: string; studioId: string; status: "open" | "solo" | "ended" };
   /** The running recording, else the most recent one, else null. */
   recording: { id: string; status: "recording" | "stopped"; startedAt: number; stoppedAt: number | null } | null;
-  participants: Array<{ id: string; displayName: string; role: "host" | "guest" }>;
+  /** `producer`: a host who is in the call and at the controls but is never recorded. */
+  participants: Array<{ id: string; displayName: string; role: "host" | "guest"; producer: boolean }>;
   /** Upload progress per participant for `recording`, so the host can see who is still uploading. */
   uploads: Array<{
     participantId: string;
@@ -400,6 +430,8 @@ export interface SessionTicket {
   token: string;
   role: "host" | "guest";
   studio: { name: string; settings: StudioSettings };
+  /** Recording alone on a solo link: this person starts and stops their own recording, with no call. */
+  solo?: { maxMinutes: number };
 }
 
 /** POST /api/sessions/:id/call-token. `enabled: false` when the server has no LiveKit configured. */
