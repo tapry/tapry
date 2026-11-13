@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+import { ActivityLog } from "@/components/activity-log";
 import { AiNotesSetting } from "@/components/ai-notes-setting";
 import type { ReactNode } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
@@ -23,7 +25,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const studios = await services.studios.list(user);
   const w = user.isAdmin ? await services.library.workspace(user) : null;
   // Keyed: these are handed to a client component as props and rendered side by side there.
-  const members = <MembersPanel key="members" initial={await services.members.view(user)} />;
+  const members = (
+    <Fragment key="members">
+      <MembersPanel initial={await services.members.view(user)} />
+      {user.accountId === user.id && <ActivityLog entries={await services.activity.list(user, 100)} />}
+    </Fragment>
+  );
   // Tapry Cloud only: a self-hosted server has no plans, and no Plan tab.
   const plan = services.billing.cloud ? (
     <PlanPanel key="plan" billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} waitlist={user.isAdmin ? await services.waitlist.list(user) : null} justPaid={paid === "1"} portalProblem={portal ?? null} />

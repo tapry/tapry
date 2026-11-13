@@ -40,6 +40,7 @@ export function describeOutput(o: Recording["outputs"][number]): { title: string
     // The mix of a recording without video is audio (WAV or FLAC); otherwise it's the grid video.
     return o.fileName.endsWith(".mp4") ? { title: "Side-by-side video", icon: "camera", format: ext } : { title: "Everyone, mixed", icon: "wave", format: ext };
   }
+  if (o.kind === "clip") return { title: o.fileName.replace(/\.\w+$/, ""), icon: o.fileName.endsWith(".mp4") ? "camera" : "wave", format: ext };
   if (o.kind === "notes") return { title: "AI notes", icon: "text", format: "Markdown" };
   if (o.kind === "transcript") {
     if (o.fileName.endsWith(".txt")) return { title: "Transcript", icon: "text", format: "Text" };

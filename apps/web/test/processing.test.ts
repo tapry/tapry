@@ -203,6 +203,23 @@ describe("recording processing", () => {
     };
     const runner = (maxAttempts = 3) => new JobRunner(t.db, storage, { ffmpeg, ffprobe, maxAttempts });
 
+    it("a studio's own keeping time: the recording is deleted that many days after its files are ready, on any server", async () => {
+      await t.hostBrowser.patch(`/studios/${t.studio.id}`, { settings: { deleteAfterDays: 7 } });
+      await uploadTrack(split(media, 3));
+      t.tick(2000);
+      await stop();
+      await runner().drain();
+      expect(await processing()).toBe("ready");
+      const [kept] = await t.db.query<{ days: number }>("SELECT round(extract(epoch FROM keep_until - now()) / 86400)::int AS days FROM recordings WHERE id = $1", [t.recordingId]);
+      expect(kept!.days).toBe(7);
+      // Its day comes: the next sweep deletes it, with no plan involved (this is a self-hosted server).
+      await t.db.query("UPDATE recordings SET keep_until = now() - interval '1 minute' WHERE id = $1", [t.recordingId]);
+      await runner().drain();
+      expect(await t.db.query("SELECT deleted_at IS NOT NULL AS gone FROM recordings WHERE id = $1", [t.recordingId])).toEqual([{ gone: true }]);
+      // And nothing is touched where no time is set.
+      expect((await t.hostBrowser.patch(`/studios/${t.studio.id}`, { settings: { deleteAfterDays: 0 } })).status).toBe(400);
+    });
+
     it("turns uploaded chunks into a downloadable WAV and, with no camera, a mixed WAV", async () => {
       await uploadTrack(split(media, 3));
       t.tick(2000);

@@ -45,6 +45,19 @@ export const loginBody = z.object({
 
 /** "I forgot my password": the address to send the link to. */
 export const forgotPasswordBody = z.object({ email });
+/** A comment on a recording, optionally at a moment of it (ms from its start). */
+export const commentBody = z.object({ body: z.string().trim().min(1).max(2000), atMs: z.number().min(0).optional() });
+/** A share-safe copy of a transcript: neutral speaker names, contact details and listed words masked. */
+export const safeTranscriptBody = z.object({
+  format: z.enum(["txt", "docx", "srt", "vtt"]),
+  pseudonyms: z.boolean(),
+  contacts: z.boolean(),
+  terms: z.array(z.string().max(80)).max(100),
+  /** Only count what would be masked; no file. */
+  preview: z.boolean().optional(),
+});
+/** Cut a clip out of a finished recording: from and to in ms from its start, and an optional title for the file's name. */
+export const clipBody = z.object({ startMs: z.number().min(0), endMs: z.number().min(0), title: plainText(80).optional() });
 /** A studio's solo link: on or off, and what the person is asked to talk about (one question per line). */
 export const soloSettingsBody = z.object({ enabled: z.boolean(), prompt: z.string().max(4000) });
 /** Someone opens a solo link to record alone. */
@@ -130,6 +143,8 @@ export const ffmpegFrameRate = (rate: FrameRate) => (rate === "29.97" ? "30000/1
 const settingsFields = {
   videoQuality: z.enum(VIDEO_QUALITIES),
   frameRate: z.enum(FRAME_RATES),
+  /** Delete each recording this many days after its files are ready. Null: keep until someone deletes it. */
+  deleteAfterDays: z.number().int().min(1).max(3650).nullable(),
   /** Guests besides the host. v1 targets 2–4 people in total. */
   maxGuests: z.number().int().min(1).max(7),
   /** Off gives better audio for guests on headphones. */
@@ -157,6 +172,7 @@ export const studioSettings = z.object({
   consentText: settingsFields.consentText.default(""),
   audioFormat: settingsFields.audioFormat.default("wav"),
   frameRate: settingsFields.frameRate.default("30"),
+  deleteAfterDays: settingsFields.deleteAfterDays.default(null),
 });
 
 /** The consent text when a studio sets none. */
@@ -558,7 +574,11 @@ export interface OwnStorageView {
 
 // ── Seats: several people in one account ────────────────────────────────────────
 
-export const inviteMemberBody = z.object({ email });
+/** What a member may do: `member` everything but the owner's own things; `viewer` only look, listen, download and comment. */
+export const MEMBER_ROLES = ["member", "viewer"] as const;
+export type MemberRole = (typeof MEMBER_ROLES)[number];
+export const inviteMemberBody = z.object({ email, role: z.enum(MEMBER_ROLES).default("member") });
+export const memberRoleBody = z.object({ role: z.enum(MEMBER_ROLES) });
 /** Accepting an invitation: someone new sends a name and a password; someone signed in sends nothing. */
 export const acceptInviteBody = z.object({
   name: plainText(100).optional(),
@@ -571,7 +591,7 @@ export interface MembersView {
   seats: number | null;
   /** The signed-in person owns the account (and so may invite and remove). */
   owner: boolean;
-  members: Array<{ id: string; name: string; email: string; role: "owner" | "member"; you: boolean }>;
+  members: Array<{ id: string; name: string; email: string; role: "owner" | MemberRole; you: boolean }>;
   /** Invitations not yet accepted; only the owner sees them. */
-  invites: Array<{ id: string; email: string; expiresAt: string }>;
+  invites: Array<{ id: string; email: string; role: MemberRole; expiresAt: string }>;
 }

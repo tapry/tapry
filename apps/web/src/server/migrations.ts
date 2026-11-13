@@ -457,4 +457,56 @@ ALTER TABLE sessions ADD CONSTRAINT sessions_status_check CHECK (status IN ('ope
 ALTER TABLE studios ADD COLUMN solo_code text UNIQUE;
 ALTER TABLE studios ADD COLUMN solo_prompt text NOT NULL DEFAULT '';
 `,
+  `
+-- Clips: a stretch of a finished recording cut out as a file of its own (output kind 'clip'),
+-- by a job that does every waiting clip of a recording.
+ALTER TABLE jobs DROP CONSTRAINT jobs_type_check;
+ALTER TABLE jobs ADD CONSTRAINT jobs_type_check
+  CHECK (type IN ('process_recording', 'transcribe_recording', 'purge_recording', 'purge_raw', 'notes_recording', 'clip_recording'));
+ALTER TABLE outputs DROP CONSTRAINT outputs_kind_check;
+ALTER TABLE outputs ADD CONSTRAINT outputs_kind_check CHECK (kind IN ('audio', 'video', 'screen', 'combined', 'transcript', 'notes', 'clip'));
+CREATE TABLE clips (
+  id text PRIMARY KEY,
+  recording_id text NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  start_ms bigint NOT NULL,
+  end_ms bigint NOT NULL,
+  title text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'ready', 'failed')),
+  output_id text REFERENCES outputs(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX clips_recording ON clips (recording_id, start_ms);
+`,
+  `
+-- A member's role in the account they joined: 'member' (everything but the owner's own things)
+-- or 'viewer' (look, listen, download and comment only). Kept on the invitation until accepted.
+ALTER TABLE users ADD COLUMN member_role text NOT NULL DEFAULT 'member' CHECK (member_role IN ('member', 'viewer'));
+ALTER TABLE account_invites ADD COLUMN role text NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'viewer'));
+`,
+  `
+-- Comments people of an account leave on a recording, and the account's activity log (who
+-- changed or took what, and when: names of things, never their content).
+CREATE TABLE comments (
+  id text PRIMARY KEY,
+  recording_id text NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+  user_id text REFERENCES users(id) ON DELETE SET NULL,
+  author text NOT NULL,
+  at_ms bigint,
+  body text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX comments_recording ON comments (recording_id, created_at);
+CREATE TABLE activity (
+  id text PRIMARY KEY,
+  -- The order things happened in, whatever the clock says.
+  seq bigserial,
+  account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id text REFERENCES users(id) ON DELETE SET NULL,
+  who text NOT NULL,
+  action text NOT NULL,
+  target text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX activity_account ON activity (account_id, seq DESC);
+`,
 ];

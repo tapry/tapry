@@ -121,6 +121,10 @@ const MAX_TRANSCRIPTS = 200;
 
 interface Parsed {
   turns: TranscriptTurn[];
+  /** When someone is speaking, from the captions' own start and end times (ms), in order. Empty without captions. */
+  speech: Array<[number, number]>;
+  /** The captions as written, one line each with its own times. */
+  cues: Cue[];
   words: number;
   /** Everything said, lowercased, for search. */
   lower: string;
@@ -274,6 +278,19 @@ export class LibraryService {
     return { state: r.transcript, turns: parsed?.turns ?? null };
   }
 
+  /** A recording's captions, line by line (speaker, times, text); null without a finished transcript. Never logged. */
+  async cues(owner: User, recordingId: string): Promise<{ title: string; cues: Cue[] } | null> {
+    const r = await this.processing.getForOwner(owner, recordingId);
+    const parsed = await this.read(r);
+    return parsed && parsed.cues.length > 0 ? { title: `${r.studioName}, Recording ${r.number}`, cues: parsed.cues } : null;
+  }
+
+  /** When someone is speaking in a recording (ms from its start), from its captions; null without a finished transcript. */
+  async speech(owner: User, recordingId: string): Promise<Array<[number, number]> | null> {
+    const parsed = await this.read(await this.processing.getForOwner(owner, recordingId));
+    return parsed && parsed.speech.length > 0 ? parsed.speech : null;
+  }
+
   /** The Storage page. Configuration and the live storage check for admins only. */
   async storageOverview(user: User): Promise<StorageOverview> {
     const studios = await this.studios.list(user);
@@ -370,9 +387,11 @@ export class LibraryService {
     } catch {
       return null; // Not readable right now: the page shows it without text. Nothing logged (it's someone's words).
     }
-    const turns = toTurns(file === vtt ? parseVtt(text) : parseTxt(text));
+    const cues = file === vtt ? parseVtt(text) : parseTxt(text);
+    const turns = toTurns(cues);
+    const speech = file === vtt ? cues.filter((c) => c.endMs > c.startMs).map((c): [number, number] => [c.startMs, c.endMs]).sort((a, b) => a[0] - b[0]) : [];
     const all = turns.map((t) => t.text).join(" ");
-    const parsed: Parsed = { turns, words: all.split(/\s+/).filter(Boolean).length, lower: all.toLocaleLowerCase() };
+    const parsed: Parsed = { turns, speech, cues, words: all.split(/\s+/).filter(Boolean).length, lower: all.toLocaleLowerCase() };
     this.cache.set(file.id, parsed);
     if (this.cache.size > CACHE_ENTRIES) this.cache.delete(this.cache.keys().next().value!);
     return parsed;
@@ -405,7 +424,7 @@ async function readText(storage: Storage, key: string, max: number) {
   return new TextDecoder().decode(all);
 }
 
-interface Cue {
+export interface Cue {
   speaker: string;
   startMs: number;
   endMs: number;

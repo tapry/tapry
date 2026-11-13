@@ -5,6 +5,23 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Timelines with long pauses left out.** Beside each timeline export there is a version
+  where stretches with nobody speaking for two seconds or more (by the transcript) are cut,
+  every track at the same place. Nothing is rendered or deleted: the cuts are in the project
+  file, and markers move with what they mark.
+- **Clips.** Cut a stretch of a finished recording (a second to ten minutes) out of the
+  combined video, or the mix, as a file of its own. Times are typed or taken from the transcript.
+- **Share-safe transcripts.** A copy of a transcript with speakers renamed Speaker 1, 2…,
+  and email addresses, phone numbers, links and the words you list masked, in TXT, DOCX, SRT
+  or VTT. Made on request and never stored. Text only: sound and picture are untouched.
+- **Viewer role.** A member can be a viewer: they see, listen, download and comment, and every
+  other change is refused. Given with the invitation, changed by the owner.
+- **Comments** on a recording, optionally at a moment of it, by anyone in the account.
+- **Activity log** for the account's owner (Settings, Members): who changed or downloaded what,
+  and when, kept a year.
+- **A studio's own keeping time.** "Delete recordings after 7 / 30 / 90 / 180 / 365 days", on
+  any server. On a self-hosted server only this setting ever deletes a recording by date.
+
 - **Two more free tools on the website.** `/recorder`: record your voice (and camera) in the
   browser and save the file to your own computer; nothing is uploaded. `/consent-form`: a
   plain-language recording consent form from a few answers, to copy or save.

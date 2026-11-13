@@ -2,6 +2,7 @@
 // is a user whose `account_id` points at it. Studios, recordings, the plan and storage belong
 // to the account (`User.accountId`); signing in, the password and who is hosting stay personal.
 import type { MembersView, acceptInviteBody } from "@tapry/shared";
+import type { MemberRole } from "@tapry/shared";
 import type { z } from "zod";
 import type { User } from "./auth";
 import type { Db, Queryable } from "./db";
@@ -42,20 +43,20 @@ export class MembersService {
 
   /** Everyone in the signed-in person's account, and the invitations still open. */
   async view(user: User): Promise<MembersView> {
-    const people = await this.db.query<{ id: string; name: string; email: string; owner: boolean }>(
-      `SELECT id, name, email, (id = $1) AS owner FROM users WHERE id = $1 OR account_id = $1 ORDER BY (id = $1) DESC, created_at`,
+    const people = await this.db.query<{ id: string; name: string; email: string; owner: boolean; member_role: MemberRole }>(
+      `SELECT id, name, email, (id = $1) AS owner, member_role FROM users WHERE id = $1 OR account_id = $1 ORDER BY (id = $1) DESC, created_at`,
       [user.accountId],
     );
-    const invites = await this.db.query<{ id: string; email: string; expires_at: Date }>(
-      "SELECT id, email, expires_at FROM account_invites WHERE account_id = $1 AND expires_at > $2 ORDER BY created_at",
+    const invites = await this.db.query<{ id: string; email: string; role: MemberRole; expires_at: Date }>(
+      "SELECT id, email, role, expires_at FROM account_invites WHERE account_id = $1 AND expires_at > $2 ORDER BY created_at",
       [user.accountId, new Date(this.now())],
     );
     return {
       seats: await this.seats(user.accountId),
       owner: user.accountId === user.id,
-      members: people.map((p) => ({ id: p.id, name: p.name, email: p.email, role: p.owner ? "owner" : "member", you: p.id === user.id })),
+      members: people.map((p) => ({ id: p.id, name: p.name, email: p.email, role: p.owner ? "owner" : p.member_role, you: p.id === user.id })),
       // Only the owner sees who else was invited.
-      invites: user.accountId === user.id ? invites.map((i) => ({ id: i.id, email: i.email, expiresAt: i.expires_at.toISOString() })) : [],
+      invites: user.accountId === user.id ? invites.map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expires_at.toISOString() })) : [],
     };
   }
 
@@ -63,7 +64,7 @@ export class MembersService {
    * Invite someone by email. Always returns the link, so it can be passed on by hand on a
    * server that sends no email; `emailed` says whether one went out too.
    */
-  async invite(owner: User, email: string, linkBase: string): Promise<{ link: string; emailed: boolean }> {
+  async invite(owner: User, email: string, linkBase: string, role: MemberRole = "member"): Promise<{ link: string; emailed: boolean }> {
     this.requireOwner(owner);
     const cutoff = this.now() - HOUR;
     const recent = (this.sent.get(owner.id) ?? []).filter((t) => t > cutoff);
@@ -81,12 +82,13 @@ export class MembersService {
       // A new invitation to the same address replaces the old one.
       await tx.query("DELETE FROM account_invites WHERE account_id = $1 AND (email = $2 OR expires_at <= $3)", [owner.id, email, new Date(this.now())]);
       await this.requireFreeSeat(tx, owner.id);
-      await tx.query("INSERT INTO account_invites (id, token_hash, account_id, email, expires_at) VALUES ($1, $2, $3, $4, $5)", [
+      await tx.query("INSERT INTO account_invites (id, token_hash, account_id, email, expires_at, role) VALUES ($1, $2, $3, $4, $5, $6)", [
         newId("inv"),
         hashToken(token),
         owner.id,
         email,
         new Date(this.now() + INVITE_DAYS * DAY),
+        role,
       ]);
     });
     const link = `${(this.opts.mail?.appUrl ?? linkBase).replace(/\/$/, "")}/invite/${token}`;
@@ -144,8 +146,8 @@ export class MembersService {
   async accept(token: string, body: z.infer<typeof acceptInviteBody>, signedIn: User | null): Promise<{ userId: string; token: string | null }> {
     const passwordHash = signedIn ? null : body.password ? await hashPassword(body.password) : null;
     return this.db.transaction(async (tx) => {
-      const [invite] = await tx.query<{ id: string; account_id: string; email: string }>(
-        "SELECT id, account_id, email FROM account_invites WHERE token_hash = $1 AND expires_at > $2 FOR UPDATE",
+      const [invite] = await tx.query<{ id: string; account_id: string; email: string; role: MemberRole }>(
+        "SELECT id, account_id, email, role FROM account_invites WHERE token_hash = $1 AND expires_at > $2 FOR UPDATE",
         [hashToken(token), new Date(this.now())],
       );
       if (!invite) throw new ApiError(404, "invite_not_found", "This invitation has been used, withdrawn or has run out. Ask for a new one.");
@@ -166,15 +168,15 @@ export class MembersService {
           throw new ApiError(409, "has_own_account", "Your account has studios or members of its own, which you would lose sight of. Delete or hand them over first.");
         }
         userId = signedIn.id;
-        await tx.query("UPDATE users SET account_id = $2, email_verified_at = coalesce(email_verified_at, $3) WHERE id = $1", [userId, invite.account_id, new Date(this.now())]);
+        await tx.query("UPDATE users SET account_id = $2, member_role = $4, email_verified_at = coalesce(email_verified_at, $3) WHERE id = $1", [userId, invite.account_id, new Date(this.now()), invite.role]);
       } else {
         if (!body.name || !passwordHash) throw new ApiError(400, "invalid_request", "A name and a password are needed");
         userId = newId("usr");
         // The owner vouched for this address by inviting it: nothing more to confirm.
         const [row] = await tx.query(
-          `INSERT INTO users (id, email, name, password_hash, is_admin, account_id, email_verified_at) VALUES ($1, $2, $3, $4, false, $5, $6)
+          `INSERT INTO users (id, email, name, password_hash, is_admin, account_id, email_verified_at, member_role) VALUES ($1, $2, $3, $4, false, $5, $6, $7)
            ON CONFLICT (email) DO NOTHING RETURNING id`,
-          [userId, invite.email, body.name, passwordHash, invite.account_id, new Date(this.now())],
+          [userId, invite.email, body.name, passwordHash, invite.account_id, new Date(this.now()), invite.role],
         );
         if (!row) throw new ApiError(409, "email_taken", "This address already has an account. Log in with it, then open the invitation link again.");
         login = newToken();
@@ -196,10 +198,17 @@ export class MembersService {
   async remove(user: User, memberId: string) {
     if (memberId === user.accountId) throw new ApiError(409, "owner_stays", "The account's owner can't be removed");
     if (memberId !== user.id) this.requireOwner(user);
-    const gone = await this.db.query("UPDATE users SET account_id = NULL WHERE id = $1 AND account_id = $2 RETURNING id", [memberId, user.accountId]);
+    const gone = await this.db.query("UPDATE users SET account_id = NULL, member_role = 'member' WHERE id = $1 AND account_id = $2 RETURNING id", [memberId, user.accountId]);
     if (gone.length === 0) throw new ApiError(404, "member_not_found", "No such member");
     // Signed out everywhere: pages they have open would otherwise still show the account.
     await this.db.query("DELETE FROM user_sessions WHERE user_id = $1", [memberId]);
+  }
+
+  /** The owner changes what a member may do. */
+  async setRole(owner: User, memberId: string, role: MemberRole) {
+    this.requireOwner(owner);
+    const changed = await this.db.query("UPDATE users SET member_role = $3 WHERE id = $1 AND account_id = $2 RETURNING id", [memberId, owner.id, role]);
+    if (changed.length === 0) throw new ApiError(404, "member_not_found", "No such member");
   }
 
   private requireOwner(user: User) {

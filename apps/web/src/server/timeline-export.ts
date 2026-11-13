@@ -26,6 +26,60 @@ export interface TimelineInput {
   frameRate: FrameRate;
   files: TimelineFile[];
   markers: Array<{ atMs: number; label: string }>;
+  /**
+   * The parts of the recording to keep, in order (ms from its start), when long pauses are left
+   * out. Every track is cut at the same places, so everyone stays in sync. Left out: all of it.
+   */
+  keep?: Array<[number, number]>;
+}
+
+/** A pause this long with nobody speaking is left out. */
+export const PAUSE_MIN_MS = 2000;
+/** What stays of a pause on each side of the cut, so speech isn't clipped and breaths sound natural. */
+export const PAUSE_PAD_MS = 400;
+
+/**
+ * The parts to keep when long pauses go: everything from shortly before someone speaks to
+ * shortly after, with gaps under PAUSE_MIN_MS left alone. `speech` is when anyone is speaking.
+ * Nothing said (or nothing known): the whole recording.
+ */
+export function keepRanges(speech: Array<[number, number]>, durationMs: number): Array<[number, number]> {
+  const merged: Array<[number, number]> = [];
+  for (const [from, to] of [...speech].sort((a, b) => a[0] - b[0])) {
+    const start = Math.max(0, from - PAUSE_PAD_MS);
+    const end = Math.min(durationMs, to + PAUSE_PAD_MS);
+    if (end <= start) continue;
+    const last = merged.at(-1);
+    // Close enough to the last stretch of speech: the pause between them stays.
+    if (last && start - last[1] < PAUSE_MIN_MS - 2 * PAUSE_PAD_MS) last[1] = Math.max(last[1], end);
+    else merged.push([start, end]);
+  }
+  return merged.length > 0 ? merged : [[0, durationMs]];
+}
+
+/** The kept parts as whole frames: where each starts in the source, where it lands on the timeline, how long. */
+function segments(t: TimelineInput): Array<{ src: number; at: number; length: number }> {
+  const total = frames(t.durationMs, t.frameRate);
+  const out: Array<{ src: number; at: number; length: number }> = [];
+  let at = 0;
+  for (const [from, to] of t.keep ?? [[0, t.durationMs]]) {
+    const src = Math.min(total, Math.max(out.length ? out.at(-1)!.src + out.at(-1)!.length : 0, frames(from, t.frameRate)));
+    const length = Math.min(total, frames(to, t.frameRate)) - src;
+    if (length <= 0) continue;
+    out.push({ src, at, length });
+    at += length;
+  }
+  return out.length > 0 ? out : [{ src: 0, at: 0, length: total }];
+}
+
+/** Where a moment of the recording lands once pauses are out (frames); a moment inside a removed pause moves to the cut. */
+function placed(frame: number, segs: Array<{ src: number; at: number; length: number }>): number {
+  for (const s of segs) {
+    if (frame < s.src) return s.at;
+    if (frame < s.src + s.length) return s.at + (frame - s.src);
+  }
+  const last = segs.at(-1)!;
+  return last.at + last.length - 1;
 }
 
 export const TIMELINE_FORMATS = ["otio", "fcpxml", "rpp"] as const;
@@ -51,6 +105,7 @@ export function toOtio(t: TimelineInput): string {
   const time = (value: number) => ({ OTIO_SCHEMA: "RationalTime.1", rate, value });
   const range = (start: number, duration: number) => ({ OTIO_SCHEMA: "TimeRange.1", duration: time(duration), start_time: time(start) });
   const total = frames(t.durationMs, t.frameRate);
+  const segs = segments(t);
   const track = (f: TimelineFile) => ({
     OTIO_SCHEMA: "Track.1",
     name: trackName(f),
@@ -59,17 +114,15 @@ export function toOtio(t: TimelineInput): string {
     effects: [],
     markers: [],
     source_range: null,
-    children: [
-      {
-        OTIO_SCHEMA: "Clip.1",
-        name: f.fileName,
-        metadata: {},
-        effects: [],
-        markers: [],
-        source_range: range(0, total),
-        media_reference: { OTIO_SCHEMA: "ExternalReference.1", name: f.fileName, metadata: {}, available_range: range(0, total), target_url: url(f.fileName) },
-      },
-    ],
+    children: segs.map((seg) => ({
+      OTIO_SCHEMA: "Clip.1",
+      name: f.fileName,
+      metadata: {},
+      effects: [],
+      markers: [],
+      source_range: range(seg.src, seg.length),
+      media_reference: { OTIO_SCHEMA: "ExternalReference.1", name: f.fileName, metadata: {}, available_range: range(0, total), target_url: url(f.fileName) },
+    })),
   });
   // Pictures above sound, as editors lay them out.
   const ordered = [...t.files.filter((f) => f.kind !== "audio"), ...t.files.filter((f) => f.kind === "audio")];
@@ -90,7 +143,7 @@ export function toOtio(t: TimelineInput): string {
           name: m.label,
           color: "RED",
           metadata: {},
-          marked_range: range(Math.min(frames(m.atMs, t.frameRate), Math.max(0, total - 1)), 1),
+          marked_range: range(placed(Math.min(frames(m.atMs, t.frameRate), Math.max(0, total - 1)), segs), 1),
         })),
         children: ordered.map(track),
       },
@@ -119,11 +172,18 @@ export function toFcpxml(t: TimelineInput): string {
   const [first, ...rest] = all;
   let up = 0;
   let down = 0;
-  const connected = rest.map((f) => {
-    const lane = f.kind === "audio" ? --down : ++up;
-    return `            <asset-clip ref="${id(f)}" lane="${lane}" offset="0s" start="0s" duration="${at(total)}" name="${xml(trackName(f))}"/>`;
-  });
-  const markers = t.markers.map((m) => `            <marker start="${at(Math.min(frames(m.atMs, t.frameRate), Math.max(0, total - 1)))}" duration="${at(1)}" value="${xml(m.label)}"/>`);
+  const lanes = rest.map((f) => ({ f, lane: f.kind === "audio" ? --down : ++up }));
+  const segs = segments(t);
+  const length = segs.reduce((n, s) => n + s.length, 0);
+  // Each kept part is one clip of the first file on the spine, carrying the same part of every other file.
+  const spine = segs.flatMap((seg) => [
+    `          <asset-clip ref="${id(first!)}" offset="${at(seg.at)}" start="${at(seg.src)}" duration="${at(seg.length)}" name="${xml(trackName(first!))}">`,
+    ...lanes.map(({ f, lane }) => `            <asset-clip ref="${id(f)}" lane="${lane}" offset="${at(seg.src)}" start="${at(seg.src)}" duration="${at(seg.length)}" name="${xml(trackName(f))}"/>`),
+    ...t.markers
+      .map((m) => Math.min(frames(m.atMs, t.frameRate), Math.max(0, total - 1)))
+      .flatMap((frame, i) => (frame >= seg.src && frame < seg.src + seg.length ? [`            <marker start="${at(frame)}" duration="${at(1)}" value="${xml(t.markers[i]!.label)}"/>`] : [])),
+    `          </asset-clip>`,
+  ]);
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<!DOCTYPE fcpxml>`,
@@ -135,12 +195,9 @@ export function toFcpxml(t: TimelineInput): string {
     `  <library>`,
     `    <event name="Tapry">`,
     `      <project name="${xml(t.title)}">`,
-    `        <sequence format="r1" duration="${at(total)}" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k">`,
+    `        <sequence format="r1" duration="${at(length)}" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k">`,
     `          <spine>`,
-    `          <asset-clip ref="${id(first!)}" offset="0s" start="0s" duration="${at(total)}" name="${xml(trackName(first!))}">`,
-    ...connected,
-    ...markers,
-    `          </asset-clip>`,
+    ...spine,
     `          </spine>`,
     `        </sequence>`,
     `      </project>`,
@@ -155,21 +212,37 @@ export function toReaper(t: TimelineInput): string {
   const sounds = t.files.filter((f) => f.kind === "audio");
   if (sounds.length === 0) throw new ApiError(409, "nothing_to_export", "This recording has no audio files for a REAPER project");
   const quote = (s: string) => `"${s.replace(/"/g, "'")}"`;
-  const length = (t.durationMs / 1000).toFixed(6);
+  // Sound has no frames: the kept parts are used to the millisecond.
+  const parts: Array<{ src: number; at: number; length: number }> = [];
+  for (const [from, to] of t.keep ?? [[0, t.durationMs]]) {
+    const at = parts.length ? parts.at(-1)!.at + parts.at(-1)!.length : 0;
+    if (to > from) parts.push({ src: from, at, length: to - from });
+  }
+  const seconds = (ms: number) => (ms / 1000).toFixed(6);
   const tracks = sounds.flatMap((f) => [
     `  <TRACK`,
     `    NAME ${quote(f.person)}`,
-    `    <ITEM`,
-    `      POSITION 0`,
-    `      LENGTH ${length}`,
-    `      NAME ${quote(f.fileName)}`,
-    `      <SOURCE ${f.fileName.toLowerCase().endsWith(".flac") ? "FLAC" : "WAVE"}`,
-    `        FILE ${quote(f.fileName)}`,
-    `      >`,
-    `    >`,
+    ...parts.flatMap((p) => [
+      `    <ITEM`,
+      `      POSITION ${p.at === 0 ? "0" : seconds(p.at)}`,
+      `      LENGTH ${seconds(p.length)}`,
+      ...(p.src > 0 ? [`      SOFFS ${seconds(p.src)}`] : []),
+      `      NAME ${quote(f.fileName)}`,
+      `      <SOURCE ${f.fileName.toLowerCase().endsWith(".flac") ? "FLAC" : "WAVE"}`,
+      `        FILE ${quote(f.fileName)}`,
+      `      >`,
+      `    >`,
+    ]),
     `  >`,
   ]);
-  const markers = t.markers.map((m, i) => `  MARKER ${i + 1} ${(m.atMs / 1000).toFixed(6)} ${quote(m.label)} 0`);
+  const place = (ms: number) => {
+    for (const p of parts) {
+      if (ms < p.src) return p.at;
+      if (ms < p.src + p.length) return p.at + (ms - p.src);
+    }
+    return parts.length ? parts.at(-1)!.at + parts.at(-1)!.length : ms;
+  };
+  const markers = t.markers.map((m, i) => `  MARKER ${i + 1} ${seconds(place(m.atMs))} ${quote(m.label)} 0`);
   return [`<REAPER_PROJECT 0.1 "7.0"`, `  SAMPLERATE 48000 0 0`, ...markers, ...tracks, `>`, ``].join("\n");
 }
 
@@ -209,8 +282,13 @@ export class TimelineExports {
     };
   }
 
-  async file(user: User, studioId: string, recordingId: string, format: TimelineFormat) {
-    return render(await this.input(user, studioId, recordingId), format);
+  /** `speech` (when anyone is speaking): the timeline with long pauses left out, every track cut alike. */
+  async file(user: User, studioId: string, recordingId: string, format: TimelineFormat, speech?: Array<[number, number]> | null) {
+    const input = await this.input(user, studioId, recordingId);
+    if (speech === undefined) return render(input, format);
+    if (!speech) throw new ApiError(409, "no_transcript", "Pauses are found from the transcript, which isn't ready");
+    const file = render({ ...input, keep: keepRanges(speech, input.durationMs) }, format);
+    return { ...file, fileName: `Timeline (pauses removed).${format}` };
   }
 
   /** Every format this recording can have (a recording without audio files has no REAPER project), for the zip. */

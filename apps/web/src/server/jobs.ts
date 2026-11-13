@@ -8,6 +8,7 @@ import {
   mergeSpeakers,
   PODCAST_LOUDNESS,
   renderRecording,
+  run as runFfmpeg,
   type FilterFailure,
   type MaskInput,
   type SkippedTrack,
@@ -23,6 +24,7 @@ import {
 import { EXPIRY_NOTICE_MS, planRetention, warnExpiring } from "./billing";
 import type { Db, Queryable } from "./db";
 import { isApiError } from "./errors";
+import { clipArgs, clipFileName } from "./clips";
 import { newId } from "./ids";
 import { NOTES_ERROR_TEXT, NOTES_FILE, NOTES_MAX_CHARS, NotesError, notesModelFor, notesModels, queueNotes, type NotesConfig, type NotesModel } from "./notes";
 import { deleteRecordingIn, type RecordingProgress } from "./processing";
@@ -82,8 +84,8 @@ export interface JobRunnerOptions {
   notesModels?: { local: NotesModel | null; outside: NotesModel | null };
 }
 
-type JobType = "process_recording" | "transcribe_recording" | "purge_recording" | "purge_raw" | "notes_recording";
-type MediaJobType = Exclude<JobType, "purge_recording" | "purge_raw" | "notes_recording">;
+type JobType = "process_recording" | "transcribe_recording" | "purge_recording" | "purge_raw" | "notes_recording" | "clip_recording";
+type MediaJobType = Exclude<JobType, "purge_recording" | "purge_raw" | "notes_recording" | "clip_recording">;
 
 interface JobRow {
   id: string;
@@ -176,7 +178,9 @@ export class JobRunner {
        WHERE id = $1 AND status = 'running'`,
       [job.id],
     );
-    if (job.type === "notes_recording") {
+    if (job.type === "clip_recording") {
+      // Its clips are still waiting: nothing to mark.
+    } else if (job.type === "notes_recording") {
       await this.db.query("UPDATE recordings SET notes = 'queued' WHERE id = $1", [job.recording_id]);
     } else if (job.type !== "purge_recording" && job.type !== "purge_raw") {
       await this.db.query(`UPDATE recordings SET ${STATUS_COLUMN[job.type]} = 'queued' WHERE id = $1`, [job.recording_id]);
@@ -231,24 +235,28 @@ export class JobRunner {
    * way a host deletes one. Never one that is still recording or being processed: it waits.
    */
   private async expire() {
-    if (!this.opts.cloud || Date.now() < this.nextExpirySweep) return;
+    // Every server: a studio can set its own keeping time. Tapry Cloud adds the plans'.
+    if (Date.now() < this.nextExpirySweep) return;
     this.nextExpirySweep = Date.now() + EXPIRY_SWEEP_MS;
     try {
       // Where the server sends email, the host is told first, and a recording goes only once
       // that warning is a day old: a mail problem delays deleting, never the other way round.
       const mail = this.opts.mail;
-      if (mail) await warnExpiring(this.db, mail);
+      if (mail && this.opts.cloud) await warnExpiring(this.db, mail);
+      // Without Tapry Cloud there are no plans: a date only counts where the studio itself
+      // asks for recordings to be deleted (a date left over from a plan is never acted on).
       const due = await this.db.query<{ id: string; session_id: string }>(
-        `SELECT id, session_id FROM recordings
-         WHERE keep_until IS NOT NULL AND keep_until < now() AND deleted_at IS NULL AND status = 'stopped'
-           AND ($1::float8 IS NULL OR expiry_warned_at < now() - make_interval(secs => $1::float8))
-         ORDER BY keep_until LIMIT 50`,
-        [mail ? EXPIRY_NOTICE_MS / 1000 : null],
+        `SELECT r.id, r.session_id FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
+         WHERE r.keep_until IS NOT NULL AND r.keep_until < now() AND r.deleted_at IS NULL AND r.status = 'stopped'
+           AND ($2::boolean OR (st.settings->>'deleteAfterDays') IS NOT NULL)
+           AND ($1::float8 IS NULL OR r.expiry_warned_at < now() - make_interval(secs => $1::float8))
+         ORDER BY r.keep_until LIMIT 50`,
+        [mail && this.opts.cloud ? EXPIRY_NOTICE_MS / 1000 : null, !!this.opts.cloud],
       );
       for (const r of due) {
         try {
           await this.db.transaction((tx) => deleteRecordingIn(tx, r.id));
-          console.log(`[worker] deleted ${r.id}: its plan's keeping time is over`);
+          console.log(`[worker] deleted ${r.id}: its keeping time is over`);
           this.kicked = true; // the purge job
           this.opts.onChange?.(r.session_id);
         } catch (err) {
@@ -309,6 +317,7 @@ export class JobRunner {
     if (job.type === "purge_recording") return this.purge(job);
     if (job.type === "purge_raw") return this.purgeRaw(job);
     if (job.type === "notes_recording") return this.writeNotes(job);
+    if (job.type === "clip_recording") return this.cutClips(job);
     const [rec] = await this.db.query<RecordingRow>(
       `SELECT r.id, r.session_id, r.started_at, r.stopped_at, st.settings
        FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
@@ -472,6 +481,8 @@ export class JobRunner {
       const rerun = row?.rerun_requested ?? false;
       // Re-processing (a late upload, "Process now" twice) replaces the previous files,
       // transcripts included: they are redone from the new audio.
+      // Clips were cut from the old combined file: they go with it.
+      await tx.query("DELETE FROM clips WHERE recording_id = $1", [rec.id]);
       const old = await tx.query<{ storage_key: string }>("DELETE FROM outputs WHERE recording_id = $1 RETURNING storage_key", [
         rec.id,
       ]);
@@ -500,6 +511,15 @@ export class JobRunner {
         // The host's plan says how long each is kept. Counted from the first time the files were
         // ready: processing again doesn't buy more time.
         rawRetentionMs = await planRetention(tx, rec.id, Date.now());
+      }
+      // The studio's own rule: deleted this many days after the files are ready. It can only
+      // bring the date forward, never past what a plan allows, and processing again doesn't move it later.
+      const deleteAfterDays = studioSettings.parse(rec.settings).deleteAfterDays;
+      if (deleteAfterDays && !rerun) {
+        await tx.query(
+          "UPDATE recordings SET keep_until = LEAST(coalesce(keep_until, 'infinity'::timestamptz), now() + make_interval(days => $2)) WHERE id = $1",
+          [rec.id, deleteAfterDays],
+        );
       }
       if (rawRetentionMs !== undefined) {
         // The originals go once the retention period is over (see purgeRaw).
@@ -591,6 +611,63 @@ export class JobRunner {
       return old.map((o) => o.storage_key);
     });
     await this.removeReplaced(replaced);
+  }
+
+  /** Cut every waiting clip of a recording out of its combined file (or its mix, without video). */
+  private async cutClips(job: JobRow) {
+    const [rec] = await this.db.query<{ id: string; session_id: string }>("SELECT id, session_id FROM recordings WHERE id = $1 AND deleted_at IS NULL", [job.recording_id]);
+    const clips = rec
+      ? await this.db.query<{ id: string; start_ms: number; end_ms: number; title: string }>("SELECT id, start_ms, end_ms, title FROM clips WHERE recording_id = $1 AND status = 'queued' ORDER BY created_at", [rec.id])
+      : [];
+    const [source] = rec ? await this.db.query<{ storage_key: string; file_name: string }>("SELECT storage_key, file_name FROM outputs WHERE recording_id = $1 AND kind = 'combined' LIMIT 1", [rec.id]) : [];
+    if (!rec || clips.length === 0 || !source) {
+      if (rec && !source) await this.db.query("UPDATE clips SET status = 'failed' WHERE recording_id = $1 AND status = 'queued'", [rec.id]);
+      await this.db.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+      return;
+    }
+    const work = await mkdtemp(join(tmpdir(), "tapry-clips-"));
+    const srcExt = source.file_name.split(".").pop()!.toLowerCase();
+    const kind = srcExt === "mp4" ? ("video" as const) : srcExt === "flac" ? ("flac" as const) : ("wav" as const);
+    const ext = kind === "video" ? "mp4" : kind;
+    const type = kind === "video" ? "video/mp4" : kind === "flac" ? "audio/flac" : "audio/wav";
+    try {
+      const src = join(work, `source.${srcExt}`);
+      await this.storage.downloadTo(source.storage_key, src);
+      for (const clip of clips) {
+        const out = join(work, `${clip.id}.${ext}`);
+        try {
+          await runFfmpeg(this.opts.ffmpeg, clipArgs(src, out, Number(clip.start_ms), Number(clip.end_ms), kind), { timeoutMs: 10 * 60 * 1000 });
+          const id = newId("out");
+          const key = `outputs/${rec.session_id}/${rec.id}/${id}.${ext}`;
+          const bytes = await this.storage.uploadFrom(key, out, type);
+          const kept = await this.db.transaction(async (tx) => {
+            // Deleted while it was being cut: the file isn't wanted.
+            const [still] = await tx.query("SELECT 1 FROM clips WHERE id = $1 FOR UPDATE", [clip.id]);
+            if (!still) return false;
+            await insertOutput(tx, rec.id, { id, key, bytes, kind: "clip", fileName: clipFileName({ startMs: Number(clip.start_ms), endMs: Number(clip.end_ms), title: clip.title }, ext), contentType: type, durationMs: Number(clip.end_ms) - Number(clip.start_ms) });
+            await tx.query("UPDATE clips SET status = 'ready', output_id = $2 WHERE id = $1", [clip.id, id]);
+            return true;
+          });
+          if (!kept) await this.removeReplaced([key]);
+        } catch (err) {
+          if (!(err instanceof FfmpegError)) throw err;
+          console.error(`[worker] clip ${clip.id} of ${rec.id} failed: ${err.message}`);
+          await this.db.query("UPDATE clips SET status = 'failed' WHERE id = $1", [clip.id]);
+        }
+      }
+      await this.db.query("UPDATE jobs SET status = 'done', finished_at = now(), error = NULL WHERE id = $1", [job.id]);
+    } catch (err) {
+      const again = job.attempts < (this.opts.maxAttempts ?? 3);
+      console.error(`[worker] clip_recording ${job.id} attempt ${job.attempts} failed:`, String(err).slice(0, 300));
+      await this.db.query(
+        again ? "UPDATE jobs SET status = 'queued', run_after = now() + make_interval(secs => $2), error = $3 WHERE id = $1" : "UPDATE jobs SET status = 'failed', finished_at = now(), error = $3 WHERE id = $1 AND $2 > 0",
+        [job.id, 30 * job.attempts, String(err).slice(0, 500)],
+      );
+      if (!again) await this.db.query("UPDATE clips SET status = 'failed' WHERE recording_id = $1 AND status = 'queued'", [rec.id]);
+    } finally {
+      await rm(work, { recursive: true, force: true });
+      this.opts.onChange?.(rec.session_id);
+    }
   }
 
   private models: { local: NotesModel | null; outside: NotesModel | null } | undefined;

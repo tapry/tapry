@@ -1,7 +1,7 @@
 // Project files for editors: every finished file on its own track from 0, markers included.
 import { writeFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { toFcpxml, toOtio, toReaper, type TimelineInput } from "../src/server/timeline-export";
+import { keepRanges, toFcpxml, toOtio, toReaper, type TimelineInput } from "../src/server/timeline-export";
 import { setup } from "./harness";
 
 const input: TimelineInput = {
@@ -59,6 +59,42 @@ describe("timeline exports", () => {
   });
 });
 
+describe("timelines with long pauses left out", () => {
+  // Speech at 1–4 s and 4.5–6 s (a short gap, kept), then nothing until 20–25 s.
+  const speech: Array<[number, number]> = [[1000, 4000], [4500, 6000], [20_000, 25_000]];
+  const tight: TimelineInput = { ...input, durationMs: 30_000, keep: keepRanges(speech, 30_000), markers: [{ atMs: 2000, label: "In speech" }, { atMs: 12_000, label: "In the pause" }, { atMs: 21_000, label: "After" }] };
+
+  it("keeps speech with a little room around it, leaves short gaps alone and never invents time", () => {
+    expect(keepRanges(speech, 30_000)).toEqual([[600, 6400], [19_600, 25_400]]);
+    expect(keepRanges([], 30_000)).toEqual([[0, 30_000]]);
+    expect(keepRanges([[0, 100], [29_950, 30_000]], 30_000)).toEqual([[0, 500], [29_550, 30_000]]);
+  });
+
+  it("cuts every track at the same places, and moves markers with what they mark", () => {
+    const otio = JSON.parse(toOtio(tight));
+    if (process.env.TIMELINE_SAMPLES) writeFileSync(`${process.env.TIMELINE_SAMPLES}/Tight.otio`, toOtio(tight));
+    const cuts = (track: any) => track.children.map((c: any) => [c.source_range.start_time.value, c.source_range.duration.value]);
+    // 25 frames a second: 0.6–6.4 s and 19.6–25.4 s.
+    expect(otio.tracks.children.map(cuts)).toEqual(Array(4).fill([[15, 145], [490, 145]]));
+    // 2 s is 35 frames into the first part; 12 s fell in the pause, so it sits at the cut; 21 s is 35 frames into the second.
+    expect(otio.tracks.markers.map((m: any) => m.marked_range.start_time.value)).toEqual([35, 145, 180]);
+
+    const xml = toFcpxml(tight);
+    if (process.env.TIMELINE_SAMPLES) writeFileSync(`${process.env.TIMELINE_SAMPLES}/Tight.fcpxml`, xml);
+    expect(xml).toContain('<sequence format="r1" duration="290/25s"');
+    expect(xml).toContain('offset="0/25s" start="15/25s" duration="145/25s" name="Host"');
+    expect(xml).toContain('offset="145/25s" start="490/25s" duration="145/25s" name="Host"');
+    expect(xml.match(/<marker /g)!.length).toBe(2); // the one in the pause has nothing left to sit on
+
+    const rpp = toReaper(tight);
+    expect(rpp.match(/<ITEM/g)!.length).toBe(4); // two parts on each of the two audio tracks
+    expect(rpp).toContain("POSITION 0\n      LENGTH 5.800000\n      SOFFS 0.600000");
+    expect(rpp).toContain("POSITION 5.800000\n      LENGTH 5.800000\n      SOFFS 19.600000");
+    expect(rpp).toContain('MARKER 1 1.400000 "In speech" 0');
+    expect(rpp).toContain('MARKER 3 7.200000 "After" 0');
+  });
+});
+
 describe("timeline downloads", () => {
   let t: Awaited<ReturnType<typeof setup>>;
   beforeEach(async () => {
@@ -83,6 +119,8 @@ describe("timeline downloads", () => {
     expect(rpp).toContain('FILE "Guest - audio.wav"'); // the person's file, not the mix
     expect(rpp).not.toContain("Combined");
     expect(rpp).toContain('MARKER 1 1.500000 "First question" 0');
+    // Pauses are found from the transcript: without one, that version says so.
+    expect((await t.hostBrowser.get(`${path("rpp")}?pauses=out`)).body.error).toBe("no_transcript");
     expect((await t.hostBrowser.get(path("premiere"))).status).toBe(404);
     expect((await t.client().get(path("otio"))).status).toBe(401);
   });

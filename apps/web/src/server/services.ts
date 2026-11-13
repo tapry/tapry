@@ -1,3 +1,5 @@
+import { ActivityService, CommentsService } from "./collab";
+import { ClipsService } from "./clips";
 import { TimelineExports } from "./timeline-export";
 import { GuideService } from "./guide";
 import { NotesService } from "./notes";
@@ -47,6 +49,12 @@ export interface Services {
   guide: GuideService;
   /** Project files for editors that place a recording's files on a timeline. */
   timelines: TimelineExports;
+  /** Clips cut out of finished recordings. */
+  clips: ClipsService;
+  /** Comments on recordings. */
+  comments: CommentsService;
+  /** The account's activity log. */
+  activity: ActivityService;
   /** The admin health page's checks. */
   health: HealthService;
   /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
@@ -115,6 +123,9 @@ export function createServices(
     waitlist: new WaitlistService(db, { cloud: billing.cloud, now: opts.now }),
     guide: new GuideService(db, opts.now),
     timelines: new TimelineExports(db),
+    clips: new ClipsService(db, storage, () => processing.onEnqueue()),
+    comments: new CommentsService(db),
+    activity: new ActivityService(db, opts.now),
     notes: new NotesService(db, storage, { local: opts.notes?.local ?? null, outside: opts.notes?.outside ?? null, cloud: billing.cloud, now: opts.now, onQueued: () => processing.onEnqueue() }),
     health,
     library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),

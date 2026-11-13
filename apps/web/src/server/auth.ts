@@ -18,6 +18,8 @@ export interface User {
    * Studios, recordings, the plan and storage are looked up by this, never by `id`.
    */
   accountId: string;
+  /** A member who may only look, listen, download and comment: every other change is refused. */
+  viewer?: boolean;
 }
 
 export interface AuthOptions {
@@ -197,6 +199,7 @@ interface UserRow {
   is_admin: boolean;
   email_verified_at: Date | null;
   account_id: string | null;
+  member_role?: string;
 }
 
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null, accountId: r.account_id ?? r.id });
+const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null, accountId: r.account_id ?? r.id, viewer: r.account_id !== null && r.member_role === "viewer" });
