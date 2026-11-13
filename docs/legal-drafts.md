@@ -14,7 +14,7 @@ read them before they go on the website, then move them into `apps/site/src/app/
 | Blank | What it is |
 |---|---|
 | `[LEGAL NAME]` | The person or company that runs Tapry Cloud and signs these terms |
-| `[ADDRESS]`, `[CONTACT EMAIL]` | A postal address and an address people can write to |
+| `[ADDRESS]` | A postal address. The contact address is hello@tapry.app (forwarded by Cloudflare Email Routing) |
 | `[COUNTRY OF LAW]`, `[COURTS]` | The law the terms are under and where disputes go |
 | `[HOSTING PROVIDER, COUNTRY]` | Where the servers run |
 | `[STORAGE PROVIDER, REGION]` | Where recordings are stored (the Team plan promises the EU) |
@@ -27,7 +27,7 @@ read them before they go on the website, then move them into `apps/site/src/app/
 
 ## Terms of Service (Tapry Cloud)
 
-**1. Who we are.** Tapry Cloud is run by `[LEGAL NAME]`, `[ADDRESS]` ("we"). Write to us at `[CONTACT EMAIL]`. These terms cover the hosted service at `[DOMAIN]`. The self-hosted software is separate: it is licensed under AGPL-3.0 (the recorder core under MIT) and these terms don't apply to it.
+**1. Who we are.** Tapry Cloud is run by `[LEGAL NAME]`, `[ADDRESS]` ("we"). Write to us at hello@tapry.app. These terms cover the hosted service at tapry.app. The self-hosted software is separate: it is licensed under AGPL-3.0 (the recorder core under MIT) and these terms don't apply to it.
 
 **2. Your account.** You need an account to host recordings; your guests never do. Give a real email address and confirm it: we use it to sign you in, to send account emails and to warn you before a recording is deleted. Keep your password to yourself; you are responsible for what is done with your account.
 
@@ -58,14 +58,14 @@ read them before they go on the website, then move them into `apps/site/src/app/
 - **First payment:** if Tapry Cloud isn't for you, ask within **14 days** of your first payment for a plan and we refund it in full, whether you paid for a month or a year.
 - **Renewals:** not refunded once the new period has started, except where the law gives you that right. Cancel before the renewal date to avoid it; the pricing page and your invoice show the date.
 - **If we fail you:** if a fault on our side loses a recording or keeps you from recording, write to us and we refund the period it happened in.
-- **How:** write to `[CONTACT EMAIL]` from your account's address. Refunds are made by `[PAYMENT PROVIDER]` to the payment method you used, usually within 10 days.
+- **How:** write to hello@tapry.app from your account's address. Refunds are made by `[PAYMENT PROVIDER]` to the payment method you used, usually within 10 days.
 - **One-time offers** (the founding offer): refundable within 14 days of purchase.
 
 ---
 
 ## Privacy policy (Tapry Cloud)
 
-**Who is responsible.** `[LEGAL NAME]`, `[ADDRESS]`, `[CONTACT EMAIL]`. For what hosts record, the host decides why and how it is recorded (the controller) and we store and process it for them (the processor). `[EU REPRESENTATIVE]`.
+**Who is responsible.** `[LEGAL NAME]`, `[ADDRESS]`, hello@tapry.app. For what hosts record, the host decides why and how it is recorded (the controller) and we store and process it for them (the processor). `[EU REPRESENTATIVE]`.
 
 **What we hold, and why**
 
@@ -95,7 +95,7 @@ read them before they go on the website, then move them into `apps/site/src/app/
 
 **Security.** Passwords are stored as scrypt hashes. Sign-in sessions, emailed links and guests' tokens are stored only as hashes. Uploads and downloads go over HTTPS, straight to storage, through links that expire. Deleting a recording removes its files from storage.
 
-**Your rights.** You can see, correct, download and delete what we hold about you; write to `[CONTACT EMAIL]`. A guest who wants their part of a recording removed should ask the host who recorded them; we help the host do it. You can complain to your data protection authority.
+**Your rights.** You can see, correct, download and delete what we hold about you; write to hello@tapry.app. A guest who wants their part of a recording removed should ask the host who recorded them; we help the host do it. You can complain to your data protection authority.
 
 **Changes.** We'll email account holders before a change that matters.
 

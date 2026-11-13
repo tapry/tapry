@@ -22,6 +22,7 @@ no limits, no Plan tab, and the billing endpoints answer 404.
 | **Sign-up limit** | Five new accounts an hour from one address (attempts count), on any server with open sign-up |
 | **Seats** | An account's owner invites people by link (Settings, Members); members see the account's studios and recordings and can host. The plan sets the seats (Studio 3, Team 5), counting open invitations; a smaller plan removes nobody. The plan, the bucket and the member list stay with the owner |
 | **Own storage** | An account connects its own S3-compatible bucket on the Storage page (needs `STORAGE_SECRET_KEY`); its sessions then record there. The Own storage plan has no other storage, no hour limit and no deletion by us; Business may use it; other plans can't |
+| **Checkout** (`/checkout/<plan>`) | With Paddle's client token set, each plan that has a price is bought on this page: it loads Paddle's script (only here) and opens the checkout with the account's id attached, by the month or the year. The owner's only |
 | **Webhook** (`POST /api/billing/webhook`) | Paddle Billing and Lemon Squeezy: signature checked, each event applied once, older events never overwrite newer state. Follows new subscriptions, plan changes, failed payments, cancellations and the end |
 
 ## Setting it up
@@ -31,17 +32,31 @@ TAPRY_CLOUD=true
 ALLOW_SIGNUP=true
 BILLING_PROVIDER=paddle                 # or lemonsqueezy
 BILLING_WEBHOOK_SECRET=…                # the webhook's signing secret
-BILLING_PRICES=pri_abc=creator,pri_def=creator,pri_xyz=studio   # monthly and yearly price ids → plan
-BILLING_CHECKOUT_URLS=creator=https://…{user_id}…{email},studio=https://…
+BILLING_PRICES=pri_abc=creator,pri_def=creator:yearly,pri_xyz=studio   # price ids → plan; ":yearly" marks the yearly price
+BILLING_PADDLE_CLIENT_TOKEN=…            # Paddle: Developer tools → Authentication → client-side token
+BILLING_PADDLE_SANDBOX=true             # while testing with sandbox-vendors.paddle.com; remove for live
 BILLING_MANAGE_URL=https://…            # the provider's customer portal
 SMTP_HOST=…  SMTP_FROM=…  APP_URL=…     # email: confirming addresses, new passwords, guests' recap
 STORAGE_SECRET_KEY=…                    # own storage: encrypts customers' bucket keys. Never change it
 GUEST_PROMO_URL=https://tapry.app/      # the Free plan's badge
 ```
 
-The checkout address must carry the account's id to the provider as custom data named `user_id`
-(`{user_id}` is replaced with it), because the webhook finds the account by it. A plan without a
-checkout address isn't offered. A separate worker reads `TAPRY_CLOUD` too: it does the retention.
+A plan without a price isn't offered. A separate worker reads `TAPRY_CLOUD` too: it does the
+retention. With another provider (Lemon Squeezy), set `BILLING_CHECKOUT_URLS=creator=https://…{user_id}…`
+instead of the Paddle token: the address must carry the account's id as custom data named `user_id`.
+
+### In Paddle
+
+1. Test first in the sandbox (a separate account at sandbox-vendors.paddle.com).
+2. **Catalog → Products:** one product per plan (Own storage, Creator, Studio, Team), each with a monthly and a yearly recurring price in USD: 12/120, 19/190, 39/390, 149/1,490. Copy each price id (`pri_…`) into `BILLING_PRICES`.
+3. **Developer tools → Authentication:** create a client-side token → `BILLING_PADDLE_CLIENT_TOKEN`.
+4. **Developer tools → Notifications:** a webhook destination at `https://<the app's address>/api/billing/webhook`, with the `subscription.*` events. Copy its secret key → `BILLING_WEBHOOK_SECRET`.
+5. **Checkout → Checkout settings:** set the default payment link to the app's address, and add the app's domain to the approved domains (Paddle only opens its checkout on approved domains).
+6. The customer portal's address (Paddle gives one per seller) → `BILLING_MANAGE_URL`.
+7. Buy a plan with Paddle's test card, and check the Plan tab changes within a minute.
+
+The founding offer is a one-time price, which the webhook doesn't read (it follows subscriptions):
+sell it with a Paddle payment link and set the buyer's plan by hand in the Plan tab.
 
 ## Not built yet
 

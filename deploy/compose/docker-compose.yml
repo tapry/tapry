@@ -41,6 +41,8 @@ x-app-env: &app-env
   BILLING_PRICES: ${BILLING_PRICES:-}
   BILLING_CHECKOUT_URLS: ${BILLING_CHECKOUT_URLS:-}
   BILLING_MANAGE_URL: ${BILLING_MANAGE_URL:-}
+  BILLING_PADDLE_CLIENT_TOKEN: ${BILLING_PADDLE_CLIENT_TOKEN:-}
+  BILLING_PADDLE_SANDBOX: ${BILLING_PADDLE_SANDBOX:-false}
 
 services:
   # HTTPS for the public names (app, storage, LiveKit, TURN), certificates from Let's Encrypt.

@@ -2,7 +2,7 @@
 // this billing month, and where to change it. Every figure comes from BillingService.
 import { PLANS, type BillingOverview, type Plan } from "@tapry/shared";
 import type { ReactNode } from "react";
-import { cn } from "./ui";
+import { cn, Notice } from "./ui";
 import { ListCard } from "./ui-extra";
 import { PlanAccounts, type Account } from "./plan-accounts";
 
@@ -19,7 +19,7 @@ export function hoursAndMinutes(ms: number) {
 const price = (p: Plan) => (p.monthlyUsd === null ? "By agreement" : p.monthlyUsd === 0 ? "$0" :`$${p.monthlyUsd} a month`);
 const keeps = (days: number | null) => (days === null ? "Until you delete them" : `${days} days after a recording is processed`);
 
-export function PlanPanel({ billing, accounts }: { billing: BillingOverview; accounts: Account[] | null }) {
+export function PlanPanel({ billing, accounts, justPaid = false }: { billing: BillingOverview; accounts: Account[] | null; /** Back from the checkout. */ justPaid?: boolean }) {
   const { plan } = billing;
   const included = plan.hours === null ? null : plan.hours * 3_600_000;
   const share = included === null ? 0 : Math.min(1, billing.usedMs / included);
@@ -27,6 +27,11 @@ export function PlanPanel({ billing, accounts }: { billing: BillingOverview; acc
 
   return (
     <>
+      {justPaid && (
+        <Notice tone="ok" data-testid="plan-paid">
+          Thank you. Your plan changes as soon as the payment is confirmed, usually within a minute: reload this page if it still shows the old one.
+        </Notice>
+      )}
       <ListCard data-testid="plan-panel">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-divider py-4">
           <span className="flex min-w-0 flex-col gap-[3px]">
@@ -85,7 +90,7 @@ export function PlanPanel({ billing, accounts }: { billing: BillingOverview; acc
       {billing.upgrades.length > 0 && (
         <ListCard>
           <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">Bigger plans. Paying happens on our payment provider&apos;s page; no card detail reaches Tapry.</span>
-          {billing.upgrades.map(({ plan: p, url }, i) => (
+          {billing.upgrades.map(({ plan: p, url, yearlyUrl }, i) => (
             <div key={p.id} className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4", i < billing.upgrades.length - 1 && "border-b border-divider")}>
               <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
                 <span className="font-medium">
@@ -95,13 +100,20 @@ export function PlanPanel({ billing, accounts }: { billing: BillingOverview; acc
                   {p.hours === null ? "No limit on hours" : `${p.hours} recording hours a month`}, files kept {p.filesDays === null ? "until you delete them" : `${p.filesDays} days`}
                 </span>
               </span>
-              <a
-                href={url}
-                data-testid={`upgrade-${p.id}`}
-                className="inline-flex h-[34px] items-center rounded-md bg-ink px-3.5 text-sm font-medium text-ink-text shadow-xs transition-colors hover:bg-ink-hover"
-              >
-                Move to {p.name}
-              </a>
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {yearlyUrl && p.monthlyUsd !== null && (
+                  <a href={yearlyUrl} data-testid={`upgrade-${p.id}-yearly`} className="text-[13px] text-muted underline underline-offset-[3px] hover:text-accent-strong">
+                    or ${(p.monthlyUsd * 10).toLocaleString("en-US")} a year
+                  </a>
+                )}
+                <a
+                  href={url}
+                  data-testid={`upgrade-${p.id}`}
+                  className="inline-flex h-[34px] items-center rounded-md bg-ink px-3.5 text-sm font-medium text-ink-text shadow-xs transition-colors hover:bg-ink-hover"
+                >
+                  Move to {p.name}
+                </a>
+              </span>
             </div>
           ))}
         </ListCard>

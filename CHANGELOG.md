@@ -19,6 +19,9 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   out. The answer is the same whether or not the address has an account. Without email it isn't
   offered. On Tapry Cloud, new accounts also confirm their address before they can create or
   open a studio. Database: `users.email_verified_at`, `account_tokens` (added automatically).
+- **Paddle checkout (Tapry Cloud).** With Paddle's client token set, plans are bought on the
+  server's own `/checkout/<plan>` page, by the month or the year; `BILLING_PRICES` marks yearly
+  prices with `:yearly`. Paddle's script loads on that page only.
 - **Members.** An account's owner can invite people from Settings, Members. They get a link
   (emailed where the server sends email, and always shown to pass on) to create their own log-in,
   even where sign-up is closed. Members see the account's studios and recordings and can create,

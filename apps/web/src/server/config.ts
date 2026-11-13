@@ -2,6 +2,7 @@
 // standalone worker (worker-main.ts), so both read the same variables the same way.
 import { z } from "zod";
 import { planId, type PlanId } from "@tapry/shared";
+import type { PaddleCheckoutConfig } from "./billing";
 import type { WebhookConfig } from "./billing-webhooks";
 import type { CallConfig } from "./call";
 import type { SmtpConfig } from "./mail";
@@ -86,12 +87,22 @@ const env = z.object({
   /** Who sells the subscriptions. With BILLING_WEBHOOK_SECRET set, POST /api/billing/webhook is on. */
   BILLING_PROVIDER: z.enum(["paddle", "lemonsqueezy"]).default("paddle"),
   BILLING_WEBHOOK_SECRET: unsetIfEmpty(z.string().min(8)),
-  /** The provider's price ids and the plan each sells: "pri_abc=creator,pri_def=creator,pri_xyz=studio". */
+  /**
+   * The provider's price ids and the plan each sells, a yearly price marked ":yearly":
+   * "pri_abc=creator,pri_def=creator:yearly,pri_xyz=studio".
+   */
   BILLING_PRICES: z.string().default(""),
   /** Checkout addresses per plan: "creator=https://…{user_id}…{email},studio=https://…". A plan without one isn't offered. */
   BILLING_CHECKOUT_URLS: z.string().default(""),
   /** The provider's customer portal (card, invoices, cancelling). */
   BILLING_MANAGE_URL: unsetIfEmpty(z.string().url()),
+  /**
+   * Paddle's client-side token: with it, plans with a price in BILLING_PRICES are bought on this
+   * server's own checkout page (/checkout/<plan>), which opens Paddle's checkout.
+   */
+  BILLING_PADDLE_CLIENT_TOKEN: unsetIfEmpty(z.string().min(8)),
+  /** Use Paddle's sandbox (test payments) instead of live. */
+  BILLING_PADDLE_SANDBOX: bool("false"),
 });
 
 /** "a=b,c=d" → pairs; the value may itself hold "=" (an address with a query). */
@@ -101,6 +112,12 @@ function pairs(value: string, name: string): Array<[string, string]> {
     if (at < 1 || at === p.length - 1) throw new Error(`${name}: "${p}" is not key=value`);
     return [p.slice(0, at).trim(), p.slice(at + 1).trim()];
   });
+}
+
+/** "creator" or "creator:yearly" → the plan and whether the price is the yearly one. */
+function planPrice(value: string, name: string): { plan: PlanId; yearly: boolean } {
+  const yearly = value.endsWith(":yearly");
+  return { plan: plan(yearly ? value.slice(0, -":yearly".length) : value, name), yearly };
 }
 
 function plan(value: string, name: string): PlanId {
@@ -137,7 +154,13 @@ export interface Config {
   /** Accounts' own buckets: the key their secrets are encrypted with (null: off). */
   ownStorage: { serverKey: string | null; allowPrivate: boolean };
   /** Tapry Cloud: plans, limits and billing. Null on a self-hosted server. */
-  cloud: { checkoutUrls: Partial<Record<PlanId, string>>; manageUrl: string | null; webhook: WebhookConfig | null } | null;
+  cloud: {
+    checkoutUrls: Partial<Record<PlanId, string>>;
+    manageUrl: string | null;
+    webhook: WebhookConfig | null;
+    /** Paddle's checkout on this server's own page; null without a client token. */
+    paddle: PaddleCheckoutConfig | null;
+  } | null;
 }
 
 export function loadConfig(source: Record<string, string | undefined> = process.env): Config {
@@ -191,14 +214,22 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     updateRepo: cfg.UPDATE_CHECK_REPO ?? null,
     ownStorage: { serverKey: cfg.STORAGE_SECRET_KEY ?? null, allowPrivate: cfg.OWN_STORAGE_ALLOW_PRIVATE },
     cloud: cfg.TAPRY_CLOUD
-      ? {
+      ? ((prices) => ({
           // Read even without a webhook secret, so a mistyped plan is caught at start.
           checkoutUrls: Object.fromEntries(pairs(cfg.BILLING_CHECKOUT_URLS, "BILLING_CHECKOUT_URLS").map(([k, v]) => [plan(k, "BILLING_CHECKOUT_URLS"), v])),
           manageUrl: cfg.BILLING_MANAGE_URL ?? null,
-          webhook: ((prices) => (cfg.BILLING_WEBHOOK_SECRET ? { provider: cfg.BILLING_PROVIDER, secret: cfg.BILLING_WEBHOOK_SECRET, prices } : null))(
-            Object.fromEntries(pairs(cfg.BILLING_PRICES, "BILLING_PRICES").map(([k, v]) => [k, plan(v, "BILLING_PRICES")])),
-          ),
-        }
+          webhook: cfg.BILLING_WEBHOOK_SECRET
+            ? { provider: cfg.BILLING_PROVIDER, secret: cfg.BILLING_WEBHOOK_SECRET, prices: Object.fromEntries(prices.map(([id, p]) => [id, p.plan])) }
+            : null,
+          paddle:
+            cfg.BILLING_PROVIDER === "paddle" && cfg.BILLING_PADDLE_CLIENT_TOKEN
+              ? {
+                  clientToken: cfg.BILLING_PADDLE_CLIENT_TOKEN,
+                  sandbox: cfg.BILLING_PADDLE_SANDBOX,
+                  prices: prices.reduce<PaddleCheckoutConfig["prices"]>((all, [id, p]) => ({ ...all, [p.plan]: { ...all[p.plan], [p.yearly ? "yearly" : "monthly"]: id } }), {}),
+                }
+              : null,
+        }))(pairs(cfg.BILLING_PRICES, "BILLING_PRICES").map(([k, v]) => [k, planPrice(v, "BILLING_PRICES")] as const))
       : null,
   };
 }

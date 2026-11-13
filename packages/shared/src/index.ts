@@ -421,7 +421,7 @@ export interface BillingOverview {
   /** Recorded in this period, in milliseconds, deleted recordings included. */
   usedMs: number;
   /** Plans that can be bought from here, with the address of their checkout. */
-  upgrades: Array<{ plan: Plan; url: string }>;
+  upgrades: Array<{ plan: Plan; url: string; /** The same plan paid by the year (ten months' price), where it is sold that way. */ yearlyUrl?: string }>;
   /** Where to change the card, see invoices or cancel; null when there is no subscription. */
   manageUrl: string | null;
 }
