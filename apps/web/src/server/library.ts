@@ -154,7 +154,7 @@ export class LibraryService {
       `SELECT s.studio_id, p.display_name, max(r.started_at) AS at
        FROM tracks t JOIN participants p ON p.id = t.participant_id
        JOIN recordings r ON r.id = t.recording_id JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
-       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL
+       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL AND t.kind <> 'mask'
        GROUP BY s.studio_id, p.display_name
        ORDER BY at DESC, p.display_name`,
       [owner.id],
@@ -185,7 +185,7 @@ export class LibraryService {
               count(DISTINCT t.recording_id)::int AS recordings, max(p.created_at) AS last_joined
        FROM participants p
        JOIN sessions s ON s.id = p.session_id JOIN studios st ON st.id = s.studio_id
-       JOIN tracks t ON t.participant_id = p.id JOIN recordings r ON r.id = t.recording_id AND r.deleted_at IS NULL
+       JOIN tracks t ON t.participant_id = p.id AND t.kind <> 'mask' JOIN recordings r ON r.id = t.recording_id AND r.deleted_at IS NULL
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND p.role = 'guest'
        GROUP BY p.display_name, st.id, st.name`,
       [owner.id],
@@ -284,7 +284,7 @@ export class LibraryService {
       [user.id],
     );
     const owned = `JOIN recordings r ON r.id = t.recording_id JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
-       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL AND r.raw_deleted_at IS NULL`;
+       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL AND r.raw_deleted_at IS NULL AND t.kind <> 'mask'`;
     const [pieces] = await this.db.query<{ confirmed: number; missing: number }>(
       `SELECT (SELECT count(*) FROM chunks c JOIN tracks t ON t.id = c.track_id ${owned})::int AS confirmed,
               (SELECT coalesce(sum(coalesce(cardinality(t.missing_seqs), 0)), 0) FROM tracks t ${owned})::int AS missing`,

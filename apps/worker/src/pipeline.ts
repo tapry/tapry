@@ -3,7 +3,7 @@ import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import { BRIGHTNESS_VALUES, LOOK_VALUES, type TrackFilters } from "@tapry/shared";
-import { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";
+import { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, run } from "./ffmpeg.js";
 
 export interface TrackInput {
   trackId: string;
@@ -21,6 +21,22 @@ export interface TrackInput {
    * applied here, to their files. Left out: the files are as recorded.
    */
   filters?: TrackFilters;
+  /** When the track's last chunk ended, minus recording start. Left out: it ran to the end of the recording. */
+  endOffsetMs?: number;
+  /**
+   * For a camera track whose filters blur the background: the mask the person's device recorded
+   * with it. Left out, unreadable or not covering the video: the file is rendered without the
+   * blur and `onFilterFailed` says so. A mask can only ever add the blur, never cost the file.
+   */
+  mask?: MaskInput;
+}
+
+/** A person's mask track: a small black-and-white video, white where the person is. */
+export interface MaskInput {
+  /** Its chunks concatenated in seq order, like a track's `rawPath`. */
+  rawPath: string;
+  /** Mask start minus recording start, server clock (the mask's own, not the camera's). */
+  offsetMs: number;
 }
 
 /** A track or file left out because ffmpeg couldn't read or render it. */
@@ -183,6 +199,56 @@ export function videoLookFilters(filters: TrackFilters | undefined): string {
   if (look.saturation !== 0 && look.temperature !== 6500) chain.push(`colortemperature=temperature=${num(look.temperature)}`);
   if (filters.touchUp) chain.push(TOUCH_UP);
   return chain.join(",");
+}
+
+/**
+ * The longest stretch of a person's video the mask may leave uncovered (before it starts, after
+ * it ends, or between two of its frames) and still be used. Where there is no mask the picture
+ * could be shown as it is (which shows the room someone asked to hide) or blurred whole (which
+ * hides the person, in a file that's meant to show them). Neither is right for long, so: up to
+ * a second is blurred whole at the start and end (a recorder starting or stopping its two
+ * tracks a moment apart) or keeps the last mask frame in between; anything longer and the mask
+ * isn't used at all, the file is rendered without the blur, and the host is told.
+ */
+export const MASK_MAX_GAP_MS = 1000;
+
+/**
+ * The filter graph (-filter_complex, video out as [v]) that blurs a camera's background.
+ * Input 0 is the camera, input 1 the mask.
+ * - The camera goes through exactly what it does without the blur (look, alignment, scale), so
+ *   the same frames come out at the same times; only then is it split into a sharp and a
+ *   blurred copy. Black that fills a late start stays black: blurred black is black.
+ * - The mask is put on the recording's timeline with its own offset at the same constant frame
+ *   rate (it is recorded at fewer frames a second: each one is held), black (nobody there) where
+ *   it has no frames, stretched to full contrast, scaled to the picture and softened at the edge.
+ * - The sharp copy shows through where the mask is white (alphamerge + overlay, which treats
+ *   the colour planes correctly); where it is fully white the pixels are the camera's own.
+ * `frame` is what follows for a piece of several (the padding to 16:9), or "".
+ */
+export function backgroundBlurGraph(o: { look: string; align: string; scale: string; frame: string; maskOffsetMs: number; height: number }): string {
+  const late = Math.max(0, Math.round(o.maskOffsetMs));
+  const early = Math.max(0, Math.round(-o.maskOffsetMs));
+  const mask = [
+    "format=gray",
+    early ? `trim=start=${sec(early)},setpts=PTS-STARTPTS` : "",
+    // From 0, so the first frames of the picture never wait for the mask's first frame.
+    `fps=${FPS}:start_time=0`,
+    late ? `tpad=start_duration=${sec(late)}:start_mode=add:color=black` : "",
+    "tpad=stop=-1:stop_mode=add:color=black",
+    // Video compression leaves the white a little grey and the black a little light.
+    "lut=y='clip((val-64)*2,0,255)'",
+  ]
+    .filter(Boolean)
+    .join(",");
+  return [
+    `[0:v]${o.look ? `${o.look},` : ""}${o.align},${o.scale},format=yuv420p,split[sharp][soft]`,
+    `[soft]gblur=sigma=${num(o.height / 54)}[bg]`,
+    `[1:v]${mask}[mask]`,
+    "[mask][sharp]scale2ref=flags=bilinear[fit][person]",
+    `[fit]gblur=sigma=${num(o.height / 270)}[edge]`,
+    "[person][edge]alphamerge[fg]",
+    `[bg][fg]overlay=format=yuv420${o.frame ? `,${o.frame}` : ""},format=yuv420p[v]`,
+  ].join(";");
 }
 
 /** Touch-up: small sigmas, luma only, so skin evens out while eyes, hair and edges stay sharp. */
@@ -575,9 +641,13 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   // merging pieces relies on it). Noise removal: on the aligned sound, like the person's WAV.
   const look = videoLookFilters(track.filters);
   const h = opts.videoHeight;
-  const frame = multi
-    ? `scale=${even((h * 16) / 9)}:${h}:force_original_aspect_ratio=decrease,pad=${even((h * 16) / 9)}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`
-    : `scale=-2:${h}`;
+  const wide = even((h * 16) / 9);
+  const pad = `pad=${wide}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
+  const frame = multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease,${pad}` : `scale=-2:${h}`;
+  const align = alignmentFilters("video", track.offsetMs, multi ? "black" : "clone");
+  // Background blur needs a mask that covers this video; without one the file is made without it.
+  const wantsBlur = track.filters?.background === "blur";
+  const mask = wantsBlur ? await usableMask(track, ctx) : null;
   try {
     let clean = "";
     if (hasAudio && track.filters?.noiseRemoval) {
@@ -599,10 +669,20 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
       }
       clean = audioCleanFilters(track.filters, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
     }
+    const picture = mask
+      ? [...RAW_INPUT_FLAGS, "-i", mask.rawPath,
+          "-filter_complex", backgroundBlurGraph({
+            look, align, height: h, maskOffsetMs: mask.offsetMs,
+            // An even size before the padding, for the colour planes of the mask.
+            scale: multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2` : frame,
+            frame: multi ? pad : "",
+          }),
+          "-map", "[v]", ...(hasAudio ? ["-map", "0:a:0"] : [])]
+      : ["-vf", `${look ? `${look},` : ""}${align},${frame},format=yuv420p`];
     await run(
       opts.ffmpeg,
       [...INPUT_FLAGS, "-i", track.rawPath,
-        "-vf", `${look ? `${look},` : ""}${alignmentFilters("video", track.offsetMs, multi ? "black" : "clone")},${frame},format=yuv420p`,
+        ...picture,
         ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps), clean, volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
         // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
         "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(opts.videoHeight)), "-r", String(FPS),
@@ -610,14 +690,43 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
       { timeoutMs },
     );
   } catch (err) {
-    // A filter this ffmpeg can't run must never cost someone their file: render it as recorded.
-    if (!(err instanceof FfmpegError) || !(look || track.filters?.noiseRemoval)) throw err;
+    if (!(err instanceof FfmpegError)) throw err;
+    // A filter this ffmpeg can't run, or a mask it can't read, must never cost someone their
+    // file: first without the blur (their look stays), then as recorded.
+    if (mask) return renderPiece({ ...track, mask: undefined }, path, ctx);
+    if (!(look || track.filters?.noiseRemoval)) throw err;
     const rendered = await renderPiece({ ...track, filters: undefined }, path, ctx);
     // Only now: had it failed again, the track is unreadable (skipped), not the filters.
     ctx.filterFailed?.(track);
     return rendered;
   }
+  // The file is there, without the blur its person asked for.
+  if (wantsBlur && !mask) ctx.filterFailed?.(track);
   return hasAudio;
+}
+
+/**
+ * The track's mask, when it can be trusted for the whole of this video: readable, and leaving
+ * no more than MASK_MAX_GAP_MS uncovered at the start, the end, or between two of its frames
+ * (see there for why). Its frame times are read from the file itself, not taken on trust.
+ */
+async function usableMask(track: TrackInput, { opts }: RenderContext): Promise<MaskInput | null> {
+  const mask = track.mask;
+  if (!mask) return null;
+  let times: number[];
+  try {
+    times = await probeFrameTimesMs(opts.ffprobe, mask.rawPath, RAW_FORMATS);
+  } catch (err) {
+    if (!(err instanceof FfmpegError)) throw err;
+    return null;
+  }
+  if (times.length < 2) return null;
+  const videoStart = Math.max(0, track.offsetMs);
+  const videoEnd = Math.min(track.endOffsetMs ?? opts.durationMs, opts.durationMs);
+  if (mask.offsetMs + times[0]! - videoStart > MASK_MAX_GAP_MS) return null;
+  if (videoEnd - (mask.offsetMs + times.at(-1)!) > MASK_MAX_GAP_MS) return null;
+  for (let i = 1; i < times.length; i++) if (times[i]! - times[i - 1]! > MASK_MAX_GAP_MS) return null;
+  return mask;
 }
 
 /**
@@ -841,7 +950,8 @@ async function renderMix(rendered: OutputFile[], opts: PipelineOptions, timeoutM
 // MediaRecorder output has no index and sometimes odd timestamps: regenerate them.
 /** What MediaRecorder writes (WebM, or MP4 in Safari): other demuxers never see a guest's bytes. */
 export const RAW_FORMATS = "matroska,webm,mov,mp4,m4a";
-const INPUT_FLAGS = ["-y", "-hide_banner", "-nostdin", "-fflags", "+genpts", "-format_whitelist", RAW_FORMATS];
+const RAW_INPUT_FLAGS = ["-fflags", "+genpts", "-format_whitelist", RAW_FORMATS];
+const INPUT_FLAGS = ["-y", "-hide_banner", "-nostdin", ...RAW_INPUT_FLAGS];
 
 /** "Sam", "Sam (2)" when two people share a name; safe for file names everywhere. */
 function uniqueNames(tracks: TrackInput[]) {

@@ -7,6 +7,7 @@ import { Button, cn, Field, Notice, RecDot, Select } from "@/components/ui";
 import { apiFetch } from "@/lib/client/api";
 import { estimateClock, type ClockEstimate } from "@/lib/client/clock";
 import { useFilterPrefs } from "@/lib/client/filters";
+import { useBackgroundBlur } from "@/lib/client/person-mask";
 import { useDevices, useLocalMedia, useMicLevel, useStoredState, type Devices } from "@/lib/media/hooks";
 import { FiltersPanel, filtersOn, useFiltersPanel } from "./filters-panel";
 import { eqAnimation, Icon, ICON } from "./icons";
@@ -50,6 +51,9 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
   const [prefs, setPrefs] = useFilterPrefs();
   const filtersPanel = useFiltersPanel(false);
   const hasPicture = !settings.audioOnly && !choice.cameraOff && !!stream && stream.getVideoTracks().length > 0;
+  // Background blur: works out where the person is from its own copy of the camera, here already,
+  // so it is ready (and they have seen it) before they go in.
+  const blur = useBackgroundBlur(hasPicture ? stream : null, prefs);
 
   // Headphones: pre-tick when the default output looks like a headset. Guests can untick.
   const detected = useRef(false);
@@ -134,6 +138,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
             prefs={prefs}
             onChange={setPrefs}
             hasCamera={hasPicture}
+            blur={blur}
             tone="page"
             onClose={filtersPanel.close}
             className="animate-fade-up"

@@ -18,6 +18,14 @@ import { BRIGHTNESS_VALUES, LOOK_VALUES, type TrackFilters } from "@tapry/shared
 //    the "multiply" blend. Warm takes out blue, cool takes out red.
 //  - touch-up → the same frame drawn again, blurred, at part strength: a cheap softening, no
 //    face detection. The file's version is whatever the worker does; this is its likeness.
+//  - background blur → the frame drawn blurred (a Gaussian of BACKGROUND_BLUR.px at 360 lines,
+//    scaled with the picture), then the sharp frame again only where the mask says the person
+//    is (person-mask.ts; the mask's edge is softened a little). Until there is a mask, the whole
+//    picture is blurred: with blur on, the room behind is never shown sharp.
+//
+// The order (picturePlan), the same as the worker's: blur the background, put the person over it,
+// then what applies to the whole picture: touch-up, and last the temperature tint. Brightness,
+// contrast and saturation go on both layers as they are drawn.
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -68,28 +76,117 @@ export function canPreviewFilters(): boolean {
   return typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
 }
 
-/** One frame of `source` with the filters, filling the canvas. */
-export function drawFiltered(ctx: CanvasRenderingContext2D, source: CanvasImageSource, width: number, height: number, f: TrackFilters) {
+/**
+ * Background blur: the Gaussian's sigma for a 360-line picture, and for the person's soft edge.
+ * As near as round numbers get to the worker's (sigma = height/54 for the background and
+ * height/270 for the edge of the mask, in apps/worker's pipeline).
+ */
+export const BACKGROUND_BLUR = { px: 6.75, edgePx: 1.25 };
+
+/** One thing drawn onto the canvas; a frame is these in order. */
+export type PictureStep =
+  /** The camera frame, filling the canvas. */
+  | { op: "frame"; filter: string }
+  /** The camera frame blurred: what's behind the person (or everything, while there is no mask). */
+  | { op: "background"; filter: string; blurPx: number }
+  /** The camera frame again, only where the mask says the person is. */
+  | { op: "person"; filter: string; edgePx: number }
+  /** Touch-up: a blurred copy at part strength, of the camera frame or of the picture so far. */
+  | { op: "soften"; of: "frame" | "picture"; filter: string; alpha: number }
+  /** The look's temperature, multiplied over everything. */
+  | { op: "tint"; color: string };
+
+const withFilter = (base: string, extra: string) => (base === "none" ? extra : `${base} ${extra}`);
+
+/**
+ * What to draw for one frame, in order, for a picture `height` lines tall. Without background
+ * blur this is what it always was: the frame, the touch-up, the tint.
+ */
+export function picturePlan(f: TrackFilters, height: number, hasMask: boolean): PictureStep[] {
   const base = canvasFilter(f);
+  const px = (at360: number) => round((at360 * height) / 360);
+  const steps: PictureStep[] = [];
+  const softenBlur = `blur(${px(TOUCH_UP.blurPx)}px)`;
+  if (f.background === "blur") {
+    const blurPx = px(BACKGROUND_BLUR.px);
+    steps.push({ op: "background", filter: withFilter(base, `blur(${blurPx}px)`), blurPx });
+    if (hasMask) steps.push({ op: "person", filter: base, edgePx: px(BACKGROUND_BLUR.edgePx) });
+    // The layers already carry the colour filters: soften what has been drawn, as it is.
+    if (f.touchUp) steps.push({ op: "soften", of: "picture", filter: softenBlur, alpha: TOUCH_UP.alpha });
+  } else {
+    steps.push({ op: "frame", filter: base });
+    if (f.touchUp) steps.push({ op: "soften", of: "frame", filter: withFilter(base, softenBlur), alpha: TOUCH_UP.alpha });
+  }
+  const tint = tintColor(f);
+  if (tint) steps.push({ op: "tint", color: tint });
+  return steps;
+}
+
+/** Where the person layer is put together before it goes over the blurred background (one per canvas). */
+const scratch = new WeakMap<CanvasRenderingContext2D, HTMLCanvasElement>();
+
+/**
+ * One frame of `source` with the filters, filling the canvas. `mask` is where the person is
+ * (opaque there, transparent elsewhere, any size), or null when there is none (yet).
+ */
+export function drawFiltered(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  f: TrackFilters,
+  mask: CanvasImageSource | null = null,
+) {
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
-  ctx.filter = base;
-  ctx.drawImage(source, 0, 0, width, height);
-  if (f.touchUp) {
-    const blur = `blur(${round((TOUCH_UP.blurPx * height) / 360)}px)`;
-    ctx.filter = base === "none" ? blur : `${base} ${blur}`;
-    ctx.globalAlpha = TOUCH_UP.alpha;
-    ctx.drawImage(source, 0, 0, width, height);
-    ctx.globalAlpha = 1;
+  for (const step of picturePlan(f, height, !!mask)) {
+    switch (step.op) {
+      case "frame":
+        ctx.filter = step.filter;
+        ctx.drawImage(source, 0, 0, width, height);
+        break;
+      case "background": {
+        // Drawn a little larger than the canvas, so the blur doesn't pull the dark outside in at the edges.
+        const m = Math.ceil(step.blurPx * 2);
+        ctx.filter = step.filter;
+        ctx.drawImage(source, -m, -m, width + 2 * m, height + 2 * m);
+        break;
+      }
+      case "person": {
+        let layer = scratch.get(ctx);
+        if (!layer) scratch.set(ctx, (layer = document.createElement("canvas")));
+        if (layer.width !== width || layer.height !== height) {
+          layer.width = width;
+          layer.height = height;
+        }
+        const l = layer.getContext("2d")!;
+        l.globalCompositeOperation = "source-over";
+        l.clearRect(0, 0, width, height);
+        l.filter = step.edgePx > 0 ? `blur(${step.edgePx}px)` : "none";
+        l.drawImage(mask!, 0, 0, width, height);
+        l.globalCompositeOperation = "source-in"; // the frame, kept only where the mask is
+        l.filter = step.filter;
+        l.drawImage(source, 0, 0, width, height);
+        ctx.filter = "none";
+        ctx.drawImage(layer, 0, 0);
+        break;
+      }
+      case "soften":
+        ctx.filter = step.filter;
+        ctx.globalAlpha = step.alpha;
+        ctx.drawImage(step.of === "frame" ? source : ctx.canvas, 0, 0, width, height);
+        ctx.globalAlpha = 1;
+        break;
+      case "tint":
+        ctx.filter = "none";
+        ctx.globalCompositeOperation = "multiply";
+        ctx.fillStyle = step.color;
+        ctx.fillRect(0, 0, width, height);
+        ctx.globalCompositeOperation = "source-over";
+        break;
+    }
   }
   ctx.filter = "none";
-  const tint = tintColor(f);
-  if (tint) {
-    ctx.globalCompositeOperation = "multiply";
-    ctx.fillStyle = tint;
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalCompositeOperation = "source-over";
-  }
 }
 
 /** The canvas size for a picture: at most `maxHeight` lines, the source's shape, even numbers. */
@@ -156,7 +253,13 @@ export interface FilteredTrack {
  */
 export function startFilteredTrack(
   source: MediaStreamTrack,
-  opts: { maxHeight: number; frameRate: number; filters: TrackFilters },
+  opts: {
+    maxHeight: number;
+    frameRate: number;
+    filters: TrackFilters;
+    /** Where the person is right now, for background blur; null when not known (see person-mask.ts). */
+    mask?: () => CanvasImageSource | null;
+  },
 ): FilteredTrack {
   let filters = opts.filters;
   const video = document.createElement("video");
@@ -183,7 +286,7 @@ export function startFilteredTrack(
       canvas.width = size.width;
       canvas.height = size.height;
     }
-    drawFiltered(ctx, video, canvas.width, canvas.height, filters);
+    drawFiltered(ctx, video, canvas.width, canvas.height, filters, filters.background === "blur" ? (opts.mask?.() ?? null) : null);
   };
   let stopLoop = onEachFrame(video, opts.frameRate, draw, true);
 

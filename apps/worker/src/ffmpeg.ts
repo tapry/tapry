@@ -51,3 +51,20 @@ export async function probeStreams(ffprobe: string, file: string, formatWhitelis
   ]);
   return out.split("\n").map((s) => s.trim()).filter(Boolean);
 }
+
+/**
+ * When each video frame of a file is shown (ms, in order), read from its packets: works on
+ * MediaRecorder's unfinished WebM, which has no duration. Reads the whole file, so for small ones.
+ */
+export async function probeFrameTimesMs(ffprobe: string, file: string, formatWhitelist?: string): Promise<number[]> {
+  const out = await run(ffprobe, [
+    "-v", "error", ...(formatWhitelist ? ["-format_whitelist", formatWhitelist] : []),
+    "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", file,
+  ]);
+  return out
+    .split("\n")
+    .map((line) => Number.parseFloat(line))
+    .filter((t) => Number.isFinite(t))
+    .map((t) => Math.round(t * 1000))
+    .sort((a, b) => a - b);
+}

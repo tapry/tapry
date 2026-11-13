@@ -1,4 +1,9 @@
-export type TrackKind = "audio" | "video";
+/**
+ * "mask" is a small picture-only video that goes with someone's camera track (where the person
+ * is in the frame, for blurring the background afterwards). It is recorded, stored and uploaded
+ * like any track; apps usually give it its own UploadQueue so it never holds up the real ones.
+ */
+export type TrackKind = "audio" | "video" | "mask";
 
 /** Metadata for one MediaRecorder chunk. Times are server-clock milliseconds. */
 export interface ChunkMeta {

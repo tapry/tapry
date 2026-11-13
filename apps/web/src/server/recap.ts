@@ -86,7 +86,7 @@ export class RecapService {
       `SELECT st.settings FROM sessions s JOIN studios st ON st.id = s.studio_id
        WHERE s.id = $1 AND st.deleted_at IS NULL AND EXISTS (
          SELECT 1 FROM tracks t JOIN recordings r ON r.id = t.recording_id
-         WHERE t.participant_id = $2 AND r.session_id = s.id AND r.deleted_at IS NULL)`,
+         WHERE t.participant_id = $2 AND t.kind <> 'mask' AND r.session_id = s.id AND r.deleted_at IS NULL)`,
       [p.sessionId, p.id],
     );
     return !!row && studioSettings.parse(row.settings).guestDownloads;
@@ -154,7 +154,7 @@ async function claim(db: Db, token: string): Promise<Due | null> {
        WHERE q.status = 'pending' AND q.run_after <= now() AND q.attempts < $1
          AND (q.locked_until IS NULL OR q.locked_until < now())
          AND NOT EXISTS (SELECT 1 FROM recordings r JOIN tracks t ON t.recording_id = r.id
-                         WHERE t.participant_id = q.participant_id AND r.deleted_at IS NULL AND r.processing NOT IN ('ready', 'failed'))
+                         WHERE t.participant_id = q.participant_id AND t.kind <> 'mask' AND r.deleted_at IS NULL AND r.processing NOT IN ('ready', 'failed'))
        ORDER BY q.created_at LIMIT 1 FOR UPDATE OF q SKIP LOCKED`,
       [MAX_ATTEMPTS],
     );

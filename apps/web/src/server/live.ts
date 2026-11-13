@@ -90,7 +90,7 @@ export class LiveService {
                   count(DISTINCT t.id) FILTER (WHERE t.status <> 'recording')::int AS complete_tracks,
                   coalesce(sum(c.bytes), 0)::bigint AS bytes
            FROM tracks t LEFT JOIN chunks c ON c.track_id = t.id
-           WHERE t.recording_id = $1
+           WHERE t.recording_id = $1 AND t.kind <> 'mask'
            GROUP BY t.participant_id`,
           [recording.id],
         )

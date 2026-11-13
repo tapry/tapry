@@ -9,6 +9,7 @@ import {
   PODCAST_LOUDNESS,
   renderRecording,
   type FilterFailure,
+  type MaskInput,
   type SkippedTrack,
   toDocx,
   toSrt,
@@ -369,7 +370,7 @@ export class JobRunner {
     try {
       const [rec] = await this.db.query<{ session_id: string; processing: string; deleted_at: Date | null; raw_deleted_at: Date | null; skipped_tracks: unknown[]; open_tracks: number; busy: boolean }>(
         `SELECT r.session_id, r.processing, r.deleted_at, r.raw_deleted_at, r.skipped_tracks,
-                (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS open_tracks,
+                (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask' AND t.status = 'recording') AS open_tracks,
                 EXISTS (SELECT 1 FROM jobs j WHERE j.recording_id = r.id AND j.type = 'process_recording' AND j.status IN ('queued', 'running')) AS busy
          FROM recordings r WHERE r.id = $1`,
         [job.recording_id],
@@ -545,33 +546,72 @@ export class JobRunner {
       `SELECT t.id, t.participant_id, p.display_name, t.kind, t.started_at,
               CASE WHEN r.apply_filters THEN t.filters END AS filters
        FROM tracks t JOIN recordings r ON r.id = t.recording_id JOIN participants p ON p.id = t.participant_id
-       WHERE t.recording_id = $1 AND EXISTS (SELECT 1 FROM chunks c WHERE c.track_id = t.id)
+       WHERE t.recording_id = $1 AND t.kind <> 'mask' AND EXISTS (SELECT 1 FROM chunks c WHERE c.track_id = t.id)
        ORDER BY p.created_at, t.kind`,
+      [rec.id],
+    );
+    // Masks (background blur): only whole ones are any use. One still uploading, cut short or
+    // missing a chunk is left out, and the pipeline then makes that video without the blur and says so.
+    const masks = await this.db.query<{ id: string; participant_id: string; started_at: number }>(
+      `SELECT t.id, t.participant_id, t.started_at FROM tracks t
+       WHERE t.recording_id = $1 AND t.kind = 'mask' AND t.status = 'complete' AND coalesce(cardinality(t.missing_seqs), 0) = 0
+         AND EXISTS (SELECT 1 FROM chunks c WHERE c.track_id = t.id)`,
       [rec.id],
     );
     if (tracks.length === 0) throw new Error("No uploaded media for this recording");
 
     const inputs: TrackInput[] = [];
     let lastEnd = rec.started_at;
-    for (const [i, t] of tracks.entries()) {
-      await this.progress(rec, { stage: "collecting", done: i, total: tracks.length, current: t.display_name });
+    /** A track's chunks from storage, joined in order. */
+    const collect = async (trackId: string) => {
       const chunks = await this.db.query<{ seq: number; storage_key: string; end_ts: number }>(
         "SELECT seq, storage_key, end_ts FROM chunks WHERE track_id = $1 ORDER BY seq",
-        [t.id],
+        [trackId],
       );
-      const dir = join(work, t.id);
+      const dir = join(work, trackId);
       await mkdir(dir);
       const paths: string[] = [];
       for (const c of chunks) {
         const path = join(dir, `${String(c.seq).padStart(8, "0")}.chunk`);
         await this.storage.downloadTo(c.storage_key, path);
         paths.push(path);
-        lastEnd = Math.max(lastEnd, c.end_ts);
       }
-      const hasGaps = chunks.some((c, n) => n > 0 && c.seq !== chunks[n - 1]!.seq + 1);
-      const rawPath = join(work, `${t.id}.raw`);
+      const rawPath = join(work, `${trackId}.raw`);
       await concatChunks(paths, rawPath);
       await rm(dir, { recursive: true, force: true });
+      return {
+        rawPath,
+        hasGaps: chunks.some((c, n) => n > 0 && c.seq !== chunks[n - 1]!.seq + 1),
+        endTs: chunks.reduce((end, c) => Math.max(end, c.end_ts), 0),
+      };
+    };
+    const collectedMasks = new Map<string, MaskInput | null>();
+    /**
+     * The mask recorded with a camera track: the person's mask that started nearest to it (a
+     * device starts the two together; someone who rejoined has one for each piece). Whether it
+     * really covers the video is the pipeline's to judge. A mask that can't be fetched is no mask.
+     */
+    const maskFor = async (t: { participant_id: string; started_at: number }): Promise<MaskInput | undefined> => {
+      const mine = masks.filter((m) => m.participant_id === t.participant_id);
+      const mask = mine.sort((a, b) => Math.abs(a.started_at - t.started_at) - Math.abs(b.started_at - t.started_at))[0];
+      if (!mask) return undefined;
+      if (!collectedMasks.has(mask.id)) {
+        try {
+          const { rawPath, hasGaps } = await collect(mask.id);
+          collectedMasks.set(mask.id, hasGaps ? null : { rawPath, offsetMs: mask.started_at - rec.started_at });
+        } catch (err) {
+          console.error(`[worker] could not fetch a mask of ${rec.id}:`, String(err).slice(0, 300));
+          collectedMasks.set(mask.id, null);
+        }
+      }
+      return collectedMasks.get(mask.id) ?? undefined;
+    };
+    for (const [i, t] of tracks.entries()) {
+      await this.progress(rec, { stage: "collecting", done: i, total: tracks.length, current: t.display_name });
+      const { rawPath, hasGaps, endTs } = await collect(t.id);
+      lastEnd = Math.max(lastEnd, endTs);
+      const { filters } = filtersFor(t.filters);
+      const mask = t.kind === "video" && filters?.background === "blur" ? await maskFor(t) : undefined;
       inputs.push({
         trackId: t.id,
         participantId: t.participant_id,
@@ -580,7 +620,9 @@ export class JobRunner {
         rawPath,
         offsetMs: t.started_at - rec.started_at,
         hasGaps,
-        ...filtersFor(t.filters),
+        endOffsetMs: endTs - rec.started_at,
+        ...(filters && { filters }),
+        ...(mask && { mask }),
       });
     }
 

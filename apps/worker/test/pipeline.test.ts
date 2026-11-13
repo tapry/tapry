@@ -9,6 +9,7 @@ import { FfmpegError, run } from "../src/ffmpeg.js";
 import {
   alignmentFilters,
   audioCleanFilters,
+  backgroundBlurGraph,
   concatChunks,
   filterDelaySamples,
   measureNoiseFloor,
@@ -70,9 +71,31 @@ describe("filters as ffmpeg chains", () => {
     // Black and white: no colour left to warm or cool.
     expect(videoLookFilters(with_({ look: "mono" }))).toBe("eq=brightness=0:contrast=1:gamma=1:saturation=0");
     expect(videoLookFilters(with_({ touchUp: true }))).toBe("bilateral=sigmaS=3:sigmaR=0.05:planes=1");
-    expect(videoLookFilters({ brightness: 2, look: "warm", touchUp: true, noiseRemoval: true })).toBe(
+    expect(videoLookFilters({ ...NO_FILTERS, brightness: 2, look: "warm", touchUp: true, noiseRemoval: true })).toBe(
       "eq=brightness=0.08:contrast=1.06:gamma=1.35:saturation=1.08,colortemperature=temperature=5200,bilateral=sigmaS=3:sigmaR=0.05:planes=1",
     );
+  });
+
+  it("blurs the background in a graph that leaves the camera's own path as it is", () => {
+    expect(videoLookFilters(with_({ background: "blur" }))).toBe(""); // the blur isn't a look: it needs the mask
+    const align = alignmentFilters("video", 500);
+    expect(backgroundBlurGraph({ look: "", align, scale: "scale=-2:1080", frame: "", maskOffsetMs: 520, height: 1080 })).toBe(
+      [
+        `[0:v]${align},scale=-2:1080,format=yuv420p,split[sharp][soft]`,
+        "[soft]gblur=sigma=20[bg]",
+        "[1:v]format=gray,fps=30:start_time=0,tpad=start_duration=0.520:start_mode=add:color=black,tpad=stop=-1:stop_mode=add:color=black,lut=y='clip((val-64)*2,0,255)'[mask]",
+        "[mask][sharp]scale2ref=flags=bilinear[fit][person]",
+        "[fit]gblur=sigma=4[edge]",
+        "[person][edge]alphamerge[fg]",
+        "[bg][fg]overlay=format=yuv420,format=yuv420p[v]",
+      ].join(";"),
+    );
+    // A mask that began before Record is trimmed like a track; the blur scales with the picture.
+    const early = backgroundBlurGraph({ look: "eq=saturation=0", align, scale: "scale=-2:720", frame: "pad=1280:720", maskOffsetMs: -40, height: 720 });
+    expect(early).toContain(`[0:v]eq=saturation=0,${align},scale=-2:720,format=yuv420p,split`);
+    expect(early).toContain("[1:v]format=gray,trim=start=0.040,setpts=PTS-STARTPTS,fps=30:start_time=0,tpad=stop=-1:stop_mode=add:color=black,lut=");
+    expect(early).toContain("gblur=sigma=13.333[bg]");
+    expect(early).toContain("overlay=format=yuv420,pad=1280:720,format=yuv420p[v]");
   });
 
   it("sets noise removal by the track's own noise floor, and takes the filter's delay off again", () => {
@@ -705,6 +728,192 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       });
     });
 
+    describe("background blur", () => {
+      const BLUR = with_({ background: "blur" });
+      let cam: string;
+      let leftMask: string;
+      /** A mask video: white on the left half, or (`swapAt`) left until then and right after. 15 frames a second, like a device's. */
+      async function makeMask(name: string, seconds: number, swapAt?: number) {
+        const file = join(dir, name);
+        const left = swapAt === undefined ? "lt(X,128)" : `if(lt(T,${swapAt}),lt(X,128),gte(X,128))`;
+        await run(ffmpeg, ["-y", "-f", "lavfi", "-i", `color=black:s=256x144:r=15:d=${seconds},format=gray,geq=lum='255*${left}'`,
+          "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "200k", "-an", file]);
+        return file;
+      }
+      /** How much fine detail a part of the picture has at `t` (mean edge strength, 0–255). */
+      const detail = (file: string, part: "left" | "right" | "seam", t = 1.5) => {
+        const crop = { left: "crop=iw/2-80:ih:0:0", right: "crop=iw/2-80:ih:iw/2+80:0", seam: "crop=6:ih:iw/2-3:0" }[part];
+        return Number.parseFloat(
+          execFileSync(ffmpeg, ["-v", "error", "-ss", String(t), "-i", file, "-frames:v", "1",
+            "-vf", `${crop},sobel,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-`, "-f", "null", "-"])
+            .toString().match(/YAVG=([\d.]+)/)![1]!,
+        );
+      };
+      const camera = (over: Partial<TrackInput> = {}): TrackInput =>
+        ({ trackId: "trk_v", participantId: "par_s", participantName: "Sam", kind: "video", rawPath: cam, offsetMs: 0, filters: BLUR, ...over });
+      async function render(name: string, track: TrackInput, durationMs = 3000) {
+        const failed: FilterFailure[] = [];
+        const skipped: SkippedTrack[] = [];
+        const outputs = await renderRecording([track], {
+          ffmpeg, ffprobe, workDir: join(dir, name), durationMs, videoHeight: 720, font: null,
+          onFilterFailed: (f) => failed.push(f), onSkipped: (s) => skipped.push(s),
+        });
+        return { video: outputs[0]!, combined: outputs.find((o) => o.kind === "combined")!, failed, skipped };
+      }
+      const SAM_VIDEO = [{ participantId: "par_s", name: "Sam", kind: "video" }];
+      let asRecorded: Awaited<ReturnType<typeof render>>;
+
+      // A camera with fine detail everywhere (a grainy test pattern), and a mask that says the person is on the left.
+      beforeAll(async () => {
+        cam = join(dir, "blur-cam.webm");
+        await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=24:duration=3,noise=alls=40:allf=t",
+          "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "3M", "-an", cam]);
+        leftMask = await makeMask("mask-left.webm", 3);
+        asRecorded = await render("blur-none", camera({ filters: undefined }));
+      });
+
+      it("blurs the picture where the mask is black and leaves the person as recorded, with a soft edge", async () => {
+        const blurred = await render("blur-on", camera({ mask: { rawPath: leftMask, offsetMs: 0 } }));
+        expect(blurred.failed).toEqual([]);
+        expect(blurred.skipped).toEqual([]);
+        expect(detail(asRecorded.video.path, "left")).toBeGreaterThan(20);
+        expect(detail(asRecorded.video.path, "right")).toBeGreaterThan(20);
+        // The person's side keeps its detail; the other side loses nearly all of it.
+        expect(detail(blurred.video.path, "left")).toBeGreaterThan(detail(asRecorded.video.path, "left") * 0.9);
+        expect(detail(blurred.video.path, "right")).toBeLessThan(detail(asRecorded.video.path, "right") * 0.25);
+        // From the very first frame: the picture never waits for the mask.
+        expect(detail(blurred.video.path, "right", 0)).toBeLessThan(detail(asRecorded.video.path, "right", 0) * 0.25);
+        // At the seam it is neither: the edge fades.
+        const kept = (part: "left" | "right" | "seam") => detail(blurred.video.path, part) / detail(asRecorded.video.path, part);
+        expect(kept("seam")).toBeLessThan(0.9);
+        expect(kept("seam")).toBeGreaterThan(kept("right") * 1.5);
+        // Same frame, frame rate, frame count and length as without it.
+        expect(shape(blurred.video.path)).toBe(shape(asRecorded.video.path));
+        expect(blurred.video.durationMs).toBe(asRecorded.video.durationMs);
+        expect(blurred.video.fileName).toBe("Sam - video.mp4");
+        // The side-by-side video shows the blurred picture.
+        expect(detail(blurred.combined.path, "left")).toBeGreaterThan(20);
+        expect(detail(blurred.combined.path, "right")).toBeLessThan(detail(asRecorded.combined.path, "right") * 0.25);
+      });
+
+      it("follows the mask in time, by the mask's own start, though it has half the frames", async () => {
+        // The person moves from the left to the right 1.5 s into the mask, which began 500 ms after Record.
+        const moving = await makeMask("mask-moving.webm", 2.5, 1.5);
+        const out = await render("blur-moving", camera({ mask: { rawPath: moving, offsetMs: 500 } }));
+        expect(out.failed).toEqual([]);
+        const sharp = (part: "left" | "right", t: number) => detail(out.video.path, part, t) > detail(asRecorded.video.path, part, t) * 0.8;
+        // Before the mask's first frame (under a second): nobody is known to be there, so all of it is blurred.
+        expect([sharp("left", 0.2), sharp("right", 0.2)]).toEqual([false, false]);
+        expect([sharp("left", 1.7), sharp("right", 1.7)]).toEqual([true, false]);
+        expect([sharp("left", 2.3), sharp("right", 2.3)]).toEqual([false, true]); // the swap, at 2.0 s on the recording's clock
+        expect(shape(out.video.path)).toBe(shape(asRecorded.video.path));
+      });
+
+      it("keeps the black before a late start black, and the picture's timing", async () => {
+        const plainLate = await render("blur-late-off", camera({ filters: undefined, offsetMs: 1000 }));
+        const late = await render("blur-late-on", camera({ offsetMs: 1000, mask: { rawPath: leftMask, offsetMs: 1000 } }));
+        expect(late.failed).toEqual([]);
+        expect(stat(late.video.path, "YAVG", 0.5)).toBe(stat(plainLate.video.path, "YAVG", 0.5));
+        expect(stat(late.video.path, "YAVG", 0.5)).toBeLessThan(20);
+        expect(detail(late.video.path, "left", 0.5)).toBeLessThan(1);
+        // The first frame of the picture is where it is without the blur.
+        const firstPicture = (file: string) => [0.9, 0.967, 1.0, 1.034, 1.1].find((t) => stat(file, "YAVG", t) > 30);
+        expect(firstPicture(late.video.path)).toBe(firstPicture(plainLate.video.path));
+        expect(detail(late.video.path, "left", 2)).toBeGreaterThan(20);
+        expect(detail(late.video.path, "right", 2)).toBeLessThan(detail(plainLate.video.path, "right", 2) * 0.25);
+        expect(shape(late.video.path)).toBe(shape(plainLate.video.path));
+      });
+
+      it("works together with a look and touch-up", async () => {
+        const out = await render("blur-look", camera({ filters: with_({ background: "blur", look: "mono", brightness: 1, touchUp: true }), mask: { rawPath: leftMask, offsetMs: 0 } }));
+        expect(out.failed).toEqual([]);
+        expect(stat(out.video.path, "SATAVG")).toBeLessThan(1.5);
+        expect(detail(out.video.path, "left")).toBeGreaterThan(15);
+        expect(detail(out.video.path, "right")).toBeLessThan(detail(asRecorded.video.path, "right") * 0.25);
+        expect(shape(out.video.path)).toBe(shape(asRecorded.video.path));
+      });
+
+      it("blurs each piece of someone who rejoined by its own mask, the gap still black", async () => {
+        const pieces: TrackInput[] = [
+          camera({ trackId: "trk_v1", endOffsetMs: 3000, mask: { rawPath: leftMask, offsetMs: 0 } }),
+          camera({ trackId: "trk_v2", offsetMs: 4000, mask: { rawPath: leftMask, offsetMs: 4000 } }),
+        ];
+        const failed: FilterFailure[] = [];
+        const [video] = await renderRecording(pieces, { ffmpeg, ffprobe, workDir: join(dir, "blur-pieces"), durationMs: 7000, videoHeight: 720, font: null, onFilterFailed: (f) => failed.push(f) });
+        expect(failed).toEqual([]);
+        for (const t of [1.5, 5.5]) {
+          expect(detail(video!.path, "left", t), `left at ${t}`).toBeGreaterThan(20);
+          expect(detail(video!.path, "right", t), `right at ${t}`).toBeLessThan(8);
+        }
+        expect(stat(video!.path, "YAVG", 3.5)).toBeLessThan(20);
+        expect(Math.abs(video!.durationMs! - 7000)).toBeLessThan(80);
+      });
+
+      describe("a mask that can't be used costs the blur, never the file", () => {
+        /** The file is there, as without the blur, and the host is told once. */
+        async function expectUnblurred(name: string, track: TrackInput) {
+          const out = await render(name, track);
+          expect(out.skipped).toEqual([]);
+          expect(out.failed).toEqual(SAM_VIDEO);
+          expect(detail(out.video.path, "right")).toBeGreaterThan(detail(asRecorded.video.path, "right") * 0.9);
+          expect(shape(out.video.path)).toBe(shape(asRecorded.video.path));
+          expect(out.video.durationMs).toBe(asRecorded.video.durationMs);
+          return out;
+        }
+
+        it("no mask at all", async () => {
+          await expectUnblurred("blur-missing", camera());
+        });
+
+        it("a mask that isn't a video", async () => {
+          const junk = join(dir, "mask-junk.raw");
+          writeFileSync(junk, "this is not a mask");
+          await expectUnblurred("blur-junk", camera({ mask: { rawPath: junk, offsetMs: 0 } }));
+          // Cut off after its header: nothing to go by.
+          const stub = join(dir, "mask-stub.raw");
+          writeFileSync(stub, readFileSync(leftMask).subarray(0, 300));
+          await expectUnblurred("blur-stub", camera({ mask: { rawPath: stub, offsetMs: 0 } }));
+        });
+
+        it("a mask that ends, starts or pauses more than a second short of the video", async () => {
+          const short = await makeMask("mask-short.webm", 1.5);
+          await expectUnblurred("blur-short", camera({ mask: { rawPath: short, offsetMs: 0 } }));
+          await expectUnblurred("blur-mistimed", camera({ mask: { rawPath: leftMask, offsetMs: 1400 } }));
+          // The device stopped making the mask for a while (frames from 0.6 s to 2.4 s are missing).
+          const paused = join(dir, "mask-paused.webm");
+          await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "color=black:s=256x144:r=15:d=3,drawbox=x=0:y=0:w=128:h=144:color=white:t=fill",
+            "-vf", "select='lt(t,0.6)+gt(t,2.4)'", "-vsync", "vfr", "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "200k", "-an", paused]);
+          await expectUnblurred("blur-paused", camera({ mask: { rawPath: paused, offsetMs: 0 } }));
+        });
+
+        it("but a mask short by under a second is used: that stretch is blurred whole", async () => {
+          const nearly = await makeMask("mask-nearly.webm", 2.4);
+          const out = await render("blur-nearly", camera({ mask: { rawPath: nearly, offsetMs: 0 } }));
+          expect(out.failed).toEqual([]);
+          expect(detail(out.video.path, "left", 1.5)).toBeGreaterThan(20);
+          expect(detail(out.video.path, "left", 2.8)).toBeLessThan(8);
+          expect(detail(out.video.path, "right", 2.8)).toBeLessThan(8);
+          // What the video's own length is comes from its chunks when the recording went on without it.
+          const ended = await render("blur-ended", camera({ endOffsetMs: 3000, mask: { rawPath: leftMask, offsetMs: 0 } }), 6000);
+          expect(ended.failed).toEqual([]);
+        });
+
+        it("an ffmpeg that can't run the blur: the person's look stays, the blur goes", async () => {
+          const bin = join(dir, "no-alphamerge.sh");
+          writeFileSync(bin, `#!/bin/sh\ncase "$*" in *alphamerge*) echo "No such filter: 'alphamerge'" >&2; exit 1;; esac\nexec "${ffmpeg}" "$@"\n`);
+          chmodSync(bin, 0o755);
+          const failed: FilterFailure[] = [];
+          const [video] = await renderRecording(
+            [camera({ filters: with_({ background: "blur", look: "mono" }), mask: { rawPath: leftMask, offsetMs: 0 } })],
+            { ffmpeg: bin, ffprobe, workDir: join(dir, "blur-old-ffmpeg"), durationMs: 3000, videoHeight: 720, font: null, onFilterFailed: (f) => failed.push(f) },
+          );
+          expect(failed).toEqual(SAM_VIDEO);
+          expect(stat(video!.path, "SATAVG")).toBeLessThan(1.5);
+          expect(detail(video!.path, "right")).toBeGreaterThan(20);
+        });
+      });
+    });
+
     describe("the commands themselves", () => {
       /** An ffmpeg that writes down the filters it was asked for, then runs the real one (or fails on `failOn`). */
       function spy(name: string, failOn = "") {
@@ -731,6 +940,10 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         await renderRecording(tracks(), options("spy-none", none.path));
         await renderRecording(tracks(NO_FILTERS), options("spy-off", off.path));
         expect(off.lines()).toEqual(none.lines());
+        // A mask with nobody asking for the blur is never read, and neither is a look's with it.
+        const masked = spy("spy-masked");
+        await renderRecording(tracks(NO_FILTERS).map((t) => ({ ...t, mask: { rawPath: videoWebm, offsetMs: 500 } })), options("spy-masked", masked.path));
+        expect(masked.lines()).toEqual(none.lines());
         expect(none.lines().slice(0, 3)).toEqual([
           "-af aresample=48000,asetpts=N/SR/TB,adelay=500:all=1,apad",
           "-vf fps=30,tpad=start_duration=0.500:start_mode=add:color=black,tpad=stop=-1:stop_mode=clone,scale=-2:720,format=yuv420p",
@@ -741,7 +954,7 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
 
       it("put the look before alignment and noise removal after it", async () => {
         const on = spy("spy-on");
-        await renderRecording(tracks({ brightness: 1, look: "cool", touchUp: true, noiseRemoval: true }), options("spy-on", on.path));
+        await renderRecording(tracks({ ...NO_FILTERS, brightness: 1, look: "cool", touchUp: true, noiseRemoval: true }), options("spy-on", on.path));
         const lines = on.lines().filter((l) => !l.includes("asplit")); // the one-off measurement of the filter's delay
         const clean = /(apad=pad_len=\d+,)?afftdn=nr=12:nf=-\d+(,atrim=start_sample=\d+,asetpts=N\/SR\/TB)?/.source;
         expect(lines[0]).toBe("-af aresample=48000,asetpts=N/SR/TB,adelay=500:all=1,apad"); // the WAV as recorded first...
