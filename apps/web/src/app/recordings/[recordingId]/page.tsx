@@ -115,6 +115,11 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
           </p>
         )}
         {ready && r.hasFilters && <RecordingFilters studioId={r.studioId} recordingId={r.id} applyFilters={r.applyFilters} filtersFailed={r.filtersFailed} rawDeleted={r.rawDeleted} />}
+        {r.keepUntil !== null && (
+          <p className="text-[13px] text-muted" data-testid="kept-until">
+            Kept until {new Date(r.keepUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} on your plan, then deleted. Download what you want to keep.
+          </p>
+        )}
         {r.rawDeleted && (
           <p className="text-[13px] text-muted">The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.</p>
         )}

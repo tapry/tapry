@@ -18,6 +18,15 @@
         "export PATH=\"$HOME/.local/node/bin:$PATH\"; exec pnpm --filter @tapry/site dev"
       ],
       "port": 3001
+    },
+    {
+      "name": "web-cloud",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.local/node/bin:$PATH\"; NEXT_DIST_DIR=.next-check DATABASE_URL=pglite://.data/pglite-cloud TAPRY_CLOUD=true ALLOW_SIGNUP=true SETUP_TOKEN= GUEST_PROMO_URL=https://tapry.test/ BILLING_CHECKOUT_URLS='creator=https://pay.example.test/creator?user={user_id},studio=https://pay.example.test/studio?user={user_id},team=https://pay.example.test/team?user={user_id}' BILLING_MANAGE_URL=https://pay.example.test/portal exec pnpm --filter @tapry/web dev --port 3002"
+      ],
+      "port": 3002
     }
   ]
 }

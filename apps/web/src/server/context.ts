@@ -39,8 +39,11 @@ export function getServices(): Promise<Services> {
       call: config.call,
       guestPromoUrl: config.guestPromoUrl,
       mailer,
+      appUrl: config.mail?.appUrl,
       speedTestOrigins: config.speedTestOrigins,
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
+      billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl },
+      billingWebhook: config.cloud?.webhook ?? null,
       serverInfo: {
         storage: { endpoint: config.storage.endpoint ?? null, region: config.storage.region, bucket: config.storage.bucket, accessKeyId: config.storage.accessKeyId },
         rawRetentionDays: config.worker.rawRetentionMs === undefined ? null : config.worker.rawRetentionMs / 86_400_000,
@@ -58,7 +61,7 @@ export function getServices(): Promise<Services> {
       const runner = new JobRunner(db, storage, {
         ...config.worker,
         kind: "inprocess",
-        mail: mailer && { mailer, appUrl: config.mail!.appUrl, promoUrl: config.guestPromoUrl },
+        mail: mailer && { mailer, appUrl: config.mail!.appUrl, promoUrl: config.guestPromoUrl, cloud: !!config.cloud },
         onChange: (sessionId) => svc.live.publishSoon(sessionId),
       });
       svc.processing.onEnqueue = () => runner.kick();

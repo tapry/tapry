@@ -20,9 +20,11 @@ import {
   type TrackInput,
   type WhisperOptions,
 } from "@tapry/worker";
+import { planRetention } from "./billing";
 import type { Db, Queryable } from "./db";
+import { isApiError } from "./errors";
 import { newId } from "./ids";
-import type { RecordingProgress } from "./processing";
+import { deleteRecordingIn, type RecordingProgress } from "./processing";
 import { sendDueRecaps, sweepRecaps, type RecapMail } from "./recap";
 import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
 
@@ -30,6 +32,9 @@ import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./wor
 const AUDIO_SUFFIX = / - audio\.(wav|flac)$/;
 /** "Sam - audio (original).wav": the same person before noise removal, never a second speaker. */
 const ORIGINAL_AUDIO = / - audio \(original\)\.(wav|flac)$/;
+
+/** How often a cloud runner looks for recordings whose keeping time is over. */
+const EXPIRY_SWEEP_MS = 10 * 60_000;
 
 /** How often a runner says it's alive (the health page calls it gone after 3 missed beats). */
 export const HEARTBEAT_MS = 30_000;
@@ -48,6 +53,11 @@ export interface JobRunnerOptions {
   lockMs?: number;
   /** Delete a recording's original uploads this long after it's processed. Unset: keep them. */
   rawRetentionMs?: number;
+  /**
+   * Tapry Cloud: each host's plan says how long originals and finished files are kept
+   * (instead of rawRetentionMs), and recordings past their time are deleted.
+   */
+  cloud?: boolean;
   /** Inside the web server, or a separate worker process (shown on the admin health page). */
   kind?: "inprocess" | "worker";
   /** Called after every poll; the standalone worker uses it as its health heartbeat. */
@@ -105,6 +115,7 @@ export class JobRunner {
   private beat: ReturnType<typeof setInterval> | undefined;
   private info: Promise<WorkerInfo> | undefined;
   private nextRecapSweep = 0;
+  private nextExpirySweep = 0;
   /** This runner in the `workers` table. */
   readonly id = newId("wrk");
 
@@ -188,6 +199,7 @@ export class JobRunner {
           }
         }
         if (!this.stopped) await this.recaps();
+        if (!this.stopped) await this.expire();
       } while (this.kicked && !this.stopped);
     } finally {
       this.busy = false;
@@ -204,6 +216,34 @@ export class JobRunner {
       }
     } catch (err) {
       console.error("[recap] failed:", err instanceof Error ? err.name : "unknown");
+    }
+  }
+
+  /**
+   * Tapry Cloud: delete recordings whose plan's keeping time is over (`keep_until`), the same
+   * way a host deletes one. Never one that is still recording or being processed: it waits.
+   */
+  private async expire() {
+    if (!this.opts.cloud || Date.now() < this.nextExpirySweep) return;
+    this.nextExpirySweep = Date.now() + EXPIRY_SWEEP_MS;
+    try {
+      const due = await this.db.query<{ id: string; session_id: string }>(
+        `SELECT id, session_id FROM recordings
+         WHERE keep_until IS NOT NULL AND keep_until < now() AND deleted_at IS NULL AND status = 'stopped'
+         ORDER BY keep_until LIMIT 50`,
+      );
+      for (const r of due) {
+        try {
+          await this.db.transaction((tx) => deleteRecordingIn(tx, r.id));
+          console.log(`[worker] deleted ${r.id}: its plan's keeping time is over`);
+          this.kicked = true; // the purge job
+          this.opts.onChange?.(r.session_id);
+        } catch (err) {
+          if (!isApiError(err)) throw err; // busy: next sweep
+        }
+      }
+    } catch (err) {
+      console.error("[worker] expiry sweep failed:", String(err));
     }
   }
 
@@ -440,13 +480,19 @@ export class JobRunner {
       } else {
         await tx.query("UPDATE recordings SET transcript = 'off' WHERE id = $1", [rec.id]);
       }
-      if (this.opts.rawRetentionMs !== undefined) {
+      let rawRetentionMs = this.opts.rawRetentionMs;
+      if (this.opts.cloud) {
+        // The host's plan says how long each is kept. Counted from the first time the files were
+        // ready: processing again doesn't buy more time.
+        rawRetentionMs = await planRetention(tx, rec.id, Date.now());
+      }
+      if (rawRetentionMs !== undefined) {
         // The originals go once the retention period is over (see purgeRaw).
         await tx.query(
           `INSERT INTO jobs (id, type, recording_id, run_after) VALUES ($1, 'purge_raw', $2, now() + make_interval(secs => $3))
            ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running')
            DO UPDATE SET run_after = EXCLUDED.run_after WHERE jobs.status = 'queued'`,
-          [newId("job"), rec.id, this.opts.rawRetentionMs / 1000],
+          [newId("job"), rec.id, rawRetentionMs / 1000],
         );
       }
       return { replaced: old.map((o) => o.storage_key), rerun };

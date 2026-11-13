@@ -278,4 +278,46 @@ ALTER TABLE recordings ADD COLUMN filters_failed jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE tracks DROP CONSTRAINT tracks_kind_check;
 ALTER TABLE tracks ADD CONSTRAINT tracks_kind_check CHECK (kind IN ('audio', 'video', 'mask'));
 `,
+  `
+-- Tapry Cloud (TAPRY_CLOUD=true) only; a self-hosted server never reads these.
+-- The plan an account is on, and what the payment provider last said about its subscription.
+ALTER TABLE users ADD COLUMN plan text NOT NULL DEFAULT 'free';
+ALTER TABLE users ADD COLUMN plan_status text NOT NULL DEFAULT 'active' CHECK (plan_status IN ('active', 'past_due', 'canceled'));
+-- A canceled plan runs until here; after it the account is on Free.
+ALTER TABLE users ADD COLUMN plan_ends_at timestamptz;
+-- The start of a billing month: recording hours are counted from its day of the month.
+ALTER TABLE users ADD COLUMN plan_period_start timestamptz;
+ALTER TABLE users ADD COLUMN billing_customer text;
+ALTER TABLE users ADD COLUMN billing_subscription text;
+-- When the provider says the state above was true: an older webhook never overwrites it.
+ALTER TABLE users ADD COLUMN billing_updated_at timestamptz;
+CREATE INDEX users_billing_subscription ON users (billing_subscription) WHERE billing_subscription IS NOT NULL;
+
+-- Webhooks already applied, by the provider's event id: each is applied once.
+CREATE TABLE billing_events (
+  id text PRIMARY KEY,
+  received_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Until when a recording's finished files are kept (the plan's days after processing).
+-- Null: until someone deletes it, as on every self-hosted server.
+ALTER TABLE recordings ADD COLUMN keep_until timestamptz;
+CREATE INDEX recordings_keep_until ON recordings (keep_until) WHERE keep_until IS NOT NULL AND deleted_at IS NULL;
+`,
+  `
+-- When the account's email address was confirmed (a link we sent was opened). Null: not yet,
+-- which only matters where confirming is required (Tapry Cloud).
+ALTER TABLE users ADD COLUMN email_verified_at timestamptz;
+
+-- Links we emailed to an account: to set a new password, or to confirm the address.
+-- Only the hash is kept; a link works once, and a newer one of its kind replaces it.
+CREATE TABLE account_tokens (
+  token_hash text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind text NOT NULL CHECK (kind IN ('reset', 'verify')),
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX account_tokens_user ON account_tokens (user_id);
+`,
 ];

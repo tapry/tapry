@@ -5,6 +5,22 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Tapry Cloud plans (off on self-hosted servers).** With `TAPRY_CLOUD=true` accounts have a
+  plan (Free, Creator, Studio, Team, Business) with recording hours a month and a time finished
+  files and originals are kept. Record is refused once the month's hours are used (a running
+  recording is never stopped); recordings past their time are deleted, with the date shown on
+  each. Settings has a Plan tab with real usage, and the admin can put an account on a plan by
+  hand. A payment provider's webhook (Paddle or Lemon Squeezy) keeps subscriptions; it is
+  untested against a live account. Without `TAPRY_CLOUD` nothing changes: no plans, no limits.
+  Database: plan columns on `users`, `billing_events`, `recordings.keep_until` (added
+  automatically on start). See docs/cloud-billing.md.
+- **A new password by email.** On a server that sends email (`SMTP_HOST`), the log-in page has
+  "Forgot it?": a link by email sets a new password once, within an hour, and signs every device
+  out. The answer is the same whether or not the address has an account. Without email it isn't
+  offered. On Tapry Cloud, new accounts also confirm their address before they can create or
+  open a studio. Database: `users.email_verified_at`, `account_tokens` (added automatically).
+- **New pricing** for the planned Tapry Cloud (docs/plan/06-monetization.md, with the benchmark
+  behind it in docs/plan/15-pricing-benchmark.md), shown as planned on the website.
 - **Filters.** Each person can brighten their picture, pick a look (warm, cool, black & white),
   add a light touch-up and take steady noise out of their microphone, from a Filters button in
   the green room and the room. The recording itself stays untouched: filters show live in the

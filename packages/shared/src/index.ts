@@ -40,6 +40,16 @@ export const loginBody = z.object({
   password: z.string().min(1).max(200),
 });
 
+/** "I forgot my password": the address to send the link to. */
+export const forgotPasswordBody = z.object({ email });
+/** The token from an emailed link (a new password, or confirming the address). */
+const emailToken = z.string().min(20).max(200);
+export const resetPasswordBody = z.object({
+  token: emailToken,
+  password: z.string().min(10, "Use at least 10 characters").max(200),
+});
+export const verifyEmailBody = z.object({ token: emailToken });
+
 // ── Studios ───────────────────────────────────────────────────────────────────
 
 const settingsFields = {
@@ -353,3 +363,62 @@ export type CallToken =
       token: string;
       room: string;
     };
+
+// ── Tapry Cloud plans ───────────────────────────────────────────────────────────
+// Only a server run as Tapry Cloud (TAPRY_CLOUD=true) uses these. A self-hosted server has no
+// plans and no limits. The figures are docs/plan/06-monetization.md (pricing v4).
+
+export const PLAN_IDS = ["free", "creator", "studio", "team", "business"] as const;
+export const planId = z.enum(PLAN_IDS);
+export type PlanId = z.infer<typeof planId>;
+
+export interface Plan {
+  id: PlanId;
+  name: string;
+  /** Per month, in US dollars; a year costs ten months. Null: agreed per customer. */
+  monthlyUsd: number | null;
+  /** Recording hours in a billing month, counted per recording (not per person). Null: no limit. */
+  hours: number | null;
+  /** Days the finished files are kept after a recording is processed. Null: until deleted. */
+  filesDays: number | null;
+  /** Days the original uploads are kept after a recording is processed. Null: until deleted. */
+  originalsDays: number | null;
+  /** Guests see "Recorded with Tapry" at the end of a session. */
+  badge: boolean;
+}
+
+export const PLANS: Record<PlanId, Plan> = {
+  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false },
+  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false },
+  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false },
+};
+
+/** Whether moving from one plan to another is an upgrade (more hours or longer keeping). */
+export const planRank = (id: PlanId) => PLAN_IDS.indexOf(id);
+
+export type PlanStatus = "active" | "past_due" | "canceled";
+
+/** `GET /api/billing`: a host's plan and what they have used of it. Tapry Cloud only. */
+export interface BillingOverview {
+  plan: Plan;
+  /** canceled: paid until `endsAt`, then Free. past_due: the last payment failed. */
+  status: PlanStatus;
+  endsAt: string | null;
+  /** The current billing month: recording hours start again at `periodEnd`. */
+  periodStart: string;
+  periodEnd: string;
+  /** Recorded in this period, in milliseconds, deleted recordings included. */
+  usedMs: number;
+  /** Plans that can be bought from here, with the address of their checkout. */
+  upgrades: Array<{ plan: Plan; url: string }>;
+  /** Where to change the card, see invoices or cancel; null when there is no subscription. */
+  manageUrl: string | null;
+}
+
+export const setPlanBody = z.object({
+  plan: planId,
+  /** When the plan ends and the account goes back to Free (ISO date). Omit: no end. */
+  endsAt: z.iso.datetime().nullish(),
+});

@@ -16,7 +16,7 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
   const { token } = await params;
   const services = await getServices();
   const participant = await services.recaps.participantFor(token);
-  const own = participant && (await services.processing.ownRecordings(participant, services.guestPromoUrl));
+  const own = participant && (await services.processing.ownRecordings(participant, await services.billing.promoFor(participant.sessionId, services.guestPromoUrl)));
   const found = participant && own?.downloads && own.recordings.length > 0;
 
   return (

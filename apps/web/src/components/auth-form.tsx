@@ -6,7 +6,21 @@ import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { Icon, Spinner } from "./ui-extra";
 import { Button, Field, Input, Notice } from "./ui";
 
-export function AuthForm({ mode, firstAccount = false, setupRequired = false }: { mode: "login" | "signup"; firstAccount?: boolean; setupRequired?: boolean }) {
+export function AuthForm({
+  mode,
+  firstAccount = false,
+  setupRequired = false,
+  canReset = false,
+  openSignup = false,
+}: {
+  mode: "login" | "signup";
+  firstAccount?: boolean;
+  setupRequired?: boolean;
+  /** The server sends email, so "Forgot your password?" leads somewhere. */
+  canReset?: boolean;
+  /** Anyone may create an account here (not only the first one). */
+  openSignup?: boolean;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -44,9 +58,16 @@ export function AuthForm({ mode, firstAccount = false, setupRequired = false }: 
         <Input name="email" type="email" autoComplete="email" placeholder="you@example.com" required />
       </Field>
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={passwordId} className="text-sm font-medium">
-          Password
-        </label>
+        <span className="flex items-baseline justify-between gap-3">
+          <label htmlFor={passwordId} className="text-sm font-medium">
+            Password
+          </label>
+          {!signup && canReset && (
+            <Link href="/forgot" className="text-[13px] text-muted underline underline-offset-[3px] hover:text-accent-strong">
+              Forgot it?
+            </Link>
+          )}
+        </span>
         <span className="relative flex">
           <Input
             id={passwordId}
@@ -103,9 +124,9 @@ export function AuthForm({ mode, firstAccount = false, setupRequired = false }: 
           </>
         ) : (
           <>
-            New server?{" "}
+            {openSignup ? "New here?" : "New server?"}{" "}
             <Link className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong" href="/signup">
-              Create the first account
+              {openSignup ? "Create an account" : "Create the first account"}
             </Link>
           </>
         )}

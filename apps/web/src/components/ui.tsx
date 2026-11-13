@@ -138,11 +138,17 @@ const tones: Record<Tone, string> = {
   danger: "bg-accent-soft text-accent-strong",
 };
 
-export function Notice({ tone = "info", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
+export function Notice({
+  tone = "info",
+  children,
+  className,
+  ...props
+}: { tone?: Tone; children: ReactNode; className?: string } & Omit<React.HTMLAttributes<HTMLDivElement>, "role">) {
   return (
     <div
       role={tone === "danger" ? "alert" : "status"}
       className={cn("rounded-lg px-3.5 py-3 text-sm leading-normal", tones[tone], className)}
+      {...props}
     >
       {children}
     </div>

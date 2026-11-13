@@ -112,6 +112,8 @@ test("background blur: a mask track beside the untouched camera, and a blurred f
 
   await test.step("green room: Blur loads, shows on the preview, and leaves the camera alone", async () => {
     before = await recorderTracks(guest);
+    // Wait for a painted frame: on a busy machine the video has a size before it has a picture.
+    await expect.poll(() => detail(guest.locator("video").first())).toBeGreaterThan(0);
     const sharp = await detail(guest.locator("video").first());
     expect(sharp).toBeGreaterThan(0);
 

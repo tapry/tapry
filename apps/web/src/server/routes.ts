@@ -9,6 +9,10 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["POST", "/api/auth/login", "login"],
   ["POST", "/api/auth/logout", "logout"],
   ["GET", "/api/auth/me", "me"],
+  ["POST", "/api/auth/forgot", "forgotPassword"],
+  ["POST", "/api/auth/reset", "resetPassword"],
+  ["POST", "/api/auth/verify", "verifyEmail"],
+  ["POST", "/api/auth/verify/send", "sendVerification"],
 
   ["GET", "/api/studios", "listStudios"],
   ["POST", "/api/studios", "createStudio"],
@@ -33,6 +37,10 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["GET", "/api/health", "health"],
   ["GET", "/api/admin/health", "adminHealth"],
   ["GET", "/api/admin/settings", "workspaceSettings"],
+  ["GET", "/api/billing", "billing"],
+  ["POST", "/api/billing/webhook", "billingWebhook"],
+  ["GET", "/api/admin/accounts", "adminAccounts"],
+  ["PUT", "/api/admin/accounts/[userId]/plan", "adminSetPlan"],
 
   ["GET", "/api/recordings", "listAllRecordings"],
   ["GET", "/api/recordings/[recordingId]", "getRecording"],

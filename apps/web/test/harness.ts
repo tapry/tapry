@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { createApiHandlers } from "../src/server/api";
+import type { BillingOptions } from "../src/server/billing";
+import type { WebhookConfig } from "../src/server/billing-webhooks";
 import { openDb } from "../src/server/db";
 import type { Mailer } from "../src/server/mail";
 import { ROUTES } from "../src/server/routes";
@@ -83,15 +85,19 @@ const ROUTE_PATTERNS = ROUTES.map(([method, path, name]) => {
 });
 
 /** A fresh in-memory server: services, handlers, and a fetch that routes like Next.js. */
-export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; setupToken?: string; speedTestOrigins?: string[]; mailer?: Mailer; bytesPerSecondCap?: number } = {}) {
+export async function createServer(storage: Storage = new FakeStorage(), opts: { allowSignup?: boolean; setupToken?: string; speedTestOrigins?: string[]; mailer?: Mailer; bytesPerSecondCap?: number; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig; guestPromoUrl?: string; appUrl?: string; /** Where the server's clock starts (ms). */ clockStart?: number } = {}) {
   const db = await openDb("pglite://memory");
-  let clock = 1_000_000;
+  let clock = opts.clockStart ?? 1_000_000;
   const services = createServices(db, storage, {
     auth: { allowSignup: opts.allowSignup ?? false, setupToken: opts.setupToken },
     bytesPerSecondCap: opts.bytesPerSecondCap,
     now: () => clock,
     speedTestOrigins: opts.speedTestOrigins,
     mailer: opts.mailer,
+    billing: opts.billing,
+    billingWebhook: opts.billingWebhook,
+    guestPromoUrl: opts.guestPromoUrl,
+    appUrl: opts.appUrl,
   });
   const api = createApiHandlers(async () => services);
 
@@ -146,6 +152,7 @@ export async function createServer(storage: Storage = new FakeStorage(), opts: {
       post: (path: string, body: unknown = {}, opts?: { token?: string | null; origin?: string }) =>
         request("POST", path, body, opts),
       patch: (path: string, body: unknown, opts?: { origin?: string }) => request("PATCH", path, body, opts),
+      put: (path: string, body: unknown, opts?: { token?: string | null; origin?: string }) => request("PUT", path, body, opts),
       del: (path: string, opts?: { origin?: string }) => request("DELETE", path, undefined, opts),
     };
   };
@@ -165,7 +172,7 @@ export async function createServer(storage: Storage = new FakeStorage(), opts: {
  * The usual scene: an admin host with a studio open, one guest joined, a recording running.
  * `call` POSTs as the guest by default (pass a token, or null for none).
  */
-export async function setup(storage: Storage = new FakeStorage(), opts: { mailer?: Mailer; bytesPerSecondCap?: number } = {}) {
+export async function setup(storage: Storage = new FakeStorage(), opts: Parameters<typeof createServer>[1] = {}) {
   const server = await createServer(storage, opts);
   const hostBrowser = server.client();
   await expectOk(hostBrowser.post("/auth/signup", { email: "host@example.com", name: "Host", password: "correct horse battery" }));

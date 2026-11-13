@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { StudioSettingsForm } from "@/components/studio-forms";
 import { cn } from "@/components/ui";
 
-type Tab = "recording" | "guests" | "workspace" | "account";
+type Tab = "recording" | "guests" | "plan" | "workspace" | "account";
 
 /**
  * The Settings page's tabs. Recording and Guests are one studio's settings (the same form as on
@@ -18,6 +18,7 @@ export function SettingsTabs({
   studios,
   studioId,
   hostName,
+  plan,
   workspace,
   account,
 }: {
@@ -25,6 +26,8 @@ export function SettingsTabs({
   studios: Array<{ id: string; name: string; settings: StudioSettings }>;
   studioId: string | null;
   hostName: string;
+  /** Tapry Cloud's plan and usage. Null on a self-hosted server: the tab isn't shown. */
+  plan: ReactNode | null;
   /** Null for hosts who aren't the admin: the tab isn't shown. */
   workspace: ReactNode | null;
   account: ReactNode;
@@ -32,11 +35,12 @@ export function SettingsTabs({
   const router = useRouter();
   const path = usePathname();
   const params = useSearchParams();
-  const [tab, setTab] = useState<Tab>(initial === "workspace" && !workspace ? "recording" : initial);
+  const [tab, setTab] = useState<Tab>((initial === "workspace" && !workspace) || (initial === "plan" && !plan) ? "recording" : initial);
   const studio = studios.find((s) => s.id === studioId) ?? studios[0];
   const tabs: Array<[Tab, string]> = [
     ["recording", "Recording"],
     ["guests", "Guests"],
+    ...(plan ? ([["plan", "Plan"]] as Array<[Tab, string]>) : []),
     ...(workspace ? ([["workspace", "Workspace"]] as Array<[Tab, string]>) : []),
     ["account", "Account"],
   ];
@@ -107,6 +111,7 @@ export function SettingsTabs({
               .
             </p>
           ))}
+        {tab === "plan" && plan}
         {tab === "workspace" && workspace}
         {tab === "account" && account}
       </div>

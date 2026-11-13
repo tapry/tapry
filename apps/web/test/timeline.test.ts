@@ -23,6 +23,7 @@ const recording = (over: Partial<RecordingSummary> = {}): RecordingSummary => ({
   incompleteTracks: 0,
   bytes: 0,
   rawDeleted: false,
+  keepUntil: null,
   hasFilters: false,
   applyFilters: true,
   filtersFailed: [],

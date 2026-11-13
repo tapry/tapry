@@ -11,6 +11,8 @@ export interface User {
   email: string;
   name: string;
   isAdmin: boolean;
+  /** The address was confirmed by a link we emailed. Only asked for where that is required. */
+  emailVerified: boolean;
 }
 
 export interface AuthOptions {
@@ -44,6 +46,11 @@ export class AuthService {
     this.now = opts.now ?? Date.now;
   }
 
+  /** Whether anyone may create an account after the first. */
+  get signupOpen() {
+    return this.opts.allowSignup;
+  }
+
   /** Whether the first account needs the install's setup code. */
   get setupRequired() {
     return !!this.opts.setupToken;
@@ -65,9 +72,10 @@ export class AuthService {
       ];
       this.checkSignup(count, body.setupToken);
       const [row] = await tx.query<UserRow>(
-        `INSERT INTO users (id, email, name, password_hash, is_admin) VALUES ($1, $2, $3, $4, $5)
+        // The first account proved itself with the setup code: nothing to confirm by email.
+        `INSERT INTO users (id, email, name, password_hash, is_admin, email_verified_at) VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (email) DO NOTHING RETURNING *`,
-        [id, body.email, body.name, passwordHash, count === 0],
+        [id, body.email, body.name, passwordHash, count === 0, count === 0 ? new Date(this.now()) : null],
       );
       if (!row) throw new ApiError(409, "email_taken", "An account with this email already exists");
       return toUser(row);
@@ -168,6 +176,7 @@ interface UserRow {
   name: string;
   password_hash: string;
   is_admin: boolean;
+  email_verified_at: Date | null;
 }
 
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin });
+const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null });

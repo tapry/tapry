@@ -154,6 +154,8 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Guests' end screen:** guests can download their own recording once it's processed (a studio
   setting, on by default). Set `GUEST_PROMO_URL` in `.env` to also show them a "Record your own,
   free" link; unset, there is none.
+- **Forgotten passwords:** with email set up (next item), the log-in page offers "Forgot it?",
+  which emails a link to set a new password. Without email it isn't offered.
 - **Recap email:** set `SMTP_HOST`, `SMTP_FROM` and, if needed, `SMTP_PORT`, `SMTP_USER` and
   `SMTP_PASSWORD` in `.env`, then `docker compose up -d`, and guests can ask on their end screen for
   an email with a link to their own recording. Any SMTP server or sending service works. Unset, it

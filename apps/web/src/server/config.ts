@@ -1,6 +1,8 @@
 // Environment → typed configuration, shared by the web server (context.ts) and the
 // standalone worker (worker-main.ts), so both read the same variables the same way.
 import { z } from "zod";
+import { planId, type PlanId } from "@tapry/shared";
+import type { WebhookConfig } from "./billing-webhooks";
 import type { CallConfig } from "./call";
 import type { SmtpConfig } from "./mail";
 import type { S3StorageConfig } from "./storage";
@@ -69,7 +71,36 @@ const env = z.object({
   LIVEKIT_URL: unsetIfEmpty(z.string().url()),
   LIVEKIT_API_KEY: unsetIfEmpty(z.string()),
   LIVEKIT_API_SECRET: unsetIfEmpty(z.string()),
+  /**
+   * Run this server as Tapry Cloud: accounts have plans with recording hours and file
+   * retention (packages/shared PLANS). False (default, every self-hosted server): no plans, no limits.
+   */
+  TAPRY_CLOUD: bool("false"),
+  /** Who sells the subscriptions. With BILLING_WEBHOOK_SECRET set, POST /api/billing/webhook is on. */
+  BILLING_PROVIDER: z.enum(["paddle", "lemonsqueezy"]).default("paddle"),
+  BILLING_WEBHOOK_SECRET: unsetIfEmpty(z.string().min(8)),
+  /** The provider's price ids and the plan each sells: "pri_abc=creator,pri_def=creator,pri_xyz=studio". */
+  BILLING_PRICES: z.string().default(""),
+  /** Checkout addresses per plan: "creator=https://…{user_id}…{email},studio=https://…". A plan without one isn't offered. */
+  BILLING_CHECKOUT_URLS: z.string().default(""),
+  /** The provider's customer portal (card, invoices, cancelling). */
+  BILLING_MANAGE_URL: unsetIfEmpty(z.string().url()),
 });
+
+/** "a=b,c=d" → pairs; the value may itself hold "=" (an address with a query). */
+function pairs(value: string, name: string): Array<[string, string]> {
+  return value.split(",").map((p) => p.trim()).filter(Boolean).map((p) => {
+    const at = p.indexOf("=");
+    if (at < 1 || at === p.length - 1) throw new Error(`${name}: "${p}" is not key=value`);
+    return [p.slice(0, at).trim(), p.slice(at + 1).trim()];
+  });
+}
+
+function plan(value: string, name: string): PlanId {
+  const parsed = planId.safeParse(value);
+  if (!parsed.success) throw new Error(`${name}: "${value}" is not a plan`);
+  return parsed.data;
+}
 
 export interface WorkerConfig {
   ffmpeg: string;
@@ -80,6 +111,8 @@ export interface WorkerConfig {
   lockMs: number;
   /** Delete originals this long after processing; undefined keeps them. */
   rawRetentionMs?: number;
+  /** Tapry Cloud: retention follows each host's plan instead of rawRetentionMs. */
+  cloud?: boolean;
 }
 
 export interface Config {
@@ -94,6 +127,8 @@ export interface Config {
   mail: { smtp: SmtpConfig; appUrl: string } | null;
   speedTestOrigins: string[];
   updateRepo: string | null;
+  /** Tapry Cloud: plans, limits and billing. Null on a self-hosted server. */
+  cloud: { checkoutUrls: Partial<Record<PlanId, string>>; manageUrl: string | null; webhook: WebhookConfig | null } | null;
 }
 
 export function loadConfig(source: Record<string, string | undefined> = process.env): Config {
@@ -133,6 +168,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       pollMs: cfg.WORKER_POLL_MS,
       lockMs: cfg.WORKER_LOCK_SECONDS * 1000,
       rawRetentionMs: cfg.RAW_RETENTION_DAYS === undefined ? undefined : cfg.RAW_RETENTION_DAYS * 86_400_000,
+      cloud: cfg.TAPRY_CLOUD,
     },
     call: cfg.LIVEKIT_URL ? { url: cfg.LIVEKIT_URL, apiKey: cfg.LIVEKIT_API_KEY!, apiSecret: cfg.LIVEKIT_API_SECRET! } : null,
     guestPromoUrl: cfg.GUEST_PROMO_URL ?? null,
@@ -144,5 +180,15 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       : null,
     speedTestOrigins: cfg.SPEED_TEST_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean),
     updateRepo: cfg.UPDATE_CHECK_REPO ?? null,
+    cloud: cfg.TAPRY_CLOUD
+      ? {
+          // Read even without a webhook secret, so a mistyped plan is caught at start.
+          checkoutUrls: Object.fromEntries(pairs(cfg.BILLING_CHECKOUT_URLS, "BILLING_CHECKOUT_URLS").map(([k, v]) => [plan(k, "BILLING_CHECKOUT_URLS"), v])),
+          manageUrl: cfg.BILLING_MANAGE_URL ?? null,
+          webhook: ((prices) => (cfg.BILLING_WEBHOOK_SECRET ? { provider: cfg.BILLING_PROVIDER, secret: cfg.BILLING_WEBHOOK_SECRET, prices } : null))(
+            Object.fromEntries(pairs(cfg.BILLING_PRICES, "BILLING_PRICES").map(([k, v]) => [k, plan(v, "BILLING_PRICES")])),
+          ),
+        }
+      : null,
   };
 }
