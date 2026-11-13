@@ -65,10 +65,20 @@ describe("a person's filters, as kept on their device", () => {
     it("are saved next to the device choices and found again by the next page", () => {
       expect(getFilterPrefs()).toEqual(DEFAULT_PREFS);
       setFilterPrefs({ filters: mono, mirror: false });
-      expect(FILTERS_KEY).toBe("opentake:filters");
-      expect(JSON.parse(stored.get(FILTERS_KEY)!)).toEqual({ filters: mono, mirror: false });
+      expect(FILTERS_KEY).toBe("filters");
+      expect(JSON.parse(stored.get("tapry:filters")!)).toEqual({ filters: mono, mirror: false });
       reloadFilterPrefs(); // a new page
       expect(getFilterPrefs()).toEqual({ filters: mono, mirror: false });
+    });
+
+    it("finds what a version from before the rename saved, and saves under the new name", () => {
+      stored.set("opentake:filters", JSON.stringify({ filters: mono, mirror: false }));
+      reloadFilterPrefs();
+      expect(getFilterPrefs()).toEqual({ filters: mono, mirror: false });
+      setFilterPrefs({ filters: mono, mirror: true });
+      expect(JSON.parse(stored.get("tapry:filters")!).mirror).toBe(true);
+      reloadFilterPrefs();
+      expect(getFilterPrefs().mirror).toBe(true); // the new one wins
     });
 
     it("survive storage that throws: the choice holds for this page only", () => {

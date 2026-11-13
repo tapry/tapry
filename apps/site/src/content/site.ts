@@ -1,5 +1,5 @@
 // Addresses the whole site links to. With NEXT_PUBLIC_APP_URL (the hosted app, Tapry Cloud) the
-// site offers log in, sign up and plan checkouts there. Without it there is no hosted app:
+// site offers log in and sign up there, and plan checkouts once Paddle is set (content/tiers.ts). Without it there is no hosted app:
 // "Get Started" leads to the choice between self-hosting and the planned Tapry Cloud (pricing).
 import type { Metadata } from "next";
 
@@ -16,7 +16,7 @@ export const BROWSER_REPORT_URL = `${GITHUB}/issues/new?template=browser.yml`;
 /** The website's docs are written in this file (condensed from docs/ in the repo). */
 export const DOCS_EDIT_URL = GITHUB_FILE("apps/site/src/content/docs.ts");
 
-/** Where the waitlist form posts (a form service that takes an `email` field). Unset: link to GitHub releases. */
+/** Where the waitlist form posts `{ email, plan }` as JSON: the hosted app's /api/waitlist. Unset: link to GitHub releases. */
 export const WAITLIST_URL = process.env.NEXT_PUBLIC_WAITLIST_URL;
 export const HAS_WAITLIST = !!WAITLIST_URL;
 /** How to hear about Tapry Cloud, for sentences: only promise a waitlist when there is one. */
@@ -32,6 +32,8 @@ export const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
 export const HAS_CLOUD = !!APP_URL;
 export const LOGIN_URL = `${APP_URL}/login`;
 export const SIGNUP_URL = `${APP_URL}/signup`;
+/** Where someone already signed in goes. */
+export const STUDIO_URL = `${APP_URL}/studios`;
 /** A plan's checkout in the app: it signs the visitor up first, then opens the payment. */
 export const checkoutUrl = (plan: "creator" | "studio" | "team" | "own_storage", yearly: boolean) => `${APP_URL}/checkout/${plan}${yearly ? "?yearly=1" : ""}`;
 export const CONTACT_EMAIL = "hello@tapry.app";

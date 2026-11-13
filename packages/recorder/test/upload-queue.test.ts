@@ -223,8 +223,22 @@ describe("UploadQueue", () => {
       }
     });
 
+    it("skips tracks held by a tab opened before the rename, under the old lock name", async () => {
+      vi.stubGlobal("navigator", { locks: { query: async () => ({ held: [{ name: "opentake:track:s1:t1" }] }) } });
+      try {
+        await store.putTrack(track);
+        await putChunks(store, 2);
+        await queue.resume();
+        await queue.drain();
+        expect(transport.uploadCalls).toBe(0);
+        expect(await store.listChunks("s1", "t1")).toHaveLength(2);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
     it("skips tracks a live recorder in another tab still holds", async () => {
-      const held = { held: [{ name: "opentake:track:s1:t1" }] };
+      const held = { held: [{ name: "tapry:track:s1:t1" }] };
       vi.stubGlobal("navigator", { locks: { query: async () => held } });
       try {
         await store.putTrack(track);

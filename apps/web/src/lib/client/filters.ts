@@ -1,5 +1,6 @@
 "use client";
 
+import { readStored, writeStored } from "./stored";
 import { NO_FILTERS, trackFilters, type TrackFilters } from "@tapry/shared";
 import { useSyncExternalStore } from "react";
 import { apiFetch } from "./api";
@@ -10,8 +11,8 @@ import { apiFetch } from "./api";
 // on the call's copies and in this person's own preview, sent to the server with each track, and
 // applied to the finished files there.
 
-/** Next to "opentake:devices" (the key family from before the rename, so nothing is orphaned). */
-export const FILTERS_KEY = "opentake:filters";
+/** The name under which a person's filters are remembered in this browser (lib/client/stored.ts). */
+export const FILTERS_KEY = "filters";
 
 export interface FilterPrefs {
   filters: TrackFilters;
@@ -56,7 +57,7 @@ const listeners = new Set<() => void>();
 export function getFilterPrefs(): FilterPrefs {
   if (!prefs) {
     try {
-      prefs = parsePrefs(localStorage.getItem(FILTERS_KEY));
+      prefs = parsePrefs(readStored(FILTERS_KEY));
     } catch {
       prefs = DEFAULT_PREFS; // no storage (private mode, blocked site data): nothing is remembered
     }
@@ -67,7 +68,7 @@ export function getFilterPrefs(): FilterPrefs {
 export function setFilterPrefs(next: FilterPrefs) {
   prefs = next;
   try {
-    localStorage.setItem(FILTERS_KEY, JSON.stringify(next));
+    writeStored(FILTERS_KEY, JSON.stringify(next));
   } catch {}
   listeners.forEach((fn) => fn());
 }

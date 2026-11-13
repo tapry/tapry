@@ -6,6 +6,24 @@ still stands between here and the first payment. Prices and reasons: `docs/plan/
 A self-hosted server is unaffected by all of this: without `TAPRY_CLOUD=true` there are no plans,
 no limits, no Plan tab, and the billing endpoints answer 404.
 
+## Selling is paused: the waitlist (13 Nov 2026)
+
+Paddle is postponed until its onboarding is done. Nothing was removed: the checkout, webhook,
+mirror tables and portal below are all still there and tested, and the products, prices and
+client token in Paddle are untouched. What changed is configuration only:
+
+- The server runs without `BILLING_PADDLE_CLIENT_TOKEN`, so Settings, Plan offers no upgrades
+  and `/checkout/<plan>` answers 404. The free plan and plans set by hand work as before.
+- The website is built without `NEXT_PUBLIC_PADDLE_*` (`build:site` in the root `package.json`),
+  so it loads nothing from Paddle; each paid plan shows its listed price, "Opening soon" and a
+  waitlist button that posts to `NEXT_PUBLIC_WAITLIST_URL` (`<app>/api/waitlist`).
+- `WaitlistService` (`apps/web/src/server/waitlist.ts`, table `waitlist`): email, plan asked
+  about, date. Tapry Cloud only; 5 an hour per address; the admin's list is in Settings, Plan.
+
+To start selling: put the two `NEXT_PUBLIC_PADDLE_*` values back into `build:site`, and
+`BILLING_PADDLE_CLIENT_TOKEN` (with `BILLING_PADDLE_ENVIRONMENT=production`) into the server's
+`.env`, then write to the waitlist.
+
 ## Built
 
 | Part | What it does |

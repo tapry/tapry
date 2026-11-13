@@ -278,3 +278,7 @@ select {
 
 /* For screen readers only. */
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Links for visitors and for someone signed in to the hosted app (components/account-links.tsx). */
+html:not([data-signed-in]) .when-in { display: none !important; }
+html[data-signed-in] .when-out { display: none !important; }

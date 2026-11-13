@@ -2,7 +2,11 @@
 // another tab can tell "tab died mid-recording" from "still recording over there".
 
 export function trackLockName(sessionId: string, trackId: string) {
-  // Named before the rename to Tapry: an older tab still recording must see the same lock.
+  return `tapry:track:${sessionId}:${trackId}`;
+}
+
+/** The lock's name before the rename to Tapry: a tab opened before an update still holds this one. */
+export function legacyTrackLockName(sessionId: string, trackId: string) {
   return `opentake:track:${sessionId}:${trackId}`;
 }
 

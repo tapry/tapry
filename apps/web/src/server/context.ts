@@ -41,6 +41,7 @@ export function getServices(): Promise<Services> {
       mailer,
       appUrl: config.mail?.appUrl,
       speedTestOrigins: config.speedTestOrigins,
+      siteOrigins: config.siteOrigins,
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
       ownStorage: config.ownStorage,
       billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl, paddle: config.cloud?.paddle },

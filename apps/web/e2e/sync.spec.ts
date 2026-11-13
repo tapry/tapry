@@ -149,7 +149,7 @@ test("tracks line up: the same moment lands at the same place in everyone's file
   await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /✓ Uploaded/], { timeout: 60_000 });
 
   const { recording } = await host.evaluate(async (id) => {
-    const { token } = JSON.parse(localStorage.getItem(`opentake:ticket:${id}`)!);
+    const { token } = JSON.parse(localStorage.getItem(`tapry:ticket:${id}`)!);
     return (await fetch(`/api/sessions/${id}/state`, { headers: { authorization: `Bearer ${token}` } })).json();
   }, sessionId);
 

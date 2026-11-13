@@ -69,3 +69,29 @@ describe.each(stores)("%s", (_name, open) => {
     expect(await store.getTrack("s1", "t1")).toEqual({ ...track, stoppedAt: 9, lastSeq: 3 });
   });
 });
+
+describe("the database's name", () => {
+  it("is tapry-recorder in a browser that never recorded before", async () => {
+    const idb = new IDBFactory();
+    (await IndexedDBChunkStore.open(undefined, idb)).close();
+    expect((await idb.databases()).map((d) => d.name)).toEqual(["tapry-recorder"]);
+  });
+
+  it("stays opentake-recorder where that database exists, so chunks not yet uploaded are found", async () => {
+    const idb = new IDBFactory();
+    const before = await IndexedDBChunkStore.open("opentake-recorder", idb);
+    await before.putTrack({ sessionId: "s1", trackId: "t1", kind: "audio", mimeType: "audio/webm", startedAt: 1 } as never);
+    before.close();
+    const now = await IndexedDBChunkStore.open(undefined, idb);
+    expect((await now.listTracks()).map((t) => t.trackId)).toEqual(["t1"]);
+    now.close();
+    expect((await idb.databases()).map((d) => d.name)).toEqual(["opentake-recorder"]);
+  });
+
+  it("uses the old name where the browser can't list its databases", async () => {
+    const idb = new IDBFactory();
+    const blind = { open: idb.open.bind(idb) } as unknown as IDBFactory;
+    (await IndexedDBChunkStore.open(undefined, blind)).close();
+    expect((await idb.databases()).map((d) => d.name)).toEqual(["opentake-recorder"]);
+  });
+});

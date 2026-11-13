@@ -4,7 +4,7 @@
 // they are. The Cloud sections state what the software does (docs/cloud-billing.md) and who
 // handles data; the fuller texts, with the operator's legal details, are in docs/legal-drafts.md.
 import { CONTACT_EMAIL, HAS_CLOUD, HAS_SPEED_TEST, HAS_WAITLIST } from "@/content/site";
-import { PADDLE_TOKEN } from "@/content/tiers";
+import { HAS_CHECKOUT, PADDLE_TOKEN } from "@/content/tiers";
 
 type Doc = { id: "privacy" | "terms"; title: string; sections: Array<[string, string]> };
 
@@ -19,11 +19,11 @@ const CLOUD_PRIVACY: Array<[string, string]> = [
   ],
   [
     "Tapry Cloud: payments",
-    "Paid plans are sold by Paddle, our payment provider and merchant of record: Paddle takes the payment, handles tax and sends the invoice, under its own privacy policy. No card detail reaches Tapry. We keep Paddle’s identifiers for your customer record and subscription, so your account gets the plan you paid for. The checkout and payment pages load Paddle’s scripts, including Paddle Retain; the rest of the app doesn’t.",
+    (HAS_CHECKOUT ? "Paid plans are sold" : "Paid plans aren’t on sale yet. When they are, they will be sold") + " by Paddle, our payment provider and merchant of record: Paddle takes the payment, handles tax and sends the invoice, under its own privacy policy. No card detail reaches Tapry. We keep Paddle’s identifiers for your customer record and subscription, so your account gets the plan you paid for. The checkout and payment pages load Paddle’s scripts, including Paddle Retain; the rest of the app doesn’t.",
   ],
   [
     "Who else handles data",
-    "Hetzner hosts the servers and the stored recordings, in Finland. Paddle handles payments. Cloudflare hosts this website and forwards mail sent to our contact address. We don’t sell or share data with anyone else.",
+    "Hetzner hosts the servers and the stored recordings, in Finland. " + (HAS_CHECKOUT ? "Paddle handles payments. " : "") + "Cloudflare hosts this website and forwards mail sent to our contact address. We don’t sell or share data with anyone else.",
   ],
   [
     "Your rights",
@@ -42,7 +42,7 @@ const CLOUD_TERMS: Array<[string, string]> = [
   ],
   [
     "Tapry Cloud: paying, cancelling and refunds",
-    `Plans are sold through Paddle and renew each month or year until you cancel. You can cancel at any time from Settings, Plan: the plan then runs to the end of the period you paid for and the account moves to the Free plan. If Tapry Cloud isn’t for you, write to ${CONTACT_EMAIL} within 14 days of your first payment and it is refunded in full.`,
+    `${HAS_CHECKOUT ? "Plans are sold" : "Paid plans aren’t on sale yet. When they are, they will be sold"} through Paddle and renew each month or year until you cancel. You can cancel at any time from Settings, Plan: the plan then runs to the end of the period you paid for and the account moves to the Free plan. If Tapry Cloud isn’t for you, write to ${CONTACT_EMAIL} within 14 days of your first payment and it is refunded in full.`,
   ],
 ];
 
@@ -55,7 +55,7 @@ const DOCS: Doc[] = [
         "This website",
         PADDLE_TOKEN
           ? "This site is a set of static pages. It sets no cookies and runs no analytics of its own. One page loads scripts from another company: the pricing page loads Paddle’s, our payment provider, to show prices in your currency. Paddle’s script also loads Paddle Retain, which Paddle uses for payment recovery and cancellation offers and which may set its own cookies, under Paddle’s privacy policy. No other page of this site loads anything from another company. Like any web server, the host serving it may keep ordinary access logs."
-          : "This site is a set of static pages. It sets no cookies, runs no analytics or trackers, and loads no fonts or scripts from other companies. Like any web server, the host serving it may keep ordinary access logs.",
+          : `This site is a set of static pages. It sets no cookies, runs no analytics or trackers, and loads no fonts or scripts from other companies.${HAS_CLOUD ? " To show the right menu, each page asks Tapry Cloud whether this browser is signed in; the answer is only yes or no, and is remembered in this browser." : ""} Like any web server, the host serving it may keep ordinary access logs.`,
       ],
       [
         "The free tools",
@@ -64,7 +64,7 @@ const DOCS: Doc[] = [
       [
         "The waitlist",
         HAS_WAITLIST
-          ? "If you join the Tapry Cloud waitlist, the email address you type is sent to the form service that collects the list, and used only to tell you when Tapry Cloud opens."
+          ? "If you join the waitlist for a paid plan, the email address you type and the plan you asked about are sent to the Tapry Cloud server in Finland and kept there, not with a form service. They are used only to tell you when that plan opens, with one email. Write to us and we remove you from the list."
           : "There is no waitlist form on this site yet; nothing you do here is stored.",
       ],
       [

@@ -127,7 +127,7 @@ test("'all uploaded' only once every track is complete on the server, even with 
   // At that moment the server must already have every track complete.
   const sessionId = new URL(page.url()).pathname.split("/").pop()!;
   const uploads = await page.evaluate(async (id) => {
-    const { token } = JSON.parse(localStorage.getItem(`opentake:ticket:${id}`)!);
+    const { token } = JSON.parse(localStorage.getItem(`tapry:ticket:${id}`)!);
     const res = await fetch(`/api/sessions/${id}/state`, { headers: { authorization: `Bearer ${token}` } });
     return (await res.json()).uploads as Array<{ tracks: number; completeTracks: number }>;
   }, sessionId);

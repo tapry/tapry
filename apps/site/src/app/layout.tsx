@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./site.css";
+import { SIGNED_IN_SCRIPT } from "@/components/account-links";
 
 const title = "Tapry: record any guest in studio quality";
 const description =
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <noscript>
           <style>{NO_SCRIPT}</style>
         </noscript>
+        {SIGNED_IN_SCRIPT && <script dangerouslySetInnerHTML={{ __html: SIGNED_IN_SCRIPT }} />}
         {children}
       </body>
     </html>

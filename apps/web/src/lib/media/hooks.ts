@@ -1,5 +1,6 @@
 "use client";
 
+import { readStored, writeStored } from "@/lib/client/stored";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   classifyLevel,
@@ -162,12 +163,12 @@ export function useMicLevel(stream: MediaStream | null): MicLevel {
   return level;
 }
 
-/** Remembered device choices (per browser). Storage may be unavailable; then nothing is remembered. */
+/** Remembered device choices (per browser), by name (lib/client/stored.ts). Storage may be unavailable; then nothing is remembered. */
 export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(initial);
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = readStored(key);
       if (raw) setValue(JSON.parse(raw) as T);
     } catch {}
   }, [key]);
@@ -175,7 +176,7 @@ export function useStoredState<T>(key: string, initial: T): [T, (v: T) => void] 
     (v: T) => {
       setValue(v);
       try {
-        localStorage.setItem(key, JSON.stringify(v));
+        writeStored(key, JSON.stringify(v));
       } catch {}
     },
     [key],

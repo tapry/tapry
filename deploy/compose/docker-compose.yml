@@ -1,17 +1,19 @@
 # Tapry self-host stack. Quick start: ./setup.sh studio.example.com you@example.com && docker compose up -d
 # See docs/self-hosting.md.
-# Named before the rename to Tapry: volumes, the database and the bucket keep their names,
-# so existing installs keep their data.
-name: opentake
+# DATA_NAME names where the data lives: the Compose project (so the volumes), the database and
+# its user, and the bucket. setup.sh writes DATA_NAME=tapry. An install from before the rename
+# to Tapry must keep DATA_NAME=opentake in .env, or it would start with empty volumes; it is
+# required for that reason, never defaulted.
+name: ${DATA_NAME:?DATA_NAME is missing from .env - an install made before 0.4 adds DATA_NAME=opentake, a new one runs setup.sh}
 
 # Settings the web app and the workers share: database, storage, media tools.
 x-app-env: &app-env
-  DATABASE_URL: postgres://opentake:${POSTGRES_PASSWORD:?}@postgres:5432/opentake
+  DATABASE_URL: postgres://${DATA_NAME}:${POSTGRES_PASSWORD:?}@postgres:5432/${DATA_NAME}
   S3_ENDPOINT: http://seaweedfs:8333
   # Browsers upload to and download from storage directly, through Caddy.
   S3_PUBLIC_ENDPOINT: ${PUBLIC_SCHEME:-https}://s3.${DOMAIN}
   S3_REGION: us-east-1
-  S3_BUCKET: opentake
+  S3_BUCKET: ${DATA_NAME}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?}
   S3_FORCE_PATH_STYLE: "true"
@@ -54,7 +56,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/caddy.Dockerfile
-    image: ${TAPRY_IMAGES:-${OPENTAKE_IMAGES:-tapry}}/tapry-caddy:${TAPRY_VERSION:-${OPENTAKE_VERSION:-local}}
+    image: ${TAPRY_IMAGES:-tapry}/tapry-caddy:${TAPRY_VERSION:-local}
     restart: unless-stopped
     network_mode: host
     environment:
@@ -76,8 +78,8 @@ services:
       context: ../..
       dockerfile: deploy/docker/web.Dockerfile
       args:
-        TAPRY_VERSION: ${TAPRY_VERSION:-${OPENTAKE_VERSION:-local}}
-    image: ${TAPRY_IMAGES:-${OPENTAKE_IMAGES:-tapry}}/tapry-web:${TAPRY_VERSION:-${OPENTAKE_VERSION:-local}}
+        TAPRY_VERSION: ${TAPRY_VERSION:-local}
+    image: ${TAPRY_IMAGES:-tapry}/tapry-web:${TAPRY_VERSION:-local}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
@@ -88,6 +90,8 @@ services:
       SETUP_TOKEN: ${SETUP_TOKEN:-}
       # Other sites allowed to use the public upload-speed test (comma-separated origins).
       SPEED_TEST_ORIGINS: ${SPEED_TEST_ORIGINS:-}
+      # The project website's origins (Tapry Cloud): it may ask whether a visitor is signed in and post to the waitlist.
+      SITE_ORIGINS: ${SITE_ORIGINS:-}
       # GitHub "owner/name" whose latest release the health page compares with; empty: no check.
       UPDATE_CHECK_REPO: ${UPDATE_CHECK_REPO:-}
       LIVEKIT_URL: ${LIVEKIT_WS_SCHEME:-wss}://livekit.${DOMAIN}
@@ -104,7 +108,7 @@ services:
   # Processes and transcribes recordings (same image, other entry point). Scale with
   # WORKER_REPLICAS=n; workers share the queue safely, a stopped one hands its job back.
   worker:
-    image: ${TAPRY_IMAGES:-${OPENTAKE_IMAGES:-tapry}}/tapry-web:${TAPRY_VERSION:-${OPENTAKE_VERSION:-local}}
+    image: ${TAPRY_IMAGES:-tapry}/tapry-web:${TAPRY_VERSION:-local}
     restart: unless-stopped
     command: ["node", "worker.cjs"]
     environment:
@@ -129,13 +133,13 @@ services:
     image: postgres:17.11-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: opentake
+      POSTGRES_USER: ${DATA_NAME}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
-      POSTGRES_DB: opentake
+      POSTGRES_DB: ${DATA_NAME}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U opentake -d opentake"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATA_NAME} -d ${DATA_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 20

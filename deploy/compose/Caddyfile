@@ -40,22 +40,37 @@
 	}
 }
 
+# Sent with every answer of the HTTPS sites below.
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
 http://{$DOMAIN}, http://s3.{$DOMAIN}, http://livekit.{$DOMAIN}, http://turn.{$DOMAIN} {
 	redir https://{host}{uri} 308
 }
 
 https://{$DOMAIN} {
+	import security
+	# The app is never shown inside another site's page.
+	header X-Frame-Options DENY
 	reverse_proxy 127.0.0.1:3000 {
 		# Server-sent events (live session state) must not be buffered.
 		flush_interval -1
+		header_down -X-Powered-By
 	}
 }
 
 https://s3.{$DOMAIN} {
+	import security
 	reverse_proxy 127.0.0.1:8333
 }
 
 https://livekit.{$DOMAIN} {
+	import security
 	reverse_proxy 127.0.0.1:7880
 }
 

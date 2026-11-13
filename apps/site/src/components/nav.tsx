@@ -5,7 +5,8 @@
 // 900px the links move into a menu that a button opens.
 import { useEffect, useRef, useState } from "react";
 import { hasCustomers } from "@/content/customers";
-import { GET_STARTED, GITHUB, HAS_CLOUD, LOGIN_URL } from "@/content/site";
+import { GITHUB, HAS_CLOUD, LOGIN_URL } from "@/content/site";
+import { StartLink } from "./account-links";
 import { LogoMark } from "./icons";
 
 export type NavId = "home" | "solutions" | "customers" | "docs" | "resources" | "self-hosting" | "pricing" | "blog" | "company";
@@ -70,13 +71,11 @@ export function Nav({ active, overlay = false }: { active?: NavId; overlay?: boo
             GitHub
           </a>
           {HAS_CLOUD && (
-            <a href={LOGIN_URL} className="nav-github">
-              Studio
+            <a href={LOGIN_URL} className="nav-github when-out">
+              Log in
             </a>
           )}
-          <a href={GET_STARTED} className="nav-cta" style={{ display: "inline-flex", height: 38, alignItems: "center", borderRadius: 10, padding: "0 16px", fontWeight: 500, whiteSpace: "nowrap" }}>
-            Get Started
-          </a>
+          <StartLink className="nav-cta" style={{ display: "inline-flex", height: 38, alignItems: "center", borderRadius: 10, padding: "0 16px", fontWeight: 500, whiteSpace: "nowrap" }} />
           <button ref={toggle} type="button" className="nav-toggle" aria-expanded={open} aria-controls="site-menu" aria-label="Menu" onClick={() => setOpen((o) => !o)}>
             <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d={open ? "M6 6l12 12M18 6L6 18" : "M4 7h16M4 12h16M4 17h16"} />
@@ -91,8 +90,12 @@ export function Nav({ active, overlay = false }: { active?: NavId; overlay?: boo
           </a>
         ))}
         <a href={GITHUB}>GitHub</a>
-        {HAS_CLOUD && <a href={LOGIN_URL}>Studio</a>}
-        {HAS_CLOUD && <a href={GET_STARTED}>Create an account</a>}
+        {HAS_CLOUD && (
+          <a href={LOGIN_URL} className="when-out">
+            Log in
+          </a>
+        )}
+        {HAS_CLOUD && <StartLink>Create an account</StartLink>}
       </nav>
       {overlay && <script dangerouslySetInnerHTML={{ __html: SCROLL_SCRIPT }} />}
     </header>

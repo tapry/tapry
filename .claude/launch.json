@@ -24,7 +24,7 @@
       "runtimeExecutable": "/bin/sh",
       "runtimeArgs": [
         "-c",
-        "export PATH=\"$HOME/.local/node/bin:$PATH\"; NEXT_DIST_DIR=.next-check DATABASE_URL=pglite://.data/pglite-cloud TAPRY_CLOUD=true ALLOW_SIGNUP=true SETUP_TOKEN= GUEST_PROMO_URL=https://tapry.test/ BILLING_CHECKOUT_URLS='creator=https://pay.example.test/creator?user={user_id},studio=https://pay.example.test/studio?user={user_id},team=https://pay.example.test/team?user={user_id}' BILLING_MANAGE_URL=https://pay.example.test/portal STORAGE_SECRET_KEY=dev-only-own-storage-key OWN_STORAGE_ALLOW_PRIVATE=true BILLING_PADDLE_ENVIRONMENT=sandbox BILLING_PADDLE_CLIENT_TOKEN=test_placeholder_token BILLING_PRICES='pri_placeholder_creator=creator,pri_placeholder_creator_y=creator:yearly,pri_placeholder_team=team' exec pnpm --filter @tapry/web dev --port 3002"
+        "export PATH=\"$HOME/.local/node/bin:$PATH\"; NEXT_DIST_DIR=.next-check DATABASE_URL=pglite://.data/pglite-cloud TAPRY_CLOUD=true ALLOW_SIGNUP=true SETUP_TOKEN= GUEST_PROMO_URL=https://tapry.test/ STORAGE_SECRET_KEY=dev-only-own-storage-key OWN_STORAGE_ALLOW_PRIVATE=true SITE_ORIGINS=http://localhost:3003 exec pnpm --filter @tapry/web dev --port 3002"
       ],
       "port": 3002
     }

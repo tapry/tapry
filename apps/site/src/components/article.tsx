@@ -1,7 +1,7 @@
 // A blog post or a customer story (the Article design). Posts by the team show the Tapry mark
 // where the design has a person's photo.
 import type { ArticleBlock } from "@/content/blog";
-import { GET_STARTED } from "@/content/site";
+import { StartLink } from "./account-links";
 import type { NavId } from "./nav";
 import { BrandPanel, Shell, TeamAvatar } from "./ui";
 
@@ -85,9 +85,9 @@ export function Article({
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14, marginTop: 20, borderTop: "1px solid #e4e4e7", paddingTop: 26, fontSize: 16 }}>
               <span style={{ fontWeight: 500 }}>Record your next conversation on your own server.</span>
               <span style={{ display: "flex", gap: 8 }}>
-                <a href={GET_STARTED} className="btn-dark-red" style={{ display: "inline-flex", height: 40, alignItems: "center", borderRadius: 10, background: "#0b0b0f", padding: "0 16px", fontSize: 15, fontWeight: 500, color: "#fff" }}>
+                <StartLink className="btn-dark-red" style={{ display: "inline-flex", height: 40, alignItems: "center", borderRadius: 10, background: "#0b0b0f", padding: "0 16px", fontSize: 15, fontWeight: 500, color: "#fff" }}>
                   Get started
-                </a>
+                </StartLink>
                 <a href="/self-hosting/" style={{ display: "inline-flex", height: 40, alignItems: "center", border: "1px solid #e4e4e7", borderRadius: 10, padding: "0 16px", fontSize: 15, fontWeight: 500 }}>
                   Self-host it
                 </a>
