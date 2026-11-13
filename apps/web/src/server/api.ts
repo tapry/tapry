@@ -1,10 +1,12 @@
 import {
+  acceptInviteBody,
   commitChunkBody,
   completeTrackBody,
   confirmStorageCheckBody,
   createStudioBody,
   createTrackBody,
   forgotPasswordBody,
+  inviteMemberBody,
   joinBody,
   loginBody,
   ownStorageBody,
@@ -195,6 +197,36 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     storageOverview: asUser(async (svc, user) => json(200, await svc.library.storageOverview(user))),
     /** How this server is set up, read-only (admins only; others get 404). */
     workspaceSettings: asUser(async (svc, user) => json(200, await svc.library.workspace(user))),
+
+    // ── Seats: the people in an account ─────────────────────────────────────────
+    members: asUser(async (svc, user) => json(200, await svc.members.view(user))),
+    /** Invite someone by email (the owner). The link comes back too, to pass on by hand. */
+    inviteMember: asUser(async (svc, user, req) =>
+      json(201, await svc.members.invite(user, (await parseBody(req, inviteMemberBody)).email, new URL(req.url).origin)),
+    ),
+    revokeInvite: asUser(async (svc, user, _req, params) => {
+      await svc.members.revokeInvite(user, params.inviteId!);
+      return new Response(null, { status: 204 });
+    }),
+    /** The owner removes a member, or a member leaves. */
+    removeMember: asUser(async (svc, user, _req, params) => {
+      await svc.members.remove(user, params.userId!);
+      return new Response(null, { status: 204 });
+    }),
+    /** What an invitation says, before anyone signs in. */
+    invitation: handler(async (svc, _req, params) => {
+      const found = await svc.members.invitation(params.token!);
+      if (!found) throw new ApiError(404, "invite_not_found", "This invitation has been used, withdrawn or has run out. Ask for a new one.");
+      return json(200, found);
+    }),
+    /** Accept it: a new account for the invited address, or the signed-in person joins. */
+    acceptInvite: handler(async (svc, req, params) => {
+      checkOrigin(req);
+      const signedIn = await svc.auth.userForToken(readCookie(req, SESSION_COOKIE));
+      const { token } = await svc.members.accept(params.token!, await parseBody(req, acceptInviteBody), signedIn);
+      const res = json(200, { ok: true });
+      return token ? withSessionCookie(res, req, token) : res;
+    }),
 
     // ── Own storage: the account's own bucket ───────────────────────────────────
     ownStorage: asUser(async (svc, user) => json(200, await svc.ownStorage.view(user))),

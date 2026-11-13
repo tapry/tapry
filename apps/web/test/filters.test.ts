@@ -240,7 +240,7 @@ describe("filters", () => {
       // And the zip has both.
       const zip = await t.services.processing.zipContents(
         (await t.db.query<{ id: string; email: string; name: string; is_admin: boolean }>("SELECT id, email, name, is_admin FROM users"))
-          .map((u) => ({ id: u.id, email: u.email, name: u.name, isAdmin: u.is_admin, emailVerified: true }))[0]!,
+          .map((u) => ({ id: u.id, email: u.email, name: u.name, isAdmin: u.is_admin, emailVerified: true, accountId: u.id }))[0]!,
         t.studio.id,
         t.recordingId,
       );

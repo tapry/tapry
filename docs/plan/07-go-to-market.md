@@ -22,7 +22,7 @@
 | Tue | **Show HN** (morning US time) + X thread with demo video |
 | Wed | r/selfhosted + r/opensource |
 | Thu | r/podcasting + LinkedIn ("the recording studio you own") |
-| Fri | Product Hunt + **founding lifetime deal opens** |
+| Fri | Product Hunt + **founding offers open** (own storage for life, price lock: `06`) |
 | Next week | awesome-selfhosted, OpenAlternative, AlternativeTo, newsletters (Console.dev, Changelog, TLDR, selfh.st) |
 
 ## Ongoing channels
@@ -46,4 +46,4 @@
 - Cloud: sign-up → first recording → second recording (activation) → paid.
 - **Recording success rate (must be ~100%)**, time to 100% uploaded after Stop, alerts fired per session.
 - Organisation pipeline: interviews → pilots → paid.
-- MRR, churn, lifetime deals sold.
+- MRR, churn, founding offers sold.

@@ -20,6 +20,7 @@ no limits, no Plan tab, and the billing endpoints answer 404.
 | **Confirming the address** | A new account gets a link by email and can't create or open a studio until it is opened (needs `SMTP_HOST`; the first account is exempt). A notice on every dashboard page offers to send it again |
 | **A warning before deletion** | Where the server sends email, each host gets one email listing the recordings within three days of their date, and a recording is deleted only a day or more after its warning went. A mail problem delays deleting; it never skips the warning |
 | **Sign-up limit** | Five new accounts an hour from one address (attempts count), on any server with open sign-up |
+| **Seats** | An account's owner invites people by link (Settings, Members); members see the account's studios and recordings and can host. The plan sets the seats (Studio 3, Team 5), counting open invitations; a smaller plan removes nobody. The plan, the bucket and the member list stay with the owner |
 | **Own storage** | An account connects its own S3-compatible bucket on the Storage page (needs `STORAGE_SECRET_KEY`); its sessions then record there. The Own storage plan has no other storage, no hour limit and no deletion by us; Business may use it; other plans can't |
 | **Webhook** (`POST /api/billing/webhook`) | Paddle Billing and Lemon Squeezy: signature checked, each event applied once, older events never overwrite newer state. Follows new subscriptions, plan changes, failed payments, cancellations and the end |
 
@@ -47,7 +48,6 @@ checkout address isn't offered. A separate worker reads `TAPRY_CLOUD` too: it do
 | Missing | Why it matters | Blocks |
 |---|---|---|
 | **A live test against the provider** | The webhook readers are written from the published formats and tested with payloads of that shape, never with a real account | The first sale |
-| **Seats** (several people in one account) | Studio and Team list 3 and 5 seats; today an account is one person | Selling Studio and Team as described |
 | **Extra hours and longer keeping** | The add-ons in the pricing | Nothing: later |
 | **Terms, refund and privacy pages, data processing agreement** | Drafted in `docs/legal-drafts.md` from what the software does, with the owner's facts left blank; not on the website | The provider's review, and taking money |
 | **SSO, audit log** (`/ee`) | Business and the organisation licence | Selling those |

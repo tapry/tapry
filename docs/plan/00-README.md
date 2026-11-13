@@ -28,7 +28,7 @@ Full list: `11-changelog.md`.
 | Signal | Detail |
 |---|---|
 | Proof people pay | Riverside, Zencastr, Iris, Remotely.fm, Ringr charge for per-guest local recording; **Descript bought SquadCast** |
-| Incumbents creating openings | SquadCast → Descript Rooms (no sunset date yet); Riverside top plan **$34 → $99 (Sep 2026)** |
+| Incumbents creating openings | SquadCast → Descript Rooms (no sunset date yet); Riverside added a $99 Webinar tier above Grow ($39): a new tier, not a price rise (`15-pricing-benchmark.md`) |
 | Reliability pain | Riverside complaints: **performance/speed 30%**, **stability 23%** (crashes, sync, lost recordings, failed uploads) |
 | Privacy pain | Ethics boards + GDPR make cloud recording of interviews slow; some universities build or buy their own tools |
 | Open-source gap | No polished, self-hostable Riverside (Ennuicastr audio-only, VDO.Ninja for OBS, Jitsi records the compressed call) |
@@ -41,7 +41,7 @@ Full list: `11-changelog.md`.
 |---|---|
 | 2 weeks | Technical prototype passes Gate A (zero loss, < 50 ms sync, Chrome + Safari) |
 | 3 months | Reliable v1 + AI producer alerts + free tools; open-source launch late Jan 2027 |
-| 4 months after launch | Realistic cash: **$3–10k total** (mostly lifetime deals), $200–1k MRR; 1–5k stars |
+| 4 months after launch | Realistic cash: **$3–10k total** (mostly founding offers), $200–1k MRR; 1–5k stars |
 | 6 months | Paid cloud, 3 organisation pilots, 30+ paying users |
 | 12–18 months | $3–15k MRR (good case) |
 
@@ -71,7 +71,7 @@ Full list: `11-changelog.md`.
 1. **Recordings never get lost.** Reliability is the product.
 2. **Dead-simple guest flow** (< 30 seconds) — and every guest sees Tapry at its best (growth loop).
 3. **Private AI that helps during the interview**, not just after (AI producer, guide tracker).
-4. **A great launch** with an audience built in public beforehand (waitlist → lifetime deals).
+4. **A great launch** with an audience built in public beforehand (waitlist → founding offers).
 
 ## Scope guard
 v1 = reliability + guest flow + transcripts + AI producer alerts + guest tech check + 2 free tools. Everything else waits for paying users. Freelancing pays the bills meanwhile.

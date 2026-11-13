@@ -154,6 +154,9 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
 - **Guests' end screen:** guests can download their own recording once it's processed (a studio
   setting, on by default). Set `GUEST_PROMO_URL` in `.env` to also show them a "Record your own,
   free" link; unset, there is none.
+- **Several people in one account:** Settings, Members lets an account's owner invite people by
+  link. They create their own log-in (even with sign-up closed) and see that account's studios
+  and recordings. There is no limit on members on your own server.
 - **Each account's own storage:** set `STORAGE_SECRET_KEY` (a long random string; keep it, and
   never change it) and every account gets "Your own storage" on its Storage page, to record into
   its own S3-compatible bucket instead of the server's. Bucket endpoints must be public HTTPS

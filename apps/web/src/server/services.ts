@@ -9,6 +9,7 @@ import type { Db } from "./db";
 import { LibraryService, type ServerInfo } from "./library";
 import { LiveHub, LiveService } from "./live";
 import type { Mailer } from "./mail";
+import { MembersService } from "./members";
 import { OwnStorageService, RoutedStorage, StorageTargets, type MakeStorage } from "./own-storage";
 import { ProcessingService } from "./processing";
 import { RecapService } from "./recap";
@@ -35,6 +36,8 @@ export interface Services {
   health: HealthService;
   /** Read-only views across a host's studios: the dashboard's Studios, Guests, Transcripts, Storage and Settings. */
   library: LibraryService;
+  /** Seats: the people in an account, and inviting more. */
+  members: MembersService;
   /** Accounts' own buckets: setting one up, and which bucket a new session records into. */
   ownStorage: OwnStorageService;
   /** A host's account by email: a new password, confirming the address. */
@@ -87,6 +90,11 @@ export function createServices(
     speedTest: { limiter: new SpeedTestLimiter(undefined, opts.now), origins: opts.speedTestOrigins ?? [] },
     health,
     library: new LibraryService(db, storage, studios, processing, health, opts.serverInfo, opts.now),
+    members: new MembersService(db, {
+      seats: (accountId, q) => billing.seatsOf(accountId, q),
+      mail: opts.mailer && opts.appUrl ? { mailer: opts.mailer, appUrl: opts.appUrl } : null,
+      now: opts.now,
+    }),
     ownStorage,
     account: new AccountService(db, {
       mail: opts.mailer && opts.appUrl ? { mailer: opts.mailer, appUrl: opts.appUrl } : null,

@@ -74,7 +74,8 @@ export default async function StoragePage() {
       </div>
 
       {/* Offered where the server can protect a secret key and the account's plan includes it; shown too while a bucket is still connected. */}
-      {own.enabled && (own.allowed || own.target) && <OwnStorage initial={own} />}
+      {/* The owner's to set up: a member records into whatever the account uses. */}
+      {own.enabled && (own.allowed || own.target) && user.accountId === user.id && <OwnStorage initial={own} />}
 
       {a && (
         <ListCard>

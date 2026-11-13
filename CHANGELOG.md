@@ -19,6 +19,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   out. The answer is the same whether or not the address has an account. Without email it isn't
   offered. On Tapry Cloud, new accounts also confirm their address before they can create or
   open a studio. Database: `users.email_verified_at`, `account_tokens` (added automatically).
+- **Members.** An account's owner can invite people from Settings, Members. They get a link
+  (emailed where the server sends email, and always shown to pass on) to create their own log-in,
+  even where sign-up is closed. Members see the account's studios and recordings and can create,
+  host and delete; the owner keeps the plan, the storage and the member list. A member can leave,
+  and the owner can remove one: they are signed out and keep an empty account. On Tapry Cloud the
+  plan sets how many seats there are. Database: `users.account_id`, `account_invites` (added
+  automatically).
 - **Own storage.** With `STORAGE_SECRET_KEY` set, an account can connect its own S3-compatible
   bucket on the Storage page, and the sessions it opens from then on record there: uploaded
   pieces, finished files and transcripts. The secret key is stored encrypted and never shown

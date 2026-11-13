@@ -148,7 +148,7 @@ export class LibraryService {
        FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL
        GROUP BY s.studio_id`,
-      [owner.id, this.now()],
+      [owner.accountId, this.now()],
     );
     const people = await this.db.query<{ studio_id: string; display_name: string; at: number }>(
       `SELECT s.studio_id, p.display_name, max(r.started_at) AS at
@@ -157,7 +157,7 @@ export class LibraryService {
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL AND t.kind <> 'mask'
        GROUP BY s.studio_id, p.display_name
        ORDER BY at DESC, p.display_name`,
-      [owner.id],
+      [owner.accountId],
     );
     return studios.map((s) => {
       const t = totals.find((x) => x.studio_id === s.id);
@@ -188,7 +188,7 @@ export class LibraryService {
        JOIN tracks t ON t.participant_id = p.id AND t.kind <> 'mask' JOIN recordings r ON r.id = t.recording_id AND r.deleted_at IS NULL
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND p.role = 'guest'
        GROUP BY p.display_name, st.id, st.name`,
-      [owner.id],
+      [owner.accountId],
     );
     if (rows.length === 0) return [];
     const key = (name: string) => name.trim().toLocaleLowerCase();
@@ -281,14 +281,14 @@ export class LibraryService {
       `SELECT count(*)::int AS recordings, count(*) FILTER (WHERE r.raw_deleted_at IS NOT NULL)::int AS raw_removed
        FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`,
-      [user.id],
+      [user.accountId],
     );
     const owned = `JOIN recordings r ON r.id = t.recording_id JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
        WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL AND r.raw_deleted_at IS NULL AND t.kind <> 'mask'`;
     const [pieces] = await this.db.query<{ confirmed: number; missing: number }>(
       `SELECT (SELECT count(*) FROM chunks c JOIN tracks t ON t.id = c.track_id ${owned})::int AS confirmed,
               (SELECT coalesce(sum(coalesce(cardinality(t.missing_seqs), 0)), 0) FROM tracks t ${owned})::int AS missing`,
-      [user.id],
+      [user.accountId],
     );
     let admin: StorageOverview["admin"] = null;
     if (user.isAdmin) {
