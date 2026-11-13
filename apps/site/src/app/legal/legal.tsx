@@ -4,6 +4,7 @@
 // they are. The Cloud sections state what the software does (docs/cloud-billing.md) and who
 // handles data; the fuller texts, with the operator's legal details, are in docs/legal-drafts.md.
 import { CONTACT_EMAIL, HAS_CLOUD, HAS_SPEED_TEST, HAS_WAITLIST } from "@/content/site";
+import { PADDLE_TOKEN } from "@/content/tiers";
 
 type Doc = { id: "privacy" | "terms"; title: string; sections: Array<[string, string]> };
 
@@ -18,7 +19,7 @@ const CLOUD_PRIVACY: Array<[string, string]> = [
   ],
   [
     "Tapry Cloud: payments",
-    "Paid plans are sold by Paddle, our payment provider and merchant of record: Paddle takes the payment, handles tax and sends the invoice, under its own privacy policy. No card detail reaches Tapry. We keep Paddle’s identifiers for your customer record and subscription, so your account gets the plan you paid for.",
+    "Paid plans are sold by Paddle, our payment provider and merchant of record: Paddle takes the payment, handles tax and sends the invoice, under its own privacy policy. No card detail reaches Tapry. We keep Paddle’s identifiers for your customer record and subscription, so your account gets the plan you paid for. The checkout and payment pages load Paddle’s scripts, including Paddle Retain; the rest of the app doesn’t.",
   ],
   [
     "Who else handles data",
@@ -50,7 +51,12 @@ const DOCS: Doc[] = [
     id: "privacy",
     title: "Privacy Policy",
     sections: [
-      ["This website", "This site is a set of static pages. It sets no cookies, runs no analytics or trackers, and loads no fonts or scripts from other companies. Like any web server, the host serving it may keep ordinary access logs."],
+      [
+        "This website",
+        PADDLE_TOKEN
+          ? "This site is a set of static pages. It sets no cookies and runs no analytics of its own. One page loads scripts from another company: the pricing page loads Paddle’s, our payment provider, to show prices in your currency. Paddle’s script also loads Paddle Retain, which Paddle uses for payment recovery and cancellation offers and which may set its own cookies, under Paddle’s privacy policy. No other page of this site loads anything from another company. Like any web server, the host serving it may keep ordinary access logs."
+          : "This site is a set of static pages. It sets no cookies, runs no analytics or trackers, and loads no fonts or scripts from other companies. Like any web server, the host serving it may keep ordinary access logs.",
+      ],
       [
         "The free tools",
         `The mic and camera test runs entirely in your browser: nothing it hears or sees is recorded or sent anywhere, and its test recording is gone when you close the tab.${HAS_SPEED_TEST ? " The upload speed test sends throwaway data to a Tapry server, which reads it and discards it; it keeps a short-lived count per network address to limit how much one address can send." : ""}`,

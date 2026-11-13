@@ -106,8 +106,12 @@ const env = z.object({
    * A secret: server-side only. Unset: the portal falls back to BILLING_MANAGE_URL, if any.
    */
   BILLING_PADDLE_API_KEY: unsetIfEmpty(z.string().min(10)),
-  /** Use Paddle's sandbox (test payments) instead of live. */
-  BILLING_PADDLE_SANDBOX: bool("false"),
+  /**
+   * Which Paddle account: production (live) or sandbox (test payments). Required whenever a
+   * Paddle token or API key is set, and checked against the token: never guessed, so the server
+   * can't quietly run against the wrong account.
+   */
+  BILLING_PADDLE_ENVIRONMENT: unsetIfEmpty(z.enum(["production", "sandbox"])),
 });
 
 /** "a=b,c=d" → pairs; the value may itself hold "=" (an address with a query). */
@@ -178,6 +182,12 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     throw new Error(`Invalid server configuration (${bad}). See apps/web/.env.example`);
   }
   const cfg = parsed.data;
+  if ((cfg.BILLING_PADDLE_CLIENT_TOKEN || cfg.BILLING_PADDLE_API_KEY) && !cfg.BILLING_PADDLE_ENVIRONMENT) {
+    throw new Error("BILLING_PADDLE_ENVIRONMENT must be set to production or sandbox when a Paddle token or API key is set");
+  }
+  if (cfg.BILLING_PADDLE_CLIENT_TOKEN && cfg.BILLING_PADDLE_ENVIRONMENT && cfg.BILLING_PADDLE_CLIENT_TOKEN.startsWith("live_") !== (cfg.BILLING_PADDLE_ENVIRONMENT === "production")) {
+    throw new Error("BILLING_PADDLE_CLIENT_TOKEN doesn't match BILLING_PADDLE_ENVIRONMENT (live_ tokens are for production, test_ for sandbox)");
+  }
   if (cfg.LIVEKIT_URL && !(cfg.LIVEKIT_API_KEY && cfg.LIVEKIT_API_SECRET)) {
     throw new Error("LIVEKIT_URL is set but LIVEKIT_API_KEY / LIVEKIT_API_SECRET are missing");
   }
@@ -233,12 +243,12 @@ export function loadConfig(source: Record<string, string | undefined> = process.
             cfg.BILLING_PROVIDER === "paddle" && cfg.BILLING_PADDLE_CLIENT_TOKEN
               ? {
                   clientToken: cfg.BILLING_PADDLE_CLIENT_TOKEN,
-                  sandbox: cfg.BILLING_PADDLE_SANDBOX,
+                  sandbox: cfg.BILLING_PADDLE_ENVIRONMENT === "sandbox",
                   prices: prices.reduce<PaddleCheckoutConfig["prices"]>((all, [id, p]) => ({ ...all, [p.plan]: { ...all[p.plan], [p.yearly ? "yearly" : "monthly"]: id } }), {}),
                 }
               : null,
           paddleApiKey: cfg.BILLING_PADDLE_API_KEY ?? null,
-          paddleSandbox: cfg.BILLING_PADDLE_SANDBOX,
+          paddleSandbox: cfg.BILLING_PADDLE_ENVIRONMENT === "sandbox",
         }))(pairs(cfg.BILLING_PRICES, "BILLING_PRICES").map(([k, v]) => [k, planPrice(v, "BILLING_PRICES")] as const))
       : null,
   };

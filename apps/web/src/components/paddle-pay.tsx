@@ -4,16 +4,10 @@
 // here with `?_ptxn=<transaction>`: links on invoices, and the "update your card" links in its own
 // subscription emails. Paddle.js opens the right checkout by itself once it is initialised; this
 // page only loads it and says what is happening. Paddle's script loads here and on /checkout only.
+import { initializePaddle } from "@paddle/paddle-js";
 import { useEffect, useRef, useState } from "react";
 import { Notice } from "./ui";
 import { Spinner } from "./ui-extra";
-
-interface PaddleJs {
-  Environment: { set(env: "sandbox" | "production"): void };
-  Initialize(opts: { token: string; eventCallback?: (event: { name?: string }) => void }): void;
-}
-
-const SCRIPT = "https://cdn.paddle.com/paddle/v2/paddle.js";
 
 export function PaddlePay({ clientToken, sandbox, hasTransaction }: { clientToken: string; sandbox: boolean; hasTransaction: boolean }) {
   const [state, setState] = useState<"loading" | "open" | "done" | "closed" | "failed" | "refused">(hasTransaction ? "loading" : "closed");
@@ -22,29 +16,20 @@ export function PaddlePay({ clientToken, sandbox, hasTransaction }: { clientToke
   useEffect(() => {
     if (!hasTransaction || started.current) return;
     started.current = true;
-    const script = document.createElement("script");
-    script.src = SCRIPT;
-    script.async = true;
-    script.onerror = () => setState("failed");
-    script.onload = () => {
-      const paddle = (window as unknown as { Paddle?: PaddleJs }).Paddle;
-      if (!paddle) return setState("failed");
-      try {
-        if (sandbox) paddle.Environment.set("sandbox");
-        paddle.Initialize({
-          token: clientToken,
-          eventCallback: (event) => {
-            if (event.name === "checkout.loaded") setState("open");
-            if (event.name === "checkout.completed") setState("done");
-            if (event.name === "checkout.error") setState("refused");
-            if (event.name === "checkout.closed") setState((now) => (now === "done" || now === "refused" ? now : "closed"));
-          },
-        });
-      } catch {
-        setState("failed");
-      }
-    };
-    document.head.appendChild(script);
+    initializePaddle({
+      token: clientToken,
+      environment: sandbox ? "sandbox" : "production",
+      eventCallback: (event) => {
+        if (event.name === "checkout.loaded") setState("open");
+        if (event.name === "checkout.completed") setState("done");
+        if (event.name === "checkout.error") setState("refused");
+        if (event.name === "checkout.closed") setState((now) => (now === "done" || now === "refused" ? now : "closed"));
+      },
+    })
+      .then((paddle) => {
+        if (!paddle) setState("failed");
+      })
+      .catch(() => setState("failed"));
   }, [clientToken, sandbox, hasTransaction]);
 
   if (state === "done") return <Notice tone="ok" data-testid="pay-done">Thank you. The payment went through, and Paddle emails you a receipt.</Notice>;

@@ -1,12 +1,16 @@
 "use client";
 
 // The plans and the monthly/yearly switch. Self-hosted is the open-source release. The three
-// Tapry Cloud plans are the ones in docs/plan/06-monetization.md (pricing v4: Creator, Studio,
-// Team; yearly: 2 months free). With the hosted app's address set (HAS_CLOUD) each plan's button
-// leads to its checkout there; without it the plans are labelled as planned.
+// Tapry Cloud plans come from content/tiers.ts. Their prices are Paddle's, localized to the
+// visitor (components/paddle-prices.ts), shown exactly as Paddle formats them; until they arrive
+// the tier's listed price shows. With the hosted app's address set (HAS_CLOUD) each plan's button
+// leads to its checkout there (sign-up first, so the payment is tied to an account); without it
+// the plans are labelled as planned.
 import { useState } from "react";
+import { usePaddlePrices } from "@/components/paddle-prices";
 import { WaitlistButton } from "@/components/waitlist";
 import { checkoutUrl, CLOUD_NEWS, HAS_CLOUD, SIGNUP_URL } from "@/content/site";
+import { TIERS } from "@/content/tiers";
 
 type Plan = {
   name: string;
@@ -21,12 +25,8 @@ type Plan = {
 
 export function Plans() {
   const [yearly, setYearly] = useState(false);
-  // Yearly: twelve months for the price of ten.
-  const price = (m: number) => `$${(yearly ? m * 10 : m).toLocaleString("en-US")}`;
+  const paddle = usePaddlePrices();
   const per = yearly ? "per year" : "per month";
-  const tag = HAS_CLOUD ? null : "Planned";
-  const lead = HAS_CLOUD ? "" : "Planned: ";
-  const buy = (plan: "creator" | "studio" | "team", name: string): Plan["cta"] => (HAS_CLOUD ? { label: `Choose ${name}`, href: checkoutUrl(plan, yearly) } : "waitlist");
 
   const plans: Plan[] = [
     {
@@ -45,36 +45,19 @@ export function Plans() {
         "Community support on GitHub",
       ],
     },
-    {
-      name: "Cloud Creator",
-      price: price(19),
-      per,
-      desc: `${lead}the same software on a server you don’t have to run, for one host.`.replace(/^t/, "T"),
-      cta: buy("creator", "Creator"),
-      highlight: true,
-      tag,
-      features: ["15 recording hours a month", "Finished files kept for 30 days", "Transcripts included", "Up to 8 people in a recording"],
-    },
-    {
-      name: "Cloud Studio",
-      price: price(39),
-      per,
-      desc: `${lead}for studios that record every week and share the work.`.replace(/^f/, "F"),
-      cta: buy("studio", "Studio"),
-      highlight: false,
-      tag,
-      features: ["40 recording hours a month", "3 seats", "Finished files kept for 60 days", "Transcripts included"],
-    },
-    {
-      name: "Cloud Team",
-      price: price(149),
-      per,
-      desc: `${lead}for newsrooms, research groups and media teams that must know where recordings are kept.`.replace(/^f/, "F"),
-      cta: buy("team", "Team"),
-      highlight: false,
-      tag,
-      features: ["80 recording hours a month", "5 seats", "Finished files kept for 90 days", "Hosted in the EU", "Email support"],
-    },
+    ...TIERS.map((t): Plan => {
+      const id = yearly ? t.priceId.year : t.priceId.month;
+      return {
+        name: `Cloud ${t.name}`,
+        price: paddle?.[id] ?? (yearly ? t.listed.year : t.listed.month),
+        per,
+        desc: HAS_CLOUD ? t.description : `Planned: ${t.description.charAt(0).toLowerCase()}${t.description.slice(1)}`,
+        cta: HAS_CLOUD ? { label: `Choose ${t.name}`, href: checkoutUrl(t.plan, yearly) } : "waitlist",
+        highlight: !!t.highlight,
+        tag: HAS_CLOUD ? null : "Planned",
+        features: t.features,
+      };
+    }),
   ];
 
   const tab = (on: boolean) => ({
@@ -127,7 +110,9 @@ export function Plans() {
                 {p.tag && <span style={{ borderRadius: 4, background: "#c43c25", padding: "2px 8px", fontSize: 12, fontWeight: 500, color: "#fff", whiteSpace: "nowrap" }}>{p.tag}</span>}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={{ fontSize: 40, fontWeight: 500, letterSpacing: "-.03em", lineHeight: 1 }}>{p.price}</span>
+                <span data-price={p.name} style={{ fontSize: 40, fontWeight: 500, letterSpacing: "-.03em", lineHeight: 1 }}>
+                  {p.price}
+                </span>
                 <span style={{ fontSize: 14, color: "#6b6b70" }}>{p.per}</span>
               </div>
               <p style={{ margin: 0, fontSize: 15, lineHeight: 1.55, color: "#6b6b70", textWrap: "pretty", minHeight: 46 }}>{p.desc}</p>
