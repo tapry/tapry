@@ -29,7 +29,7 @@ describe.skipIf(!dir)("cost benchmark", () => {
         ffprobe,
         workDir: join(dir!, "out"),
         durationMs: seconds * 1000,
-        videoHeight: 1080,
+        videoQuality: "1080p",
         loudness: PODCAST_LOUDNESS,
       });
       const report = outputs.map((o) => ({ file: o.fileName, kind: o.kind, bytes: statSync(o.path).size }));

@@ -52,6 +52,16 @@ export async function probeStreams(ffprobe: string, file: string, formatWhitelis
   return out.split("\n").map((s) => s.trim()).filter(Boolean);
 }
 
+/** The height of a file's first video stream in pixels; null when it has none or doesn't say. */
+export async function probeVideoHeight(ffprobe: string, file: string, formatWhitelist?: string): Promise<number | null> {
+  const out = await run(ffprobe, [
+    "-v", "error", ...(formatWhitelist ? ["-format_whitelist", formatWhitelist] : []),
+    "-select_streams", "v:0", "-show_entries", "stream=height", "-of", "csv=p=0", file,
+  ]);
+  const height = Number.parseInt(out.trim().split("\n")[0] ?? "", 10);
+  return Number.isFinite(height) && height > 0 ? height : null;
+}
+
 /**
  * When each video frame of a file is shown (ms, in order), read from its packets: works on
  * MediaRecorder's unfinished WebM, which has no duration. Reads the whole file, so for small ones.

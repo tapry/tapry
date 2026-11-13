@@ -1,3 +1,4 @@
+import { recordingLabel } from "@/components/quality-options";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Faces } from "@/components/faces";
@@ -56,7 +57,7 @@ export default async function StudiosPage() {
                         <span className="text-accent-strong">Recording now</span>
                       ) : (
                         <>
-                          {s.settings.audioOnly ? "Audio only" : s.settings.videoQuality === "1080p" ? "Full HD video" : "Standard video"} · up to {s.settings.maxGuests}{" "}
+                          {recordingLabel(s.settings)} · up to {s.settings.maxGuests}{" "}
                           guest{s.settings.maxGuests === 1 ? "" : "s"}
                         </>
                       )}

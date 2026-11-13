@@ -8,11 +8,12 @@ export const metadata = { title: "New studio" };
 
 export default async function NewStudioPage() {
   const user = await requireUser();
-  const studios = await (await getServices()).studios.list(user);
+  const services = await getServices();
+  const studios = await services.studios.list(user);
   return (
     <EmberPage>
       <main className="flex w-full justify-center">
-        <NewStudioForm hostName={user.name} firstStudio={studios.length === 0} />
+        <NewStudioForm hostName={user.name} firstStudio={studios.length === 0} can4k={await services.billing.allows4k(user.accountId)} />
       </main>
     </EmberPage>
   );

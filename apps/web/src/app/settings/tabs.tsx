@@ -18,6 +18,7 @@ export function SettingsTabs({
   studios,
   studioId,
   hostName,
+  can4k,
   members,
   plan,
   workspace,
@@ -26,6 +27,8 @@ export function SettingsTabs({
   initial: Tab;
   studios: Array<{ id: string; name: string; settings: StudioSettings }>;
   studioId: string | null;
+  /** This account's studios may record in 4K. */
+  can4k: boolean;
   hostName: string;
   /** The people in this account. */
   members: ReactNode;
@@ -104,7 +107,7 @@ export function SettingsTabs({
                   <span className="text-[13px] text-muted">Each studio has its own settings.</span>
                 </label>
               )}
-              <StudioSettingsForm key={studio.id} studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} section={tab as "recording" | "guests"} />
+              <StudioSettingsForm key={studio.id} studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} can4k={can4k} section={tab as "recording" | "guests"} />
             </>
           ) : (
             <p className="text-muted">

@@ -22,6 +22,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Recording hours", "Unlimited", "15 / month", "40 / month", "80 / month"],
   ["Extra hours", "—", "$2 each", "$2 each", "$2 each"],
   ["Seats", "Your server, your accounts", "1", "3", "5"],
+  ["Video", "Up to 4K", "Full HD", "Up to 4K", "Up to 4K"],
   ["Finished files kept", "You decide", "30 days", "60 days", "90 days"],
   ["Original uploads kept", "You decide", "7 days", "7 days", "7 days"],
   ["Transcripts", "whisper.cpp on your server", "Included", "Included", "Included"],
@@ -30,7 +31,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["The software today"],
   ["People per recording", "Up to 8"],
   ["Audio", "48 kHz WAV or FLAC"],
-  ["Video", "1080p, 720p or audio only"],
+  ["Video", "Up to 4K, 1080p, 720p or audio only"],
   ["Per-person files + combined video", "✓"],
   ["Tech-check link and producer alerts", "✓"],
 ];

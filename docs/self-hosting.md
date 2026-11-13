@@ -177,7 +177,7 @@ The bucket also needs CORS allowing `PUT` and `GET` from your studio's origin.
   network). Outside Docker, also set `APP_URL`, your server's public address. The health page says
   whether the mail server answers.
 - **What a guest's link can do:** upload their own tracks, for up to 7 days after a recording
-  stops, up to a sane amount for the recording's length (32 Mbit/s of it). Chunks left on a device
+  stops, up to a sane amount for the recording's length (48 Mbit/s of it, twice what 4K takes). Chunks left on a device
   after that stay there. Failed logins are limited per account and per address.
 - **Disk space:** each studio shows how much storage its recordings use (uploaded chunks plus
   processed files). Deleting a recording or a studio removes its files from storage within

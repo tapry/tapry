@@ -75,6 +75,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         studios={studios.map((s) => ({ id: s.id, name: s.name, settings: s.settings }))}
         studioId={studio ?? null}
         hostName={user.name}
+        can4k={await services.billing.allows4k(user.accountId)}
         members={members}
         plan={plan}
         workspace={workspace}

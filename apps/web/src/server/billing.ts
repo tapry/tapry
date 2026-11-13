@@ -186,6 +186,11 @@ export class BillingService {
     return this.opts.cloud ? (await this.planOf(accountId, db)).seats : null;
   }
 
+  /** Whether an account's studios may record in 4K. Always on a self-hosted server. */
+  async allows4k(accountId: string, db: Queryable = this.db): Promise<boolean> {
+    return this.opts.cloud ? (await this.planOf(accountId, db)).video4k : true;
+  }
+
   /** The plan an account is on right now. */
   async planOf(userId: string, db: Queryable = this.db): Promise<Plan> {
     const [row] = await db.query<PlanRow>(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1`, [userId]);

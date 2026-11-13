@@ -1,16 +1,16 @@
 // The guest tech check (/join/<code>/check): the pieces that aren't React, kept apart so they
 // can be tested. Nothing here records or uploads media; the speed test sends throwaway bytes.
 import { studioSettings, type StudioSettings, type TechCheckResult } from "@tapry/shared";
-import { AUDIO_BITRATE, VIDEO_BITRATE } from "./recording";
+import { AUDIO_BITRATE, videoBitrate } from "./recording";
 
 /** The live call on top of the recording: a 360p camera and the voice. */
 const CALL_BITS = { video: 700_000, audio: 50_000 };
 
-/** What this studio sends while recording, in Mbit/s: the recording plus the call. */
+/** What this studio sends at most while recording, in Mbit/s: the recording plus the call. (A 4K studio: with a 4K camera.) */
 export function neededMbps(settings: StudioSettings) {
   const bits = settings.audioOnly
     ? AUDIO_BITRATE + CALL_BITS.audio
-    : VIDEO_BITRATE[settings.videoQuality] + 2 * AUDIO_BITRATE + CALL_BITS.video + CALL_BITS.audio;
+    : videoBitrate(settings.videoQuality) + 2 * AUDIO_BITRATE + CALL_BITS.video + CALL_BITS.audio;
   return bits / 1_000_000;
 }
 
@@ -45,6 +45,7 @@ export function uploadVerdicts(mbps: number) {
     { kind: "Sound only", settings: { ...base, audioOnly: true } },
     { kind: "Standard video (720p)", settings: { ...base, videoQuality: "720p" as const } },
     { kind: "Full HD video (1080p)", settings: base },
+    { kind: "4K video", settings: { ...base, videoQuality: "2160p" as const } },
   ].map(({ kind, settings }) => ({ kind, needed: neededMbps(settings), ok: mbps >= neededMbps(settings) * 1.2 }));
 }
 

@@ -14,8 +14,8 @@ Prices in USD. Yearly billing is ten months' price (2 months free).
 | **Free cloud** | $0 | — | 2 h/month, 1 host, files kept 7 days, "Recorded with Tapry" badge | Riverside: 2 h once; Descript: 1–2 h/month; StreamYard: 2 h/month |
 | **Own storage** | **$12** | $120 | Recording into your own S3/R2 bucket, no hour limit (fair use), transcripts, no badge, 1 host | Nobody sells this; Cap includes an own bucket at full price |
 | **Creator** | **$19** | $190 | 15 h/month, 1 host, files kept 30 days, transcripts, no badge | Riverside Pro $29 (15 h); Boomcaster $29 (15 h); Descript $24 (5–10 h); Iris $19 (5 h) |
-| **Studio** | **$39** | $390 | 40 h/month, 3 seats, files kept 60 days, studio branding | Riverside Grow $39 (20 h); Boomcaster Pro $79 (30 h, 2 hosts); Descript Creator $35/person |
-| **Team** | **$149** | $1,490 | 80 h/month, 5 seats, files kept 90 days, EU hosting, data processing agreement, email support (2 working days) | Boomcaster Team $249 (75 h, 5 hosts); Lookback Team $1,782/yr; Condens from €6,000/yr |
+| **Studio** | **$39** | $390 | 40 h/month, 3 seats, video up to 4K, files kept 60 days, studio branding | Riverside Grow $39 (20 h); Boomcaster Pro $79 (30 h, 2 hosts); Descript Creator $35/person |
+| **Team** | **$149** | $1,490 | 80 h/month, 5 seats, video up to 4K, files kept 90 days, EU hosting, data processing agreement, email support (2 working days) | Boomcaster Team $249 (75 h, 5 hosts); Lookback Team $1,782/yr; Condens from €6,000/yr |
 | **Business** (hosted) | — | from **$4,800** | Unlimited studios, SSO, audit log, retention policies, redaction, invoice billing, priority support | Riverside Business and Descript Enterprise: quote only; Dovetail from $4,800/yr |
 | **Organisation support** (self-hosted) | — | **$2,400** | For one organisation running its own server: email support (2 working days), help with updates, compliance documents (data flow, sub-processors: none) | Nextcloud from ~€5,300/yr (100 users); Matomo bundles €275–3,400 |
 | **Organisation licence** (self-hosted) | — | **$6,000** | Support as above with 1-working-day response, installation and onboarding, and the `/ee` features (SSO, audit log) as they arrive | Riverside: no self-hosting at any price |
@@ -45,6 +45,13 @@ Prices in USD. Yearly billing is ten months' price (2 months free).
 ## Unit economics
 
 From `docs/costs.md`: per recorded hour with 2 people, 8.2 GB of originals and 8.9 GB of finished files; storage $0.015 per GB-month; processing about $0.02. Originals removed after 7 days. Call bandwidth is not measured yet, and payment fees (5–10%) come off every figure.
+
+**4K (added 13 Nov 2026).** Studios can record up to 4K on Studio, Team, Own storage and Business
+(`Plan.video4k`); Free and Creator are Full HD. A 4K camera stores about three times what Full HD
+does, so the margins in the table below, measured at 1080p, do not hold for an account that
+records every hour in 4K with 4K cameras: at full use Studio would cost more than it earns.
+Most webcams are Full HD and are stored as Full HD, so this is the exception; watch storage per
+account, and if it shows, count a 4K hour as two or sell 4K as an add-on.
 
 | Plan | Cost at full use, 2 people | Margin (yearly price) | Cost at full use, 4 people | Margin (yearly price) | Margin at 35% use, 4 people |
 |---|---|---|---|---|---|

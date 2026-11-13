@@ -73,7 +73,9 @@ describe("speed-test pieces", () => {
       ["Sound only", true],
       ["Standard video (720p)", false],
       ["Full HD video (1080p)", false],
+      ["4K video", false],
     ]);
-    expect(uploadVerdicts(12).every((v) => v.ok)).toBe(true);
+    expect(uploadVerdicts(12).map((v) => v.ok)).toEqual([true, true, true, false]); // 4K sends about 25 Mbit/s
+    expect(uploadVerdicts(31).every((v) => v.ok)).toBe(true);
   });
 });

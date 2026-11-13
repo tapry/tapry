@@ -65,10 +65,11 @@ export async function signInHost(page: Page) {
 }
 
 /** A new studio (a "studio" in the API), through the New studio page. */
-export async function createStudio(page: Page, name: string, opts: { audioOnly?: boolean } = {}) {
+export async function createStudio(page: Page, name: string, opts: { audioOnly?: boolean; fourK?: boolean } = {}) {
   await page.goto("/studios/new");
   await page.getByLabel("What's it called?").fill(name);
   if (opts.audioOnly) await page.getByRole("radio", { name: "Audio only" }).click();
+  if (opts.fourK) await page.getByRole("radio", { name: /^4K/ }).click();
   await page.getByRole("button", { name: "Create studio" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
   const invite = page.getByLabel("Guest invite link");

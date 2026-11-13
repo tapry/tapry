@@ -88,7 +88,7 @@ export function createServices(
     allowed: async (userId, q) => !billing.cloud || (await billing.planOf(userId, q)).ownStorage !== "no",
     required: async (userId, q) => billing.cloud && (await billing.planOf(userId, q)).ownStorage === "required",
   });
-  const studios = new StudioService(db, live, () => processing.onEnqueue(), (tx, ownerId) => ownStorage.targetForNewSession(tx, ownerId));
+  const studios = new StudioService(db, live, () => processing.onEnqueue(), (tx, ownerId) => ownStorage.targetForNewSession(tx, ownerId), (accountId) => billing.allows4k(accountId));
   const health = new HealthService(db, storage, { ...opts.health, call: opts.call ?? null, mailer: opts.mailer ?? null });
   return {
     db,

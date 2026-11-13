@@ -2,8 +2,8 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
-import { BRIGHTNESS_VALUES, LOOK_VALUES, type TrackFilters } from "@tapry/shared";
-import { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, run } from "./ffmpeg.js";
+import { BRIGHTNESS_VALUES, LOOK_VALUES, VIDEO_TIERS, videoTier, type TrackFilters, type VideoHeight, type VideoQuality } from "@tapry/shared";
+import { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, probeVideoHeight, run } from "./ffmpeg.js";
 
 export interface TrackInput {
   trackId: string;
@@ -66,7 +66,11 @@ export interface PipelineOptions {
   workDir: string;
   /** Recording length (Record → Stop). Every output is exactly this long. */
   durationMs: number;
-  videoHeight: 720 | 1080;
+  /**
+   * The studio's video quality. 720p and 1080p: every person's video is that size. 2160p (4K):
+   * each person's video keeps the size their camera delivered, up to 4K and never under 1080p.
+   */
+  videoQuality: VideoQuality;
   /** Per ffmpeg invocation. Default: 10× real time, at least 2 minutes. */
   timeoutMs?: number;
   /** Font for names on the combined video's tiles. Unset: found automatically; null: no names. */
@@ -119,10 +123,10 @@ const FPS = 30;
  * (apps/web recording.ts). x264 aims for quality (CRF 20) but never spends more than the original
  * had, so noisy or busy footage can't come out bigger than the upload without being better.
  */
-export const VIDEO_MAX_BITRATE = { 1080: 8_000_000, 720: 4_000_000 } as const;
+export const VIDEO_MAX_BITRATE = Object.fromEntries(VIDEO_TIERS.map((t) => [t.height, t.bitrate])) as Record<VideoHeight, number>;
 
 /** x264 flags for a person's final video: constant quality, capped at the original's bitrate. */
-function cappedVideo(height: 720 | 1080) {
+function cappedVideo(height: VideoHeight) {
   const max = VIDEO_MAX_BITRATE[height];
   return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-maxrate", String(max), "-bufsize", String(max * 2)];
 }
@@ -469,7 +473,7 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     unfiltered.add(key);
     opts.onFilterFailed?.({ participantId: t.participantId, name: t.participantName, kind: t.kind });
   };
-  const ctx = { opts, duration, timeoutMs, filterFailed };
+  const shared = { opts, duration, timeoutMs, filterFailed };
   const groups = groupBy(tracks, (t) => `${t.participantId}\u0000${t.kind}`);
   const byGroup = new Map<TrackInput[], OutputFile[]>();
   let firstFailure: FfmpegError | undefined;
@@ -488,6 +492,9 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     const ext = first.kind === "audio" ? "wav" : "mp4";
     const path = join(opts.workDir, `${first.trackId}.${ext}`);
     const gainDb = first.kind === "video" ? gains.get(first.participantId) : undefined;
+    // In a 4K studio a person's video keeps their camera's size: the tallest of their pieces.
+    const videoHeight = first.kind === "video" ? await personVideoHeight(pieces, opts) : undefined;
+    const ctx = { ...shared, videoHeight };
     let hasAudio: boolean;
     try {
       if (pieces.length === 1) {
@@ -504,7 +511,7 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
           }
         }
         if (parts.length === 0) continue;
-        await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs, gainDb });
+        await mergePieces(first.kind, parts, path, { opts, duration, timeoutMs, gainDb, videoHeight });
         hasAudio = parts.some((p) => p.hasAudio);
       }
     } catch (err) {
@@ -599,6 +606,21 @@ interface RenderContext {
   noiseFloorDb?: number | null;
   /** This track's file is as recorded, because its filters couldn't be run. */
   filterFailed?: (track: TrackInput) => void;
+  /** The height this person's video is made at (see PipelineOptions.videoQuality). Unset: the studio's own. */
+  videoHeight?: VideoHeight;
+}
+
+/**
+ * The height a person's video is made at. 720p and 1080p studios: the studio's. A 4K studio: the
+ * tier of the tallest picture among their pieces, so nothing is upscaled past what the camera
+ * gave. A piece that can't be probed counts for nothing here (it is skipped or fails later).
+ */
+async function personVideoHeight(pieces: TrackInput[], opts: PipelineOptions): Promise<VideoHeight> {
+  const top = videoTier(opts.videoQuality).height;
+  if (top <= 1080) return top;
+  let tallest = 0;
+  for (const piece of pieces) tallest = Math.max(tallest, (await probeVideoHeight(opts.ffprobe, piece.rawPath, RAW_FORMATS).catch(() => null)) ?? 0);
+  return videoTier(opts.videoQuality, tallest || 1080).height;
 }
 
 /** How far this ffmpeg's noise removal delays sound (measured once). */
@@ -640,7 +662,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   // start or the gap between pieces has to stay black (brightness would turn it grey, and
   // merging pieces relies on it). Noise removal: on the aligned sound, like the person's WAV.
   const look = videoLookFilters(track.filters);
-  const h = opts.videoHeight;
+  const h = ctx.videoHeight ?? videoTier(opts.videoQuality).height;
   const wide = even((h * 16) / 9);
   const pad = `pad=${wide}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
   const frame = multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease,${pad}` : `scale=-2:${h}`;
@@ -685,7 +707,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
         ...picture,
         ...(hasAudio ? ["-af", [alignmentFilters("audio", track.offsetMs, "clone", track.hasGaps), clean, volumeFilter(gainDb)].filter(Boolean).join(","), "-c:a", multi ? "pcm_s16le" : "aac", ...(multi ? [] : ["-b:a", "192k"])] : ["-an"]),
         // A piece of several is an intermediate (merged next), so it stays near-lossless and uncapped.
-        "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(opts.videoHeight)), "-r", String(FPS),
+        "-t", duration, ...(multi ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16"] : cappedVideo(h)), "-r", String(FPS),
         ...(multi ? ["-f", "mov"] : ["-movflags", "+faststart"]), path],
       { timeoutMs },
     );
@@ -738,7 +760,7 @@ async function mergePieces(
   kind: "audio" | "video",
   parts: Array<{ path: string; hasAudio: boolean }>,
   out: string,
-  { opts, duration, timeoutMs, gainDb }: RenderContext,
+  { opts, duration, timeoutMs, gainDb, videoHeight }: RenderContext,
 ) {
   const inputs = parts.flatMap((p) => ["-i", p.path]);
   // Audio files are levelled after merging (levelWav); a video's sound takes the person's gain here.
@@ -770,7 +792,7 @@ async function mergePieces(
     // One piece left (the others were unreadable): nothing to blend, so its video is mapped straight.
     ["-y", "-hide_banner", "-nostdin", ...inputs, ...(filters.length ? ["-filter_complex", filters.join(";")] : []), "-map", parts.length > 1 ? video : "0:v",
       ...(audioLabels.length ? ["-map", "[a]", "-c:a", "aac", "-b:a", "192k"] : []),
-      "-t", duration, ...cappedVideo(opts.videoHeight), "-r", String(FPS),
+      "-t", duration, ...cappedVideo(videoHeight ?? videoTier(opts.videoQuality).height), "-r", String(FPS),
       "-pix_fmt", "yuv420p", "-movflags", "+faststart", out],
     { timeoutMs },
   );

@@ -142,7 +142,7 @@ export const DOCS: DocPage[] = [
       H("Per person"),
       T([
         ["<name> - audio.wav", "48 kHz, 16-bit; or .flac when the studio’s audio setting is FLAC"],
-        ["<name> - video.mp4", "H.264 and AAC at the studio’s quality (1080p or 720p), aligned to Record"],
+        ["<name> - video.mp4", "H.264 and AAC at the studio’s quality (1080p or 720p; in a 4K studio, each camera’s own size up to 4K), aligned to Record"],
       ]),
       H("Per recording"),
       T([
@@ -169,6 +169,7 @@ export const DOCS: DocPage[] = [
         ["Processing", "55–70 CPU-minutes"],
         ["Transcription", "About 1 CPU-minute with Whisper base"],
       ]),
+      P("A 4K studio records each camera at its best: with a 4K camera that is up to about 11 GB uploaded per person and hour, three times Full HD, and the same again processed. The combined video stays 1080p."),
       P("720p roughly halves the video sizes and the encoding time. Processing scales out: WORKER_REPLICAS=3 docker compose up -d runs three workers on the same queue."),
       H("Keeping originals"),
       P("By default the original uploads are kept next to the processed files. RAW_RETENTION_DAYS=7 removes them seven days after a recording’s files are ready, which saves 40–50% of the space. After that the recording can’t be processed again."),

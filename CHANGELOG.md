@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **4K.** A studio's video quality can be "4K": each person's camera is recorded at its own
+  best, up to 3840×2160 (24 Mbit/s; 1440p cameras at 14). Nothing is upscaled: a Full HD webcam
+  in a 4K studio is a Full HD file at Full HD's size. Per-person files keep the camera's size;
+  the combined video stays 1080p. The per-person upload cap is now 48 Mbit/s. On Tapry Cloud 4K
+  is part of the Studio, Team, Own storage and Business plans; a self-hosted server has no such
+  limit. Not yet tried with a real 4K camera.
+
 - **Updating from 0.3 or earlier: add `DATA_NAME=opentake` to `.env` before you update.** The
   Compose project, database and bucket are now named by `DATA_NAME` (`tapry` for new installs);
   Compose refuses to start without it, so existing data is never left behind. `OPENTAKE_IMAGES`

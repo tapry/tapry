@@ -52,12 +52,32 @@ export class StudioService {
     private onPurgeQueued: () => void = () => {},
     /** Where a new session of this owner records: their own storage target, or null for the server's. May refuse. */
     private storageTargetFor: (tx: Queryable, ownerId: string) => Promise<string | null> = async () => null,
+    /** Whether this account's studios may record in 4K (its plan, on Tapry Cloud). */
+    private allows4k: (accountId: string) => Promise<boolean> = async () => true,
   ) {}
 
+  /** Choosing 4K needs a plan that has it. Only asked when the setting is being turned on. */
+  private async check4k(accountId: string, settings: StudioSettings, before?: StudioSettings) {
+    if (settings.videoQuality !== "2160p" || before?.videoQuality === "2160p") return;
+    if (!(await this.allows4k(accountId))) throw new ApiError(402, "plan_no_4k", "4K recording is part of the Studio plan and up. This studio can record in Full HD.");
+  }
+
+  /**
+   * The settings a session runs with. A 4K studio whose account no longer has 4K (a smaller
+   * plan since) records in Full HD; the studio's own setting is left as it was.
+   */
+  private async sessionSettings(raw: unknown, accountId: string): Promise<StudioSettings> {
+    const settings = studioSettings.parse(raw);
+    if (settings.videoQuality === "2160p" && !(await this.allows4k(accountId))) return { ...settings, videoQuality: "1080p" };
+    return settings;
+  }
+
   async create(owner: User, body: z.infer<typeof createStudioBody>): Promise<Studio> {
+    const settings = studioSettings.parse(body.settings ?? {});
+    await this.check4k(owner.accountId, settings);
     const [row] = await this.db.query<StudioRow>(
       "INSERT INTO studios (id, owner_id, name, invite_code, settings) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [newId("std"), owner.accountId, body.name, newInviteCode(), studioSettings.parse(body.settings ?? {})],
+      [newId("std"), owner.accountId, body.name, newInviteCode(), settings],
     );
     return toStudio(row!);
   }
@@ -114,6 +134,7 @@ export class StudioService {
   async update(owner: User, studioId: string, body: z.infer<typeof updateStudioBody>): Promise<Studio> {
     const current = await this.owned(owner, studioId);
     const settings = studioSettings.parse({ ...current.settings, ...body.settings });
+    await this.check4k(owner.accountId, settings, studioSettings.parse(current.settings));
     const [row] = await this.db.query<StudioRow>(
       "UPDATE studios SET name = $2, settings = $3 WHERE id = $1 RETURNING *",
       [studioId, body.name ?? current.name, settings],
@@ -155,7 +176,7 @@ export class StudioService {
       return { sessionId, participantId, token, role: "host" as const };
     });
     await this.live.publish(ticket.sessionId);
-    return { ...ticket, studio: { name: studio.name, settings: studioSettings.parse(studio.settings) } };
+    return { ...ticket, studio: { name: studio.name, settings: await this.sessionSettings(studio.settings, owner.accountId) } };
   }
 
   /**
@@ -165,13 +186,13 @@ export class StudioService {
   async invitePreview(
     inviteCode: string,
   ): Promise<{ studioName: string; hostName: string; settings: StudioSettings; consentText: string; consentHash: string } | null> {
-    const [row] = await this.db.query<{ name: string; host: string; settings: unknown }>(
-      `SELECT st.name, st.settings, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
+    const [row] = await this.db.query<{ name: string; host: string; settings: unknown; owner_id: string }>(
+      `SELECT st.name, st.settings, st.owner_id, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
       [inviteCode],
     );
     if (!row) return null;
-    const settings = studioSettings.parse(row.settings);
+    const settings = await this.sessionSettings(row.settings, row.owner_id);
     const consentText = consentTextFor(settings, row.host);
     return { studioName: row.name, hostName: row.host, settings, consentText, consentHash: sha256Hex(consentText) };
   }
@@ -228,7 +249,7 @@ export class StudioService {
       [body.inviteCode],
     );
     if (!studio) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
-    const settings = studioSettings.parse(studio.settings);
+    const settings = await this.sessionSettings(studio.settings, studio.owner_id);
     // What they agree to is the studio's text as of now; the page tells us which text it showed.
     const consentText = consentTextFor(settings, studio.host);
     const consentHash = sha256Hex(consentText);
