@@ -10,6 +10,7 @@ import { LibraryService, type ServerInfo } from "./library";
 import { LiveHub, LiveService } from "./live";
 import type { Mailer } from "./mail";
 import { MembersService } from "./members";
+import { PaddleBilling, type PaddleOptions } from "./paddle";
 import { OwnStorageService, RoutedStorage, StorageTargets, type MakeStorage } from "./own-storage";
 import { ProcessingService } from "./processing";
 import { RecapService } from "./recap";
@@ -46,13 +47,15 @@ export interface Services {
   billing: BillingService;
   /** The payment provider's webhook; null when none is set up. */
   billingWebhook: WebhookConfig | null;
+  /** Paddle: verified webhooks into the mirror, and the customer portal. Null without Paddle. */
+  paddle: PaddleBilling | null;
 }
 
 export function createServices(
   db: Db,
   /** The server's own storage; sessions of accounts with their own bucket are routed past it. */
   serverStorage: Storage,
-  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; /** This server's public address, for links in email. */ appUrl?: string | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig | null; ownStorage?: { serverKey: string | null; allowPrivate?: boolean; make?: MakeStorage; resolve?: (host: string) => Promise<string[]> } } = {
+  opts: { auth: AuthOptions; now?: () => number; hub?: LiveHub; call?: CallConfig | null; guestPromoUrl?: string | null; mailer?: Mailer | null; /** This server's public address, for links in email. */ appUrl?: string | null; bytesPerSecondCap?: number; speedTestOrigins?: string[]; health?: Omit<HealthOptions, "call">; serverInfo?: ServerInfo; billing?: Omit<BillingOptions, "now">; billingWebhook?: WebhookConfig | null; paddle?: PaddleOptions | null; ownStorage?: { serverKey: string | null; allowPrivate?: boolean; make?: MakeStorage; resolve?: (host: string) => Promise<string[]> } } = {
     auth: { allowSignup: false },
   },
 ): Services {
@@ -63,7 +66,13 @@ export function createServices(
   // whichever comes last; both paths check whether everything has arrived.
   const maybeProcess = (recordingId: string) =>
     processing.maybeEnqueue(recordingId).catch((err) => console.error("[processing] enqueue failed", err));
-  const billing = new BillingService(db, { cloud: false, ...opts.billing, now: opts.now });
+  const paddle = opts.paddle && opts.billing?.cloud ? new PaddleBilling(db, opts.paddle) : null;
+  const billing = new BillingService(db, {
+    cloud: false,
+    ...opts.billing,
+    portal: paddle?.portalAvailable ? { scheduledChange: (accountId) => paddle.scheduledChange(accountId) } : null,
+    now: opts.now,
+  });
   const live = new LiveService(db, { now: opts.now, hub: opts.hub, onStopped: maybeProcess, beforeRecording: (sessionId) => billing.checkCanRecord(sessionId) });
   processing = new ProcessingService(db, storage, (sessionId) => live.publishSoon(sessionId));
   const ownStorage = new OwnStorageService(db, targets, {
@@ -103,5 +112,6 @@ export function createServices(
     }),
     billing,
     billingWebhook: opts.billingWebhook ?? null,
+    paddle,
   };
 }

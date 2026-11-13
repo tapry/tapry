@@ -19,7 +19,19 @@ export function hoursAndMinutes(ms: number) {
 const price = (p: Plan) => (p.monthlyUsd === null ? "By agreement" : p.monthlyUsd === 0 ? "$0" :`$${p.monthlyUsd} a month`);
 const keeps = (days: number | null) => (days === null ? "Until you delete them" : `${days} days after a recording is processed`);
 
-export function PlanPanel({ billing, accounts, justPaid = false }: { billing: BillingOverview; accounts: Account[] | null; /** Back from the checkout. */ justPaid?: boolean }) {
+export function PlanPanel({
+  billing,
+  accounts,
+  justPaid = false,
+  portalProblem = null,
+}: {
+  billing: BillingOverview;
+  accounts: Account[] | null;
+  /** Back from the checkout. */
+  justPaid?: boolean;
+  /** Back from a portal that couldn't open: its code. */
+  portalProblem?: string | null;
+}) {
   const { plan } = billing;
   const included = plan.hours === null ? null : plan.hours * 3_600_000;
   const share = included === null ? 0 : Math.min(1, billing.usedMs / included);
@@ -32,6 +44,15 @@ export function PlanPanel({ billing, accounts, justPaid = false }: { billing: Bi
           Thank you. Your plan changes as soon as the payment is confirmed, usually within a minute: reload this page if it still shows the old one.
         </Notice>
       )}
+      {portalProblem && (
+        <Notice tone="danger" data-testid="plan-portal-problem">
+          {portalProblem === "no_customer"
+            ? "There's nothing to manage yet: this account hasn't paid for a plan."
+            : portalProblem === "owner_only"
+              ? "Only the account's owner can manage its billing."
+              : "The billing page couldn't be opened just now. Try again in a minute."}
+        </Notice>
+      )}
       <ListCard data-testid="plan-panel">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-divider py-4">
           <span className="flex min-w-0 flex-col gap-[3px]">
@@ -41,10 +62,19 @@ export function PlanPanel({ billing, accounts, justPaid = false }: { billing: Bi
             </span>
             <span className="text-[13px] text-muted">{price(plan)}</span>
           </span>
-          {billing.manageUrl && (
-            <a href={billing.manageUrl} className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong">
-              Card, invoices and cancelling
-            </a>
+          {billing.manageUrl?.startsWith("/api/") ? (
+            // A form post: the session is minted for this account on the server, then Paddle's page opens.
+            <form method="post" action={billing.manageUrl}>
+              <button type="submit" data-testid="plan-portal" className="cursor-pointer font-medium text-text underline underline-offset-[3px] hover:text-accent-strong">
+                Card, invoices and cancelling
+              </button>
+            </form>
+          ) : (
+            billing.manageUrl && (
+              <a href={billing.manageUrl} className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong">
+                Card, invoices and cancelling
+              </a>
+            )
           )}
         </div>
 

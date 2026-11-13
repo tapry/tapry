@@ -15,17 +15,17 @@ type Tab = "recording" | "guests" | "members" | "plan" | "workspace" | "account"
 const TABS: Tab[] = ["recording", "guests", "members", "plan", "workspace", "account"];
 
 /** Studio settings (Recording, Guests), how the server is set up (Workspace, admins), and the account. */
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; studio?: string; paid?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; studio?: string; paid?: string; portal?: string }> }) {
   const user = await requireUser();
   const services = await getServices();
-  const { tab, studio, paid } = await searchParams;
+  const { tab, studio, paid, portal } = await searchParams;
   const studios = await services.studios.list(user);
   const w = user.isAdmin ? await services.library.workspace(user) : null;
   // Keyed: these are handed to a client component as props and rendered side by side there.
   const members = <MembersPanel key="members" initial={await services.members.view(user)} />;
   // Tapry Cloud only: a self-hosted server has no plans, and no Plan tab.
   const plan = services.billing.cloud ? (
-    <PlanPanel key="plan" billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} justPaid={paid === "1"} />
+    <PlanPanel key="plan" billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} justPaid={paid === "1"} portalProblem={portal ?? null} />
   ) : null;
 
   const workspace = w && (
