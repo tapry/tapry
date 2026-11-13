@@ -54,7 +54,7 @@ Full list: `11-changelog.md`.
 | `03-recording-architecture.md` | Local recording, upload, sync, recovery, live telemetry |
 | `04-system-architecture.md` | Stack, services, data model, private AI, self-hosting, costs |
 | `05-open-source-strategy.md` | License, repo, community, stars |
-| `06-monetization.md` | Plans, organisation licences, lifetime deal, projections |
+| `06-monetization.md` | Plans (pricing v4), organisation licences, founding offers, projections |
 | `07-go-to-market.md` | Positioning, launch week, organisation sales |
 | `08-roadmap.md` | Week-by-week plan with go/no-go gates |
 | `09-risks-legal.md` | Reliability, privacy, consent, ethics, payments from Morocco |
@@ -63,6 +63,7 @@ Full list: `11-changelog.md`.
 | `12-ai-features.md` | **New:** AI producer, private AI, models, costs, phases |
 | `13-growth-features.md` | **New:** growth loops, free tools, retention, integrations, ecosystem |
 | `14-riverside-parity.md` | **New:** every Riverside feature → match / differ / later / skip |
+| `15-pricing-benchmark.md` | Competitor, open-source and organisation prices behind pricing v4 (13 Nov 2026) |
 | `CLAUDE.md` | Build instructions for Claude Code |
 
 ## The 4 things that decide success

@@ -34,8 +34,8 @@ Goal: cover ~70% of what most Riverside users actually use, plus what Riverside 
 | Edit inside Riverside | Export to any editor with aligned tracks |
 | Producer mode (chat, settings) | **AI producer** (quality alerts, talk balance, guide tracking) |
 | Magic Clips (viral social clips) | Quote finder + library search |
-| Free: 2 h total + watermark | Self-host unlimited free; 5 h/month cloud free; $6 BYO storage |
-| $29 for 5 h | $9 for 20 h, $19 for 60 h |
+| Free: 2 h total + watermark | Self-host unlimited free; 2 h/month cloud free; $12 own storage |
+| $29 for 5–15 h | $19 for 15 h, $39 for 40 h and 3 seats (pricing v4) |
 | General creator tool | Templates for research, newsrooms, podcasts; consent + redaction |
 
 ## Later (after paying users)

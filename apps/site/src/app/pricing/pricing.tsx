@@ -1,9 +1,8 @@
 "use client";
 
-// The plans and the monthly/yearly switch. Self-hosted is what exists today. The two Tapry Cloud
-// plans are the ones in docs/plan/06-monetization.md (Creator, Studio; yearly: 2 months free),
-// with only the limits that plan states and that the software can keep today. They are labelled
-// as planned, and may change.
+// The plans and the monthly/yearly switch. Self-hosted is what exists today. The three Tapry Cloud
+// plans are the ones in docs/plan/06-monetization.md (pricing v4: Creator, Studio, Team; yearly:
+// 2 months free), with only what that plan states. They are labelled as planned, and may change.
 import { useState } from "react";
 import { WaitlistButton } from "@/components/waitlist";
 import { CLOUD_NEWS } from "@/content/site";
@@ -22,7 +21,7 @@ type Plan = {
 export function Plans() {
   const [yearly, setYearly] = useState(false);
   // Yearly: twelve months for the price of ten.
-  const price = (m: number) => (yearly ? `$${m * 10}` : `$${m}`);
+  const price = (m: number) => `$${(yearly ? m * 10 : m).toLocaleString("en-US")}`;
   const per = yearly ? "per year" : "per month";
 
   const plans: Plan[] = [
@@ -44,23 +43,33 @@ export function Plans() {
     },
     {
       name: "Cloud Creator",
-      price: price(9),
+      price: price(19),
       per,
       desc: "Planned: the same software on a server you don’t have to run, for one host.",
       cta: "waitlist",
       highlight: true,
-      tag: "Planned · may change",
-      features: ["20 recording hours a month", "Files kept for 90 days", "Transcripts included"],
+      tag: "Planned",
+      features: ["15 recording hours a month", "Finished files kept for 30 days", "Transcripts included", "Up to 8 people in a recording"],
     },
     {
       name: "Cloud Studio",
-      price: price(19),
+      price: price(39),
       per,
       desc: "Planned: for studios that record every week and share the work.",
       cta: "waitlist",
       highlight: false,
-      tag: "Planned · may change",
-      features: ["60 recording hours a month", "3 seats"],
+      tag: "Planned",
+      features: ["40 recording hours a month", "3 seats", "Finished files kept for 60 days", "Transcripts included"],
+    },
+    {
+      name: "Cloud Team",
+      price: price(149),
+      per,
+      desc: "Planned: for newsrooms, research groups and media teams that must know where recordings are kept.",
+      cta: "waitlist",
+      highlight: false,
+      tag: "Planned",
+      features: ["80 recording hours a month", "5 seats", "Finished files kept for 90 days", "Hosted in the EU, with a data processing agreement", "Email support"],
     },
   ];
 
@@ -96,9 +105,9 @@ export function Plans() {
       </section>
 
       <section style={{ padding: "0 32px 96px" }}>
-        <div style={{ margin: "0 auto", display: "grid", maxWidth: 1180, gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))" }}>
+        <div style={{ margin: "0 auto", display: "grid", maxWidth: 1180, gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,250px),1fr))" }}>
           {plans.map((p) => (
-            <div key={p.name} className="rise" style={{ display: "flex", flexDirection: "column", gap: 22, border: `1px solid ${p.highlight ? "#0b0b0f" : "#ececef"}`, borderRadius: 20, background: "#fff", padding: 28 }}>
+            <div key={p.name} className="rise" style={{ display: "flex", flexDirection: "column", gap: 22, border: `1px solid ${p.highlight ? "#0b0b0f" : "#ececef"}`, borderRadius: 20, background: "#fff", padding: 24 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                 <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500 }}>{p.name}</h2>
                 {p.tag && <span style={{ borderRadius: 4, background: "#c43c25", padding: "2px 8px", fontSize: 12, fontWeight: 500, color: "#fff", whiteSpace: "nowrap" }}>{p.tag}</span>}
