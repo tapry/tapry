@@ -363,9 +363,10 @@ describe("configuration", () => {
       checkoutUrls: { creator: "https://pay.test/c?custom[user_id]={user_id}&a=b" },
       manageUrl: "https://pay.test/portal",
       webhook: { provider: "lemonsqueezy", secret: "a-long-secret", prices: { "501": "creator", "502": "studio" } },
+      paddle: null,
     });
     expect(cfg.worker.cloud).toBe(true);
-    expect(loadConfig({ ...base, TAPRY_CLOUD: "true" }).cloud).toEqual({ checkoutUrls: {}, manageUrl: null, webhook: null });
+    expect(loadConfig({ ...base, TAPRY_CLOUD: "true" }).cloud).toEqual({ checkoutUrls: {}, manageUrl: null, webhook: null, paddle: null });
     expect(() => loadConfig({ ...base, TAPRY_CLOUD: "true", BILLING_PRICES: "501=gold" })).toThrow(/not a plan/);
   });
 

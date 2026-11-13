@@ -19,7 +19,29 @@ export interface BillingOptions {
   checkoutUrls?: Partial<Record<PlanId, string>>;
   /** The provider's customer portal (card, invoices, cancelling). */
   manageUrl?: string | null;
+  /** Paddle's checkout, opened from this server's own page (/checkout/<plan>). */
+  paddle?: PaddleCheckoutConfig | null;
   now?: () => number;
+}
+
+export interface PaddleCheckoutConfig {
+  /** Paddle's client-side token (public: it is sent to the browser). */
+  clientToken: string;
+  sandbox: boolean;
+  /** The price of each plan sold, by the month and by the year. */
+  prices: Partial<Record<PlanId, { monthly?: string; yearly?: string }>>;
+}
+
+/** What the checkout page needs to open Paddle's checkout for one plan. */
+export interface PaddleCheckout {
+  plan: Plan;
+  yearly: boolean;
+  priceId: string;
+  clientToken: string;
+  sandbox: boolean;
+  /** Our account id, which Paddle hands back in its webhooks: how a payment finds its account. */
+  accountId: string;
+  email: string;
 }
 
 /** What a payment provider's webhook comes down to, whichever provider sent it. */
@@ -182,10 +204,22 @@ export class BillingService {
     const period = billingPeriod(plan.id === "free" ? null : row.plan_period_start, now);
     // Buying and the provider's portal are the owner's; a member sees the plan and what is used.
     const owner = user.accountId === user.id;
-    const upgrades = PLAN_IDS.filter((id) => owner && planRank(id) > planRank(plan.id) && this.opts.checkoutUrls?.[id]).map((id) => ({
-      plan: PLANS[id],
-      url: this.opts.checkoutUrls![id]!.replaceAll("{user_id}", encodeURIComponent(user.accountId)).replaceAll("{email}", encodeURIComponent(user.email)),
-    }));
+    const upgrades: BillingOverview["upgrades"] = [];
+    for (const id of PLAN_IDS) {
+      if (!owner || planRank(id) <= planRank(plan.id)) continue;
+      const paddle = this.opts.paddle?.prices[id];
+      const link = this.opts.checkoutUrls?.[id];
+      if (paddle?.monthly || paddle?.yearly) {
+        // Our own page, which opens Paddle's checkout with this account attached.
+        upgrades.push({
+          plan: PLANS[id],
+          url: paddle.monthly ? `/checkout/${id}` : `/checkout/${id}?yearly=1`,
+          ...(paddle.monthly && paddle.yearly ? { yearlyUrl: `/checkout/${id}?yearly=1` } : {}),
+        });
+      } else if (link) {
+        upgrades.push({ plan: PLANS[id], url: link.replaceAll("{user_id}", encodeURIComponent(user.accountId)).replaceAll("{email}", encodeURIComponent(user.email)) });
+      }
+    }
     return {
       plan,
       status: plan.id === "free" ? "active" : (row.plan_status as PlanStatus),
@@ -196,6 +230,17 @@ export class BillingService {
       upgrades,
       manageUrl: owner && row.billing_subscription ? (this.opts.manageUrl ?? null) : null,
     };
+  }
+
+  /** What the checkout page needs for one plan. The owner's to open; 404 where the plan isn't sold this way. */
+  checkout(user: User, planId: string, yearly: boolean): PaddleCheckout {
+    this.requireCloud();
+    const paddle = this.opts.paddle;
+    const known = (PLAN_IDS as readonly string[]).includes(planId) ? (planId as PlanId) : null;
+    const priceId = known && paddle?.prices[known]?.[yearly ? "yearly" : "monthly"];
+    if (!paddle || !known || !priceId) throw new ApiError(404, "not_found", "Not found");
+    if (user.accountId !== user.id) throw new ApiError(403, "owner_only", "Only the account's owner can change the plan");
+    return { plan: PLANS[known], yearly, priceId, clientToken: paddle.clientToken, sandbox: paddle.sandbox, accountId: user.accountId, email: user.email };
   }
 
   /**

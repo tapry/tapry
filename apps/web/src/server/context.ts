@@ -43,7 +43,7 @@ export function getServices(): Promise<Services> {
       speedTestOrigins: config.speedTestOrigins,
       health: { updateRepo: config.updateRepo, inProcess: config.worker.inProcess },
       ownStorage: config.ownStorage,
-      billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl },
+      billing: { cloud: !!config.cloud, checkoutUrls: config.cloud?.checkoutUrls, manageUrl: config.cloud?.manageUrl, paddle: config.cloud?.paddle },
       billingWebhook: config.cloud?.webhook ?? null,
       serverInfo: {
         storage: { endpoint: config.storage.endpoint ?? null, region: config.storage.region, bucket: config.storage.bucket, accessKeyId: config.storage.accessKeyId },
