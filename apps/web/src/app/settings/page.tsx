@@ -21,10 +21,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { tab, studio, paid } = await searchParams;
   const studios = await services.studios.list(user);
   const w = user.isAdmin ? await services.library.workspace(user) : null;
-  const members = <MembersPanel initial={await services.members.view(user)} />;
+  // Keyed: these are handed to a client component as props and rendered side by side there.
+  const members = <MembersPanel key="members" initial={await services.members.view(user)} />;
   // Tapry Cloud only: a self-hosted server has no plans, and no Plan tab.
   const plan = services.billing.cloud ? (
-    <PlanPanel billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} justPaid={paid === "1"} />
+    <PlanPanel key="plan" billing={await services.billing.overview(user)} accounts={user.isAdmin ? await services.billing.accounts(user) : null} justPaid={paid === "1"} />
   ) : null;
 
   const workspace = w && (

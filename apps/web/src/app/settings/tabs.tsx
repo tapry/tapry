@@ -2,7 +2,7 @@
 
 import type { StudioSettings } from "@tapry/shared";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { StudioSettingsForm } from "@/components/studio-forms";
 import { cn } from "@/components/ui";
 
@@ -115,10 +115,12 @@ export function SettingsTabs({
               .
             </p>
           ))}
-        {tab === "members" && members}
-        {tab === "plan" && plan}
-        {tab === "workspace" && workspace}
-        {tab === "account" && account}
+        {/* Each in a keyed Fragment: a panel that is a client component arrives from the server
+            as a not-yet-loaded element, which React would otherwise take for an unkeyed list item. */}
+        {tab === "members" && <Fragment key="members">{members}</Fragment>}
+        {tab === "plan" && <Fragment key="plan">{plan}</Fragment>}
+        {tab === "workspace" && <Fragment key="workspace">{workspace}</Fragment>}
+        {tab === "account" && <Fragment key="account">{account}</Fragment>}
       </div>
     </>
   );
