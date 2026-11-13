@@ -16,7 +16,7 @@ Goal: cover ~70% of what most Riverside users actually use, plus what Riverside 
 | Up to 10 guests | 4 → 8–10 | v1 → v1.1 |
 | Noise reduction, levelling | Open-source models | v1.1 (noise removal shipped early with filters, Nov 2026) |
 | Video filters (brightness, looks, touch-up), background blur | Non-destructive: live in the call, applied to the files, originals kept | Built Nov 2026 (owner decision, ahead of the v1 scope guard), including background blur from a mask track; background images later |
-| AI show notes, chapters, takeaways | Private AI | v1.1 |
+| AI show notes, chapters, takeaways | A model on the server, or Claude where the account's owner opts in | Built 13 Nov 2026 (not yet run against a real model) |
 | Studio branding | Yes | v1.1 |
 | Teleprompter / notes | **Interview guide tracker** (smarter) | v1.1 |
 | Collaborators | Team roles + comments | v1.1 |

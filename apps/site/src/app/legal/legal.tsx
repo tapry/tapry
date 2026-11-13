@@ -15,7 +15,7 @@ const CLOUD_PRIVACY: Array<[string, string]> = [
   ],
   [
     "Tapry Cloud: recordings",
-    "Each person’s sound and picture, the finished files and the transcripts are stored on our servers in Finland. The original uploads are removed 7 days after a recording is processed; the finished files are kept for the number of days your plan says, then the recording is deleted, and each recording shows its date. Transcripts are made on our own servers and are not sent to any AI company. Recordings are never used to train anything, and sound, picture, transcript text and email addresses are never written to logs.",
+    "Each person’s sound and picture, the finished files and the transcripts are stored on our servers in Finland. The original uploads are removed 7 days after a recording is processed; the finished files are kept for the number of days your plan says, then the recording is deleted, and each recording shows its date. Transcripts are made on our own servers. They are not sent to any AI company, with one exception that is off unless you turn it on: if your account’s owner switches on AI notes in Settings, the transcript text of your recordings (never sound or picture) is sent to Anthropic, whose Claude model writes the notes, under Anthropic’s own terms and privacy policy. Recordings are never used to train anything, and sound, picture, transcript text and email addresses are never written to logs.",
   ],
   [
     "Tapry Cloud: payments",
@@ -23,7 +23,7 @@ const CLOUD_PRIVACY: Array<[string, string]> = [
   ],
   [
     "Who else handles data",
-    "Hetzner hosts the servers and the stored recordings, in Finland. " + (HAS_CHECKOUT ? "Paddle handles payments. " : "") + "Cloudflare hosts this website and forwards mail sent to our contact address. We don’t sell or share data with anyone else.",
+    "Hetzner hosts the servers and the stored recordings, in Finland. Anthropic writes AI notes from transcript text, only for accounts that switched AI notes on. " + (HAS_CHECKOUT ? "Paddle handles payments. " : "") + "Cloudflare hosts this website and forwards mail sent to our contact address. We don’t sell or share data with anyone else.",
   ],
   [
     "Your rights",

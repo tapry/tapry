@@ -45,6 +45,22 @@ export const loginBody = z.object({
 
 /** "I forgot my password": the address to send the link to. */
 export const forgotPasswordBody = z.object({ email });
+/** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
+export const aiNotesBody = z.object({ outside: z.boolean() });
+/** How AI notes are written for this account, for its settings page. */
+export interface AiNotesView {
+  /** local: by a model on this server. outside: by an outside model the owner allowed. off: no notes. */
+  mode: "local" | "outside" | "off";
+  /** The models this server has set up, by name; null when it has none of that kind. */
+  localModel: string | null;
+  outsideModel: string | null;
+  /** The owner has allowed the outside model. */
+  outsideOn: boolean;
+  /** The account's plan includes AI notes (always true on a self-hosted server). */
+  planAllows: boolean;
+  /** This person is the account's owner. */
+  canChange: boolean;
+}
 /** The website's waitlist for Tapry Cloud's paid plans. */
 export const waitlistBody = z.object({ email, plan: z.enum(["creator", "studio", "team", "own_storage"]).optional() });
 export const removeWaitlistBody = z.object({ email });
@@ -427,16 +443,18 @@ export interface Plan {
   seats: number | null;
   /** Studios may record up to 4K. Otherwise Full HD is the most. */
   video4k: boolean;
+  /** The owner may turn on AI notes written by an outside model. (Notes by a model on the server need no plan.) */
+  aiNotes: boolean;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1, video4k: false },
+  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1, video4k: false, aiNotes: false },
   // Everything is in the customer's bucket: nothing of ours to meter or to delete.
-  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true },
-  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false },
-  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true },
-  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5, video4k: true },
-  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null, video4k: true },
+  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true, aiNotes: true },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false, aiNotes: true },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true, aiNotes: true },
+  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5, video4k: true, aiNotes: true },
+  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null, video4k: true, aiNotes: true },
 };
 
 /** Whether moving from one plan to another is an upgrade (more hours or longer keeping). */

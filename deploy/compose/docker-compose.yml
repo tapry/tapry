@@ -20,6 +20,14 @@ x-app-env: &app-env
   # Transcripts (whisper.cpp + model are in the image). Set WHISPER_MODEL= (empty) in .env to turn off.
   WHISPER_MODEL: ${WHISPER_MODEL-/opt/whisper/ggml-base.bin}
   WHISPER_THREADS: ${WHISPER_THREADS:-4}
+  # AI notes (summary, chapters, quotes from the transcript). Off unless one of these is set.
+  # A model on your own server or network, through Ollama: nothing leaves it.
+  AI_NOTES_LOCAL_URL: ${AI_NOTES_LOCAL_URL:-}
+  AI_NOTES_LOCAL_MODEL: ${AI_NOTES_LOCAL_MODEL:-}
+  # An outside model (Claude, Anthropic's API): used only for accounts whose owner turns it on
+  # in Settings, and then the transcript's text is sent to Anthropic.
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_NOTES_MODEL: ${AI_NOTES_MODEL:-claude-opus-5-5}
   # Remove each recording's original uploads this many days after its files are ready (empty: keep).
   RAW_RETENTION_DAYS: ${RAW_RETENTION_DAYS-}
   # A "Record your own, free" link on guests' end screen and recap email; empty: none.

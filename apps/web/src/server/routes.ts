@@ -45,6 +45,9 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["GET", "/api/billing", "billing"],
   ["POST", "/api/billing/webhook", "billingWebhook"],
   ["POST", "/api/billing/portal", "billingPortal"],
+  ["GET", "/api/ai-notes", "aiNotes"],
+  ["PUT", "/api/ai-notes", "setAiNotes"],
+  ["POST", "/api/studios/[studioId]/recordings/[recordingId]/notes", "makeNotes"],
   ["GET", "/api/admin/accounts", "adminAccounts"],
   ["PUT", "/api/admin/accounts/[userId]/plan", "adminSetPlan"],
 

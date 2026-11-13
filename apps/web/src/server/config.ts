@@ -49,6 +49,12 @@ const env = z.object({
   WHISPER_MODEL: unsetIfEmpty(z.string()),
   WHISPER_VAD_MODEL: unsetIfEmpty(z.string()),
   WHISPER_THREADS: z.coerce.number().int().min(1).max(64).default(4),
+  /** AI notes by a model on this server: an Ollama address and the model's name. Nothing leaves the server. */
+  AI_NOTES_LOCAL_URL: z.string().url().optional().or(z.literal("")),
+  AI_NOTES_LOCAL_MODEL: z.string().optional(),
+  /** AI notes by an outside model (Claude): only for accounts whose owner turned it on. */
+  ANTHROPIC_API_KEY: z.string().optional(),
+  AI_NOTES_MODEL: z.string().default("claude-opus-5-5"),
   /** Font for names on the combined video's tiles; found automatically when unset. */
   TILE_FONT: unsetIfEmpty(z.string()),
   /** GitHub repo ("owner/name") whose latest release the admin health page compares with. Unset: no check. */
@@ -141,6 +147,8 @@ export interface WorkerConfig {
   ffmpeg: string;
   ffprobe: string;
   whisper?: { whisper: string; model: string; vadModel?: string; threads: number };
+  /** AI notes: the models this server may use (see notes.ts). */
+  notes?: { local?: { url: string; model: string }; outside?: { apiKey: string; model: string } };
   font?: string;
   pollMs: number;
   lockMs: number;
@@ -217,6 +225,10 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       whisper: cfg.WHISPER_MODEL
         ? { whisper: cfg.WHISPER_PATH, model: cfg.WHISPER_MODEL, vadModel: cfg.WHISPER_VAD_MODEL, threads: cfg.WHISPER_THREADS }
         : undefined,
+      notes: {
+        local: cfg.AI_NOTES_LOCAL_URL && cfg.AI_NOTES_LOCAL_MODEL ? { url: cfg.AI_NOTES_LOCAL_URL, model: cfg.AI_NOTES_LOCAL_MODEL } : undefined,
+        outside: cfg.ANTHROPIC_API_KEY ? { apiKey: cfg.ANTHROPIC_API_KEY, model: cfg.AI_NOTES_MODEL } : undefined,
+      },
       font: cfg.TILE_FONT,
       pollMs: cfg.WORKER_POLL_MS,
       lockMs: cfg.WORKER_LOCK_SECONDS * 1000,

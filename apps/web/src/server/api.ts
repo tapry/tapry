@@ -14,6 +14,7 @@ import {
   recapBody,
   resetPasswordBody,
   setFiltersBody,
+  aiNotesBody,
   removeWaitlistBody,
   setPlanBody,
   waitlistBody,
@@ -289,6 +290,15 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
         console.error(`[billing] portal session failed: ${err instanceof Error ? err.name : "unknown"}`);
         return back("unavailable");
       }
+    }),
+    /** How AI notes are written for this account. */
+    aiNotes: asUser(async (svc, user) => json(200, await svc.notes.view(user))),
+    /** The owner allows, or stops allowing, an outside AI model for notes. */
+    setAiNotes: asUser(async (svc, user, req) => json(200, await svc.notes.setOutside(user, (await parseBody(req, aiNotesBody)).outside))),
+    /** Write a recording's notes now (again), from its transcript. */
+    makeNotes: asUser(async (svc, user, _req, params) => {
+      await svc.notes.request(user, params.studioId!, params.recordingId!);
+      return json(202, { ok: true });
     }),
     /** Accounts and their plans (admins). */
     adminAccounts: asUser(async (svc, user) => json(200, { accounts: await svc.billing.accounts(user) })),

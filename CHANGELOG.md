@@ -5,6 +5,15 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **AI notes.** A summary, chapters with times, key points, quotes and show notes, written from
+  each recording's transcript and saved as `Notes.md` (a draft to edit; also in the zip and on
+  the recording's page, where it can be written again). Off unless the server has a model:
+  `AI_NOTES_LOCAL_URL` + `AI_NOTES_LOCAL_MODEL` use a model on your own server through Ollama
+  (nothing leaves it); `ANTHROPIC_API_KEY` uses Claude, only for accounts whose owner switches
+  it on in Settings, Account, and then the transcript text (never sound or picture) is sent to
+  Anthropic. On Tapry Cloud the outside model is part of the paid plans. Not yet run against a
+  real model.
+
 - **Screen sharing.** Anyone in a session (on a computer) can share a screen or window. The
   others see it as the big tile in the call; while a recording runs it is recorded on the
   sharer's device as a track of its own, picture only, and uploaded like the camera. Each person
