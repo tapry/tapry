@@ -28,8 +28,6 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
 
 export const GET_STARTED = "/pricing/";
 
-export const PHOTOS = { yasmine: "/people/yasmine.jpg", tom: "/people/tom.jpg", ines: "/people/ines.jpg" };
-
 /** A page's metadata: title, description, canonical address (with its trailing slash) and the same for link previews. */
 export function pageMeta({ title, description, path, index = true }: { title: string; description: string; path: string; index?: boolean }): Metadata {
   return {
