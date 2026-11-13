@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **A backup script.** `deploy/compose/backup.sh` dumps the database, checks the dump can be
+  read back, keeps a copy of `.env`, and removes backups older than 14 days. The self-hosting
+  guide says how to schedule and restore it, and what it doesn't cover (the recordings' media).
+
 - **AI notes.** A summary, chapters with times, key points, quotes and show notes, written from
   each recording's transcript and saved as `Notes.md` (a draft to edit; also in the zip and on
   the recording's page, where it can be written again). Off unless the server has a model:
