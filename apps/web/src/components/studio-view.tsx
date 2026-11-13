@@ -1,5 +1,7 @@
 "use client";
 
+import { BrowserIcon, browserOf } from "./browser-icons";
+import { ScheduleInvite } from "./schedule-invite";
 import { SoloLink } from "./solo-link";
 import { GuideEditor } from "./guide-editor";
 import { recordingLabel } from "@/components/quality-options";
@@ -117,6 +119,7 @@ export function StudioView({
           <section className="flex flex-col gap-2.5">
             <h2 className="font-medium">Invite guests</h2>
             <InviteLink studioId={studio.id} inviteCode={studio.inviteCode} />
+            <ScheduleInvite studioName={studio.name} hostName={hostName} inviteCode={studio.inviteCode} />
             <p className="text-[13px] text-muted">They open it in their browser, with nothing to install and no account needed.</p>
           </section>
           {checks.length > 0 && <TechChecks checks={checks} />}
@@ -239,7 +242,10 @@ function TechChecks({ checks }: { checks: TechCheck[] }) {
                   <Avatar name={c.name} className="size-7 text-[11px]" />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate font-medium">{c.name}</span>
-                    <span className="truncate text-[13px] text-muted">{c.browser}</span>
+                    <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-muted">
+                      {browserOf(c.browser) && <BrowserIcon name={browserOf(c.browser)!} size={13} />}
+                      <span className="truncate">{c.browser}</span>
+                    </span>
                   </span>
                 </span>
                 <span className="text-muted">{timeAgo(c.checkedAt)}</span>

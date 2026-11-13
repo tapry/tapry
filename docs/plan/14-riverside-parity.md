@@ -133,7 +133,7 @@ Ordered by what a buyer would notice first, then by cost. Effort is a rough buil
 | 9 | Frame-rate choice | 24 / 25 / 29.97 / 30 in the studio's settings, applied by the worker | 1 day | |
 | 10 | Clips from quotes | Pick a transcript range, get that clip cut from the combined video | 4–5 days | Not "viral clip" generation |
 | 11 | Mobile guests | Test and support iOS Safari / Android Chrome as guests | unknown until tested | Apps only if phones are >15–20% of guests |
-| 12 | API and webhooks, documented | Create studios and invites, list recordings, "recording ready" webhook | 1 week | Natural for an open-source tool; Riverside gates it to Business |
+| 12 (built 13 Nov 2026) | API and webhooks, documented | Create studios and invites, list recordings, "recording ready" webhook | 1 week | Natural for an open-source tool; Riverside gates it to Business |
 
 Unchanged: live streaming and scenes stay in Later; webinars, hosting, newsletters, social
 scheduling and all generative media stay in Skip.

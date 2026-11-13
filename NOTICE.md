@@ -62,3 +62,10 @@ with the app and the website (nothing is fetched from a font service):
 - **Geist** (the website's text) and **Geist Mono** (timers and figures in both), by Vercel:
   `@fontsource-variable/geist`, `@fontsource-variable/geist-mono`.
 
+## Browser marks
+
+The Chrome, Firefox and Safari marks shown where Tapry names the browsers it works in
+(`apps/site/src/components/browser-icons.tsx`, `apps/web/src/components/browser-icons.tsx`) use
+path data from [Simple Icons](https://simpleicons.org) 16.37.0, released under CC0-1.0. The
+marks are trademarks of Google LLC, the Mozilla Foundation and Apple Inc. respectively; they
+are used only to identify those browsers and imply no endorsement.

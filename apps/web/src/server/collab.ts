@@ -57,7 +57,8 @@ export class CommentsService {
     await this.db.query("INSERT INTO comments (id, recording_id, user_id, author, at_ms, body) VALUES ($1, $2, $3, $4, $5, $6)", [
       newId("cmt"),
       recordingId,
-      user.id,
+      user.apiKey ? null : user.id, // a key isn't a user
+
       user.name,
       body.atMs === undefined ? null : Math.max(0, Math.round(body.atMs)),
       body.body,
@@ -121,7 +122,7 @@ export class ActivityService {
       await this.db.query("INSERT INTO activity (id, account_id, user_id, who, action, target, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)", [
         newId("act"),
         user.accountId,
-        user.id,
+        user.apiKey ? null : user.id,
         user.name,
         action,
         target.slice(0, 300),

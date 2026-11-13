@@ -250,6 +250,10 @@ select {
 @media (max-width: 699px) {
   .hero-app { grid-template-columns: minmax(0, 1fr); }
   .hero-side { display: none !important; }
+  .hero-call-stop-label,
+  .hero-call-device,
+  .hero-call-invite-label,
+  .hero-call-upload { display: none !important; }
 }
 
 .docs-search:focus-within { border-color: #0b0b0f !important; outline: 2px solid #e8553d; outline-offset: 2px; }

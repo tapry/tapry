@@ -1,3 +1,4 @@
+import { IntegrationsPanel } from "@/components/integrations-panel";
 import { Fragment } from "react";
 import { ActivityLog } from "@/components/activity-log";
 import { AiNotesSetting } from "@/components/ai-notes-setting";
@@ -76,6 +77,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>
     </ListCard>
     {aiNotes}
+    {user.accountId === user.id && <IntegrationsPanel keys={await services.apiKeys.list(user)} webhooks={await services.webhooks.list(user)} />}
     </>
   );
 

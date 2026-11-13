@@ -2,6 +2,7 @@
 
 // Host-side forms around a studio (a "studio" in the API): invite link, settings, enter,
 // delete, and logging out. Creating a studio has its own page (new-studio-form.tsx).
+import { SELECTED_CARD, UNSELECTED_CARD } from "./quality-options";
 import { qualityOptions, type QualityChoice } from "./quality-options";
 import { defaultConsentText, type SessionTicket, type StudioSettings, FRAME_RATES, type FrameRate } from "@tapry/shared";
 import { useRouter } from "next/navigation";
@@ -168,7 +169,7 @@ export function StudioSettingsForm({
                     "flex flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] transition-[border-color,box-shadow]",
                     locked && quality !== value ? "cursor-not-allowed opacity-60" : "cursor-pointer",
                     "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
-                    quality === value ? "border-ink shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border shadow-xs hover:border-border-strong",
+                    quality === value ? SELECTED_CARD : UNSELECTED_CARD,
                   )}
                 >
                   <input
