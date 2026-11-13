@@ -125,8 +125,8 @@
   --color-ring: var(--ring);
   --color-ring-soft: var(--ring-soft);
   --shadow-xs: var(--elev-xs);
-  --font-sans: var(--font-geist), "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Inter Variable", "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Motion from the designs: recording blink, speaking rings, level bars, entrances. */
   --animate-rec-pulse: rec-pulse 1.2s ease-in-out infinite;

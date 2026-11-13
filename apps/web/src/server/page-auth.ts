@@ -17,6 +17,15 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
+/**
+ * Where to go after signing in, from a `next` query value: only a path on this server
+ * ("/checkout/creator"), never another site. Anything else is ignored.
+ */
+export function safeNext(next: string | string[] | undefined): string | null {
+  const v = Array.isArray(next) ? next[0] : next;
+  return v && /^\/[A-Za-z0-9_\-./?=&%]*$/.test(v) && !v.startsWith("//") ? v : null;
+}
+
 /** True before the first account exists: the home page then offers to create the admin. */
 export async function isFreshInstall(): Promise<boolean> {
   const { db } = await getServices();

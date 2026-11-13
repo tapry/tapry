@@ -1,5 +1,5 @@
 import { CODE_FONT, DarkBtn, H1, HERO_BG, LEAD, OutlineBtn, SectionHead, Shell } from "@/components/ui";
-import { CLOUD_NEWS, GITHUB, pageMeta } from "@/content/site";
+import { CLOUD_NEWS, GITHUB, HAS_CLOUD, pageMeta } from "@/content/site";
 
 export const metadata = pageMeta({
   title: "Self-hosting: run Tapry on your own server · Tapry",
@@ -126,7 +126,11 @@ export default function SelfHostingPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, borderTop: "1px solid #0b0b0f", paddingTop: 20 }}>
             <h3 style={h3}>Rather not run a server?</h3>
-            <p style={p}>Tapry Cloud is planned: the same software, hosted for you. It isn’t available yet; to hear when it opens, {CLOUD_NEWS}.</p>
+            <p style={p}>
+              {HAS_CLOUD
+                ? "Tapry Cloud is the same software, hosted for you. It starts free, with paid plans for more recording hours."
+                : `Tapry Cloud is planned: the same software, hosted for you. It isn’t available yet; to hear when it opens, ${CLOUD_NEWS}.`}
+            </p>
             <DarkBtn href="/pricing/" style={{ alignSelf: "flex-start" }}>
               See pricing
             </DarkBtn>

@@ -1,11 +1,12 @@
 "use client";
 
-// The plans and the monthly/yearly switch. Self-hosted is what exists today. The three Tapry Cloud
-// plans are the ones in docs/plan/06-monetization.md (pricing v4: Creator, Studio, Team; yearly:
-// 2 months free), with only what that plan states. They are labelled as planned, and may change.
+// The plans and the monthly/yearly switch. Self-hosted is the open-source release. The three
+// Tapry Cloud plans are the ones in docs/plan/06-monetization.md (pricing v4: Creator, Studio,
+// Team; yearly: 2 months free). With the hosted app's address set (HAS_CLOUD) each plan's button
+// leads to its checkout there; without it the plans are labelled as planned.
 import { useState } from "react";
 import { WaitlistButton } from "@/components/waitlist";
-import { CLOUD_NEWS } from "@/content/site";
+import { checkoutUrl, CLOUD_NEWS, HAS_CLOUD, SIGNUP_URL } from "@/content/site";
 
 type Plan = {
   name: string;
@@ -23,6 +24,9 @@ export function Plans() {
   // Yearly: twelve months for the price of ten.
   const price = (m: number) => `$${(yearly ? m * 10 : m).toLocaleString("en-US")}`;
   const per = yearly ? "per year" : "per month";
+  const tag = HAS_CLOUD ? null : "Planned";
+  const lead = HAS_CLOUD ? "" : "Planned: ";
+  const buy = (plan: "creator" | "studio" | "team", name: string): Plan["cta"] => (HAS_CLOUD ? { label: `Choose ${name}`, href: checkoutUrl(plan, yearly) } : "waitlist");
 
   const plans: Plan[] = [
     {
@@ -45,31 +49,31 @@ export function Plans() {
       name: "Cloud Creator",
       price: price(19),
       per,
-      desc: "Planned: the same software on a server you don’t have to run, for one host.",
-      cta: "waitlist",
+      desc: `${lead}the same software on a server you don’t have to run, for one host.`.replace(/^t/, "T"),
+      cta: buy("creator", "Creator"),
       highlight: true,
-      tag: "Planned",
+      tag,
       features: ["15 recording hours a month", "Finished files kept for 30 days", "Transcripts included", "Up to 8 people in a recording"],
     },
     {
       name: "Cloud Studio",
       price: price(39),
       per,
-      desc: "Planned: for studios that record every week and share the work.",
-      cta: "waitlist",
+      desc: `${lead}for studios that record every week and share the work.`.replace(/^f/, "F"),
+      cta: buy("studio", "Studio"),
       highlight: false,
-      tag: "Planned",
+      tag,
       features: ["40 recording hours a month", "3 seats", "Finished files kept for 60 days", "Transcripts included"],
     },
     {
       name: "Cloud Team",
       price: price(149),
       per,
-      desc: "Planned: for newsrooms, research groups and media teams that must know where recordings are kept.",
-      cta: "waitlist",
+      desc: `${lead}for newsrooms, research groups and media teams that must know where recordings are kept.`.replace(/^f/, "F"),
+      cta: buy("team", "Team"),
       highlight: false,
-      tag: "Planned",
-      features: ["80 recording hours a month", "5 seats", "Finished files kept for 90 days", "Hosted in the EU, with a data processing agreement", "Email support"],
+      tag,
+      features: ["80 recording hours a month", "5 seats", "Finished files kept for 90 days", "Hosted in the EU", "Email support"],
     },
   ];
 
@@ -92,9 +96,19 @@ export function Plans() {
           Pricing
         </h1>
         <p className="rise" style={{ margin: 0, maxWidth: 580, fontSize: 18, lineHeight: 1.5, color: "#6b6b70", textWrap: "pretty", animationDelay: ".08s" }}>
-          Self-hosting is free, with no limits on recordings or hours. Tapry Cloud, for people who’d rather not run a server, is planned and not open yet: to hear when it is, {CLOUD_NEWS}.
+          {HAS_CLOUD ? (
+            <>
+              Self-hosting is free, with no limits on recordings or hours. Tapry Cloud is the same software, hosted for you:{" "}
+              <a href={SIGNUP_URL} style={{ color: "#0b0b0f", textDecoration: "underline", textUnderlineOffset: 3 }}>
+                start free
+              </a>{" "}
+              with 2 recording hours a month, or choose a plan.
+            </>
+          ) : (
+            `Self-hosting is free, with no limits on recordings or hours. Tapry Cloud, for people who’d rather not run a server, is planned and not open yet: to hear when it is, ${CLOUD_NEWS}.`
+          )}
         </p>
-        <div className="rise" role="group" aria-label="Billing period for the planned Tapry Cloud plans" style={{ display: "inline-flex", border: "1px solid #e6e6e9", borderRadius: 10, padding: 3, gap: 2, fontSize: 14, animationDelay: ".16s" }}>
+        <div className="rise" role="group" aria-label="Billing period for the Tapry Cloud plans" style={{ display: "inline-flex", border: "1px solid #e6e6e9", borderRadius: 10, padding: 3, gap: 2, fontSize: 14, animationDelay: ".16s" }}>
           <button type="button" onClick={() => setYearly(false)} aria-pressed={!yearly} style={tab(!yearly)}>
             Monthly
           </button>
@@ -120,7 +134,12 @@ export function Plans() {
               {p.cta === "waitlist" ? (
                 <WaitlistButton dark={p.highlight} />
               ) : (
-                <a href={p.cta.href} className="hv-85" style={{ display: "inline-flex", height: 36, alignItems: "center", justifyContent: "center", borderRadius: 10, fontSize: 14, fontWeight: 500, transition: "background .2s", border: "1px solid #e6e6e9", background: "#fff", color: "#0b0b0f" }}>
+                <a
+                  href={p.cta.href}
+                  className="hv-85"
+                  data-plan={p.name}
+                  style={{ display: "inline-flex", height: 36, alignItems: "center", justifyContent: "center", borderRadius: 10, fontSize: 14, fontWeight: 500, transition: "background .2s", border: `1px solid ${p.highlight ? "#0b0b0f" : "#e6e6e9"}`, background: p.highlight ? "#0b0b0f" : "#fff", color: p.highlight ? "#fff" : "#0b0b0f" }}
+                >
                   {p.cta.label}
                 </a>
               )}

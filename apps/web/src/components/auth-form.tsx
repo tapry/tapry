@@ -12,6 +12,7 @@ export function AuthForm({
   setupRequired = false,
   canReset = false,
   openSignup = false,
+  next = null,
 }: {
   mode: "login" | "signup";
   firstAccount?: boolean;
@@ -20,6 +21,8 @@ export function AuthForm({
   canReset?: boolean;
   /** Anyone may create an account here (not only the first one). */
   openSignup?: boolean;
+  /** Where to go afterwards instead of the studios: a path on this server, checked by the page. */
+  next?: string | null;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +43,7 @@ export function AuthForm({
       });
       // A full page load, not router.replace + refresh: those two race (the refresh re-renders
       // this page mid-navigation), and a lost navigation left the button on "One moment…".
-      window.location.replace("/studios");
+      window.location.replace(next ?? "/studios");
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
       setBusy(false);
@@ -118,14 +121,14 @@ export function AuthForm({
         {signup ? (
           <>
             Already have an account?{" "}
-            <Link className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong" href="/login">
+            <Link className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong" href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}>
               Log in
             </Link>
           </>
         ) : (
           <>
             {openSignup ? "New here?" : "New server?"}{" "}
-            <Link className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong" href="/signup">
+            <Link className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong" href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"}>
               {openSignup ? "Create an account" : "Create the first account"}
             </Link>
           </>

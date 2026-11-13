@@ -1,11 +1,13 @@
 import { Faq } from "@/components/faq";
 import { CtaRow, DarkBtn, H2, OutlineBtn, SectionHead, Shell } from "@/components/ui";
-import { CLOUD_NEWS, pageMeta } from "@/content/site";
+import { checkoutUrl, CLOUD_NEWS, CONTACT_EMAIL, HAS_CLOUD, pageMeta, SIGNUP_URL } from "@/content/site";
 import { Plans } from "./pricing";
 
 export const metadata = pageMeta({
   title: "Pricing: free to self-host · Tapry",
-  description: `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, a hosted version, is planned and not open yet: ${CLOUD_NEWS} to hear when it is.`,
+  description: HAS_CLOUD
+    ? "Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, the hosted version, starts free and has plans from $19 a month."
+    : `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, a hosted version, is planned and not open yet: ${CLOUD_NEWS} to hear when it is.`,
   path: "/pricing/",
 });
 
@@ -22,7 +24,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Finished files kept", "You decide", "30 days", "60 days", "90 days"],
   ["Original uploads kept", "You decide", "7 days", "7 days", "7 days"],
   ["Transcripts", "whisper.cpp on your server", "Included", "Included", "Included"],
-  ["Where files live", "Bundled SeaweedFS or your S3 bucket", "Tapry Cloud", "Tapry Cloud", "Tapry Cloud, in the EU"],
+  ["Where files live", "Bundled SeaweedFS or your S3 bucket", "Tapry Cloud, in the EU", "Tapry Cloud, in the EU", "Tapry Cloud, in the EU"],
   ["Support", "GitHub issues", "—", "—", "Email"],
   ["The software today"],
   ["People per recording", "Up to 8"],
@@ -32,13 +34,16 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Tech-check link and producer alerts", "✓"],
 ];
 
-// Planned offers beside the three cloud plans, from the same document.
-const MORE: Array<[string, string, string]> = [
-  ["Free cloud", "$0", "2 recording hours a month, finished files kept 7 days, with a “Recorded with Tapry” badge."],
-  ["Own storage", "$12 a month", "Tapry Cloud runs the studio and records into your own S3 or R2 bucket, with no limit on hours within fair use."],
-  ["Support for self-hosting", "$2,400 a year", "For an organisation running Tapry on its own server: email support, help with updates and the documents a data-protection review asks for."],
-  ["Business", "From $4,800 a year", "Hosted, with single sign-on, an audit log and retention policies. These features aren’t built yet."],
+// Offers beside the three cloud plans, from the same document: [name, price, what it is, link, link label].
+// A link only where the offer can be taken up today; the rest say how to ask.
+const MORE: Array<[string, string, string, string | null, string | null]> = [
+  ["Free cloud", "$0", "2 recording hours a month, finished files kept 7 days. Guests see a “Record your own” link at the end.", HAS_CLOUD ? SIGNUP_URL : null, "Start free"],
+  ["Own storage", "$12 a month", "Tapry Cloud runs the studio and records into your own S3 or R2 bucket, with no limit on hours within fair use.", HAS_CLOUD ? checkoutUrl("own_storage", false) : null, "Choose Own storage"],
+  ["Support for self-hosting", "$2,400 a year", "For an organisation running Tapry on its own server: email support, help with updates and the documents a data-protection review asks for.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
+  ["Business", "From $4,800 a year", "Hosted, with single sign-on, an audit log and retention policies. These features aren’t built yet.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
 ];
+/** Which of those exist today, for the "planned" label. */
+const AVAILABLE = new Set(HAS_CLOUD ? ["Free cloud", "Own storage", "Support for self-hosting"] : []);
 
 const FAQ: Array<[string, string]> = [
   ["Is self-hosting really free?", "Yes. Tapry’s server is AGPL-3.0 and the recorder core is MIT. You pay for your own machine and storage, nothing to Tapry."],
@@ -47,14 +52,21 @@ const FAQ: Array<[string, string]> = [
     "A Linux server with Docker (at least 2 vCPU and 4 GB of RAM), four DNS names pointing at it and a few open ports. The Compose bundle includes Caddy for HTTPS and SeaweedFS for storage; an S3-compatible bucket works too.",
   ],
   [
-    "When does Tapry Cloud open, and can I keep files in my own bucket?",
-    `Tapry Cloud isn’t available yet, and the plans above may still change. The plan also has a $12 a month option that records into your own S3 or R2 bucket, with no limit on hours within fair use. To hear when it opens, ${CLOUD_NEWS}.`,
+    HAS_CLOUD ? "Can I keep files in my own bucket?" : "When does Tapry Cloud open, and can I keep files in my own bucket?",
+    HAS_CLOUD
+      ? "Yes. The Own storage plan, $12 a month, records into your own S3 or R2 bucket, with no limit on hours within fair use. You connect the bucket on the Storage page, and Tapry checks it can write there before using it."
+      : `Tapry Cloud isn’t available yet, and the plans above may still change. The plan also has a $12 a month option that records into your own S3 or R2 bucket, with no limit on hours within fair use. To hear when it opens, ${CLOUD_NEWS}.`,
   ],
   [
     "How will recording hours be counted?",
-    "Per recording, not per person: an hour with four people is one hour. The planned cloud plans keep the original uploads for 7 days after processing and the finished files for the plan’s period; download what you want to keep longer.",
+    "Per recording, not per person: an hour with four people is one hour. The cloud plans keep the original uploads for 7 days after processing and the finished files for the plan’s period; download what you want to keep longer. Each recording shows its date.",
   ],
-  ["Is there a discount for schools and non-profits?", "The plan is 30% off the Creator, Studio and Team plans for education and non-profit organisations. Self-hosting is free for everyone."],
+  ["Is there a discount for schools and non-profits?", `Education and non-profit organisations get 30% off the Creator, Studio and Team plans: write to ${CONTACT_EMAIL} from your organisation’s address. Self-hosting is free for everyone.`],
+  ...(HAS_CLOUD
+    ? ([
+        ["How do I pay, and can I cancel?", "Plans are sold through Paddle, our payment provider, which takes the payment and sends the invoice. You can cancel at any time from Settings, Plan: the plan then runs to the end of the period you paid for."],
+      ] as Array<[string, string]>)
+    : []),
   ["Do guests need an account?", "No. Guests join from a link in desktop Chrome, Firefox or Safari. A green room checks their browser, camera, microphone and free space, and asks about headphones, first."],
   ["What happens if a guest’s connection drops?", "Their browser keeps recording to its own storage and uploads the rest when they’re back. The call might blur; the files don’t."],
 ];
@@ -74,9 +86,9 @@ export default function PricingPage() {
                   <span className="sr">Feature</span>
                 </span>
                 <span role="columnheader">Self-hosted</span>
-                <span role="columnheader">Cloud Creator (planned)</span>
-                <span role="columnheader">Cloud Studio (planned)</span>
-                <span role="columnheader">Cloud Team (planned)</span>
+                <span role="columnheader">Cloud Creator{HAS_CLOUD ? "" : " (planned)"}</span>
+                <span role="columnheader">Cloud Studio{HAS_CLOUD ? "" : " (planned)"}</span>
+                <span role="columnheader">Cloud Team{HAS_CLOUD ? "" : " (planned)"}</span>
               </div>
               {ROWS.map(([label, a, b, c, d], i) => {
                 const head = a === undefined;
@@ -95,16 +107,21 @@ export default function PricingPage() {
             </div>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#6b6b70" }}>
-            Tapry Cloud isn’t available yet: its columns are the plan, not something you can buy today, and may change. Paid yearly, the planned price is ten months’ worth.
+            {HAS_CLOUD ? "Paid yearly, a plan costs ten months’ worth. Prices are in US dollars, without tax." : "Tapry Cloud isn’t available yet: its columns are the plan, not something you can buy today, and may change. Paid yearly, the planned price is ten months’ worth."}
           </p>
           <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,250px),1fr))" }}>
-            {MORE.map(([name, cost, text]) => (
+            {MORE.map(([name, cost, text, href, label]) => (
               <div key={name} style={{ display: "flex", flexDirection: "column", gap: 8, border: "1px solid #ececef", borderRadius: 16, padding: 20 }}>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>
-                  {name} <span style={{ color: "#737378", fontWeight: 400 }}>· planned</span>
+                  {name} {!AVAILABLE.has(name) && <span style={{ color: "#737378", fontWeight: 400 }}>· planned</span>}
                 </h3>
                 <span style={{ fontSize: 20, fontWeight: 500, letterSpacing: "-.02em" }}>{cost}</span>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "#6b6b70", textWrap: "pretty" }}>{text}</p>
+                {href && label && (
+                  <a href={href} data-offer={name} style={{ marginTop: "auto", paddingTop: 6, fontSize: 14, fontWeight: 500, color: "#0b0b0f", textDecoration: "underline", textUnderlineOffset: 3 }}>
+                    {label}
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -118,7 +135,8 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <CtaRow title="Not sure which fits? Start self-hosted today; Tapry Cloud is planned.">
+      <CtaRow title={HAS_CLOUD ? "Not sure which fits? Start free on Tapry Cloud, or host it yourself." : "Not sure which fits? Start self-hosted today; Tapry Cloud is planned."}>
+        {HAS_CLOUD && <DarkBtn href={SIGNUP_URL}>Start free</DarkBtn>}
         <DarkBtn href="/self-hosting/">Self-host Tapry</DarkBtn>
         <OutlineBtn href="/resources/#help">Get help</OutlineBtn>
       </CtaRow>

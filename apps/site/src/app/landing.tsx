@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer";
 import { IC, Icon, LogoMark } from "@/components/icons";
 import { Nav } from "@/components/nav";
 import { customers } from "@/content/customers";
-import { CLOUD_NEWS, GET_STARTED } from "@/content/site";
+import { CLOUD_NEWS, GET_STARTED, HAS_CLOUD } from "@/content/site";
 
 const G = "#12924f";
 const A = "#a16207";
@@ -213,7 +213,9 @@ export function Landing() {
           <div className="reveal" style={{ position: "relative", margin: "0 auto", display: "flex", maxWidth: 640, flexDirection: "column", alignItems: "center", gap: 22, color: "#fff" }}>
             <h2 style={{ margin: 0, fontSize: "clamp(34px,4.4vw,56px)", lineHeight: 1.06, fontWeight: 500, letterSpacing: "-.04em", textWrap: "balance" }}>Put your next recording in motion.</h2>
             <p style={{ margin: 0, maxWidth: 500, fontSize: 17, lineHeight: 1.55, color: "rgba(255,255,255,.94)", textWrap: "pretty" }}>
-              Start with an interview, a podcast or a research study. Host Tapry yourself today. Tapry Cloud is planned: to hear when it opens, {CLOUD_NEWS}.
+              {HAS_CLOUD
+                ? "Start with an interview, a podcast or a research study. Create a free account on Tapry Cloud, or host Tapry yourself."
+                : `Start with an interview, a podcast or a research study. Host Tapry yourself today. Tapry Cloud is planned: to hear when it opens, ${CLOUD_NEWS}.`}
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 26, fontSize: 16, fontWeight: 500, marginTop: 6 }}>
               <a href={GET_STARTED} className="btn-white-flat" style={{ display: "inline-flex", height: 44, alignItems: "center", borderRadius: 12, background: "#fff", padding: "0 20px", color: "#0b0b0f" }}>

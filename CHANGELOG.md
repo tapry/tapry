@@ -5,6 +5,16 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **The app's text is set in Inter**, and all fonts (Inter, Geist, Geist Mono) are bundled from
+  npm packages instead of being downloaded from Google when building. A build no longer needs
+  that download, which had failed some builds.
+- **The website links to the hosted app.** Built with `NEXT_PUBLIC_APP_URL`, it shows Log in
+  and Get Started, the pricing page's plan buttons open each plan's checkout in the app (monthly
+  or yearly), and the privacy and terms pages describe Tapry Cloud. Without the variable the
+  site describes Tapry Cloud as planned, as before.
+- **From a plan button to its checkout.** Someone without an account who opens a checkout is
+  sent to sign up, then back to that checkout; log in and sign up take a `next` path on the same
+  server only.
 - **Tapry Cloud plans (off on self-hosted servers).** With `TAPRY_CLOUD=true` accounts have a
   plan (Free, Creator, Studio, Team, Business) with recording hours a month and a time finished
   files and originals are kept. Record is refused once the month's hours are used (a running

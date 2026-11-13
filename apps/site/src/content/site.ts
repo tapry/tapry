@@ -1,5 +1,6 @@
-// Addresses the whole site links to. There is no hosted app yet: "Get Started" leads to the
-// choice between self-hosting (free, today) and the planned Tapry Cloud (pricing).
+// Addresses the whole site links to. With NEXT_PUBLIC_APP_URL (the hosted app, Tapry Cloud) the
+// site offers log in, sign up and plan checkouts there. Without it there is no hosted app:
+// "Get Started" leads to the choice between self-hosting and the planned Tapry Cloud (pricing).
 import type { Metadata } from "next";
 
 export const GITHUB = process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com/tapry/tapry";
@@ -26,7 +27,16 @@ export const HAS_SPEED_TEST = !!SPEED_TEST_URL;
 /** The site's public address (e.g. https://tapry.app), for absolute canonical links and the sitemap. */
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
 
-export const GET_STARTED = "/pricing/";
+/** The hosted app (https://studio.tapry.app). Unset: Tapry Cloud is described as planned. */
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+export const HAS_CLOUD = !!APP_URL;
+export const LOGIN_URL = `${APP_URL}/login`;
+export const SIGNUP_URL = `${APP_URL}/signup`;
+/** A plan's checkout in the app: it signs the visitor up first, then opens the payment. */
+export const checkoutUrl = (plan: "creator" | "studio" | "team" | "own_storage", yearly: boolean) => `${APP_URL}/checkout/${plan}${yearly ? "?yearly=1" : ""}`;
+export const CONTACT_EMAIL = "hello@tapry.app";
+
+export const GET_STARTED = HAS_CLOUD ? SIGNUP_URL : "/pricing/";
 
 /** A page's metadata: title, description, canonical address (with its trailing slash) and the same for link previews. */
 export function pageMeta({ title, description, path, index = true }: { title: string; description: string; path: string; index?: boolean }): Metadata {
