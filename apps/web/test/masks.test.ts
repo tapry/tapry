@@ -219,6 +219,9 @@ describe("mask tracks", () => {
     });
   });
 
+  // Each of these renders two people with ffmpeg, several times: over 20 s on a slow CI machine.
+  const RENDER_TIMEOUT = 120_000;
+
   describe.skipIf(!hasFfmpeg)("in the files (with ffmpeg)", () => {
     let cam: Buffer;
     let maskVideo: Buffer;
@@ -274,7 +277,7 @@ describe("mask tracks", () => {
       await runner().drain();
       expect(await summary()).toMatchObject({ processing: "ready", filtersFailed: [] });
       expect(await detailOnTheRight("Guest - video.mp4")).toBeGreaterThan(10);
-    });
+    }, RENDER_TIMEOUT);
 
     it("makes everyone's files without a mask that didn't arrive, says the blur is missing, and adds it when the mask comes", async () => {
       await upload("video", cam, { filters: BLUR });
@@ -295,7 +298,7 @@ describe("mask tracks", () => {
       await runner().drain();
       expect(await summary()).toMatchObject({ processing: "ready", filtersFailed: [] });
       expect(await detailOnTheRight("Guest - video.mp4")).toBeLessThan(3);
-    });
+    }, RENDER_TIMEOUT);
 
     it("never fails anyone's files over a mask that is rubbish or missing a piece", async () => {
       await upload("video", cam, { filters: BLUR });
@@ -318,6 +321,6 @@ describe("mask tracks", () => {
       expect(r).toMatchObject({ processing: "ready", skippedTracks: [] });
       expect(r.filtersFailed).toEqual(expect.arrayContaining([{ name: "Guest", kind: "video" }, { name: "Host", kind: "video" }]));
       expect(await fileNames()).toEqual(["Combined.mp4", "Host - video.mp4", "Guest - video.mp4"]);
-    });
+    }, RENDER_TIMEOUT);
   });
 });
