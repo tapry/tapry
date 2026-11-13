@@ -9,8 +9,8 @@ test("the upload-speed check says which kinds of studio the line keeps up with",
   await page.getByRole("button", { name: "Test my upload" }).click();
   await expect(page.getByTestId("upload-mbps")).toHaveText(/^\d+(\.\d)?$/, { timeout: 30_000 });
   // On this machine the line is fast: everything keeps up.
-  await expect(page.locator("[data-verdict]")).toHaveCount(3);
-  await expect(page.locator('[data-verdict="ok"]')).toHaveCount(3);
+  await expect(page.locator("[data-verdict]")).toHaveCount(4);
+  await expect(page.locator('[data-verdict="ok"]')).toHaveCount(4);
 });
 
 test("the project website may use the public speed test; other sites may not", async ({ page, baseURL }) => {
