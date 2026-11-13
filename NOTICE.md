@@ -14,6 +14,22 @@ AGPL: MIT, Apache-2.0, BSD-2/3-Clause, ISC, 0BSD, plus `caniuse-lite` data (CC-B
 pnpm -r licenses list --prod
 ```
 
+## Served to browsers by the web app
+
+Background blur works out where a person is in their camera picture on their own device. What
+it needs is served by the Tapry server itself (`apps/web/public`), never from a CDN.
+
+| Software | License | Where |
+|---|---|---|
+| [MediaPipe Tasks Vision](https://www.npmjs.com/package/@mediapipe/tasks-vision) 0.10.21 (JavaScript and WebAssembly runtime) | Apache-2.0 | npm package; its `wasm/` files are copied to `apps/web/public/mediapipe/` by `apps/web/scripts/copy-mediapipe.mjs` before `next dev` and `next build` |
+| MediaPipe Selfie Segmenter model, `selfie_segmenter.tflite` (float16) | Apache-2.0 | `apps/web/public/models/selfie_segmenter.tflite`, in this repository |
+
+The model was downloaded on 12 Nov 2026 from
+<https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite>
+(249,537 bytes, SHA-256 `191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b`).
+Its model card is linked from the
+[MediaPipe image segmenter documentation](https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter#selfie-model).
+
 ## In the Docker images
 
 | Software | License | Where |

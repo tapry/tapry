@@ -1,5 +1,5 @@
 import { isLockHeld, trackLockName } from "./locks.js";
-import { isTrackGone, type ChunkMeta, type ChunkStore, type ChunkTransport, type CompletedTrack, type StoredChunk } from "./types.js";
+import { isTrackGone, type ChunkMeta, type ChunkStore, type ChunkTransport, type CompletedTrack, type StoredChunk, type TrackInfo } from "./types.js";
 
 export interface UploadProgress {
   /** Chunks waiting or uploading. */
@@ -107,9 +107,12 @@ export class UploadQueue {
    * Re-queue everything left in the store by a previous page load (crash,
    * closed tab, reload). Tracks still held by a live recorder in another tab
    * are skipped. Tracks that never reached stop() are completed as interrupted.
+   * `only` picks the tracks this queue takes, when several queues share one store (for example
+   * one for the recording and one for its helper tracks, so each reports its own progress).
    */
-  async resume() {
+  async resume(opts: { only?: (track: TrackInfo) => boolean } = {}) {
     for (const track of await this.store.listTracks()) {
+      if (opts.only && !opts.only(track)) continue;
       if (await isLockHeld(trackLockName(track.sessionId, track.trackId))) continue;
       const key = trackKey(track.sessionId, track.trackId);
       this.mimeTypes.set(key, track.mimeType);

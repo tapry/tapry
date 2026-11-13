@@ -20,7 +20,7 @@ const hasFfmpeg = (() => {
 })();
 
 const MIME = "audio/webm;codecs=opus";
-const WARM: TrackFilters = { brightness: 1, look: "warm", touchUp: true, noiseRemoval: false };
+const WARM: TrackFilters = { ...NO_FILTERS, brightness: 1, look: "warm", touchUp: true };
 const QUIET: TrackFilters = { ...NO_FILTERS, noiseRemoval: true };
 
 describe("filters", () => {
@@ -81,7 +81,7 @@ describe("filters", () => {
       const video = (await createTrack({ kind: "video", filters: WARM })).body.trackId;
       const res = await setFilters({ look: "cool", noiseRemoval: true });
       expect(res.status).toBe(200);
-      const kept = { brightness: 0, look: "cool", touchUp: false, noiseRemoval: true };
+      const kept = { ...NO_FILTERS, look: "cool", noiseRemoval: true };
       expect(res.body).toEqual({ filters: kept });
       // The whole choice on each: the camera track's sound takes noise removal too.
       expect(await stored(audio)).toEqual(kept);

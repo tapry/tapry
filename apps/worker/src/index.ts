@@ -1,17 +1,20 @@
 export {
   alignmentFilters,
   audioCleanFilters,
+  backgroundBlurGraph,
+  MASK_MAX_GAP_MS,
   concatChunks,
   gridLayout,
   renderRecording,
   videoLookFilters,
   type FilterFailure,
+  type MaskInput,
   type OutputFile,
   type PipelineOptions,
   type SkippedTrack,
   type TrackInput,
 } from "./pipeline.js";
-export { FfmpegError, probeDurationMs, probeStreams, run } from "./ffmpeg.js";
+export { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, run } from "./ffmpeg.js";
 export {
   findFont,
   FONT_CANDIDATES,

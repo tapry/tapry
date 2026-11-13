@@ -1,10 +1,11 @@
 // The client half of filters: what a device remembers, how the live picture is drawn, and what
 // it tells the server. (The server and worker half is in filters.test.ts.)
 import type { TrackInfo } from "@tapry/recorder";
-import { BRIGHTNESS_VALUES, NO_FILTERS, type TrackFilters } from "@tapry/shared";
+import { BRIGHTNESS_VALUES, createTrackBody, NO_FILTERS, type TrackFilters } from "@tapry/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { describeOutput } from "../src/components/recordings";
-import { canvasFilter, fitSize, kelvinGains, tintColor } from "../src/lib/client/filter-picture";
+import { BACKGROUND_BLUR, canvasFilter, fitSize, kelvinGains, picturePlan, tintColor, TOUCH_UP } from "../src/lib/client/filter-picture";
+import { FULL_PACE, MASK, MASK_EDGE, maskLevel, maskPixels, nextPace, SLOW } from "../src/lib/client/person-mask";
 import {
   createFilterSync,
   DEFAULT_PREFS,
@@ -30,10 +31,12 @@ describe("a person's filters, as kept on their device", () => {
   });
 
   it("read what was stored, filling in what an older version didn't have", () => {
-    expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, noiseRemoval: true }, mirror: false }))).toEqual({
-      filters: { brightness: 2, look: "cool", touchUp: true, noiseRemoval: true },
+    expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, background: "blur", noiseRemoval: true }, mirror: false }))).toEqual({
+      filters: { brightness: 2, look: "cool", touchUp: true, background: "blur", noiseRemoval: true },
       mirror: false,
     });
+    // Saved before background blur existed: no blur.
+    expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, noiseRemoval: true } })).filters.background).toBe("none");
     expect(parsePrefs(JSON.stringify({ filters: { look: "warm" } }))).toEqual({ filters: { ...NO_FILTERS, look: "warm" }, mirror: true });
     expect(parsePrefs(JSON.stringify({ mirror: false }))).toEqual({ filters: NO_FILTERS, mirror: false });
   });
@@ -138,12 +141,84 @@ describe("the live picture's canvas filter", () => {
   });
 });
 
+describe("the order a frame is drawn in", () => {
+  const blur: TrackFilters = { ...NO_FILTERS, background: "blur" };
+  const ops = (f: TrackFilters, hasMask: boolean) => picturePlan(f, 360, hasMask).map((s) => s.op);
+
+  it("is what it was without background blur: the frame, the touch-up, the tint", () => {
+    expect(picturePlan(NO_FILTERS, 360, false)).toEqual([{ op: "frame", filter: "none" }]);
+    expect(picturePlan(mono, 360, true)).toEqual([{ op: "frame", filter: "saturate(0)" }]); // a mask changes nothing without blur
+    expect(picturePlan({ ...NO_FILTERS, look: "warm", touchUp: true }, 360, false)).toEqual([
+      { op: "frame", filter: "saturate(1.08)" },
+      { op: "soften", of: "frame", filter: `saturate(1.08) blur(${TOUCH_UP.blurPx}px)`, alpha: TOUCH_UP.alpha },
+      { op: "tint", color: tintColor({ look: "warm" }) },
+    ]);
+  });
+
+  it("blurs the background, puts the person over it, then what applies to the whole picture", () => {
+    expect(ops({ ...blur, brightness: 1, look: "warm", touchUp: true }, true)).toEqual(["background", "person", "soften", "tint"]);
+    const plan = picturePlan({ ...blur, look: "mono", touchUp: true }, 360, true);
+    expect(plan).toEqual([
+      // The look's colour goes on both layers; only the background is blurred.
+      { op: "background", filter: `saturate(0) blur(${BACKGROUND_BLUR.px}px)`, blurPx: BACKGROUND_BLUR.px },
+      { op: "person", filter: "saturate(0)", edgePx: BACKGROUND_BLUR.edgePx },
+      // Touch-up softens the picture as drawn so far: no colour filter a second time.
+      { op: "soften", of: "picture", filter: `blur(${TOUCH_UP.blurPx}px)`, alpha: TOUCH_UP.alpha },
+    ]);
+    expect(picturePlan(blur, 360, true)).toEqual([
+      { op: "background", filter: `blur(${BACKGROUND_BLUR.px}px)`, blurPx: BACKGROUND_BLUR.px },
+      { op: "person", filter: "none", edgePx: BACKGROUND_BLUR.edgePx },
+    ]);
+  });
+
+  it("blurs the whole picture while there is no mask: the room is never shown sharp with blur on", () => {
+    expect(ops(blur, false)).toEqual(["background"]);
+    expect(ops({ ...blur, look: "cool" }, false)).toEqual(["background", "tint"]);
+  });
+
+  it("scales the blur with the picture", () => {
+    const [background, person] = picturePlan(blur, 720, true);
+    expect(background).toMatchObject({ blurPx: BACKGROUND_BLUR.px * 2, filter: `blur(${BACKGROUND_BLUR.px * 2}px)` });
+    expect(person).toMatchObject({ edgePx: BACKGROUND_BLUR.edgePx * 2 });
+  });
+});
+
+describe("the mask of where the person is", () => {
+  it("is black for background, white for the person, with a short smooth step between", () => {
+    expect(maskLevel(0)).toBe(0);
+    expect(maskLevel(MASK_EDGE.low)).toBe(0);
+    expect(maskLevel(0.5)).toBeCloseTo(0.5, 5);
+    expect(maskLevel(MASK_EDGE.high)).toBe(1);
+    expect(maskLevel(1)).toBe(1);
+    expect(maskLevel(0.45)).toBeLessThan(maskLevel(0.55));
+  });
+
+  it("becomes white pixels as opaque as the model is sure", () => {
+    const out = new Uint8ClampedArray(12);
+    maskPixels(new Float32Array([0.05, 0.5, 0.98]), out);
+    expect([...out]).toEqual([255, 255, 255, 0, 255, 255, 255, 128, 255, 255, 255, 255]);
+  });
+
+  it("is small and slow enough to cost little: about 256x144 at 15 frames a second", () => {
+    expect(MASK).toMatchObject({ width: 256, height: 144, frameRate: 15 });
+    expect(MASK.bitsPerSecond).toBeLessThanOrEqual(200_000);
+  });
+
+  it("slows down once when frames take too long, and gives up if that isn't enough", () => {
+    expect(nextPace(FULL_PACE, SLOW.budgetMs - 1)).toBe(FULL_PACE);
+    const slower = nextPace(FULL_PACE, SLOW.budgetMs + 20)!;
+    expect(slower).toEqual({ intervalMs: FULL_PACE.intervalMs * 2, reduced: true });
+    expect(nextPace(slower, SLOW.budgetMs - 1)).toBe(slower); // keeps up at half rate: carries on
+    expect(nextPace(slower, SLOW.budgetMs + 20)).toBeNull(); // still too slow: blur goes off
+  });
+});
+
 describe("registering a track", () => {
   const info = (meta?: Record<string, string>) =>
     ({ sessionId: "ses", trackId: "trk_1", kind: "video", mimeType: "video/webm", startedAt: 1000.4, meta }) as TrackInfo;
 
   it("carries the filters the person had when it started", () => {
-    const filters: TrackFilters = { brightness: 1, look: "mono", touchUp: true, noiseRemoval: true };
+    const filters: TrackFilters = { brightness: 1, look: "mono", touchUp: true, background: "blur", noiseRemoval: true };
     expect(trackRequest(info({ recordingId: "rec_1", filters: JSON.stringify(filters) }))).toEqual({
       trackId: "trk_1",
       recordingId: "rec_1",
@@ -153,6 +228,14 @@ describe("registering a track", () => {
       filters,
     });
     expect(trackRequest(info({ recordingId: "rec_1", filters: JSON.stringify(NO_FILTERS) })).filters).toEqual(NO_FILTERS);
+  });
+
+  it("registers the mask of a blurred background as its own kind of track, picture only", () => {
+    const filters: TrackFilters = { ...NO_FILTERS, background: "blur" };
+    const mask = { sessionId: "ses", trackId: "trk_mask_0123456789abcdef", kind: "mask", mimeType: "video/webm;codecs=vp8", startedAt: 2000.6, meta: { recordingId: "rec_1", filters: JSON.stringify(filters) } } as TrackInfo;
+    const request = trackRequest(mask);
+    expect(request).toEqual({ trackId: "trk_mask_0123456789abcdef", recordingId: "rec_1", kind: "mask", mimeType: "video/webm;codecs=vp8", startedAt: 2001, filters });
+    expect(createTrackBody.safeParse(request).success).toBe(true);
   });
 
   it("leaves them out for a track from before filters, or one whose note can't be read", () => {

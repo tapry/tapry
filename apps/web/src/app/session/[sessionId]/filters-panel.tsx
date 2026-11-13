@@ -15,6 +15,10 @@ const BRIGHTNESS: Array<[TrackFilters["brightness"], string]> = [
   [1, "Brighter"],
   [2, "For a dark room"],
 ];
+const BACKGROUND: Array<[TrackFilters["background"], string]> = [
+  ["none", "None"],
+  ["blur", "Blur"],
+];
 const LOOK_NAMES: Record<Look, string> = { none: "None", warm: "Warm", cool: "Cool", mono: "Black & white" };
 
 /** "page": on the app's surface (green room). "stage": on the dark call stage, in both themes. */
@@ -87,6 +91,7 @@ export function FiltersPanel({
   prefs,
   onChange,
   hasCamera,
+  blur,
   tone,
   panelRef,
   onClose,
@@ -96,6 +101,8 @@ export function FiltersPanel({
   prefs: FilterPrefs;
   onChange: (next: FilterPrefs) => void;
   hasCamera: boolean;
+  /** Background blur as it stands: getting ready, why it went off by itself, turned on after recording started. */
+  blur: { status: "off" | "loading" | "ready"; problem: string | null; late?: boolean };
   tone: Tone;
   panelRef?: RefObject<HTMLDivElement | null>;
   onClose: () => void;
@@ -199,6 +206,34 @@ export function FiltersPanel({
             </div>
           </fieldset>
 
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>Background</legend>
+            <div className={cn("grid grid-cols-2 gap-0.5 rounded-md p-0.5", t.group)}>
+              {BACKGROUND.map(([value, label]) => (
+                <label key={value} className="relative flex cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`${name}-background`}
+                    className="peer sr-only"
+                    checked={filters.background === value}
+                    disabled={!canPreview}
+                    onChange={() => set({ background: value })}
+                  />
+                  <span
+                    className={cn(
+                      "flex min-h-8 flex-1 items-center justify-center rounded-[5px] px-1.5 py-1 text-center text-[13px] leading-tight transition-colors peer-disabled:opacity-50",
+                      "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
+                      t.option,
+                    )}
+                  >
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <BlurNote tone={tone} on={filters.background === "blur"} blur={blur} />
+          </fieldset>
+
           <Switch tone={tone} label="Touch-up" hint="Softens the picture a little." checked={filters.touchUp} onChange={(touchUp) => set({ touchUp })} />
         </>
       )}
@@ -218,6 +253,29 @@ export function FiltersPanel({
         )}
       </p>
     </div>
+  );
+}
+
+/** Under Background: what blur is doing, or why it isn't. Announced, since it can change by itself. */
+function BlurNote({ tone, on, blur }: { tone: Tone; on: boolean; blur: { status: "off" | "loading" | "ready"; problem: string | null; late?: boolean } }) {
+  const text = blur.problem
+    ? blur.problem
+    : !on
+      ? null
+      : blur.status !== "ready"
+        ? "Getting ready…"
+        : blur.late
+          ? "Turn blur on before recording starts to have it in the finished file. This recording's file won't have it; the call does."
+          : "Blurred in the call now. The finished file is blurred from an outline of you that's recorded next to your camera.";
+  return (
+    <p
+      role="status"
+      data-testid="blur-status"
+      data-blur={blur.problem ? "problem" : !on ? "off" : blur.status}
+      className={cn("mt-1.5 text-[12.5px] leading-snug text-pretty empty:hidden", blur.problem || blur.late ? (tone === "stage" ? "text-[#ffb4a2]" : "text-warn-strong") : TONE[tone].muted)}
+    >
+      {text}
+    </p>
   );
 }
 

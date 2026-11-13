@@ -122,6 +122,12 @@ export function uploadToken(current: SessionTicket | null, info: TrackInfo | und
 export interface Pipeline {
   store: ChunkStore;
   queue: UploadQueue;
+  /**
+   * Mask tracks (background blur) upload through their own queue over the same store: they
+   * survive reloads and follow the same rules, but they never show in this person's upload
+   * figures, hold back "all uploaded", or take an upload slot from the camera and mic.
+   */
+  maskQueue: UploadQueue;
   transport: AppTransport;
   /** False when IndexedDB was unavailable and chunks only live in memory. */
   durable: boolean;
@@ -147,10 +153,14 @@ export function getPipeline(): Promise<Pipeline> {
     const listeners = new Set<(p: UploadProgress) => void>();
     const transport = new AppTransport(store);
     const queue = new UploadQueue({ store, transport, onProgress: (p) => listeners.forEach((fn) => fn(p)) });
-    await queue.resume().catch((err) => console.error("[recording] resume failed", err));
+    const maskQueue = new UploadQueue({ store, transport, concurrency: 1 });
+    await queue.resume({ only: (t) => t.kind !== "mask" }).catch((err) => console.error("[recording] resume failed", err));
+    // After the recording's own leftovers, and never in their way.
+    void maskQueue.resume({ only: (t) => t.kind === "mask" }).catch((err) => console.warn("[recording] mask resume failed", err));
     return {
       store,
       queue,
+      maskQueue,
       transport,
       durable,
       subscribe(fn) {
@@ -179,7 +189,15 @@ export interface RecordingOptions {
    * false, an idle queue doesn't mean everything is sent.
    */
   onLocalActive?: (active: boolean) => void;
+  /**
+   * The mask track (background blur) couldn't be recorded. Never reported through onError: the
+   * camera and mic are recording as they were. The app turns blur off and says so.
+   */
+  onMaskProblem?: (err: unknown) => void;
 }
+
+/** A mask is a small picture, a few frames a second: this is plenty. */
+export const MASK_BITRATE = 150_000;
 
 export const VIDEO_BITRATE = { "1080p": 8_000_000, "720p": 4_000_000 } as const;
 export const AUDIO_BITRATE = 128_000;
@@ -195,8 +213,10 @@ interface PlannedTrack {
 
 /** Starts and stops this participant's local recorders as the host presses Record and Stop. */
 export class RecordingController {
-  private active: { recordingId: string; recorders: TrackRecorder[]; restarts: number } | null = null;
+  private active: { recordingId: string; recorders: TrackRecorder[]; restarts: number; hasVideo: boolean; mask?: TrackRecorder; maskOf?: MediaStream } | null = null;
   private chain: Promise<unknown> = Promise.resolve();
+  /** Where the person is, as a video to record beside the camera; null when blur is off or not ready. */
+  private maskStream: MediaStream | null = null;
 
   constructor(private opts: RecordingOptions) {}
 
@@ -220,6 +240,73 @@ export class RecordingController {
     return this.sync(null);
   }
 
+  /**
+   * Background blur's mask became available (record it beside the camera, from now on) or went
+   * away (stop recording it). Nothing here can fail the camera and mic recorders: a problem only
+   * reaches onMaskProblem.
+   */
+  setMask(stream: MediaStream | null) {
+    this.maskStream = stream;
+    this.chain = this.chain
+      .then(async () => {
+        const active = this.active;
+        if (!active) return;
+        if (stream && active.maskOf !== stream) {
+          this.stopMask(active);
+          await this.startMask(active);
+        } else if (!stream) this.stopMask(active);
+      })
+      .catch((err) => this.opts.onMaskProblem?.(err));
+    return this.chain;
+  }
+
+  /** Records the mask as a third, small track of this recording. Never throws. */
+  private async startMask(active: NonNullable<RecordingController["active"]>) {
+    const stream = this.maskStream;
+    if (!stream || !active.hasVideo || active.mask || this.active !== active) return;
+    const { ticket, clockOffsetMs, onMaskProblem } = this.opts;
+    try {
+      const { store, maskQueue, transport } = await getPipeline();
+      const trackId = newTrackId();
+      const recorder: TrackRecorder = new TrackRecorder({
+        sessionId: ticket.sessionId,
+        trackId,
+        kind: "mask",
+        stream,
+        store,
+        queue: maskQueue,
+        mimeType: pickMimeType("mask"),
+        videoBitsPerSecond: MASK_BITRATE,
+        // The same clock as the camera's track, so the worker can lay one over the other.
+        now: () => Math.round(localNow() + clockOffsetMs),
+        meta: trackMeta(ticket, active.recordingId),
+        // A still picture can encode to nothing for a while: that isn't a stalled recording.
+        stallMs: 0,
+        onError: (err) => console.warn("[recording] mask", err),
+        onUnexpectedStop: () => {
+          if (active.mask !== recorder) return;
+          active.mask = active.maskOf = undefined;
+          onMaskProblem?.(new Error("The mask recorder stopped"));
+        },
+      });
+      active.mask = recorder;
+      active.maskOf = stream;
+      await recorder.start();
+      const info = await store.getTrack(ticket.sessionId, trackId);
+      if (info) transport.register(info).catch(() => {});
+    } catch (err) {
+      active.mask = active.maskOf = undefined;
+      onMaskProblem?.(err);
+    }
+  }
+
+  /** Stops the mask's recorder; what it recorded uploads and completes like any track. */
+  private stopMask(active: NonNullable<RecordingController["active"]>) {
+    const mask = active.mask;
+    active.mask = active.maskOf = undefined;
+    if (mask) void mask.stop().catch(() => {});
+  }
+
   private async start(recordingId: string) {
     const { ticket, stream } = this.opts;
     const audio = stream.getAudioTracks()[0];
@@ -230,11 +317,13 @@ export class RecordingController {
     // Camera with sound, so the video file is usable on its own too.
     if (video) plan.push({ kind: "video", stream, videoBitsPerSecond: VIDEO_BITRATE[ticket.studio.settings.videoQuality] });
 
-    const active = { recordingId, recorders: [] as TrackRecorder[], restarts: 0 };
+    const active: NonNullable<RecordingController["active"]> = { recordingId, recorders: [], restarts: 0, hasVideo: !!video };
     this.active = active;
     this.opts.onLocalActive?.(true);
     const trackIds: string[] = [];
     for (const p of plan) trackIds.push(await this.startTrack(active, p));
+    // With background blur on: the mask, from the same moment as the camera (it can't throw).
+    await this.startMask(active);
     await this.register(trackIds);
   }
 
@@ -255,13 +344,7 @@ export class RecordingController {
       // The same clock the offset was measured on (Date.now() can jump if the system clock is
       // adjusted), in whole milliseconds like every timestamp the server takes.
       now: () => Math.round(localNow() + clockOffsetMs),
-      meta: {
-        recordingId: active.recordingId,
-        participantId: ticket.participantId,
-        token: ticket.token,
-        // Only noted for the server; the recorder gets the plain stream, as always.
-        filters: JSON.stringify(getFilterPrefs().filters),
-      },
+      meta: trackMeta(ticket, active.recordingId),
       onError: this.opts.onError,
       onRecovered: this.opts.onRecovered,
       onUnexpectedStop: () => this.restart(active, p),
@@ -301,12 +384,24 @@ export class RecordingController {
     const active = this.active;
     if (!active) return;
     this.active = null;
+    this.stopMask(active); // not waited for: the mask never holds up the real tracks
     try {
       await Promise.all(active.recorders.map((r) => r.stop()));
     } finally {
       this.opts.onLocalActive?.(false);
     }
   }
+}
+
+/** What is kept with each track on the device: which recording, whose, and their filters at the time. */
+function trackMeta(ticket: SessionTicket, recordingId: string): Record<string, string> {
+  return {
+    recordingId,
+    participantId: ticket.participantId,
+    token: ticket.token,
+    // Only noted for the server; the recorder gets the plain stream, as always.
+    filters: JSON.stringify(getFilterPrefs().filters),
+  };
 }
 
 function newTrackId() {

@@ -66,6 +66,8 @@ RUN useradd --system --uid 1001 --home-dir /app tapry
 WORKDIR /app
 COPY --from=build --chown=tapry /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=tapry /repo/apps/web/.next/static ./apps/web/.next/static
+# The background-blur model and its runtime (MediaPipe), served by this server like everything else.
+COPY --from=build --chown=tapry /repo/apps/web/public ./apps/web/public
 # The standalone worker (docker-compose `worker` service): one bundled file.
 COPY --from=build --chown=tapry /repo/apps/web/dist-worker/worker.cjs ./worker.cjs
 USER tapry

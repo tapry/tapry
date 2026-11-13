@@ -21,6 +21,13 @@ describe("pickMimeType", () => {
     );
   });
 
+  it("picks a picture-only format for a mask track: WebM VP8, else VP9, else MP4 (Safari)", () => {
+    expect(pickMimeType("mask", supports("video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm;codecs=vp9,opus"))).toBe("video/webm;codecs=vp8");
+    expect(pickMimeType("mask", supports("video/webm;codecs=vp9", "video/mp4"))).toBe("video/webm;codecs=vp9");
+    expect(pickMimeType("mask", supports("video/mp4;codecs=avc1.42E01E", "video/mp4"))).toBe("video/mp4;codecs=avc1.42E01E");
+    expect(() => pickMimeType("mask", supports("audio/webm"))).toThrow(/No supported/);
+  });
+
   it("throws when nothing is supported", () => {
     expect(() => pickMimeType("audio", () => false)).toThrow(/No supported/);
   });

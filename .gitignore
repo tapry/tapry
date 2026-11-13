@@ -27,3 +27,6 @@ apps/worker/src/**/*.d.ts
 apps/worker/test/**/*.js
 apps/worker/test/**/*.js.map
 apps/worker/test/**/*.d.ts
+
+# MediaPipe's WebAssembly runtime, copied from node_modules (apps/web/scripts/copy-mediapipe.mjs)
+apps/web/public/mediapipe/

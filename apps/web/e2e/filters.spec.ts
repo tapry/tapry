@@ -141,7 +141,8 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
     // Brighter and back, and the picture back to colour and to black and white again.
     await filtersButton(guest).click();
     await panel(guest).getByText("Brighter").click();
-    await panel(guest).getByText("None", { exact: true }).click();
+    // "None" is also an option under Background: this is the Look one.
+    await panel(guest).getByRole("group", { name: "Look" }).getByText("None", { exact: true }).click();
     await expect(guest.getByTestId("filtered-picture")).toBeVisible(); // still brighter
     await panel(guest).getByText("As it is").click();
     await expect(guest.getByTestId("filtered-picture")).toHaveCount(0); // no filters: the plain <video> again

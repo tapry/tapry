@@ -4,6 +4,7 @@ import { hasVideoFilters, NO_FILTERS, type TrackFilters } from "@tapry/shared";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/components/ui";
 import { canPreviewFilters, drawFiltered, fitSize, onEachFrame } from "@/lib/client/filter-picture";
+import { getPersonMask } from "@/lib/client/person-mask";
 
 /** The preview is drawn like the call's copy, so what you see is what the others get. */
 const PREVIEW = { maxHeight: 360, frameRate: 24 };
@@ -51,7 +52,9 @@ export function SelfVideo({
         c.width = size.width;
         c.height = size.height;
       }
-      drawFiltered(ctx, v, c.width, c.height, latest.current);
+      const f = latest.current;
+      // Background blur: the same mask the call's copy is drawn with (the whole picture, until there is one).
+      drawFiltered(ctx, v, c.width, c.height, f, f.background === "blur" ? getPersonMask() : null);
     };
     draw();
     // Nobody sees a hidden tab's preview: the drawing pauses there.

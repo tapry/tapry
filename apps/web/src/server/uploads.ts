@@ -106,6 +106,10 @@ export class UploadService {
     if (body.startedAt < recording.started_at - LATE_TRACK_SLACK_MS) {
       throw new ApiError(409, "track_too_early", "This track began before the recording did");
     }
+    // A mask is a small video of where the person is; anything else under that name isn't one.
+    if (body.kind === "mask" && !/^video\//i.test(body.mimeType)) {
+      throw new ApiError(400, "invalid_mask", "A mask track must be a video");
+    }
     const trackId = body.trackId ?? newId("trk");
     if (recording.mine >= MAX_TRACKS_PER_PERSON) {
       const [known] = await this.db.query("SELECT 1 FROM tracks WHERE id = $1 AND participant_id = $2", [trackId, p.id]);

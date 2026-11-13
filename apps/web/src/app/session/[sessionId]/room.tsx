@@ -10,6 +10,7 @@ import { mb } from "@/lib/format";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
 import { createFilterSync, onTrackRegistered, useFilterPrefs, type FilterSync } from "@/lib/client/filters";
+import { useBackgroundBlur } from "@/lib/client/person-mask";
 import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid, type Layout } from "./call-grid";
@@ -43,6 +44,12 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const call = useCall(ticket, ready.stream, !ended, prefs.filters);
   const hasCamera = ready.stream.getVideoTracks().length > 0;
   const filtersPanel = useFiltersPanel(true);
+  // Background blur: where the person is, from its own copy of the camera. The mask is drawn
+  // into the call's copy and this person's tile, and recorded as a small third track; whatever
+  // goes wrong with it turns blur off and never touches the camera and mic recording.
+  const blur = useBackgroundBlur(hasCamera ? ready.stream : null, prefs);
+  const blurGiveUp = useRef(blur.giveUp);
+  blurGiveUp.current = blur.giveUp;
 
   // A change of filters during the session goes to the server a moment later (new tracks carry
   // theirs when they start). Never waited for; a failed send goes again with the next change.
@@ -93,6 +100,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
       },
       onRecovered: () => setRecorderError(null),
       onLocalActive: setLocalActive,
+      onMaskProblem: (err) => {
+        console.warn("[recording] mask", err);
+        blurGiveUp.current("recorder");
+      },
     });
     return () => {
       setTimeout(() => {
@@ -104,9 +115,18 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   }, [ticket, ready]);
 
   const recording = state?.recording?.status === "recording" ? state.recording : null;
+  // Before following the recording, so a recording that starts now has the mask from its first moment.
+  useEffect(() => {
+    void controller.current?.setMask(blur.maskStream);
+  }, [blur.maskStream]);
   useEffect(() => {
     if (state) void controller.current?.sync(recording?.id ?? null);
   }, [state, recording?.id]);
+  // The finished file is only blurred when the mask covers the recording from its start.
+  const blurAtStart = useRef<{ id: string; covered: boolean } | null>(null);
+  if (recording && blurAtStart.current?.id !== recording.id) blurAtStart.current = { id: recording.id, covered: blur.status === "ready" };
+  if (recording && blur.status !== "ready" && blurAtStart.current) blurAtStart.current.covered = false;
+  const blurLate = !!recording && !blurAtStart.current?.covered;
 
   // Closing the tab now would lose what hasn't reached the server yet.
   const unsent = !!recording || localActive || (upload !== null && !upload.idle);
@@ -554,6 +574,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     prefs={prefs}
                     onChange={setPrefs}
                     hasCamera={hasCamera && !cameraOff}
+                    blur={{ ...blur, late: blurLate }}
                     tone="stage"
                     onClose={filtersPanel.close}
                     className={cn(

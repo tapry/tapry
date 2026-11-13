@@ -14,6 +14,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   flips your own preview. If a filter can't be applied, the file is kept as recorded and the
   host is told. Database: `tracks.filters`, `recordings.apply_filters`, `recordings.filters_failed`
   (added automatically on start).
+- **Background blur** (in Filters). The camera is still recorded untouched. The person's device
+  works out where they are (MediaPipe's selfie segmenter, served by your own server, never a
+  CDN) and records a small black-and-white outline next to the camera; the call sees the
+  blurred background live, and the finished video is blurred from that outline. Turn it on
+  before recording starts to have it in the file. If the outline is missing or doesn't cover
+  the video, the file is kept unblurred and the host is told; it never holds up or costs
+  anyone's files. Self-hosters: nothing to set up; the image is about 20 MB larger.
 - **New logo**, "hanging tracks": separate tracks hanging from one line.
 
 - **New design.** The app and the website follow one design: grey neutrals, a terracotta accent

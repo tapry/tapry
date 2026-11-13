@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
 import { canPreviewFilters, startFilteredTrack, type FilteredTrack } from "./filter-picture";
+import { getPersonMask } from "./person-mask";
 
 export type CallStatus = "off" | "connecting" | "connected" | "reconnecting" | "failed";
 
@@ -241,7 +242,8 @@ async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters
 // ── Filters on the call's copies ─────────────────────────────────────────────
 
 const filteredCopy = (clone: MediaStreamTrack, filters: TrackFilters) =>
-  startFilteredTrack(clone, { maxHeight: CALL_VIDEO.height, frameRate: CALL_VIDEO.frameRate, filters });
+  // Background blur uses the mask the room keeps running (person-mask.ts); until there is one, the whole picture is blurred.
+  startFilteredTrack(clone, { maxHeight: CALL_VIDEO.height, frameRate: CALL_VIDEO.frameRate, filters, mask: getPersonMask });
 
 /** Stops the canvas picture, and the camera copy behind it (LiveKit only stops the track it holds). */
 function releasePicture(local: LocalTracks) {

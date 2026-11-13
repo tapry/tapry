@@ -270,4 +270,12 @@ ALTER TABLE recordings ADD COLUMN apply_filters boolean NOT NULL DEFAULT true;
 -- applied to them: { name, kind }, shown to the host. Written with every run, like skipped_tracks.
 ALTER TABLE recordings ADD COLUMN filters_failed jsonb NOT NULL DEFAULT '[]';
 `,
+  `
+-- A "mask" track: a small black-and-white video of where the person is in their picture, which
+-- their device records next to the camera when they blur their background. It only helps render
+-- their video: it is never a file or a recording of theirs, and is left out wherever tracks are
+-- counted or shown (every such query says kind <> 'mask').
+ALTER TABLE tracks DROP CONSTRAINT tracks_kind_check;
+ALTER TABLE tracks ADD CONSTRAINT tracks_kind_check CHECK (kind IN ('audio', 'video', 'mask'));
+`,
 ];

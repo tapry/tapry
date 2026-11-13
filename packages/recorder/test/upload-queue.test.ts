@@ -197,6 +197,32 @@ describe("UploadQueue", () => {
       expect(transport.completed).toEqual([{ ...track, stoppedAt: 12_000, lastSeq: null, interrupted: true }]);
     });
 
+    it("takes only the tracks it is asked to, when two queues share a store", async () => {
+      const mask: TrackInfo = { ...track, trackId: "m1", kind: "mask", mimeType: "video/webm;codecs=vp8" };
+      await store.putTrack({ ...track, stoppedAt: 8_000, lastSeq: 1 });
+      await store.putTrack({ ...mask, stoppedAt: 8_000, lastSeq: 1 });
+      await putChunks(store, 2);
+      await putChunks(store, 2, "m1");
+      const maskTransport = new FakeTransport();
+      const maskQueue = new UploadQueue({ store, transport: maskTransport, random: () => 1 });
+      try {
+        await queue.resume({ only: (t) => t.kind !== "mask" });
+        await queue.drain();
+        // The recording's queue is done and idle while the mask's chunks still wait.
+        expect([...transport.uploaded.keys()].sort()).toEqual(["t1/0", "t1/1"]);
+        expect(queue.progress()).toMatchObject({ idle: true, pendingChunks: 0, pendingTracks: 0 });
+        expect(await store.listChunks("s1", "m1")).toHaveLength(2);
+
+        await maskQueue.resume({ only: (t) => t.kind === "mask" });
+        await maskQueue.drain();
+        expect([...maskTransport.uploaded.keys()].sort()).toEqual(["m1/0", "m1/1"]);
+        expect(maskTransport.completed.map((t) => t.kind)).toEqual(["mask"]);
+        expect(await store.listTracks()).toEqual([]);
+      } finally {
+        maskQueue.close();
+      }
+    });
+
     it("skips tracks a live recorder in another tab still holds", async () => {
       const held = { held: [{ name: "opentake:track:s1:t1" }] };
       vi.stubGlobal("navigator", { locks: { query: async () => held } });

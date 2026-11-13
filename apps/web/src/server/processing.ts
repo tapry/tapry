@@ -6,6 +6,9 @@ import { newId } from "./ids";
 import type { Participant } from "./live";
 import type { Storage } from "./storage";
 
+/** See `maybeEnqueue`: the most a mask still uploading holds processing back. */
+export const MASK_GRACE_MS = 15_000;
+
 export type ProcessingStatus = "pending" | "queued" | "processing" | "ready" | "failed";
 
 /** A running job's step: collecting the uploads, rendering file `done + 1` of `total`, saving, transcribing. */
@@ -82,24 +85,33 @@ export class ProcessingService {
     private db: Db,
     private storage: Storage,
     private onChange: (sessionId: string) => void = () => {},
+    /** How long processing waits for a mask that is still uploading once everything else is in. */
+    private maskGraceMs = MASK_GRACE_MS,
   ) {}
 
   /**
-   * Queue processing once the recording has stopped and every track is fully uploaded.
-   * Called after Stop and after each track completes, so the last upload triggers it.
+   * Queue processing once the recording has stopped and every media track (sound, camera) is
+   * fully uploaded. Called after Stop and after each track completes, so the last upload triggers it.
+   *
+   * Masks (background blur) never decide this. One still uploading only holds the start back
+   * by MASK_GRACE_MS, since it usually lands a moment after its camera track and rendering
+   * twice costs more than waiting; after that the files are made without it (that person's
+   * blur is reported as not applied). When it does arrive, this is called again like for any
+   * late track, and the files are made again with it.
    */
   async maybeEnqueue(recordingId: string) {
-    const [r] = await this.db.query<{ status: string; tracks: number; open: number }>(
+    const [r] = await this.db.query<{ status: string; tracks: number; open: number; open_masks: number }>(
       `SELECT r.status,
-              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
-              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS open
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask') AS tracks,
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask' AND t.status = 'recording') AS open,
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind = 'mask' AND t.status = 'recording') AS open_masks
        FROM recordings r WHERE r.id = $1 AND r.deleted_at IS NULL AND r.raw_deleted_at IS NULL`,
       [recordingId],
     );
     if (r?.status === "stopped" && r.tracks > 0 && r.open === 0) {
       // Everyone's upload is in (the first time only: a late re-upload doesn't move it).
       await this.db.query("UPDATE recordings SET uploaded_at = coalesce(uploaded_at, now()) WHERE id = $1", [recordingId]);
-      await this.enqueue(recordingId, { rerunIfRunning: true });
+      await this.enqueue(recordingId, { rerunIfRunning: true, delayMs: r.open_masks > 0 ? this.maskGraceMs : 0 });
     }
   }
 
@@ -108,15 +120,24 @@ export class ProcessingService {
    * that `rerunIfRunning` has a running job go again: it has already read its chunks, and a late
    * track would otherwise be missing from "ready" files with nothing to say so.
    */
-  async enqueue(recordingId: string, opts: { rerunIfRunning?: boolean } = {}) {
+  async enqueue(recordingId: string, opts: { rerunIfRunning?: boolean; /** Start no sooner than this (waiting for a mask). */ delayMs?: number } = {}) {
+    const delayMs = opts.delayMs ?? 0;
     // The row lock orders this against a job finishing, so the request can't fall between the two.
     const inserted = await this.db.transaction(async (tx) => {
       await tx.query("SELECT 1 FROM recordings WHERE id = $1 FOR UPDATE", [recordingId]);
       const rows = await tx.query(
-        `INSERT INTO jobs (id, type, recording_id) VALUES ($1, 'process_recording', $2)
+        `INSERT INTO jobs (id, type, recording_id, run_after) VALUES ($1, 'process_recording', $2, now() + make_interval(secs => $3))
          ON CONFLICT (recording_id, type) WHERE status IN ('queued', 'running') DO NOTHING RETURNING id`,
-        [newId("job"), recordingId],
+        [newId("job"), recordingId, delayMs / 1000],
       );
+      if (rows.length === 0 && delayMs === 0) {
+        // Nothing left to wait for (the mask arrived, or the host said go): a job that was waiting starts now.
+        await tx.query(
+          `UPDATE jobs SET run_after = now() WHERE recording_id = $1 AND type = 'process_recording'
+             AND status = 'queued' AND attempts = 0 AND run_after > now()`,
+          [recordingId],
+        );
+      }
       if (rows.length === 0 && opts.rerunIfRunning) {
         await tx.query(
           `UPDATE recordings SET rerun_requested = true WHERE id = $1 AND EXISTS (
@@ -126,13 +147,17 @@ export class ProcessingService {
       }
       return rows;
     });
-    if (inserted.length === 0) return;
+    if (inserted.length === 0) {
+      if (delayMs === 0) this.onEnqueue();
+      return;
+    }
     const [rec] = await this.db.query<{ session_id: string }>(
       "UPDATE recordings SET processing = 'queued', processing_error = NULL WHERE id = $1 RETURNING session_id",
       [recordingId],
     );
     if (rec) this.onChange(rec.session_id);
-    this.onEnqueue();
+    if (delayMs === 0) this.onEnqueue();
+    else setTimeout(() => this.onEnqueue(), delayMs + 100).unref?.();
   }
 
   /** Host presses "Process now": go ahead without the tracks that never finished uploading. */
@@ -210,8 +235,8 @@ export class ProcessingService {
     }>(
       `SELECT r.id, st.id AS studio_id, st.name AS studio_name, r.number, r.raw_deleted_at, r.session_id, r.status, r.processing, r.processing_error, r.skipped_tracks, r.transcript, r.started_at, r.stopped_at,
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
-              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id) AS tracks,
-              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.status = 'recording') AS incomplete,
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask') AS tracks,
+              (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask' AND t.status = 'recording') AS incomplete,
               r.apply_filters, r.filters_failed, EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.filters IS NOT NULL) AS has_filters,
               ${RECORDING_BYTES} AS bytes
        FROM recordings r
@@ -252,7 +277,7 @@ export class ProcessingService {
               count(DISTINCT t.id) FILTER (WHERE t.status <> 'recording')::int AS complete,
               coalesce(sum(c.bytes), 0)::bigint AS bytes
        FROM tracks t JOIN participants p ON p.id = t.participant_id LEFT JOIN chunks c ON c.track_id = t.id
-       WHERE t.recording_id = ANY($1::text[])
+       WHERE t.recording_id = ANY($1::text[]) AND t.kind <> 'mask'
        GROUP BY t.recording_id, p.id, p.display_name, p.role, p.created_at
        ORDER BY (p.role = 'host') DESC, p.created_at`,
       [rows.map((r) => r.id)],
@@ -318,7 +343,7 @@ export class ProcessingService {
     const people = await this.db.query<{ display_name: string; role: "host" | "guest"; consented_at: Date | null; consent_hash: string | null; text: string | null }>(
       `SELECT p.display_name, p.role, p.consented_at, p.consent_hash, c.text
        FROM participants p LEFT JOIN consent_texts c ON c.hash = p.consent_hash
-       WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = $1 AND t.participant_id = p.id)
+       WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = $1 AND t.participant_id = p.id AND t.kind <> 'mask')
        ORDER BY (p.role = 'host') DESC, p.created_at`,
       [recordingId],
     );
@@ -395,7 +420,7 @@ export class ProcessingService {
     const recordings = await this.db.query<{ id: string; number: number; processing: OwnRecordings["recordings"][number]["processing"] }>(
       `SELECT r.id, r.number, r.processing FROM recordings r
        WHERE r.session_id = $1 AND r.deleted_at IS NULL
-         AND EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.participant_id = $2)
+         AND EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.participant_id = $2 AND t.kind <> 'mask')
        ORDER BY r.started_at`,
       [p.sessionId, p.id],
     );
@@ -442,7 +467,7 @@ const ms = (d: Date | null) => (d ? new Date(d).getTime() : null);
 /** ORDER BY term (outputs as o): a person's sound before noise removal ("… - audio (original).wav") after their cleaned file. */
 const ORIGINAL_LAST = "(o.file_name LIKE '% - audio (original).%')";
 
-/** Bytes a recording (alias r) takes in storage: its uploaded chunks plus its processed files. */
+/** Bytes a recording (alias r) takes in storage: its uploaded chunks (masks too: they take space) plus its processed files. */
 export const RECORDING_BYTES = `(
   (SELECT coalesce(sum(c.bytes), 0) FROM chunks c JOIN tracks t ON t.id = c.track_id WHERE t.recording_id = r.id) +
   (SELECT coalesce(sum(o.bytes), 0) FROM outputs o WHERE o.recording_id = r.id)
@@ -483,7 +508,7 @@ export async function deleteRecordingIn(tx: Queryable, recordingId: string): Pro
   await tx.query(
     `DELETE FROM recap_requests q WHERE q.session_id = $1 AND NOT EXISTS (
        SELECT 1 FROM tracks t JOIN recordings r ON r.id = t.recording_id
-       WHERE t.participant_id = q.participant_id AND r.deleted_at IS NULL)`,
+       WHERE t.participant_id = q.participant_id AND t.kind <> 'mask' AND r.deleted_at IS NULL)`,
     [rec.session_id],
   );
   await tx.query(

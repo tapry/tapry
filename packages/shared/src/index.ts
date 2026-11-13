@@ -11,8 +11,13 @@ const plainText = (max: number) =>
 const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/, "expected lowercase hex SHA-256");
 const mimeType = z.string().min(1).max(200);
 
-export const trackKind = z.enum(["audio", "video"]);
+// "mask" is a small black-and-white video of where the person is in their picture, recorded
+// next to the camera when they blur their background. It only ever helps render their video:
+// it is never an output, and a missing or unreadable one costs the blur, never the recording.
+export const trackKind = z.enum(["audio", "video", "mask"]);
 export type TrackKind = z.infer<typeof trackKind>;
+/** The kinds that are a person's recording (and become files). */
+export type MediaKind = Exclude<TrackKind, "mask">;
 
 // ── Accounts ──────────────────────────────────────────────────────────────────
 
@@ -240,21 +245,27 @@ export const trackIdPattern = /^trk_[A-Za-z0-9_-]{16,40}$/;
 export const BRIGHTNESS_LEVELS = [0, 1, 2] as const; // 0: as it is, 1: brighter, 2: for a dark room
 export const LOOKS = ["none", "warm", "cool", "mono"] as const;
 export type Look = (typeof LOOKS)[number];
+export const BACKGROUNDS = ["none", "blur"] as const;
+export type Background = (typeof BACKGROUNDS)[number];
 
 export const trackFilters = z.object({
   brightness: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(0),
   look: z.enum(LOOKS).default("none"),
   /** Softens skin a little. */
   touchUp: z.boolean().default(false),
+  /** Blurs what's behind the person. Needs their device to record a mask track. */
+  background: z.enum(BACKGROUNDS).default("none"),
   /** Takes steady background noise (fans, hiss) out of the microphone. */
   noiseRemoval: z.boolean().default(false),
 });
 export type TrackFilters = z.infer<typeof trackFilters>;
 
-export const NO_FILTERS: TrackFilters = { brightness: 0, look: "none", touchUp: false, noiseRemoval: false };
+export const NO_FILTERS: TrackFilters = { brightness: 0, look: "none", touchUp: false, background: "none", noiseRemoval: false };
 
 /** Does anything here change the picture / the sound? */
-export const hasVideoFilters = (f: TrackFilters) => f.brightness !== 0 || f.look !== "none" || f.touchUp;
+export const hasVideoFilters = (f: TrackFilters) => f.brightness !== 0 || f.look !== "none" || f.touchUp || f.background !== "none";
+/** Does this need the device to work out where the person is (a mask)? */
+export const needsMask = (f: TrackFilters) => f.background !== "none";
 export const hasAudioFilters = (f: TrackFilters) => f.noiseRemoval;
 
 /**
