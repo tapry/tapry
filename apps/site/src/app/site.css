@@ -240,6 +240,7 @@ select {
 /* ── Layout switches (the designs' width checks) ────────────────────────── */
 
 .hero-app { grid-template-columns: 230px minmax(0, 1fr) 300px; }
+.hero-app[data-paused] * { animation-play-state: paused !important; }
 @media (max-width: 1179px) {
   .hero-stats { display: none !important; }
 }

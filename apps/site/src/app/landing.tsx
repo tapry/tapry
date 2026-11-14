@@ -3,9 +3,10 @@
 // The Tapry landing page, from the "Tapry Landing Tembo" design. The studio in the hero and the
 // flow panels are illustrations of the real app: demo people, but only screens, labels and
 // figures the app really has (dashboard-shell.tsx and room.tsx in apps/web).
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { BrowserIcon, type BrowserName } from "@/components/browser-icons";
 import { HeroVideo } from "@/components/hero-video";
+import { HERO_CONVERSATION_DURATION, heroSpeakerAt } from "@/components/hero-conversation";
 import { Footer } from "@/components/footer";
 import { IC, Icon, LogoMark } from "@/components/icons";
 import { Nav } from "@/components/nav";
@@ -37,6 +38,7 @@ function Face({ name, color, size, tile = false, mirror = false }: { name: strin
 }
 const MONO = "var(--mono)";
 const EASE = "cubic-bezier(.2,.7,.2,1)";
+const HERO_VIDEO_MASK = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1472 360" preserveAspectRatio="none"><rect width="480" height="360" rx="20" fill="white"/><rect x="496" width="480" height="360" rx="20" fill="white"/><rect x="992" width="480" height="360" rx="20" fill="white"/></svg>')}")`;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -328,20 +330,23 @@ function Flow() {
 }
 
 /**
- * The hero's studio: an illustration of a host's screen mid-recording. Its clock and who's
- * speaking tick here, not in the page, and stand still for visitors who asked for less motion.
+ * The hero's studio: one edited conversation drives all three camera feeds, its clock and
+ * speaking indicators. Pausing or buffering the video also stops the illustration's time.
  */
 function HeroStudio() {
   const [secs, setSecs] = useState(2537);
+  const [sp, setSpeaker] = useState(-1);
   const [videosPaused, setVideosPaused] = useState(false);
+  const playback = useRef({ time: 0, cycles: 0 });
   const reduced = useReducedMotion();
-  useEffect(() => {
-    if (reduced) return;
-    const id = setInterval(() => setSecs((x) => x + 1), 1000);
-    return () => clearInterval(id);
-  }, [reduced]);
+  const onProgress = useCallback((time: number) => {
+    const current = playback.current;
+    if (time + 0.5 < current.time) current.cycles += 1;
+    current.time = time;
+    setSecs(2537 + Math.floor(current.cycles * HERO_CONVERSATION_DURATION + time));
+    setSpeaker(heroSpeakerAt(time));
+  }, []);
   const clock = `${pad(Math.floor(secs / 60))}:${pad(secs % 60)}`;
-  const sp = Math.floor((secs - 2537) / 4) % 3;
 
   // The app's sidebar: these three links, then the studios with their recordings and space used.
   const sideNav: Array<[string, string]> = [
@@ -369,6 +374,7 @@ function HeroStudio() {
     <div className="rise9" style={{ marginTop: 56, borderRadius: "26px 26px 0 0", background: "rgba(255,255,255,.34)", padding: "8px 8px 0", backdropFilter: "blur(8px)", animationDelay: ".24s" }}>
       <div
         className="hero-app"
+        data-paused={videosPaused || reduced ? "" : undefined}
         role="group"
         aria-label="Demo: the Tapry studio while recording three people, with each person’s upload and share of the talking"
         style={{ display: "grid", height: 620, overflow: "hidden", borderRadius: "19px 19px 0 0", background: "#fafafa", color: "#18181b", textAlign: "left", fontSize: 13, maskImage: "linear-gradient(#000 72%,transparent 99%)", WebkitMaskImage: "linear-gradient(#000 72%,transparent 99%)" }}
@@ -425,10 +431,13 @@ function HeroStudio() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "16px 20px" }}>
             <div style={{ borderRadius: 12, background: "#18181b", padding: 10 }}>
-              <div style={{ display: "grid", gap: 6, gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}>
+              <div style={{ position: "relative", display: "grid", gap: "1.0869565217%", gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}>
+                {/* One frame contains all three feeds: speech and reactions cannot drift apart. */}
+                <div style={{ position: "absolute", inset: 0, maskImage: HERO_VIDEO_MASK, WebkitMaskImage: HERO_VIDEO_MASK, maskSize: "100% 100%", maskRepeat: "no-repeat" }}>
+                  <HeroVideo src="/media/hero/podcast-turns-v3.mp4" poster="/media/hero/podcast-turns-v3.webp" paused={videosPaused} onProgress={onProgress} />
+                </div>
                 {PEOPLE.map(([name], i) => (
-                  <div key={name} style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", borderRadius: 8, background: "#27272a", transition: "outline-color .4s", outline: `2px solid ${sp === i ? "#ff8f78" : "transparent"}`, outlineOffset: -2 }}>
-                    <HeroVideo src={`/media/hero/${name.toLowerCase()}.mp4`} poster={`/media/hero/${name.toLowerCase()}.webp`} paused={videosPaused} />
+                  <div key={name} style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", borderRadius: 8, transition: "outline-color .15s", outline: `2px solid ${sp === i ? "#ff8f78" : "transparent"}`, outlineOffset: -2 }}>
                     <span style={{ position: "absolute", left: 7, bottom: 7, borderRadius: 5, background: "rgba(0,0,0,.6)", padding: "2px 7px", fontSize: 11.5, color: "#fff" }}>{i === 0 ? "You" : name}</span>
                     {i === 2 && (
                       <span className="hero-call-upload" style={{ position: "absolute", right: 7, top: 7, display: "flex", alignItems: "center", gap: 4, borderRadius: 5, background: "rgba(255,255,255,.94)", padding: "2px 6px", fontSize: 11, whiteSpace: "nowrap", color: "#b45309" }}>
