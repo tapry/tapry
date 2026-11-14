@@ -25,6 +25,7 @@ import {
   soloJoinBody,
   soloSettingsBody,
   brandBody,
+  guestNoteBody,
   guideBody,
   markerBody,
   producerBody,
@@ -250,6 +251,8 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     studioCards: asUser(async (svc, user) => json(200, { studios: await svc.library.studioCards(user) })),
     /** Everyone who recorded as a guest, with the newest tech check under their name. */
     listGuests: asUser(async (svc, user) => json(200, { guests: await svc.library.guests(user) })),
+    /** A contact address and notes about a guest, kept by the account. */
+    setGuestNote: asUser(async (svc, user, req) => json(200, await svc.library.setGuestNote(user, await parseBody(req, guestNoteBody)))),
     /** Recordings with a transcript; `?q=` searches what was said. */
     listTranscripts: asUser(async (svc, user, req) => {
       const q = new URL(req.url).searchParams.get("q") ?? undefined;
@@ -435,7 +438,12 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       { viewers: true },
     ),
     /** The account's activity log, for its owner. */
-    listActivity: asUser(async (svc, user) => json(200, { activity: await svc.activity.list(user) })),
+    listActivity: asUser(async (svc, user, req) => {
+      if (new URL(req.url).searchParams.get("format") !== "csv") return json(200, { activity: await svc.activity.list(user) });
+      return new Response(await svc.activity.csv(user), {
+        headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": contentDisposition("Tapry activity log.csv"), "cache-control": "no-store" },
+      });
+    }),
     /** A recording's public share page: on or off, with or without the transcript. */
     getShare: asUser(async (svc, user, _req, params) => json(200, await svc.share.get(user, params.studioId!, params.recordingId!))),
     setShare: asUser(async (svc, user, req, params) => json(200, await svc.share.set(user, params.studioId!, params.recordingId!, await parseBody(req, shareBody))), { log: "Changed a recording's share page" }),

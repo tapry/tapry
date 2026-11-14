@@ -568,4 +568,16 @@ CREATE TABLE user_avatars (
   type text NOT NULL
 );
 `,
+  `
+-- What a host keeps about a guest: a contact address and notes. Guests have no account, so the
+-- key is the name they record under (trimmed, lower case), within the account.
+CREATE TABLE guest_notes (
+  account_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name_key text NOT NULL,
+  email text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, name_key)
+);
+`,
 ];

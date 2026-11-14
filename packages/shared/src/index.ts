@@ -86,6 +86,12 @@ export const producerBody = z.object({ producer: z.boolean() });
 /** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
 /** A studio's accent colour for guest pages; null puts Tapry's back. */
 export const brandBody = z.object({ accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable() });
+/** What a host keeps about a guest, by the name they record under. Both empty: nothing is kept. */
+export const guestNoteBody = z.object({
+  name: plainText(60),
+  email: z.union([z.literal(""), z.string().trim().email().max(200)]),
+  notes: z.string().trim().max(2000),
+});
 export const aiNotesBody = z.object({ outside: z.boolean() });
 /** How AI notes are written for this account, for its settings page. */
 export interface AiNotesView {

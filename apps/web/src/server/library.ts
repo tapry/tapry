@@ -61,7 +61,13 @@ export interface GuestRow {
   lastJoinedAt: number;
   /** The newest tech check sent under the same name in one of those studios (last 30 days), if any. */
   techCheck: { at: number; issues: Array<{ tone: "warn" | "danger"; label: string }> } | null;
+  /** What the account keeps about them: a contact address and notes (empty when nothing is). */
+  email: string;
+  notes: string;
 }
+
+/** How a guest is told apart within an account: the name they record under, trimmed, in lower case. */
+export const guestKey = (name: string) => name.trim().toLocaleLowerCase();
 
 export interface TranscriptTurn {
   speaker: string;
@@ -206,7 +212,8 @@ export class LibraryService {
       [owner.accountId],
     );
     if (rows.length === 0) return [];
-    const key = (name: string) => name.trim().toLocaleLowerCase();
+    const key = guestKey;
+    const kept = await this.db.query<{ name_key: string; email: string; notes: string }>("SELECT name_key, email, notes FROM guest_notes WHERE account_id = $1", [owner.accountId]);
     const checks = await this.db.query<{ studio_id: string; name: string; checks: TechCheckResult[]; created_at: Date }>(
       `SELECT studio_id, name, checks, created_at FROM tech_checks
        WHERE studio_id = ANY($1::text[]) AND created_at > now() - interval '30 days'
@@ -224,6 +231,8 @@ export class LibraryService {
           recordings: r.recordings,
           lastJoinedAt: at,
           techCheck: null,
+          email: "",
+          notes: "",
           studioIds: new Set([r.studio_id]),
         });
         continue;
@@ -239,8 +248,11 @@ export class LibraryService {
     return [...byName.entries()]
       .map(([k, { studioIds, ...g }]) => {
         const check = checks.find((c) => studioIds.has(c.studio_id) && key(c.name) === k);
+        const note = kept.find((n) => n.name_key === k);
         return {
           ...g,
+          email: note?.email ?? "",
+          notes: note?.notes ?? "",
           techCheck: check
             ? {
                 at: new Date(check.created_at).getTime(),
@@ -250,6 +262,25 @@ export class LibraryService {
         };
       })
       .sort((a, b) => b.lastJoinedAt - a.lastJoinedAt || a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Keep (or clear) a contact address and notes about a guest. Only for someone who has recorded
+   * in this account: there is nobody else to keep notes about. Never logged: it is about a person.
+   */
+  async setGuestNote(user: User, body: { name: string; email: string; notes: string }): Promise<{ email: string; notes: string }> {
+    const key = guestKey(body.name);
+    if (!(await this.guests(user)).some((g) => guestKey(g.name) === key)) throw new ApiError(404, "guest_not_found", "Nobody has recorded with you under that name");
+    if (!body.email && !body.notes) {
+      await this.db.query("DELETE FROM guest_notes WHERE account_id = $1 AND name_key = $2", [user.accountId, key]);
+    } else {
+      await this.db.query(
+        `INSERT INTO guest_notes (account_id, name_key, email, notes) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (account_id, name_key) DO UPDATE SET email = EXCLUDED.email, notes = EXCLUDED.notes, updated_at = now()`,
+        [user.accountId, key, body.email, body.notes],
+      );
+    }
+    return { email: body.email, notes: body.notes };
   }
 
   /**

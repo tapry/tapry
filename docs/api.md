@@ -39,7 +39,7 @@ Errors are JSON: `{ "error": "<code>", "message": "<words>" }`.
 | `GET /api/studios/:studioId/recordings/:recordingId/clips` | Its clips |
 | `GET /api/recordings/:recordingId/comments` | Its comments |
 | `GET /api/transcripts?q=words` | Recordings whose transcript contains the words |
-| `GET /api/guests` | Everyone who recorded as a guest |
+| `GET /api/guests` | Everyone who recorded as a guest, with the contact address and notes the account keeps about them |
 | `GET /api/storage` | Space used, per studio |
 | `GET /api/usage` | Recordings, recorded time, guests and transcripts: in all, and for each of the last 12 months |
 | `GET /api/studios/:studioId/brand` | The studio's accent colour and logo address for guest pages |

@@ -77,6 +77,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["POST", "/api/recordings/[recordingId]/transcript/safe", "safeTranscript"],
   ["GET", "/api/dashboard/studios", "studioCards"],
   ["GET", "/api/guests", "listGuests"],
+  ["PUT", "/api/guests/note", "setGuestNote"],
   ["GET", "/api/transcripts", "listTranscripts"],
   ["GET", "/api/storage", "storageOverview"],
   ["GET", "/api/usage", "usageStats"],

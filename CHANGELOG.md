@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Studio templates.** A new studio can start from Podcast, Research interview or Newsroom
+  interview: each fills in the options, a guide to follow in the session and, for research, a
+  consent text. Everything stays changeable.
+- **Guest contacts and notes.** On the Guests page, keep an email address and notes about a
+  guest (under the name they record with). Only your account sees them.
+- **Activity log as CSV** for the account's owner (Settings, Members).
+
 - **Research exports.** A transcript can be downloaded in the layouts research software
   imports, one entry per turn with its speaker and time: tab-delimited for NVivo (Timespan,
   Speaker, Content), and the f4 layout MAXQDA and ATLAS.ti read. Beside the share-safe

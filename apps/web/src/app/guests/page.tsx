@@ -1,3 +1,4 @@
+import { GuestNote } from "@/components/guest-note";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { CopyGuestLink } from "@/components/studio-actions";
@@ -83,12 +84,13 @@ export default async function GuestsPage() {
                       {c.label}
                     </span>
                   </span>
+                  <GuestNote name={g.name} initial={{ email: g.email, notes: g.notes }} canEdit={!user.viewer} />
                 </div>
               );
             })}
           </div>
           <p className="text-[13px] text-muted">
-            Tech check: the newest one sent under the same name in that studio, from the last 30 days. Guests have no account, so names are how
+            Contact details and notes are yours: guests never see them. Tech check: the newest one sent under the same name in that studio, from the last 30 days. Guests have no account, so names are how
             they&apos;re matched.
           </p>
         </div>
