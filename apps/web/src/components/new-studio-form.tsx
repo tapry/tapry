@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
+import { STUDIO_TEMPLATES, templateConsent, type StudioTemplate } from "@/lib/studio-templates";
 import { Stepper } from "./studio-forms";
 import { Icon, Spinner } from "./ui-extra";
 import { Avatar, CheckboxRow, cn, Logo, Notice } from "./ui";
@@ -22,6 +23,13 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
   const [echo, setEcho] = useState(true);
   const [level, setLevel] = useState(true);
   const [soundOpen, setSoundOpen] = useState(false);
+  const [template, setTemplate] = useState<StudioTemplate>(STUDIO_TEMPLATES[0]!);
+  /** A template fills the form in; what it set can still be changed below. */
+  function pick(t: StudioTemplate) {
+    setTemplate(t);
+    setGuests(t.guests);
+    setQuality(t.quality);
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = name.trim().length > 0;
@@ -41,9 +49,13 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
             audioOnly: quality === "audio",
             echoCancellation: echo,
             levelLoudness: level,
+            ...template.settings,
+            ...(template.consent ? { consentText: templateConsent(template, hostName) } : {}),
           },
         },
       });
+      // The template's guide. The studio exists either way: a failure here isn't worth stopping for.
+      if (template.guide) await apiFetch(`/studios/${studio.id}/guide`, { method: "PUT", body: { guide: template.guide } }).catch(() => {});
       router.push(`/studios/${studio.id}`);
       router.refresh();
     } catch (err) {
@@ -92,6 +104,35 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
               </span>
             </span>
           </label>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium" id="template-label">
+              Start from
+            </span>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="template-label" data-testid="templates">
+              {STUDIO_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={template.id === t.id}
+                  onClick={() => pick(t)}
+                  className={cn(
+                    "flex cursor-pointer flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
+                    template.id === t.id ? SELECTED_CARD : UNSELECTED_CARD,
+                  )}
+                >
+                  <span className="text-sm font-medium">{t.name}</span>
+                  <span className="text-[12.5px] text-muted">{t.about}</span>
+                </button>
+              ))}
+            </div>
+            {template.id !== "blank" && (
+              <span className="text-[12.5px] leading-normal text-pretty text-muted" data-testid="template-note">
+                Sets the options below{template.consent ? ", the consent text guests agree to" : ""} and a guide to follow in the session. All of it can be changed in the studio&apos;s settings.
+              </span>
+            )}
+          </div>
 
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium" id="quality-label">

@@ -132,6 +132,8 @@ describe("guests", () => {
         recordings: 1,
         lastJoinedAt: expect.any(Number),
         techCheck: { at: expect.any(Number), issues: [{ tone: "warn", label: "Upload is slow" }] },
+        email: "",
+        notes: "",
       },
     ]);
     expect((await expectOk(t.other.get("/guests"))).body.guests).toEqual([]);
@@ -262,5 +264,24 @@ describe("storage and settings", () => {
     // A deleted recording leaves the count.
     await expectOk(t.admin.del(`/studios/${t.studio.id}/recordings/${t.recordingId}`));
     expect((await expectOk(t.admin.get("/usage"))).body).toMatchObject({ recordings: 0, guests: 0 });
+  });
+
+  it("keeps a contact address and notes about a guest, for the account only", async () => {
+    const t = await twoHosts();
+    const body = { name: "  sam guest ", email: "sam@example.org", notes: "Release form signed.\nAsk about the lighthouse." };
+    expect((await expectOk(t.admin.put("/guests/note", body))).body).toEqual({ email: "sam@example.org", notes: body.notes });
+    const [guest] = (await expectOk(t.admin.get("/guests"))).body.guests;
+    expect(guest).toMatchObject({ name: "Sam Guest", email: "sam@example.org", notes: body.notes });
+
+    // Not about someone who never recorded here, not from another account, not with a bad address.
+    expect((await t.admin.put("/guests/note", { name: "Nobody", email: "", notes: "x" })).status).toBe(404);
+    expect((await t.other.put("/guests/note", body)).status).toBe(404);
+    expect((await t.admin.put("/guests/note", { ...body, email: "not an address" })).status).toBe(400);
+    expect((await t.client().put("/guests/note", body)).status).toBe(401);
+
+    // Clearing both removes what was kept.
+    await expectOk(t.admin.put("/guests/note", { name: "Sam Guest", email: "", notes: "" }));
+    expect((await expectOk(t.admin.get("/guests"))).body.guests[0]).toMatchObject({ email: "", notes: "" });
+    expect(await t.db.query("SELECT 1 FROM guest_notes")).toHaveLength(0);
   });
 });

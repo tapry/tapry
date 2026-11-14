@@ -136,6 +136,19 @@ export class ActivityService {
   }
 
   /** The newest entries, for the account's owner. */
+  /**
+   * The whole log as a CSV file (time in UTC, who, what, which thing), oldest first: for an
+   * organisation's own records. Cells that a spreadsheet would run as a formula are defused.
+   */
+  async csv(user: User): Promise<string> {
+    const rows = (await this.list(user, 50_000)).reverse();
+    const cell = (v: string) => {
+      const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+      return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    };
+    return ["Time (UTC),Who,Action,On", ...rows.map((r) => [r.at, r.who, r.action, r.target].map(cell).join(","))].join("\r\n") + "\r\n";
+  }
+
   async list(user: User, limit = 200): Promise<Activity[]> {
     if (user.accountId !== user.id) throw new ApiError(403, "owner_only", "Only the account's owner can see the activity log");
     const rows = await this.db.query<{ id: string; who: string; action: string; target: string; created_at: Date }>(

@@ -78,4 +78,23 @@ describe("activity log", () => {
     expect((await log())[0]).toEqual(["Mia", "Changed a studio", "My Podcast"]);
     expect((await log()).map((a: string[]) => a[1])).toContain("Invited someone to the account");
   });
+
+  it("downloads as a CSV for the owner, oldest first, with nothing a spreadsheet would run", async () => {
+    await t.hostBrowser.patch(`/studios/${t.studio.id}`, { name: '=HYPERLINK("x"), Inc' }, ORIGIN);
+    await t.hostBrowser.patch(`/studios/${t.studio.id}`, { name: "Plain" }, ORIGIN);
+    const user = (await expectOk(t.hostBrowser.get("/auth/me"))).body.user;
+    const lines = (await t.services.activity.csv(user)).trimEnd().split("\r\n");
+    expect(lines[0]).toBe("Time (UTC),Who,Action,On");
+    expect(lines.slice(1).map((l) => l.replace(/^[^,]+,/, ""))).toEqual([
+      "Host,Created a studio,",
+      "Host,Changed a studio,My Podcast",
+      `Host,Changed a studio,"'=HYPERLINK(""x""), Inc"`,
+    ]);
+    expect(lines[1]).toMatch(/^\d{4}-\d\d-\d\dT[\d:.]+Z,/);
+
+    const res = await t.api.listActivity(new Request("https://app.test/api/activity?format=csv", { headers: { cookie: `ot_session=${t.hostBrowser.jar.get("ot_session")}` } }), {});
+    expect(res.headers.get("content-type")).toBe("text/csv; charset=utf-8");
+    expect(res.headers.get("content-disposition")).toContain("Tapry activity log.csv");
+    expect(await res.text()).toContain("Changed a studio");
+  });
 });
