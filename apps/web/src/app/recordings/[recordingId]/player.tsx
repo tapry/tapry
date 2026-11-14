@@ -136,7 +136,7 @@ export function RecordingPlayer({ src, bytes, lengthMs }: { src: string; bytes: 
             </span>
           )}
         </div>
-        <span className="flex justify-between text-[12.5px] text-muted tabular-nums">
+        <span className="flex justify-between text-[13.5px] text-muted tabular-nums">
           <span>{failed ? "Couldn't play this file here. Download it below." : shortClock(posMs)}</span>
           <span>{shortClock(durMs)}</span>
         </span>

@@ -32,7 +32,7 @@ export function GuideEditor({ studioId, initial }: { studioId: string; initial: 
           <label htmlFor="guide" className="font-medium">
             Guide
           </label>
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             Your plan for a session: one question or segment per line, and lines starting with # as section headings. Only hosts see it, beside the call, and tick items off as they go. A tick
             during a recording sets a marker at that moment.
           </span>
@@ -50,7 +50,7 @@ export function GuideEditor({ studioId, initial }: { studioId: string; initial: 
           <Button type="button" onClick={() => void save()} disabled={text === saved}>
             Save guide
           </Button>
-          <span className="text-[13px] text-muted">
+          <span className="text-[14px] text-muted">
             {items} {items === 1 ? "item" : "items"}
           </span>
           {status && <span className={cn("text-sm", status.tone === "ok" ? "text-ok-strong" : "text-danger")}>{status.text}</span>}

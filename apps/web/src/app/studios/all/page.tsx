@@ -52,7 +52,7 @@ export default async function StudiosPage() {
                     <Link href={`/studios/${s.id}`} data-testid="studio-link" className="truncate text-base font-medium text-text hover:text-accent-strong">
                       {s.name}
                     </Link>
-                    <span className="text-[13px] text-muted">
+                    <span className="text-[14px] text-muted">
                       {s.live ? (
                         <span className="text-accent-strong">Recording now</span>
                       ) : (
@@ -71,7 +71,7 @@ export default async function StudiosPage() {
                 <Tile value={(s.recordedMs / 3_600_000).toFixed(1)} label="hours" />
                 <Tile value={formatBytes(s.bytes)} label="stored" />
               </span>
-              <span className="flex flex-col gap-2 text-[13.5px] text-text-2">
+              <span className="flex flex-col gap-2 text-[14.5px] text-text-2">
                 <span className="flex items-center gap-2">
                   <Icon name="clock" size={15} className="text-muted" />
                   {s.lastRecordingAt ? `Last recording: ${shortDate(s.lastRecordingAt, now)}` : "No recordings yet"}
@@ -110,8 +110,8 @@ export default async function StudiosPage() {
 function Tile({ value, label }: { value: string; label: string }) {
   return (
     <span className="flex min-w-0 flex-col gap-0.5 rounded-lg bg-surface-2 px-[11px] py-[9px]">
-      <span className="truncate text-[17px] font-medium whitespace-nowrap tabular-nums">{value}</span>
-      <span className="text-[12.5px] text-muted">{label}</span>
+      <span className="truncate text-[18px] font-medium whitespace-nowrap tabular-nums">{value}</span>
+      <span className="text-[13.5px] text-muted">{label}</span>
     </span>
   );
 }

@@ -28,7 +28,7 @@ export default async function TechCheckPage({ params }: { params: Promise<{ invi
       brand={brand}
       locale={locale}
       title={preview.studioName}
-      right={<span className="rounded-md bg-surface-2 px-[9px] py-1 text-[13px] font-medium whitespace-nowrap">{t("check.badge")}</span>}
+      right={<span className="rounded-md bg-surface-2 px-[9px] py-1 text-[14px] font-medium whitespace-nowrap">{t("check.badge")}</span>}
     >
       <div className="flex animate-fade-up flex-col gap-[22px] p-[clamp(20px,4vw,36px)]">
         <GuestHeading title={t("check.title", { studio: preview.studioName })}>
@@ -37,7 +37,7 @@ export default async function TechCheckPage({ params }: { params: Promise<{ invi
         <LocaleProvider locale={locale}>
           <TechCheck inviteCode={inviteCode} hostName={preview.hostName} settings={preview.settings} />
         </LocaleProvider>
-        <p className="text-[13.5px] text-muted">
+        <p className="text-[14.5px] text-muted">
           {t("check.readyNow")}{" "}
           <Link href={`/join/${inviteCode}`} className="font-medium text-text underline underline-offset-2 hover:text-accent-strong">
             {t("check.goInvite")}

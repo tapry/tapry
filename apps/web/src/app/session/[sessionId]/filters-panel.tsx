@@ -136,7 +136,7 @@ export function FiltersPanel({
             type="button"
             onClick={() => onChange(DEFAULT_PREFS)}
             disabled={!changed}
-            className={cn("cursor-pointer rounded-md px-1.5 py-0.5 text-[13px] underline underline-offset-[3px] disabled:cursor-default disabled:opacity-40", t.muted)}
+            className={cn("cursor-pointer rounded-md px-1.5 py-0.5 text-[14px] underline underline-offset-[3px] disabled:cursor-default disabled:opacity-40", t.muted)}
           >
             {tr("filters.reset")}
           </button>
@@ -156,7 +156,7 @@ export function FiltersPanel({
           <Switch tone={tone} label={tr("filters.mirror")} hint={tr("filters.mirrorHint")} checked={mirror} onChange={(v) => onChange({ ...prefs, mirror: v })} />
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>{tr("filters.brightness")}</legend>
+            <legend className={cn("mb-1.5 text-[14px]", t.muted)}>{tr("filters.brightness")}</legend>
             <div className={cn("grid grid-cols-3 gap-0.5 rounded-md p-0.5", t.group)}>
               {BRIGHTNESS.map(([value, label]) => (
                 <label key={value} className="relative flex cursor-pointer">
@@ -169,7 +169,7 @@ export function FiltersPanel({
                   />
                   <span
                     className={cn(
-                      "flex min-h-8 flex-1 items-center justify-center rounded-[5px] px-1.5 py-1 text-center text-[13px] leading-tight transition-colors",
+                      "flex min-h-8 flex-1 items-center justify-center rounded-[5px] px-1.5 py-1 text-center text-[14px] leading-tight transition-colors",
                       "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
                       t.option,
                     )}
@@ -182,7 +182,7 @@ export function FiltersPanel({
           </fieldset>
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>{tr("filters.look")}</legend>
+            <legend className={cn("mb-1.5 text-[14px]", t.muted)}>{tr("filters.look")}</legend>
             <div className="grid grid-cols-4 gap-2">
               {LOOKS.map((look) => (
                 <label key={look} className="relative flex cursor-pointer flex-col items-center gap-1.5 text-center text-xs leading-tight">
@@ -209,7 +209,7 @@ export function FiltersPanel({
           </fieldset>
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>{tr("filters.background")}</legend>
+            <legend className={cn("mb-1.5 text-[14px]", t.muted)}>{tr("filters.background")}</legend>
             <div className={cn("grid grid-cols-2 gap-0.5 rounded-md p-0.5", t.group)}>
               {BACKGROUND.map(([value, label]) => (
                 <label key={value} className="relative flex cursor-pointer">
@@ -223,7 +223,7 @@ export function FiltersPanel({
                   />
                   <span
                     className={cn(
-                      "flex min-h-8 flex-1 items-center justify-center rounded-[5px] px-1.5 py-1 text-center text-[13px] leading-tight transition-colors peer-disabled:opacity-50",
+                      "flex min-h-8 flex-1 items-center justify-center rounded-[5px] px-1.5 py-1 text-center text-[14px] leading-tight transition-colors peer-disabled:opacity-50",
                       "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
                       t.option,
                     )}
@@ -248,7 +248,7 @@ export function FiltersPanel({
         onChange={(noiseRemoval) => set({ noiseRemoval })}
       />
 
-      <p className={cn("border-t pt-3 text-[12.5px] leading-normal text-pretty", t.line, t.muted)}>
+      <p className={cn("border-t pt-3 text-[13.5px] leading-normal text-pretty", t.line, t.muted)}>
         {tr("filters.kept")}
         {hasCamera && !canPreview && (
           <span data-testid="filters-no-preview"> {tr("filters.noPreview")}</span>
@@ -275,7 +275,7 @@ function BlurNote({ tone, on, blur }: { tone: Tone; on: boolean; blur: { status:
       role="status"
       data-testid="blur-status"
       data-blur={blur.problem ? "problem" : !on ? "off" : blur.status}
-      className={cn("mt-1.5 text-[12.5px] leading-snug text-pretty empty:hidden", blur.problem || blur.late ? (tone === "stage" ? "text-[#ffb4a2]" : "text-warn-strong") : TONE[tone].muted)}
+      className={cn("mt-1.5 text-[13.5px] leading-snug text-pretty empty:hidden", blur.problem || blur.late ? (tone === "stage" ? "text-[#ffb4a2]" : "text-warn-strong") : TONE[tone].muted)}
     >
       {text}
     </p>
@@ -328,7 +328,7 @@ function Switch({
     >
       <span className="flex min-w-0 flex-col gap-px">
         <span className="font-medium">{label}</span>
-        <span id={hintId} className={cn("text-[12.5px] leading-snug", t.muted)}>
+        <span id={hintId} className={cn("text-[13.5px] leading-snug", t.muted)}>
           {hint}
         </span>
       </span>

@@ -112,7 +112,7 @@ export function OwnStorage({ initial }: { initial: OwnStorageView }) {
     <ListCard data-testid="own-storage" className="pb-4">
       <span className="flex flex-col gap-1 border-b border-border pt-3 pb-3">
         <span className="font-medium">Your own storage</span>
-        <span className="text-[13px] leading-normal text-pretty text-muted">
+        <span className="text-[14px] leading-normal text-pretty text-muted">
           Connect an S3-compatible bucket (Amazon S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO) and your recordings are stored there instead: the pieces guests upload, the finished files and
           the transcripts. Sessions you open from then on use it; earlier recordings stay where they are.
         </span>
@@ -150,7 +150,7 @@ export function OwnStorage({ initial }: { initial: OwnStorageView }) {
             <Notice tone="warn" data-testid="own-storage-unproven">
               Saved, but not in use yet. {blocked ?? "An upload from a browser hasn't been tried."} Guests upload straight from their browsers, so the bucket must allow uploads from this
               address. Add this as the bucket&apos;s CORS rules, then check again:
-              <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-surface p-3 font-mono text-[12px] leading-relaxed text-text-2">{cors}</pre>
+              <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-surface p-3 font-mono text-[13px] leading-relaxed text-text-2">{cors}</pre>
             </Notice>
           )}
           <div className="flex flex-wrap gap-2">
@@ -166,7 +166,7 @@ export function OwnStorage({ initial }: { initial: OwnStorageView }) {
               {busy === "remove" ? "Removing…" : "Stop using it"}
             </Button>
           </div>
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             Stopping or changing only affects sessions you open afterwards. Recordings already in a bucket stay there, and Tapry keeps that bucket&apos;s settings to go on showing them.
           </span>
         </div>
@@ -194,7 +194,7 @@ export function OwnStorage({ initial }: { initial: OwnStorageView }) {
             </Field>
           </div>
           <CheckboxRow name="forcePathStyle" defaultChecked={t?.forcePathStyle ?? true} label="Path-style addresses" description="Needed by most providers other than Amazon S3." />
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             Use a key that can only read, write and delete in this one bucket. Tapry writes a small test file and removes it, then tries an upload from this browser.
           </span>
           {error && <Notice tone="danger">{error}</Notice>}

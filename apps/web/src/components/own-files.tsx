@@ -15,7 +15,7 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
     <>
       {recordings.map((r) => (
         <div key={r.number} className="flex flex-col gap-2">
-          {several && <span className="text-[13px] text-muted">{t("files.recordingN", { n: r.number })}</span>}
+          {several && <span className="text-[14px] text-muted">{t("files.recordingN", { n: r.number })}</span>}
           {r.processing === "ready" && r.files.length > 0 ? (
             <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] py-1">
               {r.files.map((f, i) => (
@@ -34,7 +34,7 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
                         {f.kind === "audio" ? t("files.audio") : f.kind === "screen" ? t("files.screen") : t("files.video")}
                         {isOriginalAudio(f.fileName) && ` ${t("files.original")}`}
                       </span>
-                      <span className="text-[12.5px] text-muted">
+                      <span className="text-[13.5px] text-muted">
                         {f.fileName.split(".").pop()!.toUpperCase()} · {mb(f.bytes)}
                       </span>
                     </span>

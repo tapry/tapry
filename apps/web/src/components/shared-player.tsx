@@ -16,8 +16,8 @@ export function SharedTranscript({ turns }: { turns: NonNullable<SharedRecording
   return (
     <div className="flex flex-col" data-testid="shared-transcript">
       {turns.map((t, i) => (
-        <p key={`${t.startMs}-${i}`} className="border-t border-divider py-2.5 text-[14.5px] leading-relaxed text-pretty">
-          <span className="font-medium">{t.speaker || "Someone"}</span> <span className="text-[12.5px] text-muted tabular-nums">{shortClock(t.startMs)}</span>
+        <p key={`${t.startMs}-${i}`} className="border-t border-divider py-2.5 text-[15.5px] leading-relaxed text-pretty">
+          <span className="font-medium">{t.speaker || "Someone"}</span> <span className="text-[13.5px] text-muted tabular-nums">{shortClock(t.startMs)}</span>
           <br />
           <span className="text-text-2">{t.text}</span>
         </p>

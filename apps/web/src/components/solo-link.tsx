@@ -32,12 +32,12 @@ export function SoloLink({ studioId, initial }: { studioId: string; initial: { c
       <div className="flex flex-col gap-3 py-4">
         <span className="flex flex-col gap-[3px]">
           <span className="font-medium">Solo link</span>
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             A link where one person records alone, without you and without a call: answers to your questions, a statement, a voice note. They start and stop it themselves, up to 30 minutes, and
             each one arrives here as a recording. Anyone with the link can record, so share it with the people you mean.
           </span>
         </span>
-        <label htmlFor="solo-prompt" className="text-[13px] text-muted">
+        <label htmlFor="solo-prompt" className="text-[14px] text-muted">
           What you ask them (one question per line; they see it before and while they record)
         </label>
         <textarea
@@ -51,7 +51,7 @@ export function SoloLink({ studioId, initial }: { studioId: string; initial: { c
         />
         {link && (
           <div className="flex flex-wrap items-center gap-2">
-            <input readOnly value={link} aria-label="Solo link" className="h-[34px] min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-2.5 text-[13px] text-text-2" onFocus={(e) => e.target.select()} />
+            <input readOnly value={link} aria-label="Solo link" className="h-[34px] min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-2.5 text-[14px] text-text-2" onFocus={(e) => e.target.select()} />
             <Button
               type="button"
               variant="secondary"

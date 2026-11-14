@@ -20,14 +20,14 @@ export function UploadSpeed({ endpoint }: { endpoint: string }) {
   return (
     <div className="flex flex-col gap-[18px] rounded-[20px] border border-border bg-surface p-[clamp(20px,4vw,28px)]" data-testid="upload-speed">
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-[22px] font-medium tracking-[-.02em]">Upload speed test</h2>
-        <p className="text-[15px] leading-[1.55] text-muted">Everything is kept on your computer while you record, and sent as fast as your line allows.</p>
+        <h2 className="text-[23px] font-medium tracking-[-.02em]">Upload speed test</h2>
+        <p className="text-[16px] leading-[1.55] text-muted">Everything is kept on your computer while you record, and sent as fast as your line allows.</p>
       </div>
       <div
         className="flex flex-col items-center gap-1.5 rounded-[14px] px-5 py-9"
         style={{ background: "linear-gradient(200deg,var(--accent-tint),var(--accent-soft))" }}
       >
-        <span className="text-[64px] leading-none font-medium tracking-[-.04em] tabular-nums" data-testid={done ? "upload-mbps" : undefined}>
+        <span className="text-[65px] leading-none font-medium tracking-[-.04em] tabular-nums" data-testid={done ? "upload-mbps" : undefined}>
           {state.status === "done" && state.mbps !== null ? mbit(state.mbps) : "—"}
         </span>
         <span className="text-sm text-muted">Mbit/s upload</span>
@@ -38,7 +38,7 @@ export function UploadSpeed({ endpoint }: { endpoint: string }) {
       </Button>
       {state.status === "done" && state.mbps !== null && (
         <>
-          <ul className="flex flex-col gap-2 text-[14.5px]">
+          <ul className="flex flex-col gap-2 text-[15.5px]">
             {uploadVerdicts(state.mbps).map((v) => (
               <li key={v.kind} className="flex items-start gap-2" data-verdict={v.ok ? "ok" : "slow"}>
                 <Icon name={v.ok ? "check" : "alert"} className={cn("mt-0.5", v.ok ? "text-ok-strong" : "text-warn-strong")} />

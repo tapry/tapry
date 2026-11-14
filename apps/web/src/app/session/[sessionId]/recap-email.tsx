@@ -51,10 +51,10 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
               {busy ? t("recap.saving") : t("recap.submit")}
             </Button>
           </div>
-          <p className="text-[13px] text-muted">{t("recap.hint")}</p>
+          <p className="text-[14px] text-muted">{t("recap.hint")}</p>
         </form>
       ) : (
-        <p className="text-[13.5px] leading-normal text-text-2">
+        <p className="text-[14.5px] leading-normal text-text-2">
           {recap.status === "pending"
             ? t("recap.pending", { email: recap.email ?? "" })
             : recap.status === "sent"

@@ -5,6 +5,16 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Appearance: light, dark or system** (Settings, Account). Kept in the browser, applied
+  before the page paints. Until now the app only followed the system.
+- **A warmer light theme.** Paper-toned neutrals instead of cold greys and near-white, white
+  cards on a soft background, and a calm frame behind the dashboard in place of the terracotta
+  backdrop (which stays on the sign-in and guest pages). Dark is unchanged.
+- **Text is one pixel larger** throughout the app, and the option cards have less padding.
+
+- **Selected option cards** (recording quality, templates) have a thin edge and a light fill
+  instead of a thick outline.
+
 - **The app is a little smaller on computers** (drawn at 90%), so the dashboard and the
   studio room fit a laptop screen better. Phones and tablets keep full size.
 

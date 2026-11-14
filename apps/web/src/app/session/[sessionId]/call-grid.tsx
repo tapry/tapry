@@ -113,7 +113,7 @@ export function CallGrid({
               {recording ? "You're sharing your screen. It is being recorded." : "You're sharing your screen. It is recorded while a recording runs."}
             </div>
           )}
-          <span className={cn("absolute flex max-w-[calc(100%-20px)] items-center bg-black/60", full ? "bottom-3 left-3 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 rounded-[7px] px-[9px] py-1 text-[13px]")}>
+          <span className={cn("absolute flex max-w-[calc(100%-20px)] items-center bg-black/60", full ? "bottom-3 left-3 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 rounded-[7px] px-[9px] py-1 text-[14px]")}>
             <span className="truncate">{screen.label}</span>
           </span>
         </div>
@@ -225,7 +225,7 @@ function Tile({
       <span
         className={cn(
           "absolute flex max-w-[calc(100%-20px)] items-center bg-black/60",
-          full ? "bottom-3 left-3 gap-2 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 gap-[7px] rounded-[7px] px-[9px] py-1 text-[13px]",
+          full ? "bottom-3 left-3 gap-2 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 gap-[7px] rounded-[7px] px-[9px] py-1 text-[14px]",
         )}
       >
         {micMuted && <MicOffIcon />}
@@ -237,7 +237,7 @@ function Tile({
         <span
           className={cn(
             "absolute flex max-w-[calc(100%-20px)] items-center gap-[5px] overflow-hidden bg-white/95 whitespace-nowrap text-[#b45309]",
-            full ? "top-3 right-3 rounded-lg px-2.5 py-[5px] text-[12.5px] font-medium" : "top-2.5 right-2.5 rounded-[7px] px-2 py-[3px] text-xs",
+            full ? "top-3 right-3 rounded-lg px-2.5 py-[5px] text-[13.5px] font-medium" : "top-2.5 right-2.5 rounded-[7px] px-2 py-[3px] text-xs",
           )}
         >
           <Icon d={ICON.cloudUp} className="size-[13px]" />

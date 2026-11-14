@@ -34,7 +34,7 @@ export function AiNotesSetting({ initial }: { initial: AiNotesView }) {
       <ListCard data-testid="ai-notes">
         <div className="flex flex-col gap-[3px] py-4">
           {title}
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             {what} Written by an AI model on this server ({view.localModel}): the transcript doesn&apos;t leave it.
           </span>
         </div>
@@ -46,7 +46,7 @@ export function AiNotesSetting({ initial }: { initial: AiNotesView }) {
       <ListCard data-testid="ai-notes">
         <div className="flex flex-col gap-[3px] py-4">
           {title}
-          <span className="text-[13px] leading-normal text-pretty text-muted">{what} Not set up on this server.</span>
+          <span className="text-[14px] leading-normal text-pretty text-muted">{what} Not set up on this server.</span>
         </div>
       </ListCard>
     );
@@ -57,14 +57,14 @@ export function AiNotesSetting({ initial }: { initial: AiNotesView }) {
       <label className={cn("flex items-center justify-between gap-x-6 gap-y-3 py-4", locked ? "cursor-not-allowed" : "cursor-pointer")}>
         <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
           {title}
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             {what} To write them, each recording&apos;s transcript text is sent to Anthropic, an outside AI company ({view.outsideModel}). Sound and picture are never sent. Off, nothing is sent
             and no notes are written.
           </span>
-          {!view.planAllows && <span className="text-[13px] text-warn-strong">{view.outsideOn ? "Your plan no longer includes AI notes, so none are written." : "AI notes are part of the paid plans."}</span>}
-          {!view.canChange && <span className="text-[13px] text-muted">Only the account&apos;s owner can change this.</span>}
+          {!view.planAllows && <span className="text-[14px] text-warn-strong">{view.outsideOn ? "Your plan no longer includes AI notes, so none are written." : "AI notes are part of the paid plans."}</span>}
+          {!view.canChange && <span className="text-[14px] text-muted">Only the account&apos;s owner can change this.</span>}
           {error && (
-            <span role="alert" className="text-[13px] text-danger">
+            <span role="alert" className="text-[14px] text-danger">
               {error}
             </span>
           )}

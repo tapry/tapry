@@ -182,7 +182,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
         </HeadphonesBox>
 
         {ticket.role === "host" && (
-          <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
+          <label className="flex cursor-pointer items-start gap-2.5 text-[14.5px] leading-[1.45] text-text-2">
             <input type="checkbox" checked={producer} onChange={(e) => setProducer(e.target.checked)} className="mt-0.5 size-4 shrink-0" data-testid="join-as-producer" />
             <span>Join as producer: I&apos;m in the call and at the controls, but I&apos;m not recorded and not in the files.</span>
           </label>
@@ -217,7 +217,7 @@ export function HeadphonesBox({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
+    <label className="flex cursor-pointer items-start gap-2.5 text-[14.5px] leading-[1.45] text-text-2">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 shrink-0" />
       <span>{children}</span>
     </label>
@@ -371,7 +371,7 @@ export function Preview({
         className={cn("transition-opacity duration-300", !hasVideo && "opacity-0")}
       />
       {!hasVideo && (
-        <div className="absolute inset-0 grid place-items-center px-5 text-center text-[14.5px] text-white">
+        <div className="absolute inset-0 grid place-items-center px-5 text-center text-[15.5px] text-white">
           {audioOnly
             ? t("gr.soundOnlyStudio")
             : cameraOff
@@ -413,7 +413,7 @@ export function Preview({
               />
             ))}
           </span>
-          <span className="text-[12.5px] whitespace-nowrap">
+          <span className="text-[13.5px] whitespace-nowrap">
             {!level.live ? (failed ? t("gr.noMic") : t("gr.starting")) : level.suspended ? t("gr.clickToStart") : t(`level.short.${level.state}`)}
           </span>
         </span>
@@ -456,7 +456,7 @@ export function LevelAdvice({ state, live, suspended }: { state: LevelState; liv
   return (
     <p
       className={cn(
-        "flex items-start gap-2 text-[13.5px] leading-[1.45]",
+        "flex items-start gap-2 text-[14.5px] leading-[1.45]",
         suspended ? "text-muted" : state === "clipping" ? "text-accent-strong" : "text-warn-strong",
       )}
     >

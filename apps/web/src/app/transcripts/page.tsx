@@ -30,7 +30,7 @@ export default async function TranscriptsPage({ searchParams }: { searchParams: 
     <DashboardShell user={user} studios={studios} current="transcripts" title="Transcripts">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <PageTitle>Transcripts</PageTitle>
-        <span className={cn("text-[13px]", model?.found === false ? "text-accent-strong" : "text-muted")}>
+        <span className={cn("text-[14px]", model?.found === false ? "text-accent-strong" : "text-muted")}>
           {!model
             ? "Transcripts are off on this server (WHISPER_MODEL)"
             : model.found === false
@@ -67,7 +67,7 @@ export default async function TranscriptsPage({ searchParams }: { searchParams: 
                   <Link href={`/recordings/${t.recordingId}`} className="truncate font-medium text-text hover:text-accent-strong">
                     {t.studioName} · Recording {t.number}
                   </Link>
-                  <span className="truncate text-[13px] text-muted">{t.snippet ?? (t.state === "ready" ? "No words" : "—")}</span>
+                  <span className="truncate text-[14px] text-muted">{t.snippet ?? (t.state === "ready" ? "No words" : "—")}</span>
                 </span>
                 <span className="whitespace-nowrap text-muted">{t.words === null ? "—" : `${t.words.toLocaleString("en-US")} words`}</span>
                 <span className="flex items-center justify-between gap-2">
@@ -87,7 +87,7 @@ export default async function TranscriptsPage({ searchParams }: { searchParams: 
                           key={label}
                           href={outputUrl(t.studioId, t.recordingId, id)}
                           aria-label={`Download the ${label} transcript of Recording ${t.number}`}
-                          className="rounded-[4px] border border-border bg-surface px-1.5 py-px text-[11px] text-text transition-colors hover:bg-surface-2 hover:text-text"
+                          className="rounded-[4px] border border-border bg-surface px-1.5 py-px text-[12px] text-text transition-colors hover:bg-surface-2 hover:text-text"
                         >
                           {label}
                         </a>

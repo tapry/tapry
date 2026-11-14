@@ -84,10 +84,10 @@ export function AppFrame({ sidebar, crumbs, actions, children }: { sidebar: Reac
   };
 
   return (
-    <div className="bg-ember h-dvh md:p-[22px]">
+    <div className="bg-shell h-dvh md:p-[22px]">
       <div
         className={cn(
-          "relative grid h-full grid-cols-[0px_minmax(0,1fr)] overflow-hidden bg-canvas text-sm text-text ember-card md:rounded-[19px]",
+          "relative grid h-full grid-cols-[0px_minmax(0,1fr)] overflow-hidden bg-canvas text-sm text-text shell-card md:rounded-[19px]",
           animate && "transition-[grid-template-columns] duration-[450ms] ease-[cubic-bezier(.2,.7,.2,1)]",
           !collapsed && "md:grid-cols-[248px_minmax(0,1fr)]",
         )}

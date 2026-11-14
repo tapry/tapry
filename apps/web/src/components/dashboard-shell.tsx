@@ -70,7 +70,7 @@ export async function DashboardShell({
   const sidebar = (
     <div className="flex h-full w-[248px] flex-col gap-0.5 overflow-x-hidden overflow-y-auto border-r border-border px-3 pt-3.5">
       <div className="flex items-center justify-between gap-2 px-1 pt-0.5 pb-3.5 whitespace-nowrap">
-        <Link href="/studios" aria-label="Tapry home" className="flex items-center gap-[9px] text-[15px] font-medium text-text hover:text-text">
+        <Link href="/studios" aria-label="Tapry home" className="flex items-center gap-[9px] text-[16px] font-medium text-text hover:text-text">
           <LogoMark className="size-6" />
           Tapry
         </Link>
@@ -79,7 +79,7 @@ export async function DashboardShell({
             href="/studios/new"
             aria-label="New studio"
             title="New studio"
-            className="grid size-7 place-items-center rounded-md border border-border bg-surface text-[15px] text-muted transition-colors hover:border-ink hover:text-text"
+            className="grid size-7 place-items-center rounded-md border border-border bg-surface text-[16px] text-muted transition-colors hover:border-ink hover:text-text"
           >
             +
           </Link>
@@ -89,19 +89,19 @@ export async function DashboardShell({
 
       <PageNav items={pages(user)} active={active} />
 
-      <span className="flex items-center justify-between px-2 pt-[18px] pb-1.5 text-[13px] whitespace-nowrap text-muted">
+      <span className="flex items-center justify-between px-2 pt-[18px] pb-1.5 text-[14px] whitespace-nowrap text-muted">
         Recent recordings
-        <Link href="/recordings" className="text-[13px] text-muted hover:text-accent-strong">
+        <Link href="/recordings" className="text-[14px] text-muted hover:text-accent-strong">
           View all
         </Link>
       </span>
       <RecentNav items={recent} serverNow={serverNow} currentId={currentRecordingId} />
 
       <span className="sticky bottom-0 mt-auto flex shrink-0 items-center gap-2.5 border-t border-border bg-canvas px-2 pt-3 pb-3.5 whitespace-nowrap">
-        <Avatar name={user.name} src={user.avatarUrl} className="size-[26px] text-[10px]" />
+        <Avatar name={user.name} src={user.avatarUrl} className="size-[26px] text-[11px]" />
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-sm">{user.name}</span>
-          <span className="truncate text-[12.5px] text-muted" title={user.email}>
+          <span className="truncate text-[13.5px] text-muted" title={user.email}>
             {user.isAdmin ? "Admin" : "Host"} · {user.email}
           </span>
         </span>
@@ -113,13 +113,13 @@ export async function DashboardShell({
   return (
     <AppFrame
       sidebar={sidebar}
-      crumbs={<span className="min-w-0 truncate text-[15px] font-medium">{title ?? "Studios"}</span>}
+      crumbs={<span className="min-w-0 truncate text-[16px] font-medium">{title ?? "Studios"}</span>}
       actions={
         <>
           {studio && <CopyGuestLink inviteCode={studio.inviteCode} look="icon" />}
           <OpenStudioAction studioId={target?.id ?? null} label="Open studio" look="top" iconOnlyOnPhone />
           <span title={user.name} className="ml-1 hidden sm:inline-flex">
-            <Avatar name={user.name} src={user.avatarUrl} className="size-[26px] text-[10px]" />
+            <Avatar name={user.name} src={user.avatarUrl} className="size-[26px] text-[11px]" />
           </span>
         </>
       }

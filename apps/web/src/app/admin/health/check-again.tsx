@@ -30,7 +30,7 @@ export function CallProbe({ url }: { url: string }) {
     };
   }, [url]);
   return (
-    <span className={state && !state.ok ? "text-[13px] text-accent-strong" : "text-[13px] text-muted"} data-testid="call-probe" data-ok={state ? String(state.ok) : undefined}>
+    <span className={state && !state.ok ? "text-[14px] text-accent-strong" : "text-[14px] text-muted"} data-testid="call-probe" data-ok={state ? String(state.ok) : undefined}>
       {!state
         ? "Testing from this browser…"
         : state.ok

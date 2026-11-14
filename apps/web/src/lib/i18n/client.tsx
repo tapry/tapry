@@ -29,7 +29,7 @@ export function errorText(err: unknown, locale: Locale, fallback: string): strin
 /** The guest's language, changed in place: kept in a cookie for a year, and the page is loaded again in it. */
 export function LanguagePicker({ locale, label }: { locale: Locale; label: string }) {
   return (
-    <label className="flex items-center gap-2 text-[13px] text-white/85">
+    <label className="flex items-center gap-2 text-[14px] text-white/85">
       <span className="sr-only">{label}</span>
       <svg viewBox="0 0 24 24" className="size-[15px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 0 20a15.3 15.3 0 0 1 0-20z" />
@@ -41,7 +41,7 @@ export function LanguagePicker({ locale, label }: { locale: Locale; label: strin
           document.cookie = `${LOCALE_COOKIE}=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
           window.location.reload();
         }}
-        className="cursor-pointer rounded-md border border-white/25 bg-black/25 px-2 py-1 text-[13px] text-white focus:outline-2 focus:outline-white"
+        className="cursor-pointer rounded-md border border-white/25 bg-black/25 px-2 py-1 text-[14px] text-white focus:outline-2 focus:outline-white"
       >
         {LOCALES.map((l) => (
           <option key={l} value={l} lang={l} className="text-black">

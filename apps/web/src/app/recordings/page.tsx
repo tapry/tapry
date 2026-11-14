@@ -81,7 +81,7 @@ export default async function RecordingsPage({ searchParams }: { searchParams: P
                   <Faces names={r.people.map((p) => p.name)} className="w-[62px]" />
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="truncate font-medium">Recording {r.number}</span>
-                    <span className="truncate text-[13px] text-muted">
+                    <span className="truncate text-[14px] text-muted">
                       {r.studioName}
                       <span className="sm:hidden">
                         {" "}

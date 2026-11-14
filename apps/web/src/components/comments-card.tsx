@@ -45,7 +45,7 @@ export function CommentsCard({ recordingId, comments }: { recordingId: string; c
     <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="comments">
       <span className="pt-3 pb-2 font-medium">Comments{comments.length > 0 && <span className="font-normal text-muted"> · {comments.length}</span>}</span>
       {comments.map((c) => (
-        <span key={c.id} className="flex flex-col gap-0.5 border-t border-divider py-2.5 text-[13.5px]" data-testid="comment">
+        <span key={c.id} className="flex flex-col gap-0.5 border-t border-divider py-2.5 text-[14.5px]" data-testid="comment">
           <span className="flex items-center justify-between gap-3">
             <span>
               <span className="font-medium">{c.author}</span>
@@ -53,7 +53,7 @@ export function CommentsCard({ recordingId, comments }: { recordingId: string; c
               <span className="text-muted"> · {new Date(c.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
             </span>
             {c.mine && (
-              <button type="button" disabled={busy} onClick={() => void run(() => apiFetch(`/recordings/${recordingId}/comments/${c.id}`, { method: "DELETE" }))} className="cursor-pointer text-[12.5px] text-danger underline underline-offset-[3px]">
+              <button type="button" disabled={busy} onClick={() => void run(() => apiFetch(`/recordings/${recordingId}/comments/${c.id}`, { method: "DELETE" }))} className="cursor-pointer text-[13.5px] text-danger underline underline-offset-[3px]">
                 Delete
               </button>
             )}
@@ -62,11 +62,11 @@ export function CommentsCard({ recordingId, comments }: { recordingId: string; c
         </span>
       ))}
       <form onSubmit={add} className="flex flex-wrap items-end gap-2 border-t border-divider pt-3">
-        <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex flex-col gap-1 text-[13.5px] text-muted">
           At (optional)
           <input name="at" placeholder="1:05" className={`${field} h-[34px] w-[84px]`} />
         </label>
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[13.5px] text-muted">
           Comment
           <textarea name="body" required maxLength={2000} rows={1} className={`${field} py-1.5`} />
         </label>
@@ -75,7 +75,7 @@ export function CommentsCard({ recordingId, comments }: { recordingId: string; c
         </Button>
       </form>
       {problem && (
-        <span role="alert" className="pt-2 text-[13px] text-danger">
+        <span role="alert" className="pt-2 text-[14px] text-danger">
           {problem}
         </span>
       )}

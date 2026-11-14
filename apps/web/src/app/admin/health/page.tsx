@@ -32,9 +32,9 @@ export default async function HealthPage() {
     <DashboardShell user={user} studios={studios} title="Server health" current="health">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[26px] leading-tight font-medium tracking-[-.02em]">Server health</h1>
+          <h1 className="text-[27px] leading-tight font-medium tracking-[-.02em]">Server health</h1>
           <p
-            className={cn("flex items-center gap-[7px] text-[13px]", problems ? "text-accent-strong" : warnings ? "text-warn-strong" : "text-ok-strong")}
+            className={cn("flex items-center gap-[7px] text-[14px]", problems ? "text-accent-strong" : warnings ? "text-warn-strong" : "text-ok-strong")}
             data-testid="health-summary"
           >
             <Icon name={problems || warnings ? "alert" : "check"} />
@@ -51,7 +51,7 @@ export default async function HealthPage() {
       </div>
 
       <ListCard>
-        <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">Checks</span>
+        <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">Checks</span>
         <ul aria-label="Checks" className="flex flex-col">
           {report.checks.map((c) => (
             <li
@@ -67,7 +67,7 @@ export default async function HealthPage() {
                   <span className={cn(c.tone === "danger" ? "text-accent-strong" : c.tone === "warn" ? "text-warn-strong" : "text-text-2")}>{c.summary}</span>
                 </span>
                 {c.details.map((d) => (
-                  <span key={d} className="text-[13px] break-words text-muted">
+                  <span key={d} className="text-[14px] break-words text-muted">
                     {d}
                   </span>
                 ))}
@@ -90,10 +90,10 @@ export default async function HealthPage() {
                   data-testid="worker"
                 >
                   <span className="font-medium">{w.kind === "inprocess" ? "Inside the web server" : `Worker …${w.id.slice(-6)}`}</span>
-                  <span className="text-[13px] text-muted">version {w.version}</span>
-                  <span className="text-[13px] text-muted">seen {formatWhen(w.seenAt, report.checkedAt)}</span>
-                  {w.info.tmpFreeBytes !== null && <span className="text-[13px] text-muted">{formatBytes(w.info.tmpFreeBytes)} free</span>}
-                  <span className="text-[13px] text-muted">transcripts {w.info.whisper ? (w.info.whisper.modelFound ? "on" : "model missing") : "off"}</span>
+                  <span className="text-[14px] text-muted">version {w.version}</span>
+                  <span className="text-[14px] text-muted">seen {formatWhen(w.seenAt, report.checkedAt)}</span>
+                  {w.info.tmpFreeBytes !== null && <span className="text-[14px] text-muted">{formatBytes(w.info.tmpFreeBytes)} free</span>}
+                  <span className="text-[14px] text-muted">transcripts {w.info.whisper ? (w.info.whisper.modelFound ? "on" : "model missing") : "off"}</span>
                 </li>
               ))}
             </ul>

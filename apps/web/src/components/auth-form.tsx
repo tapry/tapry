@@ -66,7 +66,7 @@ export function AuthForm({
             Password
           </label>
           {!signup && canReset && (
-            <Link href="/forgot" className="text-[13px] text-muted underline underline-offset-[3px] hover:text-accent-strong">
+            <Link href="/forgot" className="text-[14px] text-muted underline underline-offset-[3px] hover:text-accent-strong">
               Forgot it?
             </Link>
           )}
@@ -93,7 +93,7 @@ export function AuthForm({
             <Icon name={showPassword ? "eyeOff" : "eye"} />
           </button>
         </span>
-        {signup && <span className="text-[13px] text-muted">At least 10 characters.</span>}
+        {signup && <span className="text-[14px] text-muted">At least 10 characters.</span>}
       </div>
       {signup && firstAccount && setupRequired && (
         <Field label="Setup code" hint="SETUP_TOKEN in the server's .env file: only whoever installed it can take charge.">
@@ -112,7 +112,7 @@ export function AuthForm({
         {busy ? "One moment…" : signup ? "Create account" : "Log in"}
       </Button>
       {!signup && (
-        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 text-[13.5px] text-text-2">
+        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 text-[14.5px] text-text-2">
           <Icon name="link" />
           Got a guest link? Open it to join. Guests never need an account.
         </div>

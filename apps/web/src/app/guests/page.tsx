@@ -55,7 +55,7 @@ export default async function GuestsPage() {
       ) : (
         <div className="flex flex-col gap-2.5">
           <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface px-[18px] py-1">
-            <div className={cn("hidden gap-4 border-b border-border py-2.5 text-[13px] text-muted sm:grid", COLS)}>
+            <div className={cn("hidden gap-4 border-b border-border py-2.5 text-[14px] text-muted sm:grid", COLS)}>
               <span>Guest</span>
               <span>Recordings</span>
               <span>Last joined</span>
@@ -66,10 +66,10 @@ export default async function GuestsPage() {
               return (
                 <div key={g.name} className={cn("grid grid-cols-1 items-center gap-x-4 gap-y-1.5 border-b border-divider py-3 last:border-0", COLS)}>
                   <span className="flex min-w-0 items-center gap-3">
-                    <Avatar name={g.name} className="size-7 text-[11px]" />
+                    <Avatar name={g.name} className="size-7 text-[12px]" />
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate font-medium">{g.name}</span>
-                      <span className="truncate text-[13px] text-muted">{g.studios.map((s) => s.name).join(", ")}</span>
+                      <span className="truncate text-[14px] text-muted">{g.studios.map((s) => s.name).join(", ")}</span>
                     </span>
                   </span>
                   <span className="text-muted">
@@ -89,7 +89,7 @@ export default async function GuestsPage() {
               );
             })}
           </div>
-          <p className="text-[13px] text-muted">
+          <p className="text-[14px] text-muted">
             Contact details and notes are yours: guests never see them. Tech check: the newest one sent under the same name in that studio, from the last 30 days. Guests have no account, so names are how
             they&apos;re matched.
           </p>

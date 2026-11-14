@@ -69,11 +69,11 @@ export function PlanPanel({
       <ListCard data-testid="plan-panel">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-divider py-4">
           <span className="flex min-w-0 flex-col gap-[3px]">
-            <span className="text-[13px] text-muted">Your plan</span>
+            <span className="text-[14px] text-muted">Your plan</span>
             <span className="text-lg font-medium" data-testid="plan-name">
               {plan.name}
             </span>
-            <span className="text-[13px] text-muted">{price(plan)}</span>
+            <span className="text-[14px] text-muted">{price(plan)}</span>
           </span>
           {billing.manageUrl?.startsWith("/api/") ? (
             // A form post: the session is minted for this account on the server, then Paddle's page opens.
@@ -92,17 +92,17 @@ export function PlanPanel({
         </div>
 
         {billing.status === "past_due" && (
-          <p className="border-b border-divider py-3 text-[13.5px] text-warn-strong" data-testid="plan-past-due">
+          <p className="border-b border-divider py-3 text-[14.5px] text-warn-strong" data-testid="plan-past-due">
             The last payment didn&apos;t go through. The plan stays on while the payment is tried again.
           </p>
         )}
         {billing.status === "canceled" && billing.endsAt && (
-          <p className="border-b border-divider py-3 text-[13.5px] text-muted" data-testid="plan-ends">
+          <p className="border-b border-divider py-3 text-[14.5px] text-muted" data-testid="plan-ends">
             Canceled: this plan runs until {day(billing.endsAt)}, then the account is on {PLANS.free.name}.
           </p>
         )}
         {billing.status !== "canceled" && billing.endsAt && (
-          <p className="border-b border-divider py-3 text-[13.5px] text-muted" data-testid="plan-ends">
+          <p className="border-b border-divider py-3 text-[14.5px] text-muted" data-testid="plan-ends">
             This plan runs until {day(billing.endsAt)}, then the account is on {PLANS.free.name}.
           </p>
         )}
@@ -119,7 +119,7 @@ export function PlanPanel({
               <div className={cn("h-full rounded-full", usedUp ? "bg-warn" : "bg-ink")} style={{ width: `${share * 100}%` }} />
             </div>
           )}
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             {usedUp
               ? `This month's hours are used up: Record is off until ${day(billing.periodEnd)}, or until you move to a bigger plan. A recording that is running is never stopped.`
               : `Counted per recording, not per person. They start again on ${day(billing.periodEnd)}.`}
@@ -132,20 +132,20 @@ export function PlanPanel({
 
       {billing.upgrades.length > 0 && (
         <ListCard>
-          <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">Bigger plans. Paying happens on our payment provider&apos;s page; no card detail reaches Tapry.</span>
+          <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">Bigger plans. Paying happens on our payment provider&apos;s page; no card detail reaches Tapry.</span>
           {billing.upgrades.map(({ plan: p, url, yearlyUrl }, i) => (
             <div key={p.id} className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4", i < billing.upgrades.length - 1 && "border-b border-divider")}>
               <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
                 <span className="font-medium">
                   {p.name} · {price(p)}
                 </span>
-                <span className="text-[13px] leading-normal text-muted">
+                <span className="text-[14px] leading-normal text-muted">
                   {p.hours === null ? "No limit on hours" : `${p.hours} recording hours a month`}, files kept {p.filesDays === null ? "until you delete them" : `${p.filesDays} days`}
                 </span>
               </span>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 {yearlyUrl && p.monthlyUsd !== null && (
-                  <a href={yearlyUrl} data-testid={`upgrade-${p.id}-yearly`} className="text-[13px] text-muted underline underline-offset-[3px] hover:text-accent-strong">
+                  <a href={yearlyUrl} data-testid={`upgrade-${p.id}-yearly`} className="text-[14px] text-muted underline underline-offset-[3px] hover:text-accent-strong">
                     or ${(p.monthlyUsd * 10).toLocaleString("en-US")} a year
                   </a>
                 )}
@@ -175,7 +175,7 @@ function Line({ label, value, help, last }: { label: string; value: ReactNode; h
     <div className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4", !last && "border-b border-divider")}>
       <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
         <span className="font-medium">{label}</span>
-        <span className="text-[13px] leading-normal text-pretty text-muted">{help}</span>
+        <span className="text-[14px] leading-normal text-pretty text-muted">{help}</span>
       </span>
       <span className="text-text-2">{value}</span>
     </div>

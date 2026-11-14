@@ -69,19 +69,19 @@ export function SafeTranscript({ recordingId }: { recordingId: string }) {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="safe-transcript">
       <span className="pt-3 pb-2 font-medium">Share-safe transcript</span>
-      <span className="border-t border-divider pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+      <span className="border-t border-divider pt-3 text-[14.5px] leading-normal text-pretty text-muted">
         A copy of the transcript for passing on: made when you ask, never stored. Only the text changes. The sound and picture still say what was said, and a transcript can miss or mishear a
         name, so read it before you share it.
       </span>
-      <label className="flex cursor-pointer items-start gap-2.5 pt-3 text-[13.5px] leading-snug">
+      <label className="flex cursor-pointer items-start gap-2.5 pt-3 text-[14.5px] leading-snug">
         <input type="checkbox" checked={pseudonyms} onChange={(e) => (setPseudonyms(e.target.checked), setFound(null))} className="mt-0.5 size-4 shrink-0" />
         <span>Replace speakers&apos; names with Speaker 1, Speaker 2…, also where their names are said</span>
       </label>
-      <label className="flex cursor-pointer items-start gap-2.5 pt-2 text-[13.5px] leading-snug">
+      <label className="flex cursor-pointer items-start gap-2.5 pt-2 text-[14.5px] leading-snug">
         <input type="checkbox" checked={contacts} onChange={(e) => (setContacts(e.target.checked), setFound(null))} className="mt-0.5 size-4 shrink-0" />
         <span>Mask email addresses, phone numbers and web addresses</span>
       </label>
-      <label className="flex flex-col gap-1 pt-3 text-[12.5px] text-muted">
+      <label className="flex flex-col gap-1 pt-3 text-[13.5px] text-muted">
         Other words or names to mask (one per line, or separated by commas)
         <textarea
           value={terms}
@@ -102,19 +102,19 @@ export function SafeTranscript({ recordingId }: { recordingId: string }) {
         ))}
       </span>
       <span className="flex flex-wrap items-center gap-[5px] pt-2.5" data-testid="research-exports">
-        <span className="text-[12.5px] text-muted">For research software:</span>
+        <span className="text-[13.5px] text-muted">For research software:</span>
         {RESEARCH.map(([format, name, fileName]) => (
           <button key={format} type="button" disabled={busy} onClick={() => void download(format, fileName)} className="cursor-pointer rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-text transition-colors hover:bg-surface-2 disabled:opacity-50">
             {name}
           </button>
         ))}
       </span>
-      <span className="pt-1.5 text-[12.5px] leading-normal text-pretty text-muted">
+      <span className="pt-1.5 text-[13.5px] leading-normal text-pretty text-muted">
         One entry per turn with its speaker and time, masked as chosen above (untick both to keep it as spoken). NVivo: import as transcript entries, tab-delimited, without a header row, fields
         Timespan, Speaker, Content. MAXQDA and ATLAS.ti: import as a transcript with timestamps.
       </span>
       {found && (
-        <span role="status" className="pt-2 text-[13px] text-text-2" data-testid="safe-counts">
+        <span role="status" className="pt-2 text-[14px] text-text-2" data-testid="safe-counts">
           {total === 0 && found.speakers === 0
             ? "Nothing to mask was found."
             : [
@@ -130,7 +130,7 @@ export function SafeTranscript({ recordingId }: { recordingId: string }) {
         </span>
       )}
       {problem && (
-        <span role="alert" className="pt-2 text-[13px] text-danger">
+        <span role="alert" className="pt-2 text-[14px] text-danger">
           {problem}
         </span>
       )}

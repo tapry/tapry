@@ -5,20 +5,21 @@
  * Components use the Tailwind names below (bg-surface-2, text-muted, …), never raw colors.
  */
 :root {
-  --bg: #ffffff;
-  --surface: #ffffff; /* cards, inputs, panels on the light grey app background */
-  --surface-2: #f4f4f5; /* chips, segmented controls, quiet panels */
-  --canvas: #fafafa; /* the app's background and the card around auth/guest screens */
-  --border: #e4e4e7;
-  --border-strong: #d4d4d8;
-  --divider: #f4f4f5; /* rows inside a card */
-  --text: #18181b;
-  --text-2: #3f3f46;
-  --muted: #71717a;
-  --subtle: #a1a1aa;
-  --ink: #18181b; /* dark buttons */
-  --ink-hover: #3f3f46;
-  --ink-text: #fafafa;
+  /* Light: warm paper neutrals (stone), which sit better beside the terracotta than cold greys. */
+  --bg: #faf9f7;
+  --surface: #ffffff; /* cards, inputs, panels on the app's background */
+  --surface-2: #efece8; /* chips, segmented controls, quiet panels */
+  --canvas: #f5f3f0; /* the app's background and the card around auth/guest screens: warm enough that white cards stand on it */
+  --border: #e5e1db;
+  --border-strong: #d3cdc5;
+  --divider: #f0ede9; /* rows inside a card */
+  --text: #1c1917;
+  --text-2: #44403c;
+  --muted: #736b65;
+  --subtle: #a8a29e;
+  --ink: #1c1917; /* dark buttons */
+  --ink-hover: #44403c;
+  --ink-text: #fafaf9;
   --accent: #e8553d; /* terracotta: record, the one main action */
   --accent-hover: #c43c25;
   --accent-strong: #c43c25; /* terracotta text on light backgrounds */
@@ -35,10 +36,13 @@
   --warn-soft: #fffbeb;
   --warn-line: #fde68a;
   --danger: #dc2626; /* form errors */
-  --ring: #18181b;
-  --ring-soft: rgb(24 24 27 / 0.1);
+  --ring: #1c1917;
+  --ring-soft: rgb(28 25 23 / 0.1);
   /* Not named --shadow-xs: the theme key below has that name, and a variable can't refer to itself. */
-  --elev-xs: 0 1px 2px rgb(0 0 0 / 0.05);
+  --elev-xs: 0 1px 2px rgb(28 25 23 / 0.06);
+  /* Behind the dashboard's frame: quiet in the light, the deep terracotta in the dark. */
+  --shell-1: #ebe6e0;
+  --shell-2: #ddd5cc;
   /* The terracotta backdrop (.bg-ember) and the halo round the card on it. */
   --ember-1: #7d2613;
   --ember-2: #a83a1e;
@@ -47,48 +51,66 @@
   --ember-halo: rgb(255 255 255 / 0.34);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #09090b;
-    --surface: #18181b;
-    --surface-2: #27272a;
-    --canvas: #111113;
-    --border: #2e2e33;
-    --border-strong: #3f3f46;
-    --divider: #232327;
-    --text: #fafafa;
-    --text-2: #d4d4d8;
-    --muted: #a1a1aa;
-    --subtle: #71717a;
-    --ink: #fafafa;
-    --ink-hover: #d4d4d8;
-    --ink-text: #18181b;
-    --accent: #ef6a51;
-    --accent-hover: #f47a5f;
-    --accent-strong: #f8937c;
-    --accent-soft: #3a1a14;
-    --accent-tint: #2a1813;
-    --accent-line: #6b3227;
-    --accent-text: #1d0f0c; /* dark on the lighter terracotta: 6.1:1 (white would be 3.1:1) */
-    --ok: #22c55e;
-    --ok-strong: #4ade80;
-    --ok-soft: #10261a;
-    --ok-line: #1e5135;
-    --warn: #f59e0b;
-    --warn-strong: #fbbf24;
-    --warn-soft: #2b2110;
-    --warn-line: #5a4417;
-    --danger: #f87171;
-    --ring: #fafafa;
-    --ring-soft: rgb(250 250 250 / 0.12);
-    --elev-xs: 0 1px 2px rgb(0 0 0 / 0.4);
-    /* A dark card in a bright peach frame glares: deeper terracotta and a faint halo. */
-    --ember-1: #1f0d08;
-    --ember-2: #34140c;
-    --ember-3: #4d1d10;
-    --ember-4: #6b2a17;
-    --ember-halo: rgb(255 255 255 / 0.07);
-  }
+/*
+ * Dark: when the person chose it, or left it to their system and the system is dark. The
+ * choice is turned into data-theme on <html> before the first paint (src/lib/appearance.ts),
+ * so every rule that differs in the dark is written against that attribute, never against the
+ * system's setting directly.
+ */
+:root[data-theme="dark"] {
+  --bg: #09090b;
+  --surface: #18181b;
+  --surface-2: #27272a;
+  --canvas: #111113;
+  --border: #2e2e33;
+  --border-strong: #3f3f46;
+  --divider: #232327;
+  --text: #fafafa;
+  --text-2: #d4d4d8;
+  --muted: #a1a1aa;
+  --subtle: #71717a;
+  --ink: #fafafa;
+  --ink-hover: #d4d4d8;
+  --ink-text: #18181b;
+  --accent: #ef6a51;
+  --accent-hover: #f47a5f;
+  --accent-strong: #f8937c;
+  --accent-soft: #3a1a14;
+  --accent-tint: #2a1813;
+  --accent-line: #6b3227;
+  --accent-text: #1d0f0c; /* dark on the lighter terracotta: 6.1:1 (white would be 3.1:1) */
+  --ok: #22c55e;
+  --ok-strong: #4ade80;
+  --ok-soft: #10261a;
+  --ok-line: #1e5135;
+  --warn: #f59e0b;
+  --warn-strong: #fbbf24;
+  --warn-soft: #2b2110;
+  --warn-line: #5a4417;
+  --danger: #f87171;
+  --ring: #fafafa;
+  --ring-soft: rgb(250 250 250 / 0.12);
+  --elev-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  /* A dark card in a bright peach frame glares: deeper terracotta and a faint halo. */
+  --ember-1: #1f0d08;
+  --ember-2: #34140c;
+  --ember-3: #4d1d10;
+  --ember-4: #6b2a17;
+  --ember-halo: rgb(255 255 255 / 0.07);
+}
+
+/*
+ * Text one pixel larger than Tailwind's own steps (12, 14, 16, 18, 24): the app's sizes written
+ * out in class names (text-[14px] and the like) were raised by one as well. Line heights keep
+ * their proportion to the size.
+ */
+@theme {
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.3125rem;
+  --text-2xl: 1.5625rem;
 }
 
 @theme inline {
@@ -188,7 +210,10 @@
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -250,6 +275,13 @@ input[type="radio"] {
 .h-dvh {
   height: calc(100dvh / var(--ui-zoom));
 }
+/* The dashboard's backdrop. The terracotta is for the pages that greet someone (sign-in, guests); a page worked in all day gets a calm frame. */
+.bg-shell {
+  background: linear-gradient(180deg, var(--shell-1) 0%, var(--shell-2) 100%) fixed;
+}
+:root[data-theme="dark"] .bg-shell {
+  background: linear-gradient(180deg, var(--ember-1) 0%, var(--ember-2) 34%, var(--ember-3) 68%, var(--ember-4) 100%) fixed;
+}
 .bg-ember {
   background: linear-gradient(180deg, var(--ember-1) 0%, var(--ember-2) 34%, var(--ember-3) 68%, var(--ember-4) 100%) fixed;
 }
@@ -267,17 +299,26 @@ input[type="radio"] {
   --ember-3: color-mix(in oklab, var(--brand) 88%, black);
   --ember-4: color-mix(in oklab, var(--brand) 40%, white);
 }
-@media (prefers-color-scheme: dark) {
-  .branded {
-    --accent-hover: color-mix(in oklab, var(--brand) 86%, white);
-    --ember-1: color-mix(in oklab, var(--brand) 10%, black);
-    --ember-2: color-mix(in oklab, var(--brand) 18%, black);
-    --ember-3: color-mix(in oklab, var(--brand) 28%, black);
-    --ember-4: color-mix(in oklab, var(--brand) 40%, black);
-  }
+:root[data-theme="dark"] .branded {
+  --accent-hover: color-mix(in oklab, var(--brand) 86%, white);
+  --ember-1: color-mix(in oklab, var(--brand) 10%, black);
+  --ember-2: color-mix(in oklab, var(--brand) 18%, black);
+  --ember-3: color-mix(in oklab, var(--brand) 28%, black);
+  --ember-4: color-mix(in oklab, var(--brand) 40%, black);
 }
 .bg-blush {
   background: linear-gradient(180deg, var(--accent-tint) 0%, var(--bg) 100%);
+}
+/* The dashboard's frame on .bg-shell: a hairline and a soft shadow in the light, the terracotta card's halo in the dark. */
+.shell-card {
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 30px 70px -40px rgb(28 25 23 / 0.35);
+}
+:root[data-theme="dark"] .shell-card {
+  box-shadow:
+    0 0 0 8px var(--ember-halo),
+    0 40px 90px -40px rgb(70 20 8 / 0.6);
 }
 /* The framed card on .bg-ember: a translucent white halo and a warm drop shadow. */
 .ember-card {

@@ -74,16 +74,16 @@ export function NotesCard({
         </span>
       </span>
       {working ? (
-        <span className="border-t border-divider py-3 text-[13.5px] text-muted">Writing the notes from the transcript…</span>
+        <span className="border-t border-divider py-3 text-[14.5px] text-muted">Writing the notes from the transcript…</span>
       ) : text ? (
-        <pre className="max-h-[420px] overflow-auto border-t border-divider pt-3 font-sans text-[13.5px] leading-relaxed whitespace-pre-wrap text-text-2">{text}</pre>
+        <pre className="max-h-[420px] overflow-auto border-t border-divider pt-3 font-sans text-[14.5px] leading-relaxed whitespace-pre-wrap text-text-2">{text}</pre>
       ) : (
-        <span className="border-t border-divider py-3 text-[13.5px] text-muted">
+        <span className="border-t border-divider py-3 text-[14.5px] text-muted">
           {state === "failed" ? (error ?? "The notes couldn't be written.") : canWrite ? "No notes yet for this recording." : "Notes are written once the transcript is ready."}
         </span>
       )}
       {problem && (
-        <span role="alert" className="pt-2 text-[13px] text-danger">
+        <span role="alert" className="pt-2 text-[14px] text-danger">
           {problem}
         </span>
       )}

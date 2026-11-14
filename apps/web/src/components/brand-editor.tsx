@@ -46,20 +46,20 @@ export function BrandEditor({ studioId, studioName, initial }: { studioId: strin
       <div className="flex flex-col gap-4 py-4">
         <span className="flex flex-col gap-[3px]">
           <span className="font-medium">Branding</span>
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             Your logo and colour on the pages guests open: the invite, the tech check, the green room, the solo link and shared recordings. Your dashboard keeps its look.
           </span>
         </span>
 
         {!brand.allowed && (
-          <p className="rounded-md bg-surface-2 px-3 py-2 text-[13px] text-muted" data-testid="brand-plan">
+          <p className="rounded-md bg-surface-2 px-3 py-2 text-[14px] text-muted" data-testid="brand-plan">
             Branding is part of the Studio plan and up.{brand.accent || brand.logoUrl ? " What you set earlier is kept, and not shown to guests." : ""}
           </p>
         )}
 
         {/* How the top of a guest page will look. */}
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2.5" aria-label="Preview">
-          <span className="flex min-w-0 items-center gap-[9px] text-[15px] font-medium">
+          <span className="flex min-w-0 items-center gap-[9px] text-[16px] font-medium">
             {brand.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={brand.logoUrl} alt="Your logo" className="h-6 w-auto max-w-[120px] rounded-[4px] object-contain" />
@@ -68,7 +68,7 @@ export function BrandEditor({ studioId, studioName, initial }: { studioId: strin
             )}
             <span className="truncate">{studioName}</span>
           </span>
-          <span className="rounded-md px-3 py-1.5 text-[13px] font-medium" style={{ background: shown, color: brand.accent ? (brand.accentText ?? "#fff") : "#fff" }}>
+          <span className="rounded-md px-3 py-1.5 text-[14px] font-medium" style={{ background: shown, color: brand.accent ? (brand.accentText ?? "#fff") : "#fff" }}>
             Join
           </span>
         </div>
@@ -95,7 +95,7 @@ export function BrandEditor({ studioId, studioName, initial }: { studioId: strin
               Remove logo
             </Button>
           )}
-          <span className="text-[13px] text-muted">PNG, JPEG or WebP, 512 KB at most.</span>
+          <span className="text-[14px] text-muted">PNG, JPEG or WebP, 512 KB at most.</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
