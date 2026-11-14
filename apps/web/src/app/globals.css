@@ -225,6 +225,22 @@ input[type="radio"] {
  * designs), and the soft blush wash at the top of content pages. A brand surface: the light theme
  * has the designs' gradient, the dark theme a deeper one so the dark card doesn't sit in a glare.
  */
+/*
+ * The studio room, a little smaller on a computer: the stage, the recording card and the
+ * people panel are a lot to fit on a laptop screen. One step of zoom instead of retuning every
+ * size; lengths taken from the window are divided by it so the room still fills the window.
+ * Touch screens keep full size: the controls there are sized for thumbs.
+ */
+.room-scale {
+  --room-zoom: 1;
+  min-height: calc(100dvh / var(--room-zoom));
+}
+@media (pointer: fine) and (min-width: 1024px) {
+  .room-scale {
+    --room-zoom: 0.9;
+    zoom: 0.9;
+  }
+}
 .bg-ember {
   background: linear-gradient(180deg, var(--ember-1) 0%, var(--ember-2) 34%, var(--ember-3) 68%, var(--ember-4) 100%) fixed;
 }
