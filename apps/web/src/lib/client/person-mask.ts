@@ -43,12 +43,33 @@ export function maskSupported(): boolean {
 
 // ── How sure the model is → how much of the person shows ─────────────────────
 
-/** Below `low` it's background, above `high` it's the person; a smooth step between (0..1). */
-export const MASK_EDGE = { low: 0.35, high: 0.65 };
+/**
+ * Below `low` it's background, above `high` it's the person; a smooth step between (0..1).
+ * Set a little on the sure side: where the model hesitates (the rim round hair and shoulders,
+ * which is mostly background) the picture is blurred, so no sharp band of the room shows
+ * round the person.
+ */
+export const MASK_EDGE = { low: 0.4, high: 0.7 };
 
 export function maskLevel(confidence: number): number {
   const t = Math.min(1, Math.max(0, (confidence - MASK_EDGE.low) / (MASK_EDGE.high - MASK_EDGE.low)));
   return t * t * (3 - 2 * t);
+}
+
+/**
+ * The model answers each frame on its own, so a still edge shimmers from frame to frame. A
+ * small change moves only part of the way (`follow`) toward the new answer; a big one (someone
+ * moved: `jump`) is taken at once, so the outline never trails behind a hand or a turning head.
+ */
+export const STEADY = { follow: 0.55, jump: 0.3 };
+
+/** This frame's answer steadied against the last one shown. `out` may be `previous`. */
+export function steadyMask(previous: Float32Array | null, current: Float32Array, out: Float32Array) {
+  if (!previous || previous.length !== current.length) return void out.set(current);
+  for (let i = 0; i < current.length; i++) {
+    const change = current[i]! - previous[i]!;
+    out[i] = Math.abs(change) > STEADY.jump ? current[i]! : previous[i]! + change * STEADY.follow;
+  }
 }
 
 /** The model's answer for each pixel (0..1: how sure it is of a person) as white pixels of that opacity. */
@@ -167,6 +188,7 @@ export function startPersonMask(camera: MediaStreamTrack, onState: (state: MaskS
   const alphaCtx = alpha.getContext("2d")!;
   const stageCtx = stage.getContext("2d")!;
   let pixels: ImageData | null = null;
+  let steady: Float32Array | null = null; // the last answer shown, for steadyMask
   greyCtx.fillRect(0, 0, grey.width, grey.height);
 
   const stop = () => {
@@ -192,7 +214,10 @@ export function startPersonMask(camera: MediaStreamTrack, onState: (state: MaskS
       stage.height = height;
       pixels = stageCtx.createImageData(width, height);
     }
-    maskPixels(confidence, pixels.data);
+    const next = steady && steady.length === confidence.length ? steady : new Float32Array(confidence.length);
+    steadyMask(steady, confidence, next);
+    steady = next;
+    maskPixels(steady, pixels.data);
     stageCtx.putImageData(pixels, 0, 0);
     alphaCtx.clearRect(0, 0, alpha.width, alpha.height);
     alphaCtx.drawImage(stage, 0, 0, alpha.width, alpha.height);
