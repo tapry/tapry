@@ -426,7 +426,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         size={size}
         active={micMuted}
         aria-pressed={micMuted}
-        aria-label={micMuted ? "Unmute" : "Mute"}
+        aria-label={micMuted ? t("room.unmute") : t("room.mute")}
         title="Mute or unmute (⌘⇧M / Ctrl+Shift+M)"
         onClick={toggleMute}
       >
@@ -437,8 +437,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           size={size}
           active={cameraOff}
           aria-pressed={cameraOff}
-          aria-label={cameraOff ? "Turn camera on" : "Turn camera off"}
-          title={cameraOff ? "Turn camera on" : "Turn camera off"}
+          aria-label={cameraOff ? t("room.cameraOn") : t("room.cameraOffBtn")}
+          title={cameraOff ? t("room.cameraOn") : t("room.cameraOffBtn")}
           onClick={toggleCamera}
         >
           <Icon d={cameraOff ? ICON.camOff : ICON.cam} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
@@ -450,8 +450,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           active={!!screen}
           aria-pressed={!!screen}
           disabled={!screen && !!otherSharing}
-          aria-label={screen ? "Stop sharing your screen" : "Share your screen"}
-          title={screen ? "Stop sharing your screen" : otherSharing ? `${otherSharing.name} is sharing their screen` : "Share your screen"}
+          aria-label={screen ? t("room.stopShare") : t("room.share")}
+          title={screen ? t("room.stopShare") : otherSharing ? `${otherSharing.name} is sharing their screen` : t("room.share")}
           onClick={() => void toggleScreen()}
         >
           <Icon d={ICON.screen} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
@@ -464,8 +464,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         className={cn("relative", filtersPanel.open && "ring-2 ring-white/50")}
         aria-expanded={filtersPanel.open}
         aria-controls="room-filters"
-        aria-label={filtersOn(prefs.filters, hasCamera && !cameraOff) ? "Filters (on)" : "Filters"}
-        title="Filters"
+        aria-label={filtersOn(prefs.filters, hasCamera && !cameraOff) ? t("filters.titleOn") : t("filters.title")}
+        title={t("filters.title")}
         onClick={filtersPanel.toggle}
       >
         <Icon d={ICON.sliders} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
@@ -499,7 +499,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
       {invite}
     </>
   );
-  const recLabel = canRecord ? (recording ? "Stop recording" : "Start recording") : recording ? "Recording" : "Waiting to record";
+  const recLabel = canRecord ? (recording ? "Stop recording" : "Start recording") : recording ? t("room.recording") : t("room.waitingRecord");
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -520,7 +520,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
             )}
           >
             <Icon d={ICON.people} className="size-[15px]" />
-            People
+            {t("room.people")}
           </button>
         )}
       </header>
@@ -587,11 +587,11 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         ref={exitFull}
                         type="button"
                         onClick={() => setFull(false)}
-                        aria-label="Exit full screen"
+                        aria-label={t("room.exitFull")}
                         className="inline-flex h-8 cursor-pointer items-center gap-[7px] rounded-md border border-white/16 px-[11px] text-[13px] font-medium whitespace-nowrap transition-colors hover:bg-white/10"
                       >
                         <Icon d={ICON.shrink} className="size-3.5" />
-                        <span className="max-sm:hidden">Exit full screen</span>
+                        <span className="max-sm:hidden">{t("room.exitFull")}</span>
                       </button>
                     </span>
                   </div>
@@ -663,7 +663,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         className={cn(STAGE_WHITE_BUTTON, "h-9 gap-[7px] rounded-md px-3")}
                       >
                         <Icon d={ICON.expand} className="size-[15px]" />
-                        Full screen
+                        {t("room.fullScreen")}
                       </button>
                     </span>
                   </div>
@@ -824,7 +824,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
             <aside inert={fullOpen} className="w-full shrink-0 border-t border-border bg-canvas lg:w-[380px] lg:border-t-0 lg:border-l">
               <div className="flex flex-col gap-4 p-4 lg:sticky lg:top-0 lg:max-h-dvh lg:min-h-[calc(100dvh-58px)] lg:overflow-auto">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-[15px] font-medium">In the studio · {participants.length}</h2>
+                  <h2 className="text-[15px] font-medium">{t("room.inStudio", { count: participants.length })}</h2>
                   <span className="flex items-center gap-2">
                     {present && (
                       <span className="text-[13px] text-muted">
@@ -833,7 +833,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     )}
                     <button
                       type="button"
-                      aria-label="Close panel"
+                      aria-label={t("room.closePanel")}
                       onClick={() => setPanelOpen(false)}
                       className="grid size-7 cursor-pointer place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-text"
                     >
@@ -1325,7 +1325,7 @@ function EndedView({
         {
           name: selfName,
           done: ownDone,
-          label: ownDone ? "Sent" : `${mb(ownLeft)} left to send`,
+          label: ownDone ? t("end.sent") : t("end.leftToSend", { left: mb(ownLeft) }),
           pct: ownDone ? 100 : Math.max(5, Math.round((ownSent / Math.max(1, ownSent + ownLeft)) * 100)),
         },
       ];
@@ -1366,7 +1366,7 @@ function EndedView({
         </div>
         {rows.length > 0 && (
           <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] py-1">
-            <span className="pt-3 pb-2 font-medium">{isHost ? "Recordings arriving" : "Your upload"}</span>
+            <span className="pt-3 pb-2 font-medium">{isHost ? "Recordings arriving" : t("end.yourUpload")}</span>
             {rows.map((r) => (
               <div
                 key={r.name}
@@ -1653,10 +1653,11 @@ function useElapsed(startedAt: number | null, offsetMs: number): string | null {
 
 /** "REC 12:04" while recording, "Not recording" otherwise. */
 function RecPill({ clock }: { clock: string | null }) {
+  const { t } = useT();
   if (clock === null) {
     return (
       <span className="inline-flex items-center gap-[7px] rounded-md bg-surface-2 px-2.5 py-1 font-mono text-xs font-medium whitespace-nowrap text-muted">
-        <span aria-hidden className="size-[7px] rounded-full bg-current" /> Not recording
+        <span aria-hidden className="size-[7px] rounded-full bg-current" /> {t("room.notRecording")}
       </span>
     );
   }

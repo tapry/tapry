@@ -1,3 +1,4 @@
+import { AvatarEditor } from "@/components/avatar-editor";
 import { IntegrationsPanel } from "@/components/integrations-panel";
 import { Fragment } from "react";
 import { ActivityLog } from "@/components/activity-log";
@@ -65,6 +66,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const account = (
     <>
     <ListCard>
+      <AvatarEditor name={user.name} initial={user.avatarUrl ?? null} />
       <Row label="Name" help="Shown to guests on the invite and in the studio." value={user.name} />
       <Row label="Email" help="What you log in with." value={user.email} />
       <Row label="Role" help={user.isAdmin ? "The first account on this server: sees Server health and how it's set up." : "Creates studios and invites guests."} value={user.isAdmin ? "Admin" : "Host"} />

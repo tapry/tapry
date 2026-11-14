@@ -4,7 +4,7 @@
 // Text only: the sound and picture still say what was said.
 import { toDocx, toSrt, toTxt, toVtt, type Line } from "@tapry/worker";
 
-export const SAFE_FORMATS = ["txt", "docx", "srt", "vtt"] as const;
+export const SAFE_FORMATS = ["txt", "docx", "srt", "vtt", "nvivo", "maxqda"] as const;
 export type SafeFormat = (typeof SAFE_FORMATS)[number];
 
 export interface SafeOptions {
@@ -65,8 +65,62 @@ export function makeSafe(lines: Line[], opts: SafeOptions): { lines: Line[]; cou
   return { lines: out, counts, speakers: [...speakers] };
 }
 
+/** One person's stretch of speech: consecutive captions of the same speaker with less than 3 s between them. */
+function turns(lines: Line[]): Line[] {
+  const out: Line[] = [];
+  for (const l of lines) {
+    const last = out.at(-1);
+    if (last && last.speaker === l.speaker && l.startMs - last.endMs < 3000) {
+      last.text += ` ${l.text}`;
+      last.endMs = Math.max(last.endMs, l.endMs);
+    } else out.push({ ...l });
+  }
+  return out;
+}
+
+const two = (n: number) => String(n).padStart(2, "0");
+/** hh:mm:ss and tenths of a second, the finest both programs keep. */
+function clock(ms: number): [string, number] {
+  const tenths = Math.floor(Math.max(0, ms) / 100);
+  const s = Math.floor(tenths / 10);
+  return [`${two(Math.floor(s / 3600))}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}`, tenths % 10];
+}
+const oneLine = (text: string) => text.replace(/[\t\r\n]+/g, " ").trim();
+
+/**
+ * For NVivo ("Import transcript entries", tab-delimited, no header row; fields: Timespan,
+ * Speaker, Content): one row per turn, the timespan as hh:mm:ss.t-hh:mm:ss.t. Starts with a
+ * byte-order mark so NVivo reads it as UTF-8.
+ */
+export function toNvivo(lines: Line[]): string {
+  const stamp = (ms: number) => clock(ms).join(".");
+  return (
+    "\uFEFF" +
+    turns(lines)
+      .map((t) => `${stamp(t.startMs)}-${stamp(Math.max(t.endMs, t.startMs))}\t${oneLine(t.speaker)}\t${oneLine(t.text)}`)
+      .join("\r\n") +
+    "\r\n"
+  );
+}
+
+/**
+ * For MAXQDA and ATLAS.ti: the f4 transcript layout both read. One paragraph per turn,
+ * "Speaker: text", closed by the time it ends as #hh:mm:ss-t#.
+ */
+export function toF4(lines: Line[]): string {
+  return turns(lines)
+    .map((t) => {
+      const [hms, tenth] = clock(Math.max(t.endMs, t.startMs));
+      // A colon inside a name would end the name early for the program reading it.
+      return `${oneLine(t.speaker).replace(/:/g, "")}: ${oneLine(t.text)} #${hms}-${tenth}#`;
+    })
+    .join("\n\n") + "\n";
+}
+
 /** The safe copy as a file in one of the transcript formats. */
 export function safeFile(lines: Line[], format: SafeFormat, title: string): { fileName: string; contentType: string; body: string | Uint8Array } {
+  if (format === "nvivo") return { fileName: "Transcript (NVivo).txt", contentType: "text/plain; charset=utf-8", body: toNvivo(lines) };
+  if (format === "maxqda") return { fileName: "Transcript (MAXQDA, ATLAS.ti).txt", contentType: "text/plain; charset=utf-8", body: toF4(lines) };
   const name = `Transcript (share-safe).${format}`;
   if (format === "txt") return { fileName: name, contentType: "text/plain; charset=utf-8", body: toTxt(lines) };
   if (format === "srt") return { fileName: name, contentType: "application/x-subrip; charset=utf-8", body: toSrt(lines) };

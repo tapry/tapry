@@ -5,6 +5,7 @@ import type { MembersView, acceptInviteBody } from "@tapry/shared";
 import type { MemberRole } from "@tapry/shared";
 import type { z } from "zod";
 import type { User } from "./auth";
+import { avatarUrl } from "./avatars";
 import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
 import { hashToken, newId, newToken } from "./ids";
@@ -43,8 +44,8 @@ export class MembersService {
 
   /** Everyone in the signed-in person's account, and the invitations still open. */
   async view(user: User): Promise<MembersView> {
-    const people = await this.db.query<{ id: string; name: string; email: string; owner: boolean; member_role: MemberRole }>(
-      `SELECT id, name, email, (id = $1) AS owner, member_role FROM users WHERE id = $1 OR account_id = $1 ORDER BY (id = $1) DESC, created_at`,
+    const people = await this.db.query<{ id: string; name: string; email: string; owner: boolean; member_role: MemberRole; avatar_hash: string | null }>(
+      `SELECT id, name, email, (id = $1) AS owner, member_role, avatar_hash FROM users WHERE id = $1 OR account_id = $1 ORDER BY (id = $1) DESC, created_at`,
       [user.accountId],
     );
     const invites = await this.db.query<{ id: string; email: string; role: MemberRole; expires_at: Date }>(
@@ -54,7 +55,7 @@ export class MembersService {
     return {
       seats: await this.seats(user.accountId),
       owner: user.accountId === user.id,
-      members: people.map((p) => ({ id: p.id, name: p.name, email: p.email, role: p.owner ? "owner" : p.member_role, you: p.id === user.id })),
+      members: people.map((p) => ({ id: p.id, name: p.name, email: p.email, role: p.owner ? "owner" : p.member_role, you: p.id === user.id, avatarUrl: avatarUrl(p.id, p.avatar_hash) })),
       // Only the owner sees who else was invited.
       invites: user.accountId === user.id ? invites.map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expires_at.toISOString() })) : [],
     };

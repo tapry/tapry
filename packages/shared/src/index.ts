@@ -54,7 +54,8 @@ export const webhookBody = z.object({ url: z.string().url().max(500) });
 export const commentBody = z.object({ body: z.string().trim().min(1).max(2000), atMs: z.number().min(0).optional() });
 /** A share-safe copy of a transcript: neutral speaker names, contact details and listed words masked. */
 export const safeTranscriptBody = z.object({
-  format: z.enum(["txt", "docx", "srt", "vtt"]),
+  /** nvivo and maxqda: the layouts research software imports (one row or paragraph per turn, with times). */
+  format: z.enum(["txt", "docx", "srt", "vtt", "nvivo", "maxqda"]),
   pseudonyms: z.boolean(),
   contacts: z.boolean(),
   terms: z.array(z.string().max(80)).max(100),
@@ -642,7 +643,7 @@ export interface MembersView {
   seats: number | null;
   /** The signed-in person owns the account (and so may invite and remove). */
   owner: boolean;
-  members: Array<{ id: string; name: string; email: string; role: "owner" | MemberRole; you: boolean }>;
+  members: Array<{ id: string; name: string; email: string; role: "owner" | MemberRole; you: boolean; avatarUrl?: string | null }>;
   /** Invitations not yet accepted; only the owner sees them. */
   invites: Array<{ id: string; email: string; role: MemberRole; expiresAt: string }>;
 }

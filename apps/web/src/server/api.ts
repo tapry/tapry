@@ -47,6 +47,7 @@ import { readWebhook } from "./billing-webhooks";
 import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
+import { AVATAR_MAX_BYTES } from "./avatars";
 import { LOGO_MAX_BYTES } from "./brand";
 import { clientAddress, drainBody, siteCors, speedTestCors } from "./speed-test";
 import { APP_VERSION } from "./worker-info";
@@ -556,6 +557,31 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     setSolo: asUser(async (svc, user, req, params) => json(200, await svc.studios.setSolo(user, params.studioId!, await parseBody(req, soloSettingsBody))), { log: "Changed a studio's solo link", keys: true }),
     /** Someone starts recording alone on a solo link. No account. */
     soloJoin: handler(async (svc, req) => json(201, await svc.studios.soloJoin(await parseBody(req, soloJoinBody), clientAddress(req)))),
+    /** The signed-in person's own profile picture (the image is the request's body). Viewers too: it is theirs. */
+    setAvatar: asUser(async (svc, user, req) => json(200, await svc.avatars.set(user, await readCapped(req.body, AVATAR_MAX_BYTES))), { viewers: true }),
+    removeAvatar: asUser(
+      async (svc, user) => {
+        await svc.avatars.remove(user);
+        return new Response(null, { status: 204 });
+      },
+      { viewers: true },
+    ),
+    /** Public: a guest sees their host's picture on the invite. Served as an image and nothing else. */
+    avatar: handler(async (svc, req, params) => {
+      const picture = await svc.avatars.get(params.userId!);
+      if (!picture) return json(404, { error: "not_found", message: "No picture" });
+      return new Response(Buffer.from(picture.bytes), {
+        status: 200,
+        headers: {
+          "Content-Type": picture.type,
+          "Content-Length": String(picture.bytes.byteLength),
+          "Cache-Control": new URL(req.url).searchParams.has("v") ? "public, max-age=31536000, immutable" : "public, max-age=300",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+      });
+    }),
+
     /** A studio's logo and colour for the pages its guests open. */
     getBrand: asUser(async (svc, user, _req, params) => json(200, await svc.brand.view(user, params.studioId!))),
     setBrand: asUser(async (svc, user, req, params) => json(200, await svc.brand.setAccent(user, params.studioId!, (await parseBody(req, brandBody)).accent)), { log: "Changed a studio's branding" }),

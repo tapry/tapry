@@ -31,6 +31,9 @@ test("a French-speaking guest gets the invite, the consent, the green room and t
   await join.click();
   await expect(guest.getByText("En attente que l'hôte lance l'enregistrement.")).toBeVisible();
   await expect(guest.getByText("Gardez cet onglet ouvert jusqu'à la fin de votre envoi.")).toBeVisible();
+  await expect(guest.getByRole("button", { name: "Plein écran" })).toBeVisible();
+  await guest.getByRole("button", { name: "Filtres" }).click();
+  await expect(guest.getByText("Réduction du bruit")).toBeVisible();
   // The host sees the guest, in English.
   await expect(host.getByTestId("participant").filter({ hasText: "Zoé Invitée" })).toBeVisible();
   await french.close();

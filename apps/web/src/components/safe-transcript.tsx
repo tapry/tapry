@@ -21,6 +21,12 @@ const FORMATS = [
   ["vtt", "VTT"],
 ] as const;
 
+/** Layouts research software imports: speakers and times in the form each program reads. */
+const RESEARCH = [
+  ["nvivo", "NVivo", "Transcript (NVivo).txt"],
+  ["maxqda", "MAXQDA / ATLAS.ti", "Transcript (MAXQDA, ATLAS.ti).txt"],
+] as const;
+
 export function SafeTranscript({ recordingId }: { recordingId: string }) {
   const [pseudonyms, setPseudonyms] = useState(true);
   const [contacts, setContacts] = useState(true);
@@ -51,11 +57,11 @@ export function SafeTranscript({ recordingId }: { recordingId: string }) {
     }
   }
   const check = () => run(async () => setFound(await (await ask({ preview: true })).json()));
-  const download = (format: string) =>
+  const download = (format: string, fileName = `Transcript (share-safe).${format}`) =>
     run(async () => {
       const blob = await (await ask({ format })).blob();
       const url = URL.createObjectURL(blob);
-      Object.assign(document.createElement("a"), { href: url, download: `Transcript (share-safe).${format}` }).click();
+      Object.assign(document.createElement("a"), { href: url, download: fileName }).click();
       URL.revokeObjectURL(url);
     });
 
@@ -94,6 +100,18 @@ export function SafeTranscript({ recordingId }: { recordingId: string }) {
             {name}
           </button>
         ))}
+      </span>
+      <span className="flex flex-wrap items-center gap-[5px] pt-2.5" data-testid="research-exports">
+        <span className="text-[12.5px] text-muted">For research software:</span>
+        {RESEARCH.map(([format, name, fileName]) => (
+          <button key={format} type="button" disabled={busy} onClick={() => void download(format, fileName)} className="cursor-pointer rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-text transition-colors hover:bg-surface-2 disabled:opacity-50">
+            {name}
+          </button>
+        ))}
+      </span>
+      <span className="pt-1.5 text-[12.5px] leading-normal text-pretty text-muted">
+        One entry per turn with its speaker and time, masked as chosen above (untick both to keep it as spoken). NVivo: import as transcript entries, tab-delimited, without a header row, fields
+        Timespan, Speaker, Content. MAXQDA and ATLAS.ti: import as a transcript with timestamps.
       </span>
       {found && (
         <span role="status" className="pt-2 text-[13px] text-text-2" data-testid="safe-counts">

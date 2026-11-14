@@ -1,3 +1,6 @@
+"use client";
+
+import { useT } from "@/lib/i18n/client";
 import type { OwnRecordings } from "@tapry/shared";
 import { StatusDot } from "@/components/ui";
 import { Icon } from "@/components/ui-extra";
@@ -6,12 +9,13 @@ import { mb } from "@/lib/format";
 
 /** A participant's own files, recording by recording: on their end screen and the emailed page. */
 export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["recordings"]; waiting: string }) {
+  const { t } = useT();
   const several = recordings.length > 1;
   return (
     <>
       {recordings.map((r) => (
         <div key={r.number} className="flex flex-col gap-2">
-          {several && <span className="text-[13px] text-muted">Recording {r.number}</span>}
+          {several && <span className="text-[13px] text-muted">{t("files.recordingN", { n: r.number })}</span>}
           {r.processing === "ready" && r.files.length > 0 ? (
             <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] py-1">
               {r.files.map((f, i) => (
@@ -27,8 +31,8 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
                     <Icon name={f.kind === "audio" ? "wave" : f.kind === "screen" ? "screen" : "camera"} size={15} className="text-muted" />
                     <span className="flex min-w-0 flex-col gap-px">
                       <span className="truncate">
-                        {f.kind === "audio" ? "Your audio" : f.kind === "screen" ? "Your shared screen" : "Your video"}
-                        {isOriginalAudio(f.fileName) && " (original)"}
+                        {f.kind === "audio" ? t("files.audio") : f.kind === "screen" ? t("files.screen") : t("files.video")}
+                        {isOriginalAudio(f.fileName) && ` ${t("files.original")}`}
                       </span>
                       <span className="text-[12.5px] text-muted">
                         {f.fileName.split(".").pop()!.toUpperCase()} · {mb(f.bytes)}
@@ -45,7 +49,7 @@ export function OwnFiles({ recordings, waiting }: { recordings: OwnRecordings["r
               ))}
             </div>
           ) : r.processing === "failed" || r.processing === "ready" ? (
-            <p className="text-sm text-muted">Your file couldn&apos;t be prepared here. The host has your recording.</p>
+            <p className="text-sm text-muted">{t("files.failed")}</p>
           ) : (
             <p className="flex items-center gap-2 text-sm text-muted">
               <StatusDot tone="warn" className="animate-rec-pulse" />

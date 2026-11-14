@@ -31,7 +31,7 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
         {/* The call stage is dark in both themes. No camera is opened here: that waits for the next step. */}
         <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[14px] bg-[#18181b] text-white [--ring:#fafafa]">
           <span className="flex flex-col items-center gap-3 px-6 text-center">
-            <Avatar name={preview.hostName} className="size-20 text-2xl ring-4 ring-white/10" />
+            <Avatar name={preview.hostName} src={preview.hostAvatarUrl} className="size-20 text-2xl ring-4 ring-white/10" />
             <span className="text-[15px] font-medium">{preview.hostName}</span>
           </span>
           <span className="absolute start-3 bottom-3 flex items-center gap-2.5 rounded-full bg-black/60 py-1.5 ps-2 pe-3 backdrop-blur-md">

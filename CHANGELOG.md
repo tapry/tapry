@@ -5,6 +5,17 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Research exports.** A transcript can be downloaded in the layouts research software
+  imports, one entry per turn with its speaker and time: tab-delimited for NVivo (Timespan,
+  Speaker, Content), and the f4 layout MAXQDA and ATLAS.ti read. Beside the share-safe
+  transcript, so the same file can have names replaced and contact details masked. The
+  layouts follow each program's documentation; none has been imported into the real program.
+- **Profile pictures** for hosts and members (Settings, Account): shown in the dashboard, in
+  the members list and to guests on the invite. Cropped and shrunk in the browser before
+  upload; PNG, JPEG or WebP.
+- **The rest of the guest room is translated**: filters, the room's buttons, the end screen's
+  upload card, the own-files list and the recap email form.
+
 - **Studio branding.** A studio can show its own logo and accent colour on the pages its
   guests open: the invite, the tech check, the green room, the solo link and shared
   recordings (studio settings, Branding). The dashboard keeps Tapry's look. Logos are PNG,
@@ -14,8 +25,7 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
   English, French, Spanish, German, Portuguese, Arabic (right to left). The default consent
   text is in the guest's language, and that exact text is what is kept with their consent; a
   studio's own consent text is shown as written. Hosts' pages, and what hosts are sent, stay
-  English. The translations have not been reviewed by native speakers; a few parts of the room
-  (filters, the recap email form, file names) are still English.
+  English. The translations have not been reviewed by native speakers.
 - **Guests on phones.** The room keeps the screen on while a session runs and until the upload
   is done, stage buttons are thumb-sized on touch screens, form fields no longer make iOS zoom,
   and wording says "this device". Tested at a phone's size in Chromium, not on real phones.

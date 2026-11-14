@@ -98,7 +98,7 @@ export async function DashboardShell({
       <RecentNav items={recent} serverNow={serverNow} currentId={currentRecordingId} />
 
       <span className="sticky bottom-0 mt-auto flex shrink-0 items-center gap-2.5 border-t border-border bg-canvas px-2 pt-3 pb-3.5 whitespace-nowrap">
-        <Avatar name={user.name} className="size-[26px] text-[10px]" />
+        <Avatar name={user.name} src={user.avatarUrl} className="size-[26px] text-[10px]" />
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-sm">{user.name}</span>
           <span className="truncate text-[12.5px] text-muted" title={user.email}>
@@ -119,7 +119,7 @@ export async function DashboardShell({
           {studio && <CopyGuestLink inviteCode={studio.inviteCode} look="icon" />}
           <OpenStudioAction studioId={target?.id ?? null} label="Open studio" look="top" iconOnlyOnPhone />
           <span title={user.name} className="ml-1 hidden sm:inline-flex">
-            <Avatar name={user.name} className="size-[26px] text-[10px]" />
+            <Avatar name={user.name} src={user.avatarUrl} className="size-[26px] text-[10px]" />
           </span>
         </>
       }
