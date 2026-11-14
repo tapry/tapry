@@ -35,7 +35,7 @@ export function ScheduleInvite({ studioName, hostName, inviteCode }: { studioNam
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="cursor-pointer self-start text-[13.5px] font-medium text-text underline underline-offset-[3px]" data-testid="schedule-open">
+      <button type="button" onClick={() => setOpen(true)} className="cursor-pointer self-start text-[14.5px] font-medium text-text underline underline-offset-[3px]" data-testid="schedule-open">
         Schedule a session: make a calendar invite
       </button>
     );
@@ -43,20 +43,20 @@ export function ScheduleInvite({ studioName, hostName, inviteCode }: { studioNam
   const field = "h-[34px] rounded-md border border-border bg-surface px-2.5 text-sm text-text shadow-xs focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)] focus:outline-none";
   return (
     <form onSubmit={make} className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3.5" data-testid="schedule">
-      <span className="text-[13.5px] leading-normal text-pretty text-muted">
+      <span className="text-[14.5px] leading-normal text-pretty text-muted">
         Makes a calendar file with the invite link and the tech-check link. Send it to your guests, or open it and invite them from your own calendar. The time is in this computer&apos;s time
         zone; their calendars show it in theirs.
       </span>
       <span className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex flex-col gap-1 text-[13.5px] text-muted">
           Day
           <input type="date" name="date" required className={field} />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex flex-col gap-1 text-[13.5px] text-muted">
           Time
           <input type="time" name="time" required className={field} />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex flex-col gap-1 text-[13.5px] text-muted">
           Length
           <select name="minutes" defaultValue="60" className={field}>
             <option value="30">30 minutes</option>
@@ -70,7 +70,7 @@ export function ScheduleInvite({ studioName, hostName, inviteCode }: { studioNam
         </Button>
       </span>
       {problem && (
-        <span role="alert" className="text-[13px] text-danger">
+        <span role="alert" className="text-[14px] text-danger">
           {problem}
         </span>
       )}

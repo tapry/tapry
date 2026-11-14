@@ -4,9 +4,9 @@ import { Avatar, cn } from "./ui";
 
 const SIZES = {
   /** The sidebar's recent recordings. */
-  xs: { box: "-ml-1.5 border-[1.5px] border-canvas", avatar: "size-4 text-[7px]" },
+  xs: { box: "-ml-1.5 border-[1.5px] border-canvas", avatar: "size-4 text-[8px]" },
   /** Lists and cards. */
-  sm: { box: "-ml-2 border-2 border-surface", avatar: "size-6 text-[9px]" },
+  sm: { box: "-ml-2 border-2 border-surface", avatar: "size-6 text-[10px]" },
 } as const;
 
 export function Faces({ names, size = "sm", max = 3, className }: { names: string[]; size?: keyof typeof SIZES; max?: number; className?: string }) {

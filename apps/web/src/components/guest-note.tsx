@@ -32,7 +32,7 @@ export function GuestNote({ name, initial, canEdit }: { name: string; initial: {
   return (
     <div className="col-span-full flex flex-col gap-2 sm:pl-10" data-testid="guest-note">
       {!open && (
-        <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px]">
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-[14px]">
           {saved.email && (
             <a href={`mailto:${saved.email}`} className="truncate text-text-2 underline underline-offset-2">
               {saved.email}
@@ -48,7 +48,7 @@ export function GuestNote({ name, initial, canEdit }: { name: string; initial: {
       )}
       {open && (
         <div id={id} className="flex flex-col gap-2 rounded-lg border border-border bg-surface-2/50 p-3">
-          <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+          <label className="flex flex-col gap-1 text-[13.5px] text-muted">
             Email
             <input
               type="email"
@@ -59,7 +59,7 @@ export function GuestNote({ name, initial, canEdit }: { name: string; initial: {
               className="h-9 rounded-md border border-border bg-surface px-2.5 text-sm text-text shadow-xs focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)] focus:outline-none"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+          <label className="flex flex-col gap-1 text-[13.5px] text-muted">
             Notes
             <textarea
               value={notes}
@@ -89,7 +89,7 @@ export function GuestNote({ name, initial, canEdit }: { name: string; initial: {
               Cancel
             </Button>
             {problem && (
-              <span role="alert" className={cn("text-[13px] text-danger")}>
+              <span role="alert" className={cn("text-[14px] text-danger")}>
                 {problem}
               </span>
             )}

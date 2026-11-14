@@ -47,7 +47,7 @@ export function WaitlistPanel({ entries }: { entries: WaitlistRow[] }) {
 
   return (
     <ListCard data-testid="waitlist">
-      <span className="flex flex-wrap items-center justify-between gap-3 border-b border-border pt-3 pb-2 text-[13px] text-muted">
+      <span className="flex flex-wrap items-center justify-between gap-3 border-b border-border pt-3 pb-2 text-[14px] text-muted">
         <span>
           Waitlist for paid plans: {entries.length === 0 ? "nobody yet." : `${entries.length} ${entries.length === 1 ? "person" : "people"}.`}
         </span>
@@ -58,17 +58,17 @@ export function WaitlistPanel({ entries }: { entries: WaitlistRow[] }) {
         )}
       </span>
       {error && (
-        <p role="alert" className="border-b border-divider py-3 text-[13.5px] text-danger">
+        <p role="alert" className="border-b border-divider py-3 text-[14.5px] text-danger">
           {error}
         </p>
       )}
       {entries.map((e, i) => (
         <div key={e.email} className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-3 ${i < entries.length - 1 ? "border-b border-divider" : ""}`} data-testid="waitlist-entry">
           <span className="min-w-0 flex-[1_1_220px] truncate font-medium">{e.email}</span>
-          <span className="text-[13px] text-muted">
+          <span className="text-[14px] text-muted">
             {planName(e.plan)} · {day(e.createdAt)}
           </span>
-          <button type="button" disabled={busy === e.email} onClick={() => remove(e.email)} className="cursor-pointer text-[13px] text-danger underline underline-offset-[3px] disabled:opacity-50">
+          <button type="button" disabled={busy === e.email} onClick={() => remove(e.email)} className="cursor-pointer text-[14px] text-danger underline underline-offset-[3px] disabled:opacity-50">
             Remove
           </button>
         </div>

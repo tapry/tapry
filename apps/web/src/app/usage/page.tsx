@@ -36,10 +36,10 @@ export default async function UsagePage() {
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {stats.map((st) => (
           <div key={st.k} className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-surface px-4 py-[18px] sm:px-5">
-            <span className="truncate text-[22px] font-medium tracking-[-.02em] tabular-nums" data-testid={st.testId}>
+            <span className="truncate text-[23px] font-medium tracking-[-.02em] tabular-nums" data-testid={st.testId}>
               {st.v}
             </span>
-            <span className="text-[13px] text-muted">{st.k}</span>
+            <span className="text-[14px] text-muted">{st.k}</span>
           </div>
         ))}
       </div>
@@ -58,18 +58,18 @@ export default async function UsagePage() {
             <h2 id="by-month" className="font-medium">
               Recorded each month
             </h2>
-            <span className="text-[13px] text-muted">Last 12 months</span>
+            <span className="text-[14px] text-muted">Last 12 months</span>
           </div>
           {/* The bars are the picture; the table under them is the same figures for everyone. */}
           <div className="flex h-36 items-end gap-1.5 sm:gap-2.5" aria-hidden>
             {u.months.map((m) => (
               <div key={m.month} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5" title={`${monthName(m.month, true)}: ${hours(m.recordedMs)}`}>
                 <span className="rounded-t-[3px] bg-ink" style={{ height: `${peak > 0 ? Math.max(m.recordedMs > 0 ? 3 : 0, (m.recordedMs / peak) * 100) : 0}%` }} />
-                <span className="truncate text-center text-[11px] text-muted">{monthName(m.month)}</span>
+                <span className="truncate text-center text-[12px] text-muted">{monthName(m.month)}</span>
               </div>
             ))}
           </div>
-          <table className="w-full text-left text-[13px] tabular-nums" data-testid="usage-months">
+          <table className="w-full text-left text-[14px] tabular-nums" data-testid="usage-months">
             <thead className="text-muted">
               <tr className="border-b border-border">
                 <th className="py-2 font-normal">Month</th>
@@ -92,7 +92,7 @@ export default async function UsagePage() {
                 ))}
             </tbody>
           </table>
-          <p className="text-[13px] text-muted">Recordings you have deleted are not counted. Months follow UTC.</p>
+          <p className="text-[14px] text-muted">Recordings you have deleted are not counted. Months follow UTC.</p>
         </section>
       )}
     </DashboardShell>

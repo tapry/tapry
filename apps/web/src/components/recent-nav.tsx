@@ -27,7 +27,7 @@ export function PageNav({ items, active }: { items: PageLink[]; active?: string 
             href={n.href}
             aria-current={on ? "page" : undefined}
             className={cn(
-              "flex shrink-0 items-center gap-[11px] rounded-md p-2 text-[14.5px] whitespace-nowrap text-text-2 transition-colors duration-200 hover:bg-surface-2 hover:text-text-2",
+              "flex shrink-0 items-center gap-[11px] rounded-md p-2 text-[15.5px] whitespace-nowrap text-text-2 transition-colors duration-200 hover:bg-surface-2 hover:text-text-2",
               on && "bg-surface-2 font-medium text-text",
             )}
           >
@@ -58,7 +58,7 @@ export interface RecentItem {
  * elements inside that prop makes React warn about keys in development.
  */
 export function RecentNav({ items, serverNow, currentId }: { items: RecentItem[]; serverNow: number; currentId?: string }) {
-  if (items.length === 0) return <span className="px-2 py-1.5 text-[13px] text-muted">Nothing recorded yet</span>;
+  if (items.length === 0) return <span className="px-2 py-1.5 text-[14px] text-muted">Nothing recorded yet</span>;
   return (
     <nav className="flex flex-col gap-0.5" aria-label="Recent recordings">
       {items.map((r) => {
@@ -79,11 +79,11 @@ export function RecentNav({ items, serverNow, currentId }: { items: RecentItem[]
           >
             <Icon name={s.icon} className={cn(s.color, live && s.anim)} />
             <span className="truncate text-sm">Recording {r.number}</span>
-            <span className={cn("font-mono text-[11.5px] whitespace-nowrap", live ? "text-accent-strong" : "text-muted")}>
+            <span className={cn("font-mono text-[12.5px] whitespace-nowrap", live ? "text-accent-strong" : "text-muted")}>
               {live ? <LiveClock startedAt={r.startedAt} serverNow={serverNow} /> : shortClock((r.stoppedAt ?? r.startedAt) - r.startedAt)}
             </span>
             <span />
-            <span className="flex min-w-0 gap-[5px] text-[12.5px] whitespace-nowrap text-muted">
+            <span className="flex min-w-0 gap-[5px] text-[13.5px] whitespace-nowrap text-muted">
               <span className={cn("shrink-0", s.color)}>{r.label}</span>
               <span className="min-w-0 truncate">· {r.studioName}</span>
             </span>

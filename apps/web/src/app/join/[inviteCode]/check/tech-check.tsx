@@ -180,7 +180,7 @@ function HearYourself({
           </span>
           <span className="flex flex-col gap-0.5">
             <span className="text-sm font-medium">{t("check.hear")}</span>
-            <span className="text-[13px] text-muted">{t("check.hearBody", { seconds: SAMPLE_SECONDS })}</span>
+            <span className="text-[14px] text-muted">{t("check.hearBody", { seconds: SAMPLE_SECONDS })}</span>
           </span>
         </span>
         <Button variant="secondary" onClick={record} disabled={!stream || left !== null}>
@@ -252,7 +252,7 @@ function SendResults({
         {sent && !changed ? t("check.sent") : sent ? t("check.sendNew") : t("check.send", { host: hostName })}
       </Button>
       {sent && !changed && (
-        <p className="flex items-start gap-2 text-[13.5px] leading-[1.45] text-ok-strong" data-testid="check-sent">
+        <p className="flex items-start gap-2 text-[14.5px] leading-[1.45] text-ok-strong" data-testid="check-sent">
           <Icon d={ICON.checkCircle} className="mt-0.5 size-[15px]" />
           {t("check.sentBody", { host: hostName })}
         </p>

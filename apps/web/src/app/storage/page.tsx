@@ -32,7 +32,7 @@ export default async function StoragePage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <PageTitle>Storage</PageTitle>
         {a && (
-          <span className={cn("flex items-center gap-[7px] text-[13px]", a.status.ok ? "text-ok-strong" : "text-accent-strong")} title={a.status.summary}>
+          <span className={cn("flex items-center gap-[7px] text-[14px]", a.status.ok ? "text-ok-strong" : "text-accent-strong")} title={a.status.summary}>
             <Icon name={a.status.ok ? "check" : "alert"} />
             {a.status.ok ? "Connected" : "Not answering"} · {a.endpointHost}
           </span>
@@ -42,16 +42,16 @@ export default async function StoragePage() {
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {stats.map((st) => (
           <div key={st.k} className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-surface px-4 py-[18px] sm:px-5" title={st.title}>
-            <span className="truncate text-[22px] font-medium tracking-[-.02em] tabular-nums" data-testid={st.testId}>
+            <span className="truncate text-[23px] font-medium tracking-[-.02em] tabular-nums" data-testid={st.testId}>
               {st.v}
             </span>
-            <span className="text-[13px] text-muted">{st.k}</span>
+            <span className="text-[14px] text-muted">{st.k}</span>
           </div>
         ))}
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="flex flex-wrap justify-between gap-2 text-[13px] text-muted">
+        <span className="flex flex-wrap justify-between gap-2 text-[14px] text-muted">
           <span>Space used by studio</span>
           <span>{formatBytes(s.bytes)} in total</span>
         </span>
@@ -60,7 +60,7 @@ export default async function StoragePage() {
             <span key={st.id} className={BAR_COLORS[i % BAR_COLORS.length]} style={{ width: `${s.bytes ? (st.bytes / s.bytes) * 100 : 0}%` }} />
           ))}
         </div>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-muted">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[14px] text-muted">
           {s.studios.map((st, i) => (
             <li key={st.id} className="flex min-w-0 items-center gap-1.5">
               <span className={cn("size-2 shrink-0 rounded-[2px]", BAR_COLORS[i % BAR_COLORS.length])} />
@@ -79,7 +79,7 @@ export default async function StoragePage() {
 
       {a && (
         <ListCard>
-          <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">Configuration</span>
+          <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">Configuration</span>
           {(
             [
               ["S3_ENDPOINT", a.endpointHost, "docker-compose.yml"],
@@ -94,11 +94,11 @@ export default async function StoragePage() {
             ] as const
           ).map(([k, v, where]) => (
             <div key={k} className="grid grid-cols-1 items-center gap-x-4 gap-y-1 border-b border-divider py-3 last:border-0 sm:grid-cols-[minmax(140px,max-content)_minmax(0,1fr)_auto]">
-              <code className="font-mono text-[13px] [overflow-wrap:anywhere]">{k}</code>
+              <code className="font-mono text-[14px] [overflow-wrap:anywhere]">{k}</code>
               <span className="truncate text-text-2" title={v}>
                 {v}
               </span>
-              <span className="text-[13px] whitespace-nowrap text-muted">{where ? `Set in ${where}` : "Built in"}</span>
+              <span className="text-[14px] whitespace-nowrap text-muted">{where ? `Set in ${where}` : "Built in"}</span>
             </div>
           ))}
         </ListCard>

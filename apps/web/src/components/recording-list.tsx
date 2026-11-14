@@ -56,7 +56,7 @@ export function RecordingList({
     <section className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="font-medium">Recordings</h2>
-        <span className="text-[13px] text-muted">{formatBytes(recordings.reduce((n, e) => n + e.bytes, 0))} used</span>
+        <span className="text-[14px] text-muted">{formatBytes(recordings.reduce((n, e) => n + e.bytes, 0))} used</span>
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
       {recordings.length === 0 ? (
@@ -146,7 +146,7 @@ function RecordingRow({
           <Faces names={e.people.map((x) => x.name)} />
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="truncate font-medium">Recording {e.number}</span>
-            <span className="truncate text-[13px] text-muted">
+            <span className="truncate text-[14px] text-muted">
               {guests} guest{guests === 1 ? "" : "s"} · <span data-testid="recording-bytes">{formatBytes(e.bytes)}</span>
             </span>
           </span>
@@ -158,7 +158,7 @@ function RecordingRow({
           {p.label}
         </span>
         <Icon name="back" size={14} className={cn("hidden text-subtle transition-transform sm:block", open ? "rotate-90" : "-rotate-90")} />
-        <span className="text-[13px] text-muted sm:hidden">
+        <span className="text-[14px] text-muted sm:hidden">
           {formatWhen(e.startedAt, now)} · {length}
         </span>
       </button>
@@ -199,7 +199,7 @@ function RecordingRow({
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider pt-4">
               <a
                 href={`/api/studios/${studioId}/recordings/${e.id}/consent`}
-                className="flex items-center gap-2 text-[13.5px] text-muted hover:text-text"
+                className="flex items-center gap-2 text-[14.5px] text-muted hover:text-text"
                 data-testid="consent-record"
               >
                 <Icon name="shield" size={15} />
@@ -231,7 +231,7 @@ function Faces({ names }: { names: string[] }) {
     <span aria-hidden className="flex w-[62px] shrink-0 items-center pl-2">
       {names.slice(0, 3).map((n, i) => (
         <span key={`${n}-${i}`} className="-ml-2 rounded-full border-2 border-surface">
-          <Avatar name={n} className="size-6 text-[9px]" />
+          <Avatar name={n} className="size-6 text-[10px]" />
         </span>
       ))}
     </span>
@@ -266,12 +266,12 @@ function PeopleProgress({ recording: e }: { recording: Recording }) {
                 </span>
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-px">
-                <span className="truncate text-[14.5px] font-medium">{x.name}</span>
+                <span className="truncate text-[15.5px] font-medium">{x.name}</span>
                 <span className="truncate font-mono text-xs text-muted">{size}</span>
               </span>
               <span
                 className={cn(
-                  "shrink-0 rounded-md px-2 py-[3px] text-[12.5px] font-medium whitespace-nowrap",
+                  "shrink-0 rounded-md px-2 py-[3px] text-[13.5px] font-medium whitespace-nowrap",
                   recording ? "bg-accent-soft text-accent-strong" : done ? "bg-ok-soft text-ok-strong" : "bg-warn-soft text-warn-strong",
                 )}
               >
@@ -328,7 +328,7 @@ function Downloads({ studioId, recording: e }: { studioId: string; recording: Re
                     <Icon name={d.icon} size={15} className="text-muted" />
                     <span className="flex min-w-0 flex-col gap-px">
                       <span className="truncate">{d.title}</span>
-                      <span className="text-[12.5px] text-muted">
+                      <span className="text-[13.5px] text-muted">
                         {d.format} · {formatBytes(o.bytes)}
                       </span>
                     </span>
@@ -345,7 +345,7 @@ function Downloads({ studioId, recording: e }: { studioId: string; recording: Re
           })}
         </ul>
       </div>
-      <span className="flex items-center gap-2 text-[13px] text-muted empty:hidden" data-testid="transcript-status">
+      <span className="flex items-center gap-2 text-[14px] text-muted empty:hidden" data-testid="transcript-status">
         {transcribing && (
           <>
             <StatusDot tone="warn" className="animate-rec-pulse" /> Writing the transcript… you can download everything else now.
@@ -353,12 +353,12 @@ function Downloads({ studioId, recording: e }: { studioId: string; recording: Re
         )}
       </span>
       {e.keepUntil !== null && (
-        <p className="text-[13px] text-muted" data-testid="kept-until">
+        <p className="text-[14px] text-muted" data-testid="kept-until">
           Kept until {new Date(e.keepUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} on your plan, then deleted. Download what you want to keep.
         </p>
       )}
       {e.rawDeleted && (
-        <p className="text-[13px] text-muted" data-testid="originals-removed">
+        <p className="text-[14px] text-muted" data-testid="originals-removed">
           The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.
         </p>
       )}

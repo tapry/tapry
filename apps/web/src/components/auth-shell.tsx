@@ -18,12 +18,12 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           </Link>
           <div className="mx-auto my-7 flex w-full max-w-[380px] flex-1 animate-fade-up flex-col justify-center gap-[18px]">
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">{title}</h1>
-              <p className="text-[14.5px] leading-normal text-pretty text-muted">{subtitle}</p>
+              <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em]">{title}</h1>
+              <p className="text-[15.5px] leading-normal text-pretty text-muted">{subtitle}</p>
             </div>
             {children}
           </div>
-          <span className="flex flex-wrap justify-between gap-2 text-[12.5px] text-muted">
+          <span className="flex flex-wrap justify-between gap-2 text-[13.5px] text-muted">
             <span>© Tapry contributors</span>
             <span>Open source · self-hosted</span>
           </span>

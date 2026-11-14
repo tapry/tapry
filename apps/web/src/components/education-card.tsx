@@ -38,7 +38,7 @@ export function EducationCard({ initial }: { initial: EducationStatus }) {
       <div className="flex flex-col gap-3 py-4">
         <span className="flex flex-col gap-[3px]">
           <span className="font-medium">Education</span>
-          <span className="text-[13px] leading-normal text-pretty text-muted">
+          <span className="text-[14px] leading-normal text-pretty text-muted">
             {edu.status === "verified"
               ? `This is an education account${edu.school ? ` (${edu.school})` : ""}: ${gives}`
               : edu.status === "requested"
@@ -49,7 +49,7 @@ export function EducationCard({ initial }: { initial: EducationStatus }) {
         {edu.status === "none" &&
           (edu.owner ? (
             <div className="flex flex-wrap items-end gap-2.5">
-              <label className="flex min-w-0 flex-[1_1_240px] flex-col gap-1 text-[12.5px] text-muted">
+              <label className="flex min-w-0 flex-[1_1_240px] flex-col gap-1 text-[13.5px] text-muted">
                 Your school or university
                 <input
                   value={school}
@@ -64,17 +64,17 @@ export function EducationCard({ initial }: { initial: EducationStatus }) {
               </Button>
             </div>
           ) : (
-            <span className="text-[13px] text-muted">The account&apos;s owner can ask for this.</span>
+            <span className="text-[14px] text-muted">The account&apos;s owner can ask for this.</span>
           ))}
         {edu.status === "none" && edu.owner && (
-          <span className="text-[12.5px] leading-normal text-muted">
+          <span className="text-[13.5px] leading-normal text-muted">
             {edu.automatic
               ? "Your email address is at a school or university, so this takes effect at once."
               : "We look at each request by hand, usually within a few working days. An address at your school (.edu, .ac.uk and the like), once confirmed, is recognised by itself."}
           </span>
         )}
         {problem && (
-          <span role="alert" className={cn("text-[13px] text-danger")}>
+          <span role="alert" className={cn("text-[14px] text-danger")}>
             {problem}
           </span>
         )}
@@ -103,12 +103,12 @@ export function EducationRequests({ initial }: { initial: EducationRequest[] }) 
 
   return (
     <ListCard data-testid="education-requests">
-      <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">Education requests waiting. Approve where the school is real and the person belongs to it.</span>
+      <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">Education requests waiting. Approve where the school is real and the person belongs to it.</span>
       {requests.map((r) => (
         <div key={r.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-divider py-3 last:border-0" data-testid="education-request">
           <span className="flex min-w-0 flex-[1_1_240px] flex-col gap-[2px]">
             <span className="truncate font-medium">{r.school || "No school given"}</span>
-            <span className="truncate text-[13px] text-muted">
+            <span className="truncate text-[14px] text-muted">
               {r.name} · {r.email}
             </span>
           </span>

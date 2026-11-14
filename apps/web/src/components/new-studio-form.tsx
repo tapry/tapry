@@ -70,10 +70,10 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
       <form onSubmit={submit} className="ember-card flex animate-fade-up flex-col gap-[22px] rounded-[19px] bg-canvas p-[clamp(22px,5vw,36px)] text-text">
         <div className="flex items-center justify-between gap-3">
           <Link href="/studios" aria-label="Tapry home" className="text-text hover:text-text">
-            <Logo className="text-[15px]" mark="size-6" />
+            <Logo className="text-[16px]" mark="size-6" />
           </Link>
           {!firstStudio && (
-            <Link href="/studios" className="flex items-center gap-1.5 text-[13px] text-muted hover:text-text">
+            <Link href="/studios" className="flex items-center gap-1.5 text-[14px] text-muted hover:text-text">
               <Icon name="back" size={14} />
               Your studios
             </Link>
@@ -82,8 +82,8 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">{firstStudio ? "Your first studio" : "New studio"}</h1>
-            <p className="text-[14.5px] leading-normal text-muted">Where your recordings and guests live. You can add more studios later.</p>
+            <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em]">{firstStudio ? "Your first studio" : "New studio"}</h1>
+            <p className="text-[15.5px] leading-normal text-muted">Where your recordings and guests live. You can add more studios later.</p>
           </div>
 
           <label className="flex flex-col gap-1.5">
@@ -96,9 +96,9 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
               required
               autoFocus
               placeholder="e.g. The Long Table"
-              className="h-10 rounded-md border border-border bg-surface px-3 text-[15px] text-text shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-subtle focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)]"
+              className="h-10 rounded-md border border-border bg-surface px-3 text-[16px] text-text shadow-xs transition-[border-color,box-shadow] outline-none placeholder:text-subtle focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)]"
             />
-            <span className="flex justify-between gap-3 text-[12.5px] text-muted">
+            <span className="flex justify-between gap-3 text-[13.5px] text-muted">
               <span>Guests see this on their invite. You can rename it anytime.</span>
               <span className="tabular-nums">
                 {name.length} / {MAX_NAME}
@@ -119,17 +119,17 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
                   aria-checked={template.id === t.id}
                   onClick={() => pick(t)}
                   className={cn(
-                    "flex cursor-pointer flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
+                    "flex cursor-pointer flex-col gap-0.5 rounded-lg border bg-surface px-2.5 py-2 text-left text-text transition-[border-color,box-shadow] duration-200",
                     template.id === t.id ? SELECTED_CARD : UNSELECTED_CARD,
                   )}
                 >
                   <span className="text-sm font-medium">{t.name}</span>
-                  <span className="text-[12.5px] text-muted">{t.about}</span>
+                  <span className="text-[13.5px] text-muted">{t.about}</span>
                 </button>
               ))}
             </div>
             {template.id !== "blank" && (
-              <span className="text-[12.5px] leading-normal text-pretty text-muted" data-testid="template-note">
+              <span className="text-[13.5px] leading-normal text-pretty text-muted" data-testid="template-note">
                 Sets the options below{template.consent ? ", the consent text guests agree to" : ""} and a guide to follow in the session.
                 {template.solo ? " Its solo link is switched on with an assignment to edit: share it, and each student's recording arrives in this studio. Recordings are deleted after 120 days." : ""} All of it can be changed in the studio&apos;s settings.
               </span>
@@ -140,7 +140,7 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
             <span className="text-sm font-medium" id="quality-label">
               Recording
             </span>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2" role="radiogroup" aria-labelledby="quality-label">
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="quality-label">
               {qualityOptions(can4k).map(([value, label, sub, locked]) => (
                 <button
                   key={value}
@@ -150,12 +150,12 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
                   disabled={locked}
                   onClick={() => setQuality(value)}
                   className={cn(
-                    "flex cursor-pointer flex-col disabled:cursor-not-allowed disabled:opacity-60 gap-[3px] rounded-lg border bg-surface px-3 py-[11px] text-left text-text transition-[border-color,box-shadow] duration-200",
+                    "flex cursor-pointer flex-col disabled:cursor-not-allowed disabled:opacity-60 gap-0.5 rounded-lg border bg-surface px-2.5 py-2 text-left text-text transition-[border-color,box-shadow] duration-200",
                     quality === value ? SELECTED_CARD : UNSELECTED_CARD,
                   )}
                 >
                   <span className="text-sm font-medium">{label}</span>
-                  <span className="text-[12.5px] text-muted">{sub}</span>
+                  <span className="text-[13.5px] text-muted">{sub}</span>
                 </button>
               ))}
             </div>
@@ -166,14 +166,14 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
               <span className="text-sm font-medium" id="guests-label">
                 Guests per recording
               </span>
-              <span className="text-[13px] text-muted">
+              <span className="text-[14px] text-muted">
                 You + {guests} guest{guests === 1 ? "" : "s"}, up to {MAX_GUESTS}
               </span>
             </span>
             <span className="flex items-center gap-3">
               {/* One seat each: you, then a place for every guest. Decorative: the words beside it say the same. */}
               <span aria-hidden className="flex flex-wrap items-center gap-1.5" data-testid="seats">
-                <Avatar name={hostName} className="size-7 text-[10.5px]" />
+                <Avatar name={hostName} className="size-7 text-[11.5px]" />
                 {Array.from({ length: guests }, (_, i) => (
                   <span key={i} className="grid size-7 place-items-center rounded-full border border-dashed border-border-strong bg-surface text-subtle">
                     <svg viewBox="0 0 24 24" className="size-[13px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -194,7 +194,7 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
               className="flex cursor-pointer items-center justify-between gap-3 py-3 text-left text-sm font-medium"
             >
               Sound options
-              <span className="flex items-center gap-1.5 text-[13px] font-normal text-muted">
+              <span className="flex items-center gap-1.5 text-[14px] font-normal text-muted">
                 {soundOpen ? "Hide" : [echo && "Echo reduction", level && "Even volume"].filter(Boolean).join(" · ") || "Off"}
                 <Icon name="back" size={13} className={cn("transition-transform", soundOpen ? "rotate-90" : "-rotate-90")} />
               </span>
@@ -230,9 +230,9 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
               Cancel
             </Link>
           ) : (
-            <span className="text-[13px] text-muted">Next: a guest link to share. Nothing records until you press Record.</span>
+            <span className="text-[14px] text-muted">Next: a guest link to share. Nothing records until you press Record.</span>
           )}
-          {!firstStudio && <span className="text-[13px] text-muted">Nothing records until you press Record.</span>}
+          {!firstStudio && <span className="text-[14px] text-muted">Nothing records until you press Record.</span>}
           <button
             type="submit"
             aria-disabled={!ready}

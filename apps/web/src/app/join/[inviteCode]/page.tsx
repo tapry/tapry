@@ -32,13 +32,13 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
         <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[14px] bg-[#18181b] text-white [--ring:#fafafa]">
           <span className="flex flex-col items-center gap-3 px-6 text-center">
             <Avatar name={preview.hostName} src={preview.hostAvatarUrl} className="size-20 text-2xl ring-4 ring-white/10" />
-            <span className="text-[15px] font-medium">{preview.hostName}</span>
+            <span className="text-[16px] font-medium">{preview.hostName}</span>
           </span>
           <span className="absolute start-3 bottom-3 flex items-center gap-2.5 rounded-full bg-black/60 py-1.5 ps-2 pe-3 backdrop-blur-md">
             <span className="grid size-[22px] place-items-center rounded-full bg-accent text-accent-text">
               <Icon d={audioOnly ? ICON.mic : ICON.cam} className="size-[11px]" strokeWidth={2.6} />
             </span>
-            <span className="text-[12.5px]">{t(audioOnly ? "invite.soundOnly" : "invite.camMic")}</span>
+            <span className="text-[13.5px]">{t(audioOnly ? "invite.soundOnly" : "invite.camMic")}</span>
           </span>
         </div>
 
@@ -47,7 +47,7 @@ export default async function JoinPage({ params }: { params: Promise<{ inviteCod
           <LocaleProvider locale={locale}>
             <JoinForm inviteCode={inviteCode} hostName={preview.hostName} consentText={preview.consentText} consentHash={preview.consentHash} />
           </LocaleProvider>
-          <p className="text-[13.5px] text-muted">
+          <p className="text-[14.5px] text-muted">
             {t("invite.early")}{" "}
             <Link href={`/join/${inviteCode}/check`} className="font-medium text-text underline underline-offset-2 hover:text-accent-strong">
               {t("invite.testFirst")}

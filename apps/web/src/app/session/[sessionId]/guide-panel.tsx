@@ -68,7 +68,7 @@ export function GuidePanel({ ticket, recordingId, title = "Guide" }: { ticket: S
   return (
     <section className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface px-3 py-3" data-testid="guide-panel">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[15px] font-medium">
+        <h2 className="text-[16px] font-medium">
           {title}{items > 0 && <span className="font-normal text-muted"> · {[...done].length} of {items}</span>}
         </h2>
         <button
@@ -82,17 +82,17 @@ export function GuidePanel({ ticket, recordingId, title = "Guide" }: { ticket: S
         </button>
       </div>
       {lines.length === 0 ? (
-        <p className="text-[13px] leading-normal text-muted">{title === "Guide" ? "No guide for this studio yet. Write one in the studio's settings: one question or segment per line." : "Say what you'd like to say, then press Stop."}</p>
+        <p className="text-[14px] leading-normal text-muted">{title === "Guide" ? "No guide for this studio yet. Write one in the studio's settings: one question or segment per line." : "Say what you'd like to say, then press Stop."}</p>
       ) : (
         <ul className="flex max-h-[320px] flex-col gap-1 overflow-auto">
           {lines.map((l, i) =>
             l.kind === "section" ? (
-              <li key={i} className="pt-1.5 text-[12.5px] font-medium tracking-wide text-muted uppercase">
+              <li key={i} className="pt-1.5 text-[13.5px] font-medium tracking-wide text-muted uppercase">
                 {l.text}
               </li>
             ) : (
               <li key={i}>
-                <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-1 py-1 text-[13.5px] leading-snug hover:bg-surface-2">
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-1 py-1 text-[14.5px] leading-snug hover:bg-surface-2">
                   <input type="checkbox" checked={done.has(i)} onChange={() => toggle(i, l.text)} className="mt-0.5 size-4 shrink-0" />
                   <span className={cn(done.has(i) && "text-muted line-through")}>{l.text}</span>
                 </label>
@@ -102,12 +102,12 @@ export function GuidePanel({ ticket, recordingId, title = "Guide" }: { ticket: S
         </ul>
       )}
       {markers.length > 0 && (
-        <p className="text-[12.5px] text-muted" data-testid="guide-markers">
+        <p className="text-[13.5px] text-muted" data-testid="guide-markers">
           {markers.length} {markers.length === 1 ? "marker" : "markers"} in this recording · last at {shortClock(markers.at(-1)!.atMs)}
         </p>
       )}
       {problem && (
-        <p role="alert" className="text-[12.5px] text-danger">
+        <p role="alert" className="text-[13.5px] text-danger">
           {problem}
         </p>
       )}

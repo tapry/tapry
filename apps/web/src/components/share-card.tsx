@@ -32,7 +32,7 @@ export function ShareCard({ studioId, recordingId, initial, hasTranscript, video
   return (
     <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="share" data-shared={share.code ? "yes" : "no"}>
       <span className="pt-3 pb-2 font-medium">Share page</span>
-      <span className="border-t border-divider pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+      <span className="border-t border-divider pt-3 text-[14.5px] leading-normal text-pretty text-muted">
         {share.code
           ? "Anyone with this link can play this recording. It isn't listed anywhere and search engines are asked not to index it."
           : "A public page with this recording's player, for anyone you send the link to. Nobody can see it until you turn it on."}
@@ -40,7 +40,7 @@ export function ShareCard({ studioId, recordingId, initial, hasTranscript, video
       {share.code ? (
         <>
           <span className="flex flex-wrap items-center gap-2 pt-3">
-            <input readOnly value={link} aria-label="Share link" onFocus={(e) => e.target.select()} className="h-[32px] min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-2.5 text-[13px] text-text-2" />
+            <input readOnly value={link} aria-label="Share link" onFocus={(e) => e.target.select()} className="h-[32px] min-w-0 flex-1 rounded-md border border-border bg-surface-2 px-2.5 text-[14px] text-text-2" />
             <button type="button" className={small} onClick={() => copy("link", link)}>
               {copied === "link" ? "Copied" : "Copy link"}
             </button>
@@ -49,7 +49,7 @@ export function ShareCard({ studioId, recordingId, initial, hasTranscript, video
             </button>
           </span>
           {hasTranscript && (
-            <label className="flex cursor-pointer items-start gap-2.5 pt-3 text-[13.5px] leading-snug">
+            <label className="flex cursor-pointer items-start gap-2.5 pt-3 text-[14.5px] leading-snug">
               <input type="checkbox" checked={share.transcript} disabled={busy} onChange={(e) => void save({ enabled: true, transcript: e.target.checked })} className="mt-0.5 size-4 shrink-0" />
               <span>Show the transcript on the page too</span>
             </label>
@@ -71,7 +71,7 @@ export function ShareCard({ studioId, recordingId, initial, hasTranscript, video
         </span>
       )}
       {problem && (
-        <span role="alert" className="pt-2 text-[13px] text-danger">
+        <span role="alert" className="pt-2 text-[14px] text-danger">
           {problem}
         </span>
       )}

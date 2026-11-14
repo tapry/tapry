@@ -133,7 +133,7 @@ export function PageTitle({
 }: { children: ReactNode; className?: string; strong?: boolean } & React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h1
-      className={cn("text-[26px] leading-tight text-balance break-words", strong ? "font-semibold tracking-[-.025em]" : "font-medium tracking-[-.02em]", className)}
+      className={cn("text-[27px] leading-tight text-balance break-words", strong ? "font-semibold tracking-[-.025em]" : "font-medium tracking-[-.02em]", className)}
       {...props}
     >
       {children}

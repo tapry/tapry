@@ -1,3 +1,4 @@
+import { AppearancePicker } from "@/components/appearance";
 import { AvatarEditor } from "@/components/avatar-editor";
 import { IntegrationsPanel } from "@/components/integrations-panel";
 import { Fragment } from "react";
@@ -40,7 +41,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   const workspace = w && (
     <ListCard>
-      <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">How this server is set up. Read-only here: change it in docker-compose.yml (or .env) and restart.</span>
+      <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">How this server is set up. Read-only here: change it in docker-compose.yml (or .env) and restart.</span>
       <Row label="Email" help="Guests can ask for a link to their recording by email at the end of a session." value={w.emailOn ? "On" : "Off"} env="SMTP_HOST" />
       <Row label="Transcripts" help="Each person's audio is transcribed on this server with whisper.cpp." value={!w.transcriptsModel ? "Off" : w.transcriptsModel.found === false ? `${w.transcriptsModel.name} not found: transcripts fail` : `On · ${w.transcriptsModel.name}`} env="WHISPER_MODEL" />
       <Row label="Live call" help="Without it, recording still works; people just don't see or hear each other in Tapry." value={w.callOn ? "On" : "Off"} env="LIVEKIT_URL" />
@@ -69,11 +70,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <AvatarEditor name={user.name} initial={user.avatarUrl ?? null} />
       <Row label="Name" help="Shown to guests on the invite and in the studio." value={user.name} />
       <Row label="Email" help="What you log in with." value={user.email} />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-divider py-4">
+        <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
+          <span className="font-medium">Appearance</span>
+          <span className="text-[14px] leading-normal text-muted">Light, dark, or the same as your computer. Kept in this browser.</span>
+        </span>
+        <AppearancePicker />
+      </div>
       <Row label="Role" help={user.isAdmin ? "The first account on this server: sees Server health and how it's set up." : "Creates studios and invites guests."} value={user.isAdmin ? "Admin" : "Host"} />
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4">
         <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
           <span className="font-medium">Log out</span>
-          <span className="text-[13px] leading-normal text-muted">On this browser.</span>
+          <span className="text-[14px] leading-normal text-muted">On this browser.</span>
         </span>
         <LogOutButton />
       </div>
@@ -106,11 +114,11 @@ function Row({ label, help, value, env, last }: { label: string; help?: string; 
     <div className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4 ${last ? "" : "border-b border-divider"}`}>
       <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
         <span className="font-medium">{label}</span>
-        {help && <span className="text-[13px] leading-normal text-pretty text-muted">{help}</span>}
+        {help && <span className="text-[14px] leading-normal text-pretty text-muted">{help}</span>}
       </span>
       <span className="flex min-w-0 flex-wrap items-center gap-2 text-text-2">
         <span className="min-w-0 break-words">{value}</span>
-        {env && <code className="rounded-md border border-border px-2 py-0.5 font-mono text-[12px] text-muted">{env}</code>}
+        {env && <code className="rounded-md border border-border px-2 py-0.5 font-mono text-[13px] text-muted">{env}</code>}
       </span>
     </div>
   );

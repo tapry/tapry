@@ -4,6 +4,8 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/geist-mono";
 import "./globals.css";
+import { AppearanceSync } from "@/components/appearance";
+import { APPEARANCE_SCRIPT } from "@/lib/appearance";
 
 export const metadata: Metadata = {
   title: { default: "Tapry", template: "%s · Tapry" },
@@ -14,8 +16,15 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh">{children}</body>
+    // data-theme is set by the script before React starts: not a mismatch to complain about.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
+      </head>
+      <body className="min-h-dvh">
+        <AppearanceSync />
+        {children}
+      </body>
     </html>
   );
 }

@@ -63,19 +63,19 @@ export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId
   return (
     <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="clips">
       <span className="pt-3 pb-2 font-medium">Clips</span>
-      <span className="border-t border-divider pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+      <span className="border-t border-divider pt-3 text-[14.5px] leading-normal text-pretty text-muted">
         Cut a stretch of this recording out as its own file. Take the times from the transcript; a clip can be up to ten minutes of the {shortClock(lengthMs)} recorded.
       </span>
       <form onSubmit={create} className="flex flex-wrap items-end gap-2 pt-3">
-        <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex flex-col gap-1 text-[13.5px] text-muted">
           From
           <input name="from" required placeholder="1:05" inputMode="numeric" className={`${field} w-[84px]`} />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex flex-col gap-1 text-[13.5px] text-muted">
           To
           <input name="to" required placeholder="2:30" inputMode="numeric" className={`${field} w-[84px]`} />
         </label>
-        <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-[12.5px] text-muted">
+        <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-[13.5px] text-muted">
           Name (optional)
           <input name="title" maxLength={80} placeholder="The hard year" className={field} />
         </label>
@@ -84,20 +84,20 @@ export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId
         </Button>
       </form>
       {problem && (
-        <span role="alert" className="pt-2 text-[13px] text-danger">
+        <span role="alert" className="pt-2 text-[14px] text-danger">
           {problem}
         </span>
       )}
       {clips.length > 0 && (
         <div className="mt-3 flex flex-col">
           {clips.map((c) => (
-            <span key={c.id} className="flex items-center justify-between gap-3 border-t border-divider py-2.5 text-[13.5px]" data-testid="clip" data-status={c.status}>
+            <span key={c.id} className="flex items-center justify-between gap-3 border-t border-divider py-2.5 text-[14.5px]" data-testid="clip" data-status={c.status}>
               <span className="flex min-w-0 flex-col gap-px">
                 <span className="truncate">
                   {shortClock(c.startMs)} to {shortClock(c.endMs)}
                   {c.title && ` · ${c.title}`}
                 </span>
-                <span className="text-[12.5px] text-muted">{c.status === "queued" ? "Being cut…" : c.status === "failed" ? "Couldn't be cut. Delete it and try again." : `${c.output!.fileName.split(".").pop()!.toUpperCase()} · ${formatBytes(c.output!.bytes)}`}</span>
+                <span className="text-[13.5px] text-muted">{c.status === "queued" ? "Being cut…" : c.status === "failed" ? "Couldn't be cut. Delete it and try again." : `${c.output!.fileName.split(".").pop()!.toUpperCase()} · ${formatBytes(c.output!.bytes)}`}</span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {c.output && (
@@ -109,7 +109,7 @@ export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId
                     Download
                   </a>
                 )}
-                <button type="button" onClick={() => void remove(c.id)} className="cursor-pointer text-[12.5px] text-danger underline underline-offset-[3px]">
+                <button type="button" onClick={() => void remove(c.id)} className="cursor-pointer text-[13.5px] text-danger underline underline-offset-[3px]">
                   Delete
                 </button>
               </span>

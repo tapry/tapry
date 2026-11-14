@@ -84,8 +84,8 @@ export function JoinForm({
     <div className="flex flex-col gap-4">
       {previous && (
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3.5">
-          <p className="flex items-center gap-2.5 text-[13.5px] text-text-2">
-            <Avatar name={previous.name} className="size-6 text-[10px]" />
+          <p className="flex items-center gap-2.5 text-[14.5px] text-text-2">
+            <Avatar name={previous.name} className="size-6 text-[11px]" />
             {t("join.already", { name: previous.name })}
           </p>
           <Button variant="record" onClick={() => router.push(`/session/${previous.ticket.sessionId}`)}>
@@ -104,7 +104,7 @@ export function JoinForm({
         <Field label={t("common.yourName")} hint={t("join.nameHint", { host: hostName })}>
           <Input name="displayName" autoComplete="name" required maxLength={60} autoFocus={!previous} />
         </Field>
-        <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
+        <label className="flex cursor-pointer items-start gap-2.5 text-[14.5px] leading-[1.45] text-text-2">
           <input
             type="checkbox"
             name="consent"

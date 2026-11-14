@@ -36,14 +36,14 @@ export default async function SoloPage({ params }: { params: Promise<{ code: str
         </GuestHeading>
         {questions.length > 0 && (
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4" data-testid="solo-prompt">
-            <span className="text-[13px] text-muted">{t("solo.prompt", { host: preview.hostName })}</span>
+            <span className="text-[14px] text-muted">{t("solo.prompt", { host: preview.hostName })}</span>
             {questions.map((q, i) =>
               q.kind === "section" ? (
-                <span key={i} className="pt-1 text-[12.5px] font-medium tracking-wide text-muted uppercase">
+                <span key={i} className="pt-1 text-[13.5px] font-medium tracking-wide text-muted uppercase">
                   {q.text}
                 </span>
               ) : (
-                <span key={i} className="text-[14.5px] leading-snug text-pretty">
+                <span key={i} className="text-[15.5px] leading-snug text-pretty">
                   {q.text}
                 </span>
               ),

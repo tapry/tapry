@@ -72,7 +72,7 @@ export function StudioView({
     <>
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em] break-words">{studio.name}</h1>
+          <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em] break-words">{studio.name}</h1>
           <span className="text-sm text-pretty text-muted">
             {recordingLabel(studio.settings)} · up to {studio.settings.maxGuests}{" "}
             guest{studio.settings.maxGuests === 1 ? "" : "s"} · started{" "}
@@ -124,7 +124,7 @@ export function StudioView({
             <h2 className="font-medium">Invite guests</h2>
             <InviteLink studioId={studio.id} inviteCode={studio.inviteCode} />
             <ScheduleInvite studioName={studio.name} hostName={hostName} inviteCode={studio.inviteCode} />
-            <p className="text-[13px] text-muted">They open it in their browser, with nothing to install and no account needed.</p>
+            <p className="text-[14px] text-muted">They open it in their browser, with nothing to install and no account needed.</p>
           </section>
           {checks.length > 0 && <TechChecks checks={checks} />}
           <RecordingList
@@ -146,7 +146,7 @@ export function StudioView({
           <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-accent-line bg-surface px-[18px] py-4">
             <span className="flex flex-[1_1_260px] flex-col gap-[3px]">
               <span className="font-medium">Delete this studio</span>
-              <span className="text-[13px] text-muted">Removes the studio, its invite link and every recording in it, including the files.</span>
+              <span className="text-[14px] text-muted">Removes the studio, its invite link and every recording in it, including the files.</span>
             </span>
             <DeleteStudioButton studioId={studio.id} name={studio.name} recordings={recordings.length} />
           </section>
@@ -161,14 +161,14 @@ export function StudioView({
 function Stat({ label, value, sub, live, testId }: { label: string; value: string; sub: string; live?: boolean; testId?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-surface px-4 py-[18px] sm:px-5">
-      <span className="text-[13px] text-muted">{label}</span>
+      <span className="text-[14px] text-muted">{label}</span>
       <span
-        className={cn("text-[22px] font-medium tracking-[-.02em] whitespace-nowrap tabular-nums", live && "text-accent-strong")}
+        className={cn("text-[23px] font-medium tracking-[-.02em] whitespace-nowrap tabular-nums", live && "text-accent-strong")}
         data-testid={testId}
       >
         {value}
       </span>
-      <span className="text-[12.5px] text-muted">{sub}</span>
+      <span className="text-[13.5px] text-muted">{sub}</span>
     </div>
   );
 }
@@ -180,7 +180,7 @@ function SpaceUsed({ studios }: { studios: Array<{ id: string; name: string; byt
   return (
     <>
       <div className="flex flex-col gap-2">
-        <span className="flex flex-wrap justify-between gap-2 text-[13px] text-muted">
+        <span className="flex flex-wrap justify-between gap-2 text-[14px] text-muted">
           <span>Space used by your studios</span>
           <span>{formatBytes(total)} in total</span>
         </span>
@@ -191,7 +191,7 @@ function SpaceUsed({ studios }: { studios: Array<{ id: string; name: string; byt
         </div>
       </div>
       <ListCard>
-        <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">By studio</span>
+        <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">By studio</span>
         <ul className="flex flex-col">
           {studios.map((s, i) => (
             <li key={s.id} className="flex justify-between gap-3 border-b border-divider py-3 last:border-0">
@@ -204,7 +204,7 @@ function SpaceUsed({ studios }: { studios: Array<{ id: string; name: string; byt
           ))}
         </ul>
       </ListCard>
-      <p className="text-[13px] text-muted">
+      <p className="text-[14px] text-muted">
         Tip: each person recorded in Full HD adds about 3.6 GB per hour (1.8 GB in Standard), plus the processed files.
         Deleting a recording frees its space right away.
       </p>
@@ -229,7 +229,7 @@ function TechChecks({ checks }: { checks: TechCheck[] }) {
     <section className="flex flex-col gap-2.5">
       <h2 className="font-medium">Tech checks</h2>
       <ListCard>
-        <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,.8fr)_minmax(0,1.3fr)] gap-4 border-b border-border py-2.5 text-[13px] text-muted sm:grid">
+        <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,.8fr)_minmax(0,1.3fr)] gap-4 border-b border-border py-2.5 text-[14px] text-muted sm:grid">
           <span>Guest</span>
           <span>Checked</span>
           <span>Result</span>
@@ -244,10 +244,10 @@ function TechChecks({ checks }: { checks: TechCheck[] }) {
                 data-testid="tech-check"
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <Avatar name={c.name} className="size-7 text-[11px]" />
+                  <Avatar name={c.name} className="size-7 text-[12px]" />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate font-medium">{c.name}</span>
-                    <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-muted">
+                    <span className="flex min-w-0 items-center gap-1.5 text-[14px] text-muted">
                       {browserOf(c.browser) && <BrowserIcon name={browserOf(c.browser)!} size={13} />}
                       <span className="truncate">{c.browser}</span>
                     </span>
@@ -259,7 +259,7 @@ function TechChecks({ checks }: { checks: TechCheck[] }) {
                     <Icon name="shield" /> All good
                   </span>
                 ) : (
-                  <ul className="flex flex-col gap-1 text-[13.5px]">
+                  <ul className="flex flex-col gap-1 text-[14.5px]">
                     {issues.map((x) => (
                       <li key={x.id} className={cn("flex items-start gap-[7px]", x.tone === "danger" ? "text-danger" : "text-warn-strong")}>
                         <Icon name="alert" size={15} className="mt-0.5" />

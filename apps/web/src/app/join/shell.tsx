@@ -21,7 +21,7 @@ export function GuestShell({ title, right, children, brand, locale }: { title: R
     >
       <main className="ember-card flex w-full max-w-[920px] flex-col overflow-hidden rounded-[19px] bg-canvas text-text">
         <div className="flex items-center justify-between gap-3 border-b border-border px-[22px] py-3.5">
-          <span className="flex min-w-0 items-center gap-[9px] text-[15px] font-medium">
+          <span className="flex min-w-0 items-center gap-[9px] text-[16px] font-medium">
             {brand?.logoUrl ? (
               // The studio's own picture: any size, shown at the mark's height.
               // eslint-disable-next-line @next/next/no-img-element
@@ -66,7 +66,7 @@ export function Steps({ current, locale = "en" }: { current: number; locale?: Lo
           key={label}
           aria-current={i === current ? "step" : undefined}
           className={cn(
-            "flex items-center gap-1.5 rounded-md px-[9px] py-1 text-[13px] font-medium whitespace-nowrap transition-colors duration-300",
+            "flex items-center gap-1.5 rounded-md px-[9px] py-1 text-[14px] font-medium whitespace-nowrap transition-colors duration-300",
             i === current && "bg-surface-2",
             i <= current ? "text-text" : "text-subtle",
           )}
@@ -74,7 +74,7 @@ export function Steps({ current, locale = "en" }: { current: number; locale?: Lo
           <span
             aria-hidden
             className={cn(
-              "grid size-4 place-items-center rounded-full text-[10px]",
+              "grid size-4 place-items-center rounded-full text-[11px]",
               // A fixed green dark enough for the white tick in both themes.
               i < current ? "bg-[#15803d] text-white" : i === current ? "bg-ink text-ink-text" : "bg-border text-muted",
             )}
@@ -93,9 +93,9 @@ export function Steps({ current, locale = "en" }: { current: number; locale?: Lo
 export function GuestHeading({ title, children, above }: { title: ReactNode; children?: ReactNode; above?: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      {above && <span className="text-[13px] text-muted">{above}</span>}
-      <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em] text-balance">{title}</h1>
-      {children && <p className="text-[14.5px] leading-normal text-pretty text-muted">{children}</p>}
+      {above && <span className="text-[14px] text-muted">{above}</span>}
+      <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em] text-balance">{title}</h1>
+      {children && <p className="text-[15.5px] leading-normal text-pretty text-muted">{children}</p>}
     </div>
   );
 }

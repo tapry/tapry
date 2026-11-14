@@ -40,10 +40,10 @@ export function AuthPicture() {
       style={{ background: "linear-gradient(200deg,var(--accent-tint) 0%,var(--accent-soft) 55%,var(--accent-line) 100%)" }}
     >
       <div className="flex flex-col gap-2.5">
-        <h2 className="text-[24px] leading-[1.2] font-medium tracking-[-.025em] text-balance">
+        <h2 className="text-[25px] leading-[1.2] font-medium tracking-[-.025em] text-balance">
           Every voice on its own track, even when the Wi-Fi gives up.
         </h2>
-        <p className="text-[14.5px] leading-[1.55] text-pretty text-text-2">
+        <p className="text-[15.5px] leading-[1.55] text-pretty text-text-2">
           Guests are recorded on their own computer and uploaded while you talk.
         </p>
       </div>
@@ -60,11 +60,11 @@ export function AuthPicture() {
             </span>
           </span>
           <span className="flex flex-col gap-0.5">
-            <span className="flex items-center gap-1.5 self-start rounded-md bg-accent-soft px-[7px] py-px text-[11.5px] font-semibold text-accent-strong">
+            <span className="flex items-center gap-1.5 self-start rounded-md bg-accent-soft px-[7px] py-px text-[12.5px] font-semibold text-accent-strong">
               <span className="size-[5px] animate-rec-pulse rounded-full bg-current" />
               Recording
             </span>
-            <span className="text-[24px] leading-[1.1] font-medium tracking-[-.03em] tabular-nums">
+            <span className="text-[25px] leading-[1.1] font-medium tracking-[-.03em] tabular-nums">
               {pad(Math.floor(t / 60))}:{pad(t % 60)}
             </span>
           </span>
@@ -76,10 +76,10 @@ export function AuthPicture() {
               <span className="relative grid size-[30px] place-items-center">
                 {on && <span className="absolute inset-0 animate-ring rounded-full border-2 border-accent" />}
                 <span className={cn("relative rounded-full", on ? "shadow-[0_0_0_2px_var(--accent)]" : "shadow-[0_0_0_2px_var(--surface)]")}>
-                  <Avatar name={name} className="size-[30px] text-[11px]" />
+                  <Avatar name={name} className="size-[30px] text-[12px]" />
                 </span>
               </span>
-              <span className="text-[13.5px] font-medium whitespace-nowrap">{name}</span>
+              <span className="text-[14.5px] font-medium whitespace-nowrap">{name}</span>
               <span
                 className={cn(
                   "flex h-7 min-w-0 items-center gap-2 rounded-full px-2.5 transition-colors duration-300",
@@ -87,7 +87,7 @@ export function AuthPicture() {
                 )}
               >
                 <EqBars active={on} />
-                <span className={cn("text-[11.5px] font-medium whitespace-nowrap", on ? "text-accent-strong" : "text-muted")}>
+                <span className={cn("text-[12.5px] font-medium whitespace-nowrap", on ? "text-accent-strong" : "text-muted")}>
                   {on ? "Speaking" : "Listening"}
                 </span>
               </span>
@@ -95,7 +95,7 @@ export function AuthPicture() {
           );
         })}
       </div>
-      <span className="text-[13px] text-text-2">Open source · self-hosted · your storage</span>
+      <span className="text-[14px] text-text-2">Open source · self-hosted · your storage</span>
     </aside>
   );
 }

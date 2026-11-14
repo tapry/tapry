@@ -39,11 +39,11 @@ export function PlanAccounts({ accounts }: { accounts: Account[] }) {
 
   return (
     <ListCard data-testid="plan-accounts">
-      <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">
+      <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">
         Accounts on this server. Set a plan by hand for someone who pays outside the payment provider; subscriptions are kept by the provider.
       </span>
       {error && (
-        <p role="alert" className="border-b border-divider py-3 text-[13.5px] text-danger">
+        <p role="alert" className="border-b border-divider py-3 text-[14.5px] text-danger">
           {error}
         </p>
       )}
@@ -51,7 +51,7 @@ export function PlanAccounts({ accounts }: { accounts: Account[] }) {
         <div key={a.id} className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 ${i < accounts.length - 1 ? "border-b border-divider" : ""}`} data-testid="plan-account">
           <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[2px]">
             <span className="truncate font-medium">{a.name}</span>
-            <span className="truncate text-[13px] text-muted">{a.email}</span>
+            <span className="truncate text-[14px] text-muted">{a.email}</span>
           </span>
           {a.subscription ? (
             <span className="text-text-2">

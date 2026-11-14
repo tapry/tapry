@@ -25,25 +25,25 @@ export default async function SharePage({ params }: { params: Promise<{ code: st
               // eslint-disable-next-line @next/next/no-img-element
               <img src={brand.logoUrl} alt="" data-testid="brand-logo" className="mb-3 h-8 w-auto max-w-[160px] self-start rounded-[4px] object-contain" />
             )}
-            <h1 className="text-[26px] leading-tight font-medium tracking-[-.02em] text-balance">{shared.title}</h1>
-            <span className="text-[13.5px] text-muted">{shortClock(shared.lengthMs)}</span>
+            <h1 className="text-[27px] leading-tight font-medium tracking-[-.02em] text-balance">{shared.title}</h1>
+            <span className="text-[14.5px] text-muted">{shortClock(shared.lengthMs)}</span>
           </header>
           <SharedPlayer code={code} shared={shared} />
           {shared.turns && shared.turns.length > 0 && (
             <section className="flex flex-col gap-1">
-              <h2 className="text-[15px] font-medium">Transcript</h2>
+              <h2 className="text-[16px] font-medium">Transcript</h2>
               <SharedTranscript turns={shared.turns} />
             </section>
           )}
         </>
       ) : (
         <div className="flex flex-col gap-2 py-16" data-testid="share-gone">
-          <h1 className="text-[22px] font-medium">This recording isn&apos;t shared</h1>
+          <h1 className="text-[23px] font-medium">This recording isn&apos;t shared</h1>
           <p className="text-muted">The link may have been switched off or replaced, or the recording deleted. Ask whoever sent it for the current link.</p>
         </div>
       )}
       {services.guestPromoUrl && (
-        <footer className="mt-auto flex items-center gap-2 pt-6 text-[13px] text-muted">
+        <footer className="mt-auto flex items-center gap-2 pt-6 text-[14px] text-muted">
           <LogoMark small />
           <a href={services.guestPromoUrl} className="underline underline-offset-[3px]">
             Recorded with Tapry

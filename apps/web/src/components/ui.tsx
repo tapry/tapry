@@ -18,15 +18,15 @@ const variants: Record<Variant, string> = {
   ghost: "text-muted hover:bg-surface-2 hover:text-text",
   danger: "border border-accent-line bg-surface text-accent-strong hover:bg-accent-soft",
   // Quiet text that acts ("Delete recording…"): no box, so it takes no size.
-  link: "text-[13.5px] text-muted hover:text-accent-strong",
+  link: "text-[14.5px] text-muted hover:text-accent-strong",
 };
 
 // Pick a size here rather than overriding height or padding with className: Tailwind orders
 // same-property classes by value, not by where they're written, so "h-9" loses to "h-10".
 const sizes: Record<Size, string> = {
   sm: "h-9 rounded-md px-3 text-sm",
-  md: "h-10 rounded-md px-4 text-[14.5px]",
-  lg: "h-11 rounded-[10px] px-5 text-[15px]",
+  md: "h-10 rounded-md px-4 text-[15.5px]",
+  lg: "h-11 rounded-[10px] px-5 text-[16px]",
 };
 
 export const Button = forwardRef<
@@ -62,7 +62,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
     <textarea
       ref={ref}
       className={cn(
-        "w-full rounded-md border border-border bg-surface min-h-[120px] px-3 py-2.5 leading-normal text-[14.5px] text-text shadow-xs transition-[border-color,box-shadow] placeholder:text-subtle",
+        "w-full rounded-md border border-border bg-surface min-h-[120px] px-3 py-2.5 leading-normal text-[15.5px] text-text shadow-xs transition-[border-color,box-shadow] placeholder:text-subtle",
         "focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)] focus:outline-none aria-[invalid=true]:border-danger",
         className,
       )}
@@ -79,7 +79,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
     <input
       ref={ref}
       className={cn(
-        "h-[38px] w-full rounded-md border border-border bg-surface px-3 text-[14.5px] text-text shadow-xs transition-[border-color,box-shadow] placeholder:text-subtle",
+        "h-[38px] w-full rounded-md border border-border bg-surface px-3 text-[15.5px] text-text shadow-xs transition-[border-color,box-shadow] placeholder:text-subtle",
         "focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)] focus:outline-none aria-[invalid=true]:border-danger",
         className,
       )}
@@ -92,7 +92,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cn(
-        "h-[38px] w-full rounded-md border border-border bg-surface px-3 text-[14.5px] text-text shadow-xs transition-[border-color,box-shadow]",
+        "h-[38px] w-full rounded-md border border-border bg-surface px-3 text-[15.5px] text-text shadow-xs transition-[border-color,box-shadow]",
         "focus:border-ring focus:shadow-[0_0_0_3px_var(--ring-soft)] focus:outline-none aria-[invalid=true]:border-danger",
         className,
       )}
@@ -106,7 +106,7 @@ export function Field({ label, hint, children }: { label: ReactNode; hint?: Reac
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium">{label}</span>
       {children}
-      {hint && <span className="text-[13px] text-muted">{hint}</span>}
+      {hint && <span className="text-[14px] text-muted">{hint}</span>}
     </label>
   );
 }
@@ -119,11 +119,11 @@ export function CheckboxRow({
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode; description?: ReactNode }) {
   return (
-    <label className={cn("flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2", className)}>
+    <label className={cn("flex cursor-pointer items-start gap-2.5 text-[14.5px] leading-[1.45] text-text-2", className)}>
       <input type="checkbox" className="mt-0.5 size-4 shrink-0" {...props} />
       <span className="flex flex-col gap-0.5">
         <span className="font-medium text-text">{label}</span>
-        {description && <span className="text-[13px] leading-normal text-muted">{description}</span>}
+        {description && <span className="text-[14px] leading-normal text-muted">{description}</span>}
       </span>
     </label>
   );
@@ -187,7 +187,7 @@ export function Avatar({ name, className, src }: { name: string; className?: str
   return (
     <span
       aria-hidden
-      className={cn("grid shrink-0 place-items-center rounded-full font-semibold text-[#18181b]", className ?? "size-9 text-[13px]")}
+      className={cn("grid shrink-0 place-items-center rounded-full font-semibold text-[#18181b]", className ?? "size-9 text-[14px]")}
       style={{ background: AVATAR_COLORS[hash % AVATAR_COLORS.length] }}
     >
       {initials(name)}

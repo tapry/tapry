@@ -62,7 +62,7 @@ export function RecordingFilters({
 
   return (
     <div className="flex flex-col gap-1.5" data-testid="recording-filters" data-filters={applyFilters ? "applied" : "off"}>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[13px] text-muted">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[14px] text-muted">
         <span className="flex min-w-0 flex-[1_1_240px] items-start gap-2 text-pretty">
           <Icon name="sliders" size={15} className="mt-px" />
           <span>
@@ -87,7 +87,7 @@ export function RecordingFilters({
           </span>
         </div>
       )}
-      {error && <p className="text-[13px] text-accent-strong">{error}</p>}
+      {error && <p className="text-[14px] text-accent-strong">{error}</p>}
     </div>
   );
 }

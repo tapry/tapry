@@ -105,7 +105,7 @@ export function RecordingTimeline({ recording, now, levelLoudness }: { recording
             <span
               aria-hidden
               className={cn(
-                "grid size-[22px] shrink-0 place-items-center rounded-full text-[11px] font-medium",
+                "grid size-[22px] shrink-0 place-items-center rounded-full text-[12px] font-medium",
                 s.state === "done" && "text-ok-strong",
                 s.state === "current" && "text-warn-strong",
                 s.state === "failed" && "text-accent-strong",
@@ -128,7 +128,7 @@ export function RecordingTimeline({ recording, now, levelLoudness }: { recording
           </span>
           <span className={cn("flex min-w-0 flex-col gap-0.5", i < steps.length - 1 && "pb-3.5")}>
             <span className={cn("leading-[22px] font-medium", s.state === "todo" && "text-muted")}>{s.label}</span>
-            {s.detail && <span className={cn("text-[13px]", s.state === "failed" ? "text-accent-strong" : "text-muted")}>{s.detail}</span>}
+            {s.detail && <span className={cn("text-[14px]", s.state === "failed" ? "text-accent-strong" : "text-muted")}>{s.detail}</span>}
             {s.fraction !== undefined && (
               <span
                 className="mt-1 flex max-w-[360px] items-center gap-2.5"
@@ -140,7 +140,7 @@ export function RecordingTimeline({ recording, now, levelLoudness }: { recording
                 <span className="h-1.5 flex-1 overflow-hidden rounded-[3px] bg-surface-2">
                   <span className="block h-full rounded-[3px] bg-warn transition-[width] duration-500" style={{ width: `${Math.max(3, s.fraction * 100)}%` }} />
                 </span>
-                <span aria-hidden className="w-[34px] text-right text-[12.5px] text-muted tabular-nums">
+                <span aria-hidden className="w-[34px] text-right text-[13.5px] text-muted tabular-nums">
                   {Math.round(s.fraction * 100)}%
                 </span>
               </span>

@@ -506,7 +506,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
       <header inert={fullOpen} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-[clamp(14px,3vw,28px)] py-3">
         <span className="flex min-w-0 flex-wrap items-center gap-3">
           <LogoMark className="size-[26px]" />
-          <span className="truncate text-[15px] font-medium">{ticket.studio.name}</span>
+          <span className="truncate text-[16px] font-medium">{ticket.studio.name}</span>
           <RecPill clock={clock} />
         </span>
         {!ended && (
@@ -561,13 +561,13 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                   <div className="flex shrink-0 items-center justify-between gap-4 px-[18px] py-3.5">
                     <span className="flex min-w-0 items-center gap-3">
                       <LogoMark className="size-[26px]" />
-                      <span className="truncate text-[15px] font-medium">{ticket.studio.name}</span>
+                      <span className="truncate text-[16px] font-medium">{ticket.studio.name}</span>
                     </span>
                     <span className="flex items-center gap-2.5">
                       {/* A fixed terracotta dark enough for white text: this view is dark in both themes. */}
                       <span
                         className={cn(
-                          "flex items-center gap-2 rounded-md px-2.5 py-[5px] text-[13px] font-semibold whitespace-nowrap",
+                          "flex items-center gap-2 rounded-md px-2.5 py-[5px] text-[14px] font-semibold whitespace-nowrap",
                           recording ? "bg-[#c43c25]" : "bg-white/12",
                         )}
                       >
@@ -576,7 +576,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         {clock && <span className="font-mono font-medium tabular-nums">{clock}</span>}
                       </span>
                       <span
-                        className="flex items-center gap-1.5 rounded-md bg-white/8 px-2.5 py-[5px] text-[13px] whitespace-nowrap text-white/80"
+                        className="flex items-center gap-1.5 rounded-md bg-white/8 px-2.5 py-[5px] text-[14px] whitespace-nowrap text-white/80"
                         title={connectedCount !== null ? `${connectedCount} of ${participants.length} in the call` : `${participants.length} in the studio`}
                       >
                         <Icon d={ICON.people} className="size-3.5" />
@@ -588,7 +588,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         type="button"
                         onClick={() => setFull(false)}
                         aria-label={t("room.exitFull")}
-                        className="inline-flex h-8 cursor-pointer items-center gap-[7px] rounded-md border border-white/16 px-[11px] text-[13px] font-medium whitespace-nowrap transition-colors hover:bg-white/10"
+                        className="inline-flex h-8 cursor-pointer items-center gap-[7px] rounded-md border border-white/16 px-[11px] text-[14px] font-medium whitespace-nowrap transition-colors hover:bg-white/10"
                       >
                         <Icon d={ICON.shrink} className="size-3.5" />
                         <span className="max-sm:hidden">{t("room.exitFull")}</span>
@@ -732,13 +732,13 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                           ))}
                         </span>
                       </span>
-                      <span className="text-[36px] leading-[1.1] font-medium tracking-[-.03em] tabular-nums">{clock ?? "00:00"}</span>
+                      <span className="text-[37px] leading-[1.1] font-medium tracking-[-.03em] tabular-nums">{clock ?? "00:00"}</span>
                       {canRecord ? (
-                        <span className="text-[12.5px] whitespace-nowrap text-muted">
+                        <span className="text-[13.5px] whitespace-nowrap text-muted">
                           {solo ? (recording ? "Press to stop when you're done" : "Press to start recording yourself") : recording ? "Press to stop recording for everyone" : "Press to start recording everyone"}
                         </span>
                       ) : (
-                        <span className="text-[13.5px] font-medium text-text-2">
+                        <span className="text-[14.5px] font-medium text-text-2">
                           {recording ? t("room.beingRecorded") : t("room.waitingHost")}
                         </span>
                       )}
@@ -760,7 +760,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         },
                       ].map((st) => (
                         <span key={st.k} className="flex flex-col gap-1 border-l border-border px-[18px] py-0.5">
-                          <span className="flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-muted">
+                          <span className="flex items-center gap-1.5 text-[13.5px] whitespace-nowrap text-muted">
                             <Icon d={st.icon} className="size-3.5" />
                             {st.k}
                           </span>
@@ -798,7 +798,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
 
                 <LocalUploadStatus recording={!!recording} finishing={!recording && localActive} upload={upload} offsetMs={offsetMs} />
 
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-divider bg-canvas px-5 py-[11px] text-[13.5px] text-muted">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-divider bg-canvas px-5 py-[11px] text-[14.5px] text-muted">
                   <span className="flex min-w-0 flex-[1_1_240px] items-center gap-2">
                     <Icon d={ICON.shield} className="size-[15px] text-ok" />
                     <span className="text-pretty">
@@ -824,10 +824,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
             <aside inert={fullOpen} className="w-full shrink-0 border-t border-border bg-canvas lg:w-[380px] lg:border-t-0 lg:border-l">
               <div className="flex flex-col gap-4 p-4 lg:sticky lg:top-0 lg:max-h-[calc(100dvh/var(--ui-zoom))] lg:min-h-[calc(100dvh/var(--ui-zoom)-58px)] lg:overflow-auto">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-[15px] font-medium">{t("room.inStudio", { count: participants.length })}</h2>
+                  <h2 className="text-[16px] font-medium">{t("room.inStudio", { count: participants.length })}</h2>
                   <span className="flex items-center gap-2">
                     {present && (
-                      <span className="text-[13px] text-muted">
+                      <span className="text-[14px] text-muted">
                         {connectedCount} of {participants.length} connected
                       </span>
                     )}
@@ -849,7 +849,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         <Avatar name={p.displayName} className={cn("size-[34px] text-xs", away && "opacity-50 grayscale")} />
                         <span className="flex min-w-0 flex-1 flex-col gap-1">
                           <span className="flex items-baseline justify-between gap-2">
-                            <span className="min-w-0 truncate text-[14.5px] font-medium">
+                            <span className="min-w-0 truncate text-[15.5px] font-medium">
                               {p.displayName}
                               {p.id === ticket.participantId && <span className="font-normal text-muted"> {t("room.you")}</span>}
                               {p.role === "host" && <span className="font-normal text-muted"> · {t("room.host")}</span>}
@@ -857,7 +857,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                             {shares && <TalkShare share={shares.get(p.id) ?? 0} />}
                           </span>
                           {p.producer ? (
-                            <span className="text-[13.5px] text-muted" data-testid="producer-row">
+                            <span className="text-[14.5px] text-muted" data-testid="producer-row">
                               Producer · not recorded
                             </span>
                           ) : isHost && state?.recording ? (
@@ -871,7 +871,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                           ) : (
                             present && (
                               <span
-                                className={cn("flex items-center gap-[7px] text-[13.5px]", away ? "text-warn-strong" : "text-muted")}
+                                className={cn("flex items-center gap-[7px] text-[14.5px]", away ? "text-warn-strong" : "text-muted")}
                                 title={away ? t("room.notConnected") : t("room.inCall")}
                               >
                                 <StatusDot tone={away ? "warn" : "ok"} />
@@ -1127,12 +1127,12 @@ function TrackRow({
         </span>
       </span>
       <span className="flex min-w-0 flex-col gap-px">
-        <span className="truncate text-[15px] font-medium">
+        <span className="truncate text-[16px] font-medium">
           {name}
           {self && <span className="font-normal text-muted"> (you)</span>}
         </span>
         {/* What the server has from them. Your own row leaves the figure to the line below, which counts on this device. */}
-        <span className="truncate text-[12.5px] text-muted">
+        <span className="truncate text-[13.5px] text-muted">
           {role === "host" ? "Host" : "Guest"}
           {upload && !self && ` · ${mb(upload.bytes)} received`}
         </span>
@@ -1164,7 +1164,7 @@ function TrackRow({
       {pill ? (
         <span
           className={cn(
-            "flex items-center gap-1.5 justify-self-end rounded-md py-[3px] pr-2 pl-1.5 text-[12.5px] font-medium whitespace-nowrap",
+            "flex items-center gap-1.5 justify-self-end rounded-md py-[3px] pr-2 pl-1.5 text-[13.5px] font-medium whitespace-nowrap",
             pill.tone === "ok" ? "bg-ok-soft text-ok-strong" : pill.tone === "warn" ? "bg-warn-soft text-warn-strong" : "bg-surface-2 text-muted",
           )}
         >
@@ -1202,7 +1202,7 @@ function uploadsSummary(state: SessionState, troubled: (participantId: string) =
 /** An amber line with a warning sign: advice for this person about their own setup. */
 function AlertLine({ children }: { children: React.ReactNode }) {
   return (
-    <div role="status" className="flex animate-fade-up items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[13.5px] leading-[1.45] text-text-2">
+    <div role="status" className="flex animate-fade-up items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-[14.5px] leading-[1.45] text-text-2">
       <Icon d={ICON.alert} className="mt-0.5 size-[15px] text-warn" />
       <span className="text-pretty">{children}</span>
     </div>
@@ -1213,7 +1213,7 @@ function AlertLine({ children }: { children: React.ReactNode }) {
 function TalkShare({ share }: { share: number }) {
   const percent = Math.round(share * 100);
   return (
-    <span className="shrink-0 text-[12.5px] whitespace-nowrap text-muted tabular-nums" data-testid="talk-share" data-share={percent}>
+    <span className="shrink-0 text-[13.5px] whitespace-nowrap text-muted tabular-nums" data-testid="talk-share" data-share={percent}>
       {percent}% talking
     </span>
   );
@@ -1239,7 +1239,7 @@ function HealthChips({ health, offsetMs }: { health: SessionState["health"][numb
           key={c.key}
           data-alert={c.key}
           className={cn(
-            "flex items-center gap-[5px] rounded-[7px] px-[7px] py-px text-[12.5px] whitespace-nowrap",
+            "flex items-center gap-[5px] rounded-[7px] px-[7px] py-px text-[13.5px] whitespace-nowrap",
             c.info ? "bg-surface-2 text-muted" : "bg-warn-soft text-warn-strong",
           )}
         >
@@ -1360,8 +1360,8 @@ function EndedView({
             <Icon d={allDone ? ICON.checkCircle : ICON.cloudUp} className="size-[22px]" />
           </span>
           <div className="flex flex-col gap-[5px]">
-            <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em] text-balance">{title}</h1>
-            <p className="text-[14.5px] leading-normal text-pretty text-muted">{sub}</p>
+            <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em] text-balance">{title}</h1>
+            <p className="text-[15.5px] leading-normal text-pretty text-muted">{sub}</p>
           </div>
         </div>
         {rows.length > 0 && (
@@ -1370,10 +1370,10 @@ function EndedView({
             {rows.map((r) => (
               <div
                 key={r.name}
-                className="grid grid-cols-1 items-center gap-x-3.5 gap-y-2 border-t border-divider py-3 text-[14.5px] sm:grid-cols-[minmax(96px,auto)_minmax(40px,1fr)_auto]"
+                className="grid grid-cols-1 items-center gap-x-3.5 gap-y-2 border-t border-divider py-3 text-[15.5px] sm:grid-cols-[minmax(96px,auto)_minmax(40px,1fr)_auto]"
               >
                 <span className="flex min-w-0 items-center gap-2.5">
-                  <Avatar name={r.name} className="size-6 text-[10px]" />
+                  <Avatar name={r.name} className="size-6 text-[11px]" />
                   <span className="truncate">{r.name}</span>
                 </span>
                 <span className="h-[5px] overflow-hidden rounded-[3px] bg-border">
@@ -1388,7 +1388,7 @@ function EndedView({
                 </span>
                 <span
                   className={cn(
-                    "flex items-center gap-[7px] text-[13.5px] tabular-nums sm:justify-end sm:whitespace-nowrap",
+                    "flex items-center gap-[7px] text-[14.5px] tabular-nums sm:justify-end sm:whitespace-nowrap",
                     r.done ? "text-ok-strong" : "text-warn-strong",
                   )}
                 >
@@ -1489,8 +1489,8 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
           className="flex flex-col gap-1 rounded-xl border border-accent-line bg-accent-soft px-[18px] py-3.5 transition-colors hover:border-accent"
           data-testid="promo"
         >
-          <span className="text-[14.5px] font-medium text-accent-strong">{t("end.promoTitle")}</span>
-          <span className="text-[13.5px] leading-normal text-text-2">
+          <span className="text-[15.5px] font-medium text-accent-strong">{t("end.promoTitle")}</span>
+          <span className="text-[14.5px] leading-normal text-text-2">
             {t("end.promoBody")}
           </span>
         </a>
@@ -1534,7 +1534,7 @@ function LocalUploadStatus({
     text = t("room.up.left", { left: mb(upload.pendingBytes) });
   }
   return (
-    <p className="flex items-center gap-2 border-t border-divider px-5 py-3 text-[13.5px] text-text-2" role="status" data-testid="local-upload">
+    <p className="flex items-center gap-2 border-t border-divider px-5 py-3 text-[14.5px] text-text-2" role="status" data-testid="local-upload">
       <StatusDot tone={tone} className={cn(tone === "warn" && "animate-rec-pulse")} /> {text}
     </p>
   );
@@ -1561,14 +1561,14 @@ function ParticipantUpload({
     return () => clearTimeout(id);
   }, [upload, stopped, startedAt, offsetMs]);
   if (!upload) {
-    if (stopped) return <span className="text-[13.5px] text-muted">Nothing recorded</span>;
+    if (stopped) return <span className="text-[14.5px] text-muted">Nothing recorded</span>;
     return late ? (
-      <span className="flex items-start gap-[7px] text-[13.5px] text-warn-strong" data-testid="not-recording-yet">
+      <span className="flex items-start gap-[7px] text-[14.5px] text-warn-strong" data-testid="not-recording-yet">
         <Icon d={ICON.alert} className="mt-0.5 size-[15px]" />
         Not recording yet. Ask them to reload the page.
       </span>
     ) : (
-      <span className="flex items-center gap-[7px] text-[13.5px] text-muted">
+      <span className="flex items-center gap-[7px] text-[14.5px] text-muted">
         <Icon d={ICON.loader} className="size-[15px] animate-spin-fast" />
         Starting…
       </span>
@@ -1582,7 +1582,7 @@ function ParticipantUpload({
       : `${stopped ? "Uploading" : "Recording"} · ${mb(upload.bytes)} sent`;
   return (
     <span
-      className={cn("flex min-w-0 items-center gap-[7px] text-[13.5px]", done ? "text-ok-strong" : away ? "text-warn-strong" : "text-text-2")}
+      className={cn("flex min-w-0 items-center gap-[7px] text-[14.5px]", done ? "text-ok-strong" : away ? "text-warn-strong" : "text-text-2")}
       data-testid="participant-upload"
     >
       <Icon d={done ? ICON.cloudCheck : ICON.cloudUp} className="size-[15px]" />
@@ -1598,7 +1598,7 @@ function CallLabel({ status }: { status: CallStatus }) {
   const map = { connecting: "idle", connected: "ok", reconnecting: "warn", failed: "danger" } as const;
   const [tone, label] = [map[status], t(`room.call.${status}`)];
   return (
-    <p className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted" data-testid="call-status">
+    <p className="flex items-center gap-2 text-[14px] whitespace-nowrap text-muted" data-testid="call-status">
       <StatusDot tone={tone} /> {label}
     </p>
   );
@@ -1609,7 +1609,7 @@ function ConnectionLabel({ status }: { status: ConnectionStatus }) {
   const map = { connecting: "idle", live: "ok", reconnecting: "warn", unauthorized: "danger" } as const;
   const [tone, label] = [map[status], t(`room.conn.${status}`)];
   return (
-    <p className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted">
+    <p className="flex items-center gap-2 text-[14px] whitespace-nowrap text-muted">
       <StatusDot tone={tone} /> {label}
     </p>
   );

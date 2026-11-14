@@ -20,9 +20,9 @@ export function recordingLabel(settings: Pick<StudioSettings, "audioOnly" | "vid
 }
 
 /**
- * A choice card that is selected: one crisp 2px edge in the ink colour (the 1px border plus a
- * 1px ring drawn inside it, so the card doesn't change size), and no halo. The halo is kept
- * for keyboard focus, where the browser's own outline shows around it.
+ * A choice card that is selected: the same hairline border as the others, in the ink colour,
+ * on a slightly raised fill. No second ring and no halo: a thick edge reads as an error or a
+ * focus ring. Keyboard focus still gets the browser's own outline around the card.
  */
-export const SELECTED_CARD = "border-ink shadow-[inset_0_0_0_1px_var(--ink)]";
+export const SELECTED_CARD = "border-ink bg-surface-2";
 export const UNSELECTED_CARD = "border-border shadow-xs hover:border-border-strong";

@@ -42,7 +42,7 @@ export function SoloForm({ code, hostName, consentText, consentHash }: { code: s
       <Field label={t("common.yourName")} hint={t("solo.nameHint", { host: hostName })}>
         <Input name="displayName" autoComplete="name" required maxLength={60} autoFocus />
       </Field>
-      <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
+      <label className="flex cursor-pointer items-start gap-2.5 text-[14.5px] leading-[1.45] text-text-2">
         <input type="checkbox" name="consent" required checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 size-4 shrink-0" />
         <span className="whitespace-pre-line" data-testid="consent-text">
           {consentText}

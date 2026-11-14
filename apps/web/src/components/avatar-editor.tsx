@@ -59,9 +59,9 @@ export function AvatarEditor({ name, initial }: { name: string; initial: string 
         <Avatar name={name} src={url} className="size-12 text-base" />
         <span className="flex min-w-0 flex-col gap-[3px]">
           <span className="font-medium">Picture</span>
-          <span className="text-[13px] leading-normal text-muted">Shown in the dashboard, to the others in your account and to guests on the invite.</span>
+          <span className="text-[14px] leading-normal text-muted">Shown in the dashboard, to the others in your account and to guests on the invite.</span>
           {problem && (
-            <span role="alert" className={cn("text-[13px] text-danger")}>
+            <span role="alert" className={cn("text-[14px] text-danger")}>
               {problem}
             </span>
           )}

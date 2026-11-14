@@ -45,7 +45,7 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
-        <span className="text-[13px] text-muted">Guest link · anyone with it can join from a browser, once you&apos;ve entered the studio</span>
+        <span className="text-[14px] text-muted">Guest link · anyone with it can join from a browser, once you&apos;ve entered the studio</span>
         <span className="flex flex-wrap gap-1.5">
           <input
             readOnly
@@ -66,19 +66,19 @@ export function InviteLink({ studioId, inviteCode: initial }: { studioId: string
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3.5 py-3">
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="font-medium">Tech-check link</span>
-          <span className="text-[13px] text-muted">Before the session, guests can test their camera, mic and connection.</span>
+          <span className="text-[14px] text-muted">Before the session, guests can test their camera, mic and connection.</span>
           <input
             readOnly
             value={checkLink}
             aria-label="Tech-check link"
             onFocus={(e) => e.currentTarget.select()}
-            className="mt-1 min-w-0 truncate bg-transparent font-mono text-[12px] text-muted focus:outline-none"
+            className="mt-1 min-w-0 truncate bg-transparent font-mono text-[13px] text-muted focus:outline-none"
           />
         </span>
         <button
           type="button"
           onClick={() => copy("check")}
-          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-[7px] text-[13px] font-medium whitespace-nowrap text-text transition-colors hover:border-ink"
+          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-[7px] text-[14px] font-medium whitespace-nowrap text-text transition-colors hover:border-ink"
         >
           {copied === "check" ? "✓ Copied" : "Copy tech-check link"}
         </button>
@@ -159,14 +159,14 @@ export function StudioSettingsForm({
             <legend className="sr-only">Recording</legend>
             <span className="flex flex-col gap-[3px]">
               <span className="font-medium">Video quality</span>
-              <span className="text-[13px] leading-normal text-muted">Each person is recorded on their own device at this quality.</span>
+              <span className="text-[14px] leading-normal text-muted">Each person is recorded on their own device at this quality.</span>
             </span>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {qualityOptions(can4k).map(([value, label, sub, locked]) => (
                 <label
                   key={value}
                   className={cn(
-                    "flex flex-col gap-[3px] rounded-lg border bg-surface px-3 py-[11px] transition-[border-color,box-shadow]",
+                    "flex flex-col gap-0.5 rounded-lg border bg-surface px-2.5 py-2 transition-[border-color,box-shadow]",
                     locked && quality !== value ? "cursor-not-allowed opacity-60" : "cursor-pointer",
                     "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring",
                     quality === value ? SELECTED_CARD : UNSELECTED_CARD,
@@ -182,7 +182,7 @@ export function StudioSettingsForm({
                     className="sr-only"
                   />
                   <span className="font-medium">{label}</span>
-                  <span className="text-[12.5px] text-muted">{sub}</span>
+                  <span className="text-[13.5px] text-muted">{sub}</span>
                 </label>
               ))}
             </div>
@@ -244,7 +244,7 @@ export function StudioSettingsForm({
               <label htmlFor="consent-text" className="font-medium">
                 What guests agree to
               </label>
-              <span className="text-[13px] leading-normal text-pretty text-muted">
+              <span className="text-[14px] leading-normal text-pretty text-muted">
                 Shown next to the consent box on the invite; guests must tick it to join. Leave it empty for the text shown here. Each
                 guest&apos;s agreement is kept with the exact text and when they agreed (the recording&apos;s consent record). A change
                 applies to guests who join from now on.
@@ -278,7 +278,7 @@ export function StudioSettingsForm({
 
 /** A small grey heading inside a settings card ("Recording", "Guests"). */
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <span className="border-b border-border pt-3 pb-2 text-[13px] text-muted">{children}</span>;
+  return <span className="border-b border-border pt-3 pb-2 text-[14px] text-muted">{children}</span>;
 }
 
 /** A settings row: what it is and why on the left, the control on the right. */
@@ -287,7 +287,7 @@ function Row({ label, help, children, last }: { label: ReactNode; help?: ReactNo
     <div className={cn("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-4", !last && "border-b border-divider")}>
       <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
         <span className="font-medium">{label}</span>
-        {help && <span className="text-[13px] leading-normal text-pretty text-muted">{help}</span>}
+        {help && <span className="text-[14px] leading-normal text-pretty text-muted">{help}</span>}
       </span>
       <span className="flex w-full shrink-0 sm:w-auto">{children}</span>
     </div>
@@ -308,7 +308,7 @@ function SwitchRow({
     <label className={cn("flex cursor-pointer items-center justify-between gap-x-6 gap-y-3 py-4", !last && "border-b border-divider")}>
       <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-[3px]">
         <span className="font-medium">{label}</span>
-        <span className="text-[13px] leading-normal text-pretty text-muted">{help}</span>
+        <span className="text-[14px] leading-normal text-pretty text-muted">{help}</span>
       </span>
       <input type="checkbox" role="switch" className="peer sr-only" {...props} />
       <span

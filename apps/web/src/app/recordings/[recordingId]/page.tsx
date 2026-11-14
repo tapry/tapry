@@ -83,7 +83,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
                 {r.studioName}
               </Link>
               · {people} {people === 1 ? "person" : "people"} · {shortClock(lengthMs)}
-              <span className={cn("flex items-center gap-[5px] rounded-md px-2 py-0.5 text-[12.5px] font-medium", PILL[st.tone])}>
+              <span className={cn("flex items-center gap-[5px] rounded-md px-2 py-0.5 text-[13.5px] font-medium", PILL[st.tone])}>
                 <Icon name={st.tone === "ok" ? "check" : st.tone === "live" ? "rec" : st.tone === "danger" ? "alert" : "loader"} size={13} className={st.tone === "live" ? "animate-rec-pulse" : undefined} />
                 {ready ? "Ready" : phase(r).label}
               </span>
@@ -106,7 +106,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
           <div className="flex flex-col gap-3">
             <RecordingTimeline recording={r} now={now} levelLoudness={studio?.settings.levelLoudness ?? true} />
             {(r.processing === "failed" || (r.status === "stopped" && r.processing === "pending" && r.incompleteTracks > 0)) && (
-              <p className="text-[13.5px] text-muted">
+              <p className="text-[14.5px] text-muted">
                 {r.processing === "failed" ? (r.processingError ?? "The files couldn't be made. The uploads are safe.") : "Someone's recording is still on its way."}{" "}
                 <Link href={`/studios/${r.studioId}`} className="font-medium text-text underline underline-offset-[3px] hover:text-accent-strong">
                   Open the studio
@@ -127,19 +127,19 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
         )}
         {ready && r.hasFilters && <RecordingFilters studioId={r.studioId} recordingId={r.id} applyFilters={r.applyFilters} filtersFailed={r.filtersFailed} rawDeleted={r.rawDeleted} />}
         {r.keepUntil !== null && (
-          <p className="text-[13px] text-muted" data-testid="kept-until">
+          <p className="text-[14px] text-muted" data-testid="kept-until">
             Kept until {new Date(r.keepUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}, then deleted: this studio's setting, or your plan. Download what you want to keep.
           </p>
         )}
         {r.rawDeleted && (
-          <p className="text-[13px] text-muted">The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.</p>
+          <p className="text-[14px] text-muted">The original uploads were removed after this server&apos;s retention period. These files are what&apos;s kept.</p>
         )}
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-start gap-4">
           <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] py-1">
             <span className="pt-3 pb-2 font-medium">Files</span>
             {media.length === 0 ? (
-              <span className="border-t border-divider py-3 text-[13.5px] text-muted">{ready ? "No files." : "The files appear here once they're ready."}</span>
+              <span className="border-t border-divider py-3 text-[14.5px] text-muted">{ready ? "No files." : "The files appear here once they're ready."}</span>
             ) : (
               media.map((o) => {
                 const d = describeOutput(o);
@@ -149,7 +149,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
                       <span className="truncate" title={o.fileName}>
                         {d.title}
                       </span>
-                      <span className="text-[12.5px] text-muted">
+                      <span className="text-[13.5px] text-muted">
                         {d.format} · {formatBytes(o.bytes)}
                       </span>
                     </span>
@@ -191,7 +191,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
           {ready && media.some((o) => o.kind === "audio" || o.kind === "video" || o.kind === "screen") && (
             <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="timelines">
               <span className="pt-3 pb-2 font-medium">For your editor</span>
-              <span className="border-t border-divider pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+              <span className="border-t border-divider pt-3 text-[14.5px] leading-normal text-pretty text-muted">
                 A project file that lays these files out on a timeline, all lined up{markers.length > 0 ? ", with your markers" : ""}. Download everything, unzip it into one folder and open the project
                 from there.
               </span>
@@ -215,7 +215,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
               </span>
               {r.transcript === "ready" && (
                 <>
-                  <span className="pt-3 text-[13.5px] leading-normal text-pretty text-muted">
+                  <span className="pt-3 text-[14.5px] leading-normal text-pretty text-muted">
                     The same, with long pauses left out: where nobody speaks for two seconds or more, every track is cut at the same place. Nothing is deleted from the files; undo any cut in your
                     editor.
                   </span>
@@ -250,7 +250,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
               <span className="pt-3 pb-2 font-medium">Markers</span>
               <div className="flex max-h-[320px] flex-col overflow-y-auto">
                 {markers.map((m) => (
-                  <span key={m.id} className="flex gap-3 border-t border-divider py-2 text-[13.5px]">
+                  <span key={m.id} className="flex gap-3 border-t border-divider py-2 text-[14.5px]">
                     <span className="w-14 shrink-0 text-muted tabular-nums">{shortClock(m.atMs)}</span>
                     <span className="min-w-0 text-pretty text-text-2">{m.label}</span>
                   </span>
@@ -277,7 +277,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
 
 function TranscriptBody({ state, turns, ready, on }: { state: string; turns: Array<{ speaker: string; startMs: number; text: string }> | null; ready: boolean; on: boolean }) {
   const note = (text: string, busy = false) => (
-    <span className="flex items-center gap-2 border-t border-divider pt-3 text-[13.5px] text-muted">
+    <span className="flex items-center gap-2 border-t border-divider pt-3 text-[14.5px] text-muted">
       {busy && <Spinner size={14} />}
       {text}
     </span>
@@ -287,9 +287,9 @@ function TranscriptBody({ state, turns, ready, on }: { state: string; turns: Arr
       <div className="flex max-h-[560px] flex-col overflow-y-auto">
         {turns.map((l, i) => (
           <div key={`${l.startMs}-${i}`} className="flex gap-2.5 border-t border-divider py-2.5">
-            <Avatar name={l.speaker || "?"} className="size-6 text-[9px]" />
+            <Avatar name={l.speaker || "?"} className="size-6 text-[10px]" />
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-[13px]">
+              <span className="text-[14px]">
                 <span className="font-medium">{l.speaker || "Someone"}</span> <span className="text-muted tabular-nums">{shortClock(l.startMs)}</span>
               </span>
               <span className="leading-normal text-pretty text-text-2">{l.text}</span>

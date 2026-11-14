@@ -104,7 +104,7 @@ export function SettingsTabs({
                       </option>
                     ))}
                   </select>
-                  <span className="text-[13px] text-muted">Each studio has its own settings.</span>
+                  <span className="text-[14px] text-muted">Each studio has its own settings.</span>
                 </label>
               )}
               <StudioSettingsForm key={studio.id} studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} can4k={can4k} section={tab as "recording" | "guests"} />

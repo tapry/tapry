@@ -23,12 +23,12 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
     <EmberPage>
       <main className="w-full max-w-[560px]">
         <EmberCard className="flex animate-fade-up flex-col gap-[22px] p-[clamp(22px,5vw,36px)]">
-          <Logo className="text-[15px]" mark="size-6" />
+          <Logo className="text-[16px]" mark="size-6" />
           {found ? (
             <>
               <div className="flex flex-col gap-1.5">
-                <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">Your recording</h1>
-                <p className="text-[14.5px] leading-normal text-pretty text-muted">
+                <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em]">Your recording</h1>
+                <p className="text-[15.5px] leading-normal text-pretty text-muted">
                   From {participant.studioName}. These are your files only, recorded on your own device.
                 </p>
               </div>
@@ -42,8 +42,8 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
                 <Icon name="link" size={22} />
               </span>
               <div className="flex flex-col gap-1.5">
-                <h1 className="text-[26px] leading-tight font-semibold tracking-[-.025em]">This link no longer works</h1>
-                <p className="text-[14.5px] leading-normal text-pretty text-muted">
+                <h1 className="text-[27px] leading-tight font-semibold tracking-[-.025em]">This link no longer works</h1>
+                <p className="text-[15.5px] leading-normal text-pretty text-muted">
                   It may have expired, or the host may have removed the recording. Ask them for a copy.
                 </p>
               </div>
@@ -54,7 +54,7 @@ export default async function RecapPage({ params }: { params: Promise<{ token: s
               href={own.promoUrl}
               target="_blank"
               rel="noopener"
-              className="flex items-center justify-between gap-3 border-t border-border pt-[18px] text-[13.5px] font-medium text-text hover:text-accent-strong"
+              className="flex items-center justify-between gap-3 border-t border-border pt-[18px] text-[14.5px] font-medium text-text hover:text-accent-strong"
             >
               Record your own, free
               <span aria-hidden>→</span>
