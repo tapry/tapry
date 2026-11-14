@@ -9,8 +9,7 @@ import {
   meterRelease,
   withoutDeviceIds,
   type LevelState,
-  type MediaProblem,
-} from "./media";
+  type MediaProblem, widescreenRequest } from "./media";
 
 export interface Devices {
   audioInputs: MediaDeviceInfo[];
@@ -52,6 +51,24 @@ export type MediaStatus = "starting" | "live" | "error";
  * Opens camera + mic for the given constraints and keeps exactly one stream alive:
  * changing constraints stops the old tracks before the new ones start.
  */
+/**
+ * In a 4K studio, a camera without 4K may answer with a 4:3 mode that looks zoomed in a
+ * widescreen tile: ask it again for its largest 16:9 size (see widescreenRequest). Done here,
+ * before anything records or is cloned from the track. Never fails the stream: the picture
+ * it already has is kept when the camera won't change.
+ */
+async function keepWidescreen(stream: MediaStream, c: MediaStreamConstraints) {
+  const track = stream.getVideoTracks()[0];
+  const video = typeof c.video === "object" ? c.video : null;
+  const askedHeight = typeof video?.height === "object" ? Number(video.height.ideal) : 0;
+  if (!track || !askedHeight) return;
+  const size = widescreenRequest({ height: askedHeight }, track.getSettings(), typeof track.getCapabilities === "function" ? track.getCapabilities() : null);
+  if (!size) return;
+  await track
+    .applyConstraints({ ...video, width: { ideal: size.width }, height: { ideal: size.height }, aspectRatio: { ideal: size.width / size.height } })
+    .catch(() => {});
+}
+
 export function useLocalMedia(constraints: MediaStreamConstraints) {
   const key = JSON.stringify(constraints);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -76,6 +93,7 @@ export function useLocalMedia(constraints: MediaStreamConstraints) {
     const open = async (c: MediaStreamConstraints, fallback: boolean): Promise<void> => {
       try {
         const s = await navigator.mediaDevices.getUserMedia(c);
+        await keepWidescreen(s, c);
         if (cancelled) return s.getTracks().forEach((t) => t.stop());
         owned.current = s;
         setStream(s);

@@ -40,6 +40,34 @@ export function buildConstraints(settings: StudioSettings, choice: DeviceChoice)
   };
 }
 
+const WIDE = 16 / 9;
+const WIDE_SIZES: Array<[number, number]> = [
+  [3840, 2160],
+  [2560, 1440],
+  [1920, 1080],
+];
+
+/**
+ * A 4K studio asks every camera for 3840×2160 and takes its closest. For a camera without 4K,
+ * "closest" is often its tallest mode, which on many webcams is a 4:3 one cut from the middle
+ * of the sensor: shown in a widescreen tile it looks zoomed in, and so would the file. So when
+ * a request above Full HD comes back in another shape than 16:9, ask again for the largest
+ * widescreen size the camera says it has (Full HD when it doesn't say).
+ * Returns the size to ask for, or null when the picture is fine as it is.
+ */
+export function widescreenRequest(
+  asked: { height: number },
+  got: { width?: number; height?: number },
+  caps: { width?: { max?: number }; height?: { max?: number } } | null,
+): { width: number; height: number } | null {
+  if (asked.height <= 1080 || !got.width || !got.height) return null;
+  if (Math.abs(got.width / got.height - WIDE) < 0.03) return null;
+  const maxW = caps?.width?.max ?? 0;
+  const maxH = caps?.height?.max ?? 0;
+  const [width, height] = WIDE_SIZES.find(([w, h]) => w <= maxW && h <= maxH && h <= asked.height) ?? WIDE_SIZES.at(-1)!;
+  return { width, height };
+}
+
 /** Same constraints without pinned device ids: the fallback when a saved device has gone away. */
 export function withoutDeviceIds(c: MediaStreamConstraints): MediaStreamConstraints {
   const strip = (t: boolean | MediaTrackConstraints | undefined) => {

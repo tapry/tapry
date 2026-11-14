@@ -2,7 +2,7 @@ import { studioSettings, videoTier } from "@tapry/shared";
 import { describe, expect, it } from "vitest";
 import { videoBitrate } from "../src/lib/client/recording";
 import { neededMbps } from "../src/lib/client/tech-check";
-import { buildConstraints } from "../src/lib/media/media";
+import { buildConstraints, widescreenRequest } from "../src/lib/media/media";
 import { createServer, expectOk } from "./harness";
 
 const PASSWORD = "correct horse battery";
@@ -32,6 +32,28 @@ describe("4K studios: each camera's best, up to 4K", () => {
     expect(videoBitrate("1080p", 720)).toBe(8_000_000); // unchanged
     // The tech check warns against the most the studio could send.
     expect(neededMbps({ ...defaults, videoQuality: "2160p" })).toBeCloseTo(25, 0);
+  });
+});
+
+describe("a camera without 4K in a 4K studio", () => {
+  it("is asked again for a widescreen size when it answers 4K with a 4:3 mode", () => {
+    const asked = { height: 2160 };
+    // A laptop camera whose tallest mode is 4:3: back to its largest 16:9 size.
+    expect(widescreenRequest(asked, { width: 1920, height: 1440 }, { width: { max: 1920 }, height: { max: 1440 } })).toEqual({ width: 1920, height: 1080 });
+    // One that can do 1440p widescreen but answered with something square.
+    expect(widescreenRequest(asked, { width: 1552, height: 1552 }, { width: { max: 3264 }, height: { max: 2448 } })).toEqual({ width: 2560, height: 1440 });
+    // A browser that doesn't say what the camera can do: Full HD.
+    expect(widescreenRequest(asked, { width: 1280, height: 960 }, null)).toEqual({ width: 1920, height: 1080 });
+  });
+
+  it("is left alone when the picture is widescreen already, or the studio isn't above Full HD", () => {
+    expect(widescreenRequest({ height: 2160 }, { width: 3840, height: 2160 }, null)).toBeNull();
+    expect(widescreenRequest({ height: 2160 }, { width: 1920, height: 1080 }, null)).toBeNull();
+    expect(widescreenRequest({ height: 2160 }, { width: 1280, height: 720 }, null)).toBeNull();
+    // Full HD and 720p studios behave as they always did, whatever shape the camera gives.
+    expect(widescreenRequest({ height: 1080 }, { width: 1440, height: 1080 }, null)).toBeNull();
+    expect(widescreenRequest({ height: 720 }, { width: 960, height: 720 }, null)).toBeNull();
+    expect(widescreenRequest({ height: 2160 }, {}, null)).toBeNull();
   });
 });
 
