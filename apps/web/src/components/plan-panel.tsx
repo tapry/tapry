@@ -4,6 +4,9 @@ import { PLANS, type BillingOverview, type Plan } from "@tapry/shared";
 import type { ReactNode } from "react";
 import { cn, Notice } from "./ui";
 import { ListCard } from "./ui-extra";
+import { EducationCard, EducationRequests } from "./education-card";
+import type { EducationStatus } from "@tapry/shared";
+import type { EducationRequest } from "@/server/education";
 import { PlanAccounts, type Account } from "./plan-accounts";
 import { WaitlistPanel, type WaitlistRow } from "./waitlist-panel";
 
@@ -26,7 +29,13 @@ export function PlanPanel({
   waitlist = null,
   justPaid = false,
   portalProblem = null,
+  education = null,
+  educationRequests = null,
 }: {
+  /** Whether this is an education account, and what that gives. */
+  education?: EducationStatus | null;
+  /** Education requests waiting, for the admin. */
+  educationRequests?: EducationRequest[] | null;
   billing: BillingOverview;
   accounts: Account[] | null;
   /** The website's waitlist, for the admin. */
@@ -153,6 +162,8 @@ export function PlanPanel({
         </ListCard>
       )}
 
+      {education && <EducationCard initial={education} />}
+      {educationRequests && <EducationRequests initial={educationRequests} />}
       {accounts && <PlanAccounts accounts={accounts} />}
       {waitlist && <WaitlistPanel entries={waitlist} />}
     </>

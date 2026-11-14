@@ -18,6 +18,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...DOCS.map(docHref),
     "/resources/",
     "/about/",
+    "/education/",
     "/tools/",
     "/mic-test/",
     "/recorder/",

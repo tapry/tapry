@@ -5,6 +5,7 @@ import { ClipsService } from "./clips";
 import { TimelineExports } from "./timeline-export";
 import { AvatarService } from "./avatars";
 import { BrandService } from "./brand";
+import { EducationService } from "./education";
 import { GuideService } from "./guide";
 import { NotesService } from "./notes";
 import { WaitlistService } from "./waitlist";
@@ -53,6 +54,8 @@ export interface Services {
   guide: GuideService;
   /** A studio's logo and colour on the pages its guests open. */
   brand: BrandService;
+  /** Education accounts: more free hours and a discount, on Tapry Cloud. */
+  education: EducationService;
   /** Profile pictures of hosts and members. */
   avatars: AvatarService;
   /** Project files for editors that place a recording's files on a timeline. */
@@ -138,6 +141,7 @@ export function createServices(
     guide: new GuideService(db, opts.now),
     brand: new BrandService(db, (accountId) => billing.allowsBranding(accountId)),
     avatars: new AvatarService(db),
+    education: new EducationService(db, { cloud: billing.cloud, now: opts.now, discountActive: !!opts.billing?.paddle?.educationDiscountId }),
     timelines: new TimelineExports(db),
     clips: new ClipsService(db, storage, () => processing.onEnqueue()),
     comments: new CommentsService(db),

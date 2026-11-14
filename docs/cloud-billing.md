@@ -154,3 +154,21 @@ From the providers' own pages unless marked. Not legal or tax advice; re-check b
 - **First choice: Paddle.** It also issues invoices payable by bank transfer, which suits yearly organisation contracts. It reviews the website before approving: live pricing, terms, privacy and refund pages must exist.
 - **Moroccan rules to take to an accountant:** proceeds of exported services must be brought home within 90 days; the auto-entrepreneur ceiling for services (200,000 MAD a year, secondary source) is reached quickly at these prices; a US company formed by a Moroccan resident appears to need Office des Changes authorisation.
 - The webhook reader for Paddle is built; Creem has none yet.
+
+## Education accounts
+
+Built: an account can be marked as an education account (`users.education_at`). On the Free
+plan it then has 10 recording hours a month instead of 2. The owner asks in Settings, Plan,
+naming their school:
+
+- a **confirmed** email address on an academic domain (`.edu`, `.ac.uk`, `.edu.au` and the
+  like) is verified at once;
+- anything else is a request the admin approves or declines in Settings, Plan. On a server
+  without email, no address is ever confirmed, so every request comes to the admin.
+
+The 30% discount on Creator, Studio and Team is **not applied by Tapry**: it is a discount
+made in Paddle. To switch it on when selling reopens: create a 30% recurring discount in
+Paddle restricted to those prices, and put its id (`dsc_…`) in
+`BILLING_PADDLE_EDUCATION_DISCOUNT`. The checkout then opens with it for verified education
+accounts only. Not yet run against Paddle. The website's `/education` page says paid plans
+aren't open while `NEXT_PUBLIC_PADDLE_*` is unset.

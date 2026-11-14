@@ -588,6 +588,27 @@ export interface BillingOverview {
   manageUrl: string | null;
 }
 
+/** Recording hours a month on the Free plan for a verified education account (Free has `PLANS.free.hours`). */
+export const EDUCATION_FREE_HOURS = 10;
+/** What a verified education account pays less on Creator, Studio and Team (docs/plan/06-monetization.md). */
+export const EDUCATION_DISCOUNT_PERCENT = 30;
+
+/** `GET /api/billing/education`: whether the account is an education account. Tapry Cloud only. */
+export interface EducationStatus {
+  status: "none" | "requested" | "verified";
+  /** The school or university the owner named. */
+  school: string;
+  /** The owner's confirmed address is on an academic domain: asking verifies at once. */
+  automatic: boolean;
+  owner: boolean;
+  freeHours: number;
+  discountPercent: number;
+  /** The discount is set up at the checkout. False: it is promised for when paid plans open. */
+  discountActive: boolean;
+}
+export const educationRequestBody = z.object({ school: plainText(120) });
+export const educationDecisionBody = z.object({ approve: z.boolean() });
+
 export const setPlanBody = z.object({
   plan: planId,
   /** When the plan ends and the account goes back to Free (ISO date). Omit: no end. */

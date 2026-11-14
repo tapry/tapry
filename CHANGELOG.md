@@ -5,6 +5,17 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Education accounts (Tapry Cloud).** A verified education account records 10 hours a month
+  on the Free plan instead of 2, and the checkout applies the education discount (30%) where
+  one is set up (`BILLING_PADDLE_EDUCATION_DISCOUNT`). An account whose owner has a confirmed
+  address on an academic domain is verified when it asks (Settings, Plan); any other school's
+  request waits for an admin. Nothing of this exists on a self-hosted server, which has no
+  limits to lift.
+- **Class template.** A new studio can start from Class: its solo link is switched on with an
+  assignment, so students record alone without accounts, and recordings delete themselves
+  after 120 days.
+- Website: a page for teaching and research (`/education`).
+
 - **Studio templates.** A new studio can start from Podcast, Research interview or Newsroom
   interview: each fills in the options, a guide to follow in the session and, for research, a
   consent text. Everything stays changeable.

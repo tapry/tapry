@@ -56,6 +56,7 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
       });
       // The template's guide. The studio exists either way: a failure here isn't worth stopping for.
       if (template.guide) await apiFetch(`/studios/${studio.id}/guide`, { method: "PUT", body: { guide: template.guide } }).catch(() => {});
+      if (template.solo) await apiFetch(`/studios/${studio.id}/solo`, { method: "PUT", body: { enabled: true, prompt: template.solo } }).catch(() => {});
       router.push(`/studios/${studio.id}`);
       router.refresh();
     } catch (err) {
@@ -109,7 +110,7 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
             <span className="text-sm font-medium" id="template-label">
               Start from
             </span>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="template-label" data-testid="templates">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-labelledby="template-label" data-testid="templates">
               {STUDIO_TEMPLATES.map((t) => (
                 <button
                   key={t.id}
@@ -129,7 +130,8 @@ export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostNam
             </div>
             {template.id !== "blank" && (
               <span className="text-[12.5px] leading-normal text-pretty text-muted" data-testid="template-note">
-                Sets the options below{template.consent ? ", the consent text guests agree to" : ""} and a guide to follow in the session. All of it can be changed in the studio&apos;s settings.
+                Sets the options below{template.consent ? ", the consent text guests agree to" : ""} and a guide to follow in the session.
+                {template.solo ? " Its solo link is switched on with an assignment to edit: share it, and each student's recording arrives in this studio. Recordings are deleted after 120 days." : ""} All of it can be changed in the studio&apos;s settings.
               </span>
             )}
           </div>

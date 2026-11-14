@@ -6,7 +6,7 @@ import { LogoMark } from "./icons";
 
 type Col = [title: string, links: Array<[string, string]>];
 
-const company: Array<[string, string]> = [...(hasCustomers ? [["Customers", "/customers/"] as [string, string]] : []), ["Blog", "/blog/"], ["About", "/about/"]];
+const company: Array<[string, string]> = [...(hasCustomers ? [["Customers", "/customers/"] as [string, string]] : []), ["Blog", "/blog/"], ["Education", "/education/"], ["About", "/about/"]];
 const developers: Array<[string, string]> = [
   ["Docs", "/docs/"],
   ["Self-hosting", "/self-hosting/"],

@@ -25,6 +25,8 @@ import {
   soloJoinBody,
   soloSettingsBody,
   brandBody,
+  educationDecisionBody,
+  educationRequestBody,
   guestNoteBody,
   guideBody,
   markerBody,
@@ -319,6 +321,14 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     // ── Tapry Cloud: plans and billing (404 on a self-hosted server) ────────────
     /** The signed-in host's plan, what they have used of it, and where to change it. */
     billing: asUser(async (svc, user) => json(200, await svc.billing.overview(user))),
+    /** Education accounts (Tapry Cloud): the account's status, asking for it, and the admin's list and decision. */
+    education: asUser(async (svc, user) => json(200, await svc.education.status(user))),
+    requestEducation: asUser(async (svc, user, req) => json(200, await svc.education.request(user, (await parseBody(req, educationRequestBody)).school)), { log: "Asked for an education account" }),
+    educationRequests: asUser(async (svc, user) => json(200, { requests: await svc.education.pending(user) })),
+    decideEducation: asUser(async (svc, user, req, params) => {
+      await svc.education.decide(user, params.userId!, (await parseBody(req, educationDecisionBody)).approve);
+      return json(200, { ok: true });
+    }),
     /**
      * Open Paddle's customer portal: a session minted for the signed-in account's own customer,
      * then a redirect to it. A form posts here from the Plan tab; problems go back there.
