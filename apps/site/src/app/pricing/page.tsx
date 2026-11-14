@@ -23,6 +23,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Extra hours", "—", "$2 each", "$2 each", "$2 each"],
   ["Seats", "Your server, your accounts", "1", "3", "5"],
   ["Video", "Up to 4K", "Full HD", "Up to 4K", "Up to 4K"],
+  ["Your logo and colour on guest pages", "✓", "—", "✓", "✓"],
   ["Finished files kept", "You decide", "30 days", "60 days", "90 days"],
   ["Original uploads kept", "You decide", "7 days", "7 days", "7 days"],
   ["Transcripts", "whisper.cpp on your server", "Included", "Included", "Included"],
@@ -36,6 +37,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Per-person files + combined video", "✓"],
   ["Screen sharing, recorded as its own file", "✓"],
   ["Tech-check link and producer alerts", "✓"],
+  ["Guest pages in English, French, Spanish, German, Portuguese and Arabic", "✓"],
 ];
 
 // Offers beside the three cloud plans, from the same document: [name, price, what it is, link, link label].

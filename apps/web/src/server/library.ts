@@ -83,6 +83,17 @@ export interface TranscriptRow {
   srt: string | null;
 }
 
+/** The Usage page: what the account has recorded, in all and month by month (UTC months). */
+export interface UsageStats {
+  recordings: number;
+  recordedMs: number;
+  /** Different guest names across every recording. */
+  guests: number;
+  transcripts: number;
+  /** The last 12 months, oldest first; months with nothing are there with zeros. */
+  months: Array<{ month: string; recordings: number; recordedMs: number; guests: number }>;
+}
+
 export interface StorageOverview {
   bytes: number;
   studios: Array<{ id: string; name: string; bytes: number }>;
@@ -239,6 +250,53 @@ export class LibraryService {
         };
       })
       .sort((a, b) => b.lastJoinedAt - a.lastJoinedAt || a.name.localeCompare(b.name));
+  }
+
+  /**
+   * The Usage page: recordings that still exist (a deleted one is no longer part of the library),
+   * their length, and the different guest names in them. Counts only, never content.
+   */
+  async usage(owner: User): Promise<UsageStats> {
+    const now = this.now();
+    const scope = `FROM recordings r JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
+       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL`;
+    const month = `to_char(to_timestamp(r.started_at / 1000.0) AT TIME ZONE 'UTC', 'YYYY-MM')`;
+    const [total] = await this.db.query<{ recordings: number; recorded_ms: number; transcripts: number }>(
+      `SELECT count(*)::int AS recordings, coalesce(sum(greatest(0, coalesce(r.stopped_at, $2) - r.started_at)), 0)::bigint AS recorded_ms,
+              count(*) FILTER (WHERE r.transcribed_at IS NOT NULL)::int AS transcripts ${scope}`,
+      [owner.accountId, now],
+    );
+    const byMonth = await this.db.query<{ month: string; recordings: number; recorded_ms: number }>(
+      `SELECT ${month} AS month, count(*)::int AS recordings, coalesce(sum(greatest(0, coalesce(r.stopped_at, $2) - r.started_at)), 0)::bigint AS recorded_ms
+       ${scope} GROUP BY 1`,
+      [owner.accountId, now],
+    );
+    const guestRows = await this.db.query<{ month: string; name: string }>(
+      `SELECT DISTINCT ${month} AS month, lower(btrim(p.display_name)) AS name
+       FROM tracks t JOIN participants p ON p.id = t.participant_id AND p.role = 'guest'
+       JOIN recordings r ON r.id = t.recording_id JOIN sessions s ON s.id = r.session_id JOIN studios st ON st.id = s.studio_id
+       WHERE st.owner_id = $1 AND st.deleted_at IS NULL AND r.deleted_at IS NULL AND t.kind <> 'mask'`,
+      [owner.accountId],
+    );
+    const months: UsageStats["months"] = [];
+    const d = new Date(now);
+    for (let i = 11; i >= 0; i--) {
+      const key = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - i, 1)).toISOString().slice(0, 7);
+      const m = byMonth.find((x) => x.month === key);
+      months.push({
+        month: key,
+        recordings: m?.recordings ?? 0,
+        recordedMs: Number(m?.recorded_ms ?? 0),
+        guests: guestRows.filter((g) => g.month === key).length,
+      });
+    }
+    return {
+      recordings: total?.recordings ?? 0,
+      recordedMs: Number(total?.recorded_ms ?? 0),
+      guests: new Set(guestRows.map((g) => g.name)).size,
+      transcripts: total?.transcripts ?? 0,
+      months,
+    };
   }
 
   /**

@@ -191,6 +191,11 @@ export class BillingService {
     return this.opts.cloud ? (await this.planOf(accountId, db)).video4k : true;
   }
 
+  /** Whether an account's studios may carry their own logo and colour. Always on a self-hosted server. */
+  async allowsBranding(accountId: string, db: Queryable = this.db): Promise<boolean> {
+    return this.opts.cloud ? (await this.planOf(accountId, db)).branding : true;
+  }
+
   /** The plan an account is on right now. */
   async planOf(userId: string, db: Queryable = this.db): Promise<Plan> {
     const [row] = await db.query<PlanRow>(`SELECT ${PLAN_COLUMNS} FROM users WHERE id = $1`, [userId]);

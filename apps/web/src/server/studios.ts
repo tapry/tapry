@@ -1,5 +1,6 @@
 import {
   consentTextFor,
+  type GuestLocale,
   studioSettings,
   type createStudioBody,
   type joinBody,
@@ -124,6 +125,7 @@ export class StudioService {
         [studioId],
       );
       await tx.query("DELETE FROM tech_checks WHERE studio_id = $1", [studioId]);
+      await tx.query("DELETE FROM studio_brands WHERE studio_id = $1", [studioId]);
       // A fresh random code frees the old one and keeps the row from matching any link.
       await tx.query("UPDATE studios SET deleted_at = now(), invite_code = $2 WHERE id = $1", [studioId, newInviteCode()]);
       return open.map((s) => s.id);
@@ -190,6 +192,7 @@ export class StudioService {
    */
   async invitePreview(
     inviteCode: string,
+    locale: GuestLocale = "en",
   ): Promise<{ studioName: string; hostName: string; settings: StudioSettings; consentText: string; consentHash: string } | null> {
     const [row] = await this.db.query<{ name: string; host: string; settings: unknown; owner_id: string }>(
       `SELECT st.name, st.settings, st.owner_id, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
@@ -198,7 +201,7 @@ export class StudioService {
     );
     if (!row) return null;
     const settings = await this.sessionSettings(row.settings, row.owner_id);
-    const consentText = consentTextFor(settings, row.host);
+    const consentText = consentTextFor(settings, row.host, locale);
     return { studioName: row.name, hostName: row.host, settings, consentText, consentHash: sha256Hex(consentText) };
   }
 
@@ -256,7 +259,8 @@ export class StudioService {
     if (!studio) throw new ApiError(404, "invite_not_found", "This invite link is invalid or has been replaced");
     const settings = await this.sessionSettings(studio.settings, studio.owner_id);
     // What they agree to is the studio's text as of now; the page tells us which text it showed.
-    const consentText = consentTextFor(settings, studio.host);
+    // In the language they read it in.
+    const consentText = consentTextFor(settings, studio.host, body.locale);
     const consentHash = sha256Hex(consentText);
     if (body.consentHash && body.consentHash !== consentHash) {
       throw new ApiError(409, "consent_changed", "The host has just changed what you're agreeing to. Read it again, then join.");
@@ -313,7 +317,7 @@ export class StudioService {
   }
 
   /** What someone sees on a solo link before recording. Null for a link that is wrong or switched off. */
-  async soloPreview(code: string) {
+  async soloPreview(code: string, locale: GuestLocale = "en") {
     const [row] = await this.db.query<{ name: string; host: string; settings: unknown; owner_id: string; solo_prompt: string }>(
       `SELECT st.name, st.settings, st.owner_id, st.solo_prompt, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.solo_code = $1 AND st.deleted_at IS NULL`,
@@ -321,7 +325,7 @@ export class StudioService {
     );
     if (!row) return null;
     const settings = await this.sessionSettings(row.settings, row.owner_id);
-    const consentText = consentTextFor(settings, row.host);
+    const consentText = consentTextFor(settings, row.host, locale);
     return { studioName: row.name, hostName: row.host, settings, prompt: row.solo_prompt, consentText, consentHash: sha256Hex(consentText), maxMinutes: SOLO_MAX_MINUTES };
   }
 
@@ -341,7 +345,7 @@ export class StudioService {
     );
     if (!studio) throw new ApiError(404, "invite_not_found", "This link is invalid or has been switched off");
     const settings = await this.sessionSettings(studio.settings, studio.owner_id);
-    const consentText = consentTextFor(settings, studio.host);
+    const consentText = consentTextFor(settings, studio.host, body.locale);
     const consentHash = sha256Hex(consentText);
     if (body.consentHash && body.consentHash !== consentHash) {
       throw new ApiError(409, "consent_changed", "What you're agreeing to has just changed. Read it again, then continue.");

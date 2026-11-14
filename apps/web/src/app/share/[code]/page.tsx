@@ -15,12 +15,16 @@ export async function generateMetadata({ params }: { params: Promise<{ code: str
 export default async function SharePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const services = await getServices();
-  const shared = await services.share.view(code);
+  const [shared, brand] = await Promise.all([services.share.view(code), services.brand.forShare(code)]);
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[860px] flex-col gap-6 px-5 py-10">
       {shared ? (
         <>
           <header className="flex flex-col gap-1">
+            {brand?.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={brand.logoUrl} alt="" data-testid="brand-logo" className="mb-3 h-8 w-auto max-w-[160px] self-start rounded-[4px] object-contain" />
+            )}
             <h1 className="text-[26px] leading-tight font-medium tracking-[-.02em] text-balance">{shared.title}</h1>
             <span className="text-[13.5px] text-muted">{shortClock(shared.lengthMs)}</span>
           </header>

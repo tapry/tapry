@@ -1,21 +1,41 @@
 // The guest screens' frame (the "Tapry Guest" design): a framed card on the terracotta backdrop,
 // with the studio's name and the step chips in its header. No hooks: used by server and client pages.
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { dirOf, translate, type Locale } from "@/lib/i18n";
+import { LanguagePicker } from "@/lib/i18n/client";
+import type { Brand } from "@/server/brand";
 import { cn, LogoMark } from "@/components/ui";
 
-export function GuestShell({ title, right, children }: { title: ReactNode; right?: ReactNode; children: ReactNode }) {
+/**
+ * With a studio's `brand`, its logo stands where Tapry's mark is and its colour replaces the
+ * terracotta. With a `locale`, the frame reads in that language's direction and offers the
+ * other languages under the card.
+ */
+export function GuestShell({ title, right, children, brand, locale }: { title: ReactNode; right?: ReactNode; children: ReactNode; brand?: Brand | null; locale?: Locale }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-ember px-[22px] py-[30px]">
+    <div
+      lang={locale}
+      dir={locale ? dirOf(locale) : undefined}
+      className={cn("flex min-h-dvh flex-col items-center justify-center gap-4 bg-ember px-[22px] py-[30px]", brand?.accent && "branded")}
+      style={brand?.accent ? ({ "--brand": brand.accent, "--brand-text": brand.accentText ?? "#ffffff" } as CSSProperties) : undefined}
+    >
       <main className="ember-card flex w-full max-w-[920px] flex-col overflow-hidden rounded-[19px] bg-canvas text-text">
         <div className="flex items-center justify-between gap-3 border-b border-border px-[22px] py-3.5">
           <span className="flex min-w-0 items-center gap-[9px] text-[15px] font-medium">
-            <LogoMark className="size-6" />
+            {brand?.logoUrl ? (
+              // The studio's own picture: any size, shown at the mark's height.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={brand.logoUrl} alt="" data-testid="brand-logo" className="h-6 w-auto max-w-[120px] shrink-0 rounded-[4px] object-contain" />
+            ) : (
+              <LogoMark className="size-6" />
+            )}
             <span className="truncate">{title}</span>
           </span>
           {right}
         </div>
         {children}
       </main>
+      {locale && <LanguagePicker locale={locale} label={translate(locale, "lang.label")} />}
     </div>
   );
 }
@@ -35,13 +55,13 @@ export function GuestGrid({ children, className }: { children: ReactNode; classN
 }
 
 // Step 2 is the green room. Not "Tech check": that is the separate page a host sends beforehand.
-const STEPS = ["Join", "Get ready", "Studio"];
+const STEPS = ["steps.join", "steps.ready", "steps.studio"] as const;
 
 /** Join → Get ready → Studio, with the current one highlighted and the done ones ticked. */
-export function Steps({ current }: { current: number }) {
+export function Steps({ current, locale = "en" }: { current: number; locale?: Locale }) {
   return (
-    <ol aria-label="Steps" className="flex items-center gap-1.5">
-      {STEPS.map((label, i) => (
+    <ol aria-label={translate(locale, "steps.label")} className="flex items-center gap-1.5">
+      {STEPS.map((key, i) => [translate(locale, key), i] as const).map(([label, i]) => (
         <li
           key={label}
           aria-current={i === current ? "step" : undefined}
@@ -62,7 +82,7 @@ export function Steps({ current }: { current: number }) {
             {i < current ? "✓" : i + 1}
           </span>
           <span className="max-[620px]:sr-only">{label}</span>
-          {i < current && <span className="sr-only">(done)</span>}
+          {i < current && <span className="sr-only">{translate(locale, "steps.done")}</span>}
         </li>
       ))}
     </ol>

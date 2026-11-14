@@ -1,5 +1,8 @@
 "use client";
 
+import { isTouchDevice, keepAwake, wakeLockSupported } from "@/lib/client/wake-lock";
+import { translateMaybe } from "@/lib/i18n";
+import { useT } from "@/lib/i18n/client";
 import { GuidePanel } from "./guide-panel";
 import type { UploadProgress } from "@tapry/recorder";
 import { STALE_REPORT_MS, type OwnRecordings, type RecapStatus, type SessionState, type SessionTicket } from "@tapry/shared";
@@ -27,6 +30,7 @@ import { FilterDot, type ReadyToJoin } from "./green-room";
  * live call. The call never affects the recording (see useCall).
  */
 export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJoin }) {
+  const { locale, t } = useT();
   const [state, setState] = useState<SessionState | null>(null);
   const [connection, setConnection] = useState<ConnectionStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +153,16 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsent]);
 
+  // The screen stays on while the session runs and until everything is uploaded: a phone that
+  // locks stops recording. Not a need: where the browser can't, phones get a line saying so.
+  const awake = !ended || unsent;
+  useEffect(() => {
+    if (!awake) return;
+    return keepAwake();
+  }, [awake]);
+  const [screenMayLock, setScreenMayLock] = useState(false);
+  useEffect(() => setScreenMayLock(isTouchDevice() && !wakeLockSupported()), []);
+
   const isHost = ticket.role === "host";
   // Recording alone on a solo link: no call, and this person starts and stops their own recording.
   const solo = !!ticket.solo;
@@ -181,7 +195,14 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     recordingId: recording?.id ?? null,
     active: !ended,
   });
-  const advice = quality.alerts.map((a) => alertAdvice(a, quality.uploadBehindS)).filter((x): x is string => !!x);
+  const advice = quality.alerts
+    .map((a) => {
+      const english = alertAdvice(a, quality.uploadBehindS);
+      if (!english || locale === "en") return english;
+      const minutes = quality.uploadBehindS !== null && quality.uploadBehindS >= 120 ? Math.floor(quality.uploadBehindS / 60) : null;
+      return translateMaybe(locale, a === "upload_behind" && minutes !== null ? "advice.upload_behind_minutes" : `advice.${a}`, { minutes: minutes ?? 0 }) ?? english;
+    })
+    .filter((x): x is string => !!x);
   const shares = isHost && state?.recording ? talkShares(state.health, state.recording.id) : null;
   const nudge = isHost && recording && state ? talkNudge(state.health, recording.id, ticket.participantId) : null;
 
@@ -383,7 +404,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
           )}
         </div>
       )}
-      {micMuted && recording && <AlertLine>You&apos;re muted: your microphone is silent in the recording too.</AlertLine>}
+      {micMuted && recording && <AlertLine>{t("room.muted")}</AlertLine>}
+      {screenMayLock && awake && <AlertLine>{t("room.screenOn")}</AlertLine>}
     </>
   );
 
@@ -449,9 +471,9 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         <Icon d={ICON.sliders} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
         {filtersOn(prefs.filters, hasCamera && !cameraOff) && <FilterDot />}
       </StageButton>
-      {/* The layouts only differ once someone else is in the call. On a phone the full-screen bar keeps to one row. */}
+      {/* The layouts only differ once someone else is in the call, and not at all on a phone's width, where tiles stack either way. */}
       {call.peers.length > 0 && (
-        <span className={cn("flex items-center gap-1.5", fullOpen && "gap-2 max-sm:hidden")}>
+        <span className={cn("flex items-center gap-1.5 max-sm:hidden", fullOpen && "gap-2")}>
           <StageSeparator tall={fullOpen} />
           {LAYOUTS.map(([id, name, d]) => (
             <button
@@ -550,7 +572,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         )}
                       >
                         <span aria-hidden className={cn("size-[7px] rounded-full bg-white", recording && "animate-rec-pulse")} />
-                        {recording ? "Recording" : "Ready"}
+                        {recording ? t("room.recording") : t("room.ready")}
                         {clock && <span className="font-mono font-medium tabular-nums">{clock}</span>}
                       </span>
                       <span
@@ -717,7 +739,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                         </span>
                       ) : (
                         <span className="text-[13.5px] font-medium text-text-2">
-                          {recording ? "You're being recorded." : "Waiting for the host to start recording."}
+                          {recording ? t("room.beingRecorded") : t("room.waitingHost")}
                         </span>
                       )}
                     </span>
@@ -781,10 +803,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     <Icon d={ICON.shield} className="size-[15px] text-ok" />
                     <span className="text-pretty">
                       {recording
-                        ? "Everyone is recorded on their own computer, so a bad connection can't spoil the result."
+                        ? t("room.ownDevice")
                         : isHost
                           ? "Nothing is being recorded right now. Press Record when everyone is ready."
-                          : "Nothing is being recorded right now. Your host starts when everyone is ready."}
+                          : t("room.nothingYet")}
                     </span>
                   </span>
                   <span className="flex flex-wrap gap-x-4 gap-y-1">
@@ -829,8 +851,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                           <span className="flex items-baseline justify-between gap-2">
                             <span className="min-w-0 truncate text-[14.5px] font-medium">
                               {p.displayName}
-                              {p.id === ticket.participantId && <span className="font-normal text-muted"> (you)</span>}
-                              {p.role === "host" && <span className="font-normal text-muted"> · host</span>}
+                              {p.id === ticket.participantId && <span className="font-normal text-muted"> {t("room.you")}</span>}
+                              {p.role === "host" && <span className="font-normal text-muted"> · {t("room.host")}</span>}
                             </span>
                             {shares && <TalkShare share={shares.get(p.id) ?? 0} />}
                           </span>
@@ -850,10 +872,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                             present && (
                               <span
                                 className={cn("flex items-center gap-[7px] text-[13.5px]", away ? "text-warn-strong" : "text-muted")}
-                                title={away ? "Not connected" : "In the call"}
+                                title={away ? t("room.notConnected") : t("room.inCall")}
                               >
                                 <StatusDot tone={away ? "warn" : "ok"} />
-                                {away ? "Not connected" : "In the call"}
+                                {away ? t("room.notConnected") : t("room.inCall")}
                               </span>
                             )
                           )}
@@ -868,9 +890,9 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                 {(isHost || solo) && <GuidePanel ticket={ticket} recordingId={recording?.id ?? null} title={solo ? "Questions" : "Guide"} />}
                 {!isHost && (
                   <div className="flex flex-col gap-[9px] rounded-xl border border-border bg-surface p-3.5 text-sm leading-normal text-text-2">
-                    <span>• If your internet drops, keep talking. Your recording is saved here first.</span>
-                    <span>• Keep this tab open until your upload is finished.</span>
-                    <span>• Plug in your laptop if you can.</span>
+                    <span>• {t("room.tipDrops")}</span>
+                    <span>• {t("room.tipTab")}</span>
+                    <span>• {t("room.tipPower")}</span>
                   </div>
                 )}
                 {isHost && (
@@ -934,7 +956,8 @@ function StageButton({
       type="button"
       className={cn(
         "grid cursor-pointer place-items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-        size === "lg" ? "size-11" : "size-[38px]",
+        // On touch screens every stage button is a thumb's size.
+        size === "lg" ? "size-11" : "size-[38px] pointer-coarse:size-11",
         active ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-white/12 text-white hover:bg-white/28",
         className,
       )}
@@ -1285,6 +1308,7 @@ function EndedView({
   upload: UploadProgress | null;
   finishing: boolean;
 }) {
+  const { t } = useT();
   const ownSent = upload?.uploadedBytes ?? 0;
   const ownLeft = upload?.pendingBytes ?? 0;
   const ownDone = !finishing && (upload?.idle ?? true);
@@ -1311,8 +1335,8 @@ function EndedView({
       ? "That's a wrap. Everything's here."
       : "That's a wrap!"
     : allDone
-      ? `Thanks, ${selfName}. All done!`
-      : `Thanks for joining, ${selfName}!`;
+      ? t("end.thanksDone", { name: selfName })
+      : t("end.thanks", { name: selfName });
   const sub = isHost
     ? rows.length === 0
       ? "The session has ended. Nothing was recorded in it."
@@ -1320,8 +1344,8 @@ function EndedView({
         ? "Every recording has arrived. Your files will be ready to download in a few minutes."
         : "Everyone's recordings are still arriving. You can close this page; they'll keep coming in."
     : allDone
-      ? "Your recording has reached the host. You can close this tab now."
-      : "Your recording is still being sent to the host. Please keep this tab open until it's done.";
+      ? t("end.reached")
+      : t("end.sending");
 
   return (
     <div className="flex flex-1 justify-center px-[clamp(16px,4vw,44px)] py-7">
@@ -1388,8 +1412,8 @@ function EndedView({
         {!isHost && (
           <Notice tone={allDone ? "ok" : "warn"}>
             {allDone
-              ? "You're free to go. The host has everything they need."
-              : "Closed it by accident? Just open the invite link again and the rest will be sent."}
+              ? t("end.free")
+              : t("end.reopen")}
           </Notice>
         )}
         {/* Only once their upload is done: nothing should compete with "keep this tab open". */}
@@ -1409,6 +1433,7 @@ const LINKS_REFRESH_MS = 30 * 60_000;
  * own" link (if the server sets one).
  */
 function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
+  const { t } = useT();
   const [own, setOwn] = useState<OwnRecordings | null>(null);
   const [recap, setRecap] = useState<RecapStatus | null>(null);
   // Bumped when the guest asks for the email: look again soon, even if the files were already ready.
@@ -1444,8 +1469,8 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
     <>
       {own.downloads && own.recordings.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-[18px]" data-testid="own-recording">
-          <h2 className="font-medium">Your recording</h2>
-          <OwnFiles recordings={own.recordings} waiting="Getting your file ready. Takes a few minutes; keep this page open to download it." />
+          <h2 className="font-medium">{t("end.yourRecording")}</h2>
+          <OwnFiles recordings={own.recordings} waiting={t("end.gettingReady")} />
           {recap?.enabled && <RecapEmail
               ticket={ticket}
               recap={recap}
@@ -1464,10 +1489,9 @@ function GuestAfterwards({ ticket }: { ticket: SessionTicket }) {
           className="flex flex-col gap-1 rounded-xl border border-accent-line bg-accent-soft px-[18px] py-3.5 transition-colors hover:border-accent"
           data-testid="promo"
         >
-          <span className="text-[14.5px] font-medium text-accent-strong">Record your own, free →</span>
+          <span className="text-[14.5px] font-medium text-accent-strong">{t("end.promoTitle")}</span>
           <span className="text-[13.5px] leading-normal text-text-2">
-            Podcasts, interviews and video in full quality, everyone recorded on their own computer. Open source, and you can run it
-            yourself.
+            {t("end.promoBody")}
           </span>
         </a>
       )}
@@ -1488,6 +1512,7 @@ function LocalUploadStatus({
   finishing: boolean;
   upload: UploadProgress | null;
 }) {
+  const { t } = useT();
   if (!upload || (!recording && !finishing && upload.uploadedChunks === 0 && upload.idle)) return null;
   const behindS = upload.oldestPendingTs !== null ? Math.round((localNow() + offsetMs - upload.oldestPendingTs) / 1000) : 0;
   let tone: "ok" | "warn" | "idle" = "ok";
@@ -1497,16 +1522,16 @@ function LocalUploadStatus({
     tone = behindS > 30 ? "warn" : "ok";
     text =
       behindS > 30
-        ? `Recording on this device. Upload is ${behindS} s behind; it will catch up.`
-        : `Recording on this device and uploading as you go (${mb(upload.uploadedBytes)} sent).`;
+        ? t("room.up.behind", { seconds: behindS })
+        : t("room.up.recording", { sent: mb(upload.uploadedBytes) });
   } else if (finishing) {
     tone = "warn";
-    text = "Finishing the recording on this device. Keep this tab open.";
+    text = t("room.up.finishing");
   } else if (upload.idle) {
-    text = `All of your recording is uploaded (${mb(upload.uploadedBytes)}).`;
+    text = t("room.up.done", { sent: mb(upload.uploadedBytes) });
   } else {
     tone = "warn";
-    text = `Uploading your recording: ${mb(upload.pendingBytes)} left. Keep this tab open.`;
+    text = t("room.up.left", { left: mb(upload.pendingBytes) });
   }
   return (
     <p className="flex items-center gap-2 border-t border-divider px-5 py-3 text-[13.5px] text-text-2" role="status" data-testid="local-upload">
@@ -1568,14 +1593,10 @@ function ParticipantUpload({
 
 
 function CallLabel({ status }: { status: CallStatus }) {
+  const { t } = useT();
   if (status === "off") return null;
-  const map = {
-    connecting: ["idle", "Call: connecting…"],
-    connected: ["ok", "Call: connected"],
-    reconnecting: ["warn", "Call: reconnecting… (recording continues)"],
-    failed: ["danger", "Call unavailable (recording continues)"],
-  } as const;
-  const [tone, label] = map[status];
+  const map = { connecting: "idle", connected: "ok", reconnecting: "warn", failed: "danger" } as const;
+  const [tone, label] = [map[status], t(`room.call.${status}`)];
   return (
     <p className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted" data-testid="call-status">
       <StatusDot tone={tone} /> {label}
@@ -1584,13 +1605,9 @@ function CallLabel({ status }: { status: CallStatus }) {
 }
 
 function ConnectionLabel({ status }: { status: ConnectionStatus }) {
-  const map = {
-    connecting: ["idle", "Connecting…"],
-    live: ["ok", "Connected"],
-    reconnecting: ["warn", "Reconnecting…"],
-    unauthorized: ["danger", "Disconnected"],
-  } as const;
-  const [tone, label] = map[status];
+  const { t } = useT();
+  const map = { connecting: "idle", live: "ok", reconnecting: "warn", unauthorized: "danger" } as const;
+  const [tone, label] = [map[status], t(`room.conn.${status}`)];
   return (
     <p className="flex items-center gap-2 text-[13px] whitespace-nowrap text-muted">
       <StatusDot tone={tone} /> {label}

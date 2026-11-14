@@ -17,10 +17,10 @@ Goal: cover ~70% of what most Riverside users actually use, plus what Riverside 
 | Noise reduction, levelling | Open-source models | v1.1 (noise removal shipped early with filters, Nov 2026) |
 | Video filters (brightness, looks, touch-up), background blur | Non-destructive: live in the call, applied to the files, originals kept | Built Nov 2026 (owner decision, ahead of the v1 scope guard), including background blur from a mask track; background images later |
 | AI show notes, chapters, takeaways | A model on the server, or Claude where the account's owner opts in | Built 13 Nov 2026 (not yet run against a real model) |
-| Studio branding | Yes | v1.1 |
+| Studio branding | A logo and an accent colour on the pages guests open (invite, tech check, green room, solo link, share page) | Built 14 Nov 2026 |
 | Teleprompter / notes | Guide beside the call with tick-off and markers (built 13 Nov 2026); tracking it from the live transcript is not built | Built (manual) |
 | Collaborators | Team roles + comments | v1.1 |
-| Phone guests | Mobile browser first | v1 / v1.1 |
+| Phone guests | Mobile browser first: screen kept on, thumb-sized controls, tested at a phone's size in Chromium; guest pages in six languages | Built 14 Nov 2026 (no real iPhone or Android phone tried) |
 | Screen share | Separate track, own file, fills the combined video while shared | Built 13 Nov 2026 (Chromium tested) |
 | Filler/pause removal | Light, all tracks in sync | v1.2 |
 | Captions | SRT/VTT | v1.2 |

@@ -44,6 +44,13 @@ export default function ToolsPage() {
               <span style={{ fontSize: 14, fontWeight: 500 }}>Make a form →</span>
             </a>
           </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <a href="/data-map/" style={{ display: "flex", flexDirection: "column", gap: 8, border: "1px solid #ececef", borderRadius: 20, padding: 22, color: "#0b0b0f" }}>
+              <span style={{ fontSize: 17, fontWeight: 500 }}>Recording data map</span>
+              <span style={{ fontSize: 14.5, lineHeight: 1.5, color: "#5f6470" }}>A plain record of what your recordings collect, where they are stored, who handles them and how long they are kept, for GDPR and ethics reviews.</span>
+              <span style={{ fontSize: 14, fontWeight: 500 }}>Make a data map →</span>
+            </a>
+          </div>
           {HAS_SPEED_TEST && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <SpeedCard />

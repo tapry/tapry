@@ -71,6 +71,8 @@ export const soloJoinBody = z.object({
   displayName: plainText(60),
   consent: z.literal(true, { error: "Consent to recording is required" }),
   consentHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  /** The language the page (and so the default consent text) was shown in. */
+  locale: z.enum(["en", "fr", "es", "de", "pt", "ar"]).optional(),
 });
 /** The longest one solo recording runs, in minutes: it stops by itself there. */
 export const SOLO_MAX_MINUTES = 30;
@@ -81,6 +83,8 @@ export const markerBody = z.object({ label: plainText(200).optional() });
 /** A host joins as a producer (in the call, never recorded) or as someone who is recorded. */
 export const producerBody = z.object({ producer: z.boolean() });
 /** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
+/** A studio's accent colour for guest pages; null puts Tapry's back. */
+export const brandBody = z.object({ accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable() });
 export const aiNotesBody = z.object({ outside: z.boolean() });
 /** How AI notes are written for this account, for its settings page. */
 export interface AiNotesView {
@@ -180,14 +184,52 @@ export const studioSettings = z.object({
   deleteAfterDays: settingsFields.deleteAfterDays.default(null),
 });
 
-/** The consent text when a studio sets none. */
-export function defaultConsentText(hostName: string, audioOnly: boolean) {
-  return `I'm happy to be recorded. My ${audioOnly ? "microphone is" : "camera and microphone are"} recorded on this computer and sent to ${hostName}.`;
+/** The languages the pages a guest opens can be in (the app's guest-page languages). */
+export const GUEST_LOCALES = ["en", "fr", "es", "de", "pt", "ar"] as const;
+export type GuestLocale = (typeof GUEST_LOCALES)[number];
+const guestLocale = z.enum(GUEST_LOCALES);
+
+// The default consent in each guest-page language: [camera and microphone, microphone only].
+// {host} is the host's name. A guest agrees to the text in the language they read it in, and
+// that exact text is what is kept with their consent.
+const DEFAULT_CONSENT: Record<GuestLocale, [string, string]> = {
+  en: [
+    "I'm happy to be recorded. My camera and microphone are recorded on this device and sent to {host}.",
+    "I'm happy to be recorded. My microphone is recorded on this device and sent to {host}.",
+  ],
+  fr: [
+    "J'accepte d'être enregistré. Ma caméra et mon micro sont enregistrés sur cet appareil et envoyés à {host}.",
+    "J'accepte d'être enregistré. Mon micro est enregistré sur cet appareil et envoyé à {host}.",
+  ],
+  es: [
+    "Acepto que se me grabe. Mi cámara y mi micrófono se graban en este dispositivo y se envían a {host}.",
+    "Acepto que se me grabe. Mi micrófono se graba en este dispositivo y se envía a {host}.",
+  ],
+  de: [
+    "Ich bin mit der Aufnahme einverstanden. Meine Kamera und mein Mikrofon werden auf diesem Gerät aufgenommen und an {host} gesendet.",
+    "Ich bin mit der Aufnahme einverstanden. Mein Mikrofon wird auf diesem Gerät aufgenommen und an {host} gesendet.",
+  ],
+  pt: [
+    "Aceito ser gravado. A minha câmara e o meu microfone são gravados neste dispositivo e enviados a {host}.",
+    "Aceito ser gravado. O meu microfone é gravado neste dispositivo e enviado a {host}.",
+  ],
+  ar: [
+    "أوافق على تسجيلي. تُسجَّل كاميرتي وميكروفوني على هذا الجهاز ويُرسلان إلى {host}.",
+    "أوافق على تسجيلي. يُسجَّل ميكروفوني على هذا الجهاز ويُرسل إلى {host}.",
+  ],
+};
+
+/** The consent text when a studio sets none, in the guest's language (English unless said). */
+export function defaultConsentText(hostName: string, audioOnly: boolean, locale: GuestLocale = "en") {
+  return (DEFAULT_CONSENT[locale] ?? DEFAULT_CONSENT.en)[audioOnly ? 1 : 0].replace("{host}", () => hostName);
 }
 
-/** The exact text a guest of this studio agrees to (what's hashed and kept with their consent). */
-export function consentTextFor(settings: StudioSettings, hostName: string) {
-  return settings.consentText || defaultConsentText(hostName, settings.audioOnly);
+/**
+ * The exact text a guest of this studio agrees to (what's hashed and kept with their consent).
+ * A studio's own text is shown as the host wrote it, whatever the guest's language.
+ */
+export function consentTextFor(settings: StudioSettings, hostName: string, locale: GuestLocale = "en") {
+  return settings.consentText || defaultConsentText(hostName, settings.audioOnly, locale);
 }
 export type StudioSettings = z.infer<typeof studioSettings>;
 
@@ -216,6 +258,8 @@ export const joinBody = z.object({
    * Optional for pages loaded before this existed.
    */
   consentHash: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  /** The language the page (and so the default consent text) was shown in. */
+  locale: guestLocale.optional(),
 });
 
 // ── Guest tech check (before the session; results go to the host only if the guest sends them) ──
@@ -498,16 +542,18 @@ export interface Plan {
   video4k: boolean;
   /** The owner may turn on AI notes written by an outside model. (Notes by a model on the server need no plan.) */
   aiNotes: boolean;
+  /** Studios may show their own logo and colour to guests. */
+  branding: boolean;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1, video4k: false, aiNotes: false },
+  free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1, video4k: false, aiNotes: false, branding: false },
   // Everything is in the customer's bucket: nothing of ours to meter or to delete.
-  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true, aiNotes: true },
-  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false, aiNotes: true },
-  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true, aiNotes: true },
-  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5, video4k: true, aiNotes: true },
-  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null, video4k: true, aiNotes: true },
+  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true, aiNotes: true, branding: false },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false, aiNotes: true, branding: false },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true, aiNotes: true, branding: true },
+  team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5, video4k: true, aiNotes: true, branding: true },
+  business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null, video4k: true, aiNotes: true, branding: true },
 };
 
 /** Whether moving from one plan to another is an upgrade (more hours or longer keeping). */

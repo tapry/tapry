@@ -3,6 +3,7 @@ import { ApiKeysService, WebhooksService } from "./integrations";
 import { ActivityService, CommentsService } from "./collab";
 import { ClipsService } from "./clips";
 import { TimelineExports } from "./timeline-export";
+import { BrandService } from "./brand";
 import { GuideService } from "./guide";
 import { NotesService } from "./notes";
 import { WaitlistService } from "./waitlist";
@@ -49,6 +50,8 @@ export interface Services {
   notes: NotesService;
   /** The host's guide for a studio, and markers on recordings. */
   guide: GuideService;
+  /** A studio's logo and colour on the pages its guests open. */
+  brand: BrandService;
   /** Project files for editors that place a recording's files on a timeline. */
   timelines: TimelineExports;
   /** Clips cut out of finished recordings. */
@@ -130,6 +133,7 @@ export function createServices(
     siteOrigins: opts.siteOrigins ?? [],
     waitlist: new WaitlistService(db, { cloud: billing.cloud, now: opts.now }),
     guide: new GuideService(db, opts.now),
+    brand: new BrandService(db, (accountId) => billing.allowsBranding(accountId)),
     timelines: new TimelineExports(db),
     clips: new ClipsService(db, storage, () => processing.onEnqueue()),
     comments: new CommentsService(db),

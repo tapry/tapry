@@ -6,11 +6,14 @@ import { Notice } from "@/components/ui";
 import { loadTicket } from "@/lib/client/api";
 import { getPipeline } from "@/lib/client/recording";
 import { holdSessionLock } from "@/lib/client/session-lock";
+import { dirOf, translate, type Locale, type MessageKey } from "@/lib/i18n";
+import { LocaleProvider } from "@/lib/i18n/client";
+import type { Brand } from "@/server/brand";
 import { GuestHeading, GuestShell, Steps } from "../../join/shell";
 import { GreenRoom, type ReadyToJoin } from "./green-room";
 import { Room } from "./room";
 
-export function SessionClient({ sessionId }: { sessionId: string }) {
+export function SessionClient({ sessionId, brand, locale: guestLocale = "en" }: { sessionId: string; brand?: Brand | null; /** The language for a guest; a host's studio is in English like their dashboard. */ locale?: Locale }) {
   // undefined = still reading storage; null = no ticket in this browser.
   const [ticket, setTicket] = useState<SessionTicket | null | undefined>(undefined);
   const [ready, setReady] = useState<ReadyToJoin | null>(null);
@@ -57,19 +60,24 @@ export function SessionClient({ sessionId }: { sessionId: string }) {
       </div>
     );
   }
+  // Guests read the room in their language; a host's studio is in English, like their dashboard.
+  const locale: Locale = ticket.role === "guest" ? guestLocale : "en";
+  const t = (key: MessageKey) => translate(locale, key);
   if (!ready) {
     const intro = (
-      <GuestHeading title="Before you go in" above={ticket.role === "host" ? ticket.studio.name : undefined}>
-        Check how you look and sound before you go in. This only takes a moment.
+      <GuestHeading title={t("gr.title")} above={ticket.role === "host" ? ticket.studio.name : undefined}>
+        {t("gr.body")}
       </GuestHeading>
     );
     // Guests come from the invite page: the same framed card, at step 2. Hosts get the plain studio page.
     if (ticket.role === "guest") {
       return (
-        <GuestShell title={ticket.studio.name} right={<Steps current={1} />}>
+        <GuestShell title={ticket.studio.name} right={<Steps current={1} locale={locale} />} brand={brand} locale={locale}>
           <div className="flex animate-fade-up flex-col gap-[22px] p-[clamp(20px,4vw,36px)]">
             {intro}
-            <GreenRoom ticket={ticket} onJoin={setReady} />
+            <LocaleProvider locale={locale}>
+              <GreenRoom ticket={ticket} onJoin={setReady} />
+            </LocaleProvider>
           </div>
         </GuestShell>
       );
@@ -81,5 +89,11 @@ export function SessionClient({ sessionId }: { sessionId: string }) {
       </div>
     );
   }
-  return <Room ticket={ticket} ready={ready} />;
+  return (
+    <LocaleProvider locale={locale}>
+      <div lang={locale} dir={dirOf(locale)} className="contents">
+        <Room ticket={ticket} ready={ready} />
+      </div>
+    </LocaleProvider>
+  );
 }

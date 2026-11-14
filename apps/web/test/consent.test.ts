@@ -68,4 +68,24 @@ describe("consent per studio", () => {
     expect(await res.text()).toBe(body);
     expect((await t.fetchFor()(url)).status).toBe(401);
   });
+
+  it("keeps the default consent in the language the guest read it in, and a studio's own text as written", async () => {
+    const french = defaultConsentText("Host", false, "fr");
+    expect(french).toContain("J'accepte d'être enregistré");
+    expect(french).toContain("Host");
+    expect(defaultConsentText("Host", true, "ar")).toContain("Host");
+    expect(consentTextFor({ ...studioSettings.parse({}), consentText: "Our study's consent." }, "Ines", "de")).toBe("Our study's consent.");
+    // Joining from the French page: the French text is what was agreed to and what is kept.
+    const t = await setup();
+    const preview = (await t.services.studios.invitePreview(t.studio.inviteCode, "fr"))!;
+    expect(preview.consentText).toBe(french);
+    const joined = (await expectOk(t.client().post("/join", { inviteCode: t.studio.inviteCode, displayName: "Zoé", consent: true, consentHash: preview.consentHash, locale: "fr" }))).body;
+    const [row] = await t.db.query<{ text: string }>("SELECT c.text FROM participants p JOIN consent_texts c ON c.hash = p.consent_hash WHERE p.id = $1", [joined.participantId]);
+    expect(row!.text).toBe(french);
+    // The French hash without saying which language was read: refused, as a changed text would be.
+    expect((await t.client().post("/join", { inviteCode: t.studio.inviteCode, displayName: "Zoé", consent: true, consentHash: preview.consentHash })).status).toBe(409);
+    expect((await t.client().post("/join", { inviteCode: t.studio.inviteCode, displayName: "Zoé", consent: true, locale: "xx" })).status).toBe(400);
+    // A name with $ signs is put in as it is.
+    expect(defaultConsentText("A$&B", false, "es")).toContain("A$&B");
+  });
 });
