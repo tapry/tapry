@@ -1,4 +1,5 @@
 // Pure green-room logic: no React, no live devices. Unit-tested in test/media.test.ts.
+import type { MessageKey, Vars } from "@/lib/i18n";
 import { pickMimeType } from "@tapry/recorder";
 import type { StudioSettings } from "@tapry/shared";
 import { videoTier } from "@tapry/shared";
@@ -54,6 +55,8 @@ export function withoutDeviceIds(c: MediaStreamConstraints): MediaStreamConstrai
 export interface MediaProblem {
   title: string;
   help: string;
+  /** Which problem, for the guest pages' other languages ("media.<code>.title" / ".help"). */
+  code: "blocked" | "notFound" | "gone" | "busy" | "unsupported" | "other";
   /** A pinned device id no longer matches anything: retry with defaults. */
   retryWithDefaults?: boolean;
 }
@@ -64,16 +67,19 @@ export function describeMediaError(err: unknown): MediaProblem {
     case "NotAllowedError":
     case "SecurityError":
       return {
+        code: "blocked",
         title: "Camera and microphone are blocked",
         help: "Click the camera icon in the address bar, allow access for this site, then press Try again.",
       };
     case "NotFoundError":
       return {
+        code: "notFound",
         title: "No microphone found",
         help: "Plug in a microphone or headset, then press Try again.",
       };
     case "OverconstrainedError":
       return {
+        code: "gone",
         title: "That device isn't available anymore",
         help: "Switching back to your default camera and microphone.",
         retryWithDefaults: true,
@@ -81,17 +87,19 @@ export function describeMediaError(err: unknown): MediaProblem {
     case "NotReadableError":
     case "AbortError":
       return {
+        code: "busy",
         title: "Your camera or microphone is busy",
         help: "Another app (Zoom, Teams, FaceTime…) may be using it. Close that app, then press Try again.",
       };
     default:
       if (typeof navigator !== "undefined" && !navigator.mediaDevices?.getUserMedia) {
         return {
-          title: "This browser can't record",
+          code: "unsupported",
+        title: "This browser can't record",
           help: "Open this link in a current version of Chrome, Edge, Firefox or Safari, over https.",
         };
       }
-      return { title: "Couldn't start your camera or microphone", help: "Press Try again, or reload the page." };
+      return { code: "other", title: "Couldn't start your camera or microphone", help: "Press Try again, or reload the page." };
   }
 }
 
@@ -159,7 +167,10 @@ export function looksLikeHeadphones(label: string | undefined) {
 export interface Check {
   id: string;
   tone: "ok" | "warn" | "danger";
+  /** In English: what the host gets when a guest sends their tech check. */
   label: string;
+  /** The same as a message of the guest pages' languages, for showing it to the guest. */
+  msg?: [key: MessageKey, vars?: Vars];
 }
 
 export interface BrowserEnv {
@@ -184,25 +195,26 @@ export function currentBrowserEnv(): BrowserEnv {
 export function browserChecks(env: BrowserEnv): Check[] {
   const checks: Check[] = [];
   if (!env.isSecureContext) {
-    checks.push({ id: "https", tone: "danger", label: "This page must be opened over https to use your camera." });
+    checks.push({ id: "https", tone: "danger", label: "This page must be opened over https to use your camera.", msg: ["chk.https"] });
   }
   if (!env.hasMediaRecorder) {
-    checks.push({ id: "recorder", tone: "danger", label: "This browser can't record. Use Chrome, Edge, Firefox or Safari." });
+    checks.push({ id: "recorder", tone: "danger", label: "This browser can't record. Use Chrome, Edge, Firefox or Safari.", msg: ["chk.noRecorder"] });
   } else {
     try {
       const format = pickMimeType("video", env.isTypeSupported).split(";")[0];
-      checks.push({ id: "recorder", tone: "ok", label: `Recording supported (${format})` });
+      checks.push({ id: "recorder", tone: "ok", label: `Recording supported (${format})`, msg: ["chk.recorderOk", { format: format ?? "" }] });
     } catch {
-      checks.push({ id: "recorder", tone: "danger", label: "This browser can't record video. Try Chrome or Edge." });
+      checks.push({ id: "recorder", tone: "danger", label: "This browser can't record video. Try Chrome or Edge.", msg: ["chk.noVideo"] });
     }
   }
   checks.push(
     env.hasIndexedDB
-      ? { id: "storage-api", tone: "ok", label: "Local backup storage available" }
+      ? { id: "storage-api", tone: "ok", label: "Local backup storage available", msg: ["chk.storageOk"] }
       : {
           id: "storage-api",
           tone: "danger",
           label: "Browser storage is blocked (private window?). Your recording can't be protected against crashes.",
+          msg: ["chk.storageBlocked"],
         },
   );
   if (/Android|iPhone|iPad|Mobile/i.test(env.userAgent)) {
@@ -210,31 +222,34 @@ export function browserChecks(env: BrowserEnv): Check[] {
       id: "mobile",
       tone: "warn",
       label: "On a phone, keep this tab open and the screen on: recording stops in the background. A computer is more reliable.",
+      msg: ["chk.mobile"],
     });
   }
   return checks;
 }
 
 export function storageCheck(freeBytes: number | null, ok: boolean): Check {
-  if (freeBytes === null) return { id: "disk", tone: "ok", label: "Disk space: couldn't check" };
+  if (freeBytes === null) return { id: "disk", tone: "ok", label: "Disk space: couldn't check", msg: ["chk.diskUnknown"] };
   const gb = (freeBytes / 1024 ** 3).toFixed(1);
   return ok
-    ? { id: "disk", tone: "ok", label: `${gb} GB free for the local backup` }
+    ? { id: "disk", tone: "ok", label: `${gb} GB free for the local backup`, msg: ["chk.diskOk", { gb }] }
     : {
         id: "disk",
         tone: "warn",
         label: `Only ${gb} GB free. Long recordings may not fit if your upload is slow. Free up some space.`,
+        msg: ["chk.diskLow", { gb }],
       };
 }
 
 export function networkCheck(rttMs: number | null): Check {
-  if (rttMs === null) return { id: "network", tone: "danger", label: "Can't reach the server. Check your connection." };
+  if (rttMs === null) return { id: "network", tone: "danger", label: "Can't reach the server. Check your connection.", msg: ["chk.netNone"] };
   if (rttMs > 400) {
     return {
       id: "network",
       tone: "warn",
       label: `Slow connection (${rttMs} ms). The call may lag; your recording is still saved at full quality.`,
+      msg: ["chk.netSlow", { ms: rttMs }],
     };
   }
-  return { id: "network", tone: "ok", label: `Connection OK (${rttMs} ms)` };
+  return { id: "network", tone: "ok", label: `Connection OK (${rttMs} ms)`, msg: ["chk.netOk", { ms: rttMs }] };
 }

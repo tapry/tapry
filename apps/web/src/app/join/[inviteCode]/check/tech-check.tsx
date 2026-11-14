@@ -8,7 +8,8 @@ import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { estimateClock } from "@/lib/client/clock";
 import { describeBrowser, measureUpload, uploadCheck } from "@/lib/client/tech-check";
 import { useDevices, useLocalMedia, useMicLevel, useStoredState } from "@/lib/media/hooks";
-import { browserChecks, buildConstraints, currentBrowserEnv, networkCheck, storageCheck, type DeviceChoice } from "@/lib/media/media";
+import { useT } from "@/lib/i18n/client";
+import { browserChecks, buildConstraints, currentBrowserEnv, networkCheck, storageCheck, type Check, type DeviceChoice } from "@/lib/media/media";
 import { CheckList, DevicePickers, HeadphonesBox, LevelAdvice, Preview } from "../../../session/[sessionId]/green-room";
 import { Icon, ICON } from "../../../session/[sessionId]/icons";
 
@@ -32,7 +33,8 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
   }, [level.state]);
 
   // Browser, disk, connection and upload speed: measured once, in the background.
-  const [background, setBackground] = useState<TechCheckResult[]>([]);
+  const { t } = useT();
+  const [background, setBackground] = useState<Check[]>([]);
   const [testing, setTesting] = useState(true);
   useEffect(() => {
     let cancelled = false;
@@ -54,35 +56,35 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
   }, [inviteCode, settings]);
 
   const [sampleOk, setSampleOk] = useState<boolean | null>(null);
-  const checks: TechCheckResult[] = [...deviceChecks(), ...background];
+  const checks: Check[] = [...deviceChecks(), ...background];
   if (sampleOk !== null) {
     checks.push(
       sampleOk
-        ? { id: "playback", tone: "ok", label: "Sounded clear on the test recording" }
-        : { id: "playback", tone: "warn", label: "The test recording didn't sound right. Try another microphone above." },
+        ? { id: "playback", tone: "ok", label: "Sounded clear on the test recording", msg: ["chk.playbackOk"] }
+        : { id: "playback", tone: "warn", label: "The test recording didn't sound right. Try another microphone above.", msg: ["chk.playbackBad"] },
     );
   }
 
-  function deviceChecks(): TechCheckResult[] {
-    if (status === "error") return [{ id: "devices", tone: "danger", label: problem?.title ?? "Camera or microphone unavailable" }];
+  function deviceChecks(): Check[] {
+    if (status === "error") return [{ id: "devices", tone: "danger", label: problem?.title ?? "Camera or microphone unavailable", msg: [problem ? `media.${problem.code}.title` : "chk.devicesBad"] }];
     if (status !== "live" || !stream) return [];
-    const out: TechCheckResult[] = [];
+    const out: Check[] = [];
     if (!settings.audioOnly) {
       out.push(
         stream.getVideoTracks().length > 0
-          ? { id: "camera", tone: "ok", label: "Camera works" }
-          : { id: "camera", tone: "ok", label: "Camera off: you'll be recorded with sound only" },
+          ? { id: "camera", tone: "ok", label: "Camera works", msg: ["chk.cameraOk"] }
+          : { id: "camera", tone: "ok", label: "Camera off: you'll be recorded with sound only", msg: ["chk.cameraOff"] },
       );
     }
     out.push(
       heard
-        ? { id: "mic", tone: "ok", label: "Microphone picks you up" }
-        : { id: "mic", tone: "warn", label: "We haven't heard you yet. Say a few words." },
+        ? { id: "mic", tone: "ok", label: "Microphone picks you up", msg: ["chk.micOk"] }
+        : { id: "mic", tone: "warn", label: "We haven't heard you yet. Say a few words.", msg: ["chk.micWait"] },
     );
     out.push(
       choice.headphones
-        ? { id: "headphones", tone: "ok", label: "Wearing headphones" }
-        : { id: "headphones", tone: "warn", label: "No headphones: the others' voices may leak into your recording" },
+        ? { id: "headphones", tone: "ok", label: "Wearing headphones", msg: ["chk.headphonesOk"] }
+        : { id: "headphones", tone: "warn", label: "No headphones: the others' voices may leak into your recording", msg: ["chk.headphonesNo"] },
     );
     return out;
   }
@@ -101,10 +103,10 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
         <LevelAdvice state={level.state} live={status === "live"} suspended={level.suspended} />
         {problem && (
           <Notice tone="danger">
-            <p className="font-medium">{problem.title}</p>
-            <p className="mt-1">{problem.help}</p>
+            <p className="font-medium">{t(`media.${problem.code}.title`)}</p>
+            <p className="mt-1">{t(`media.${problem.code}.help`)}</p>
             <Button variant="secondary" className="mt-3" onClick={retry}>
-              Try again
+              {t("common.tryAgain")}
             </Button>
           </Notice>
         )}
@@ -114,11 +116,11 @@ export function TechCheck({ inviteCode, hostName, settings }: { inviteCode: stri
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-[18px]">
         <DevicePickers settings={settings} devices={devices} choice={choice} setChoice={setChoice} />
         <HeadphonesBox checked={choice.headphones} onChange={(headphones) => setChoice({ ...choice, headphones })}>
-          I&apos;ll wear headphones, so other voices don&apos;t leak into my microphone.
+          {t("check.willWear")}
         </HeadphonesBox>
         <CheckList
           checks={checks}
-          pending={[...(status === "starting" ? ["Starting your camera and microphone…"] : []), ...(testing ? ["Testing your upload speed…"] : [])]}
+          pending={[...(status === "starting" ? [t("check.startingDevices")] : []), ...(testing ? [t("check.testingUpload")] : [])]}
         />
         <SendResults inviteCode={inviteCode} hostName={hostName} checks={checks} ready={!testing && status !== "starting"} />
       </div>
@@ -136,6 +138,7 @@ function HearYourself({
   answered: boolean | null;
   onAnswer: (ok: boolean) => void;
 }) {
+  const { t } = useT();
   const [left, setLeft] = useState<number | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
@@ -176,24 +179,24 @@ function HearYourself({
             <Icon d={ICON.wave} className="size-[15px]" />
           </span>
           <span className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium">Hear yourself</span>
-            <span className="text-[13px] text-muted">Record {SAMPLE_SECONDS} seconds and listen back. It stays on this computer.</span>
+            <span className="text-sm font-medium">{t("check.hear")}</span>
+            <span className="text-[13px] text-muted">{t("check.hearBody", { seconds: SAMPLE_SECONDS })}</span>
           </span>
         </span>
         <Button variant="secondary" onClick={record} disabled={!stream || left !== null}>
-          {left !== null ? `Recording… ${left}` : url ? "Record again" : "Record a test"}
+          {left !== null ? t("check.recordingLeft", { left }) : url ? t("check.recordAgain") : t("check.recordTest")}
         </Button>
       </div>
       {url && (
         <>
           <audio ref={audio} src={url} controls autoPlay className="w-full" />
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="mr-1 text-text-2">How did it sound?</span>
+            <span className="me-1 text-text-2">{t("check.howSound")}</span>
             <Button variant={answered === true ? "primary" : "secondary"} onClick={() => onAnswer(true)}>
-              Clear
+              {t("check.clear")}
             </Button>
             <Button variant={answered === false ? "primary" : "secondary"} onClick={() => onAnswer(false)}>
-              Something&apos;s off
+              {t("check.off")}
             </Button>
           </div>
         </>
@@ -211,9 +214,12 @@ function SendResults({
 }: {
   inviteCode: string;
   hostName: string;
-  checks: TechCheckResult[];
+  checks: Check[];
   ready: boolean;
 }) {
+  const { t } = useT();
+  // The host reads the results in English, whatever language the guest reads them in.
+  const report: TechCheckResult[] = checks.map(({ id, tone, label }) => ({ id, tone, label }));
   const [reportId] = useState(() => `chk_${crypto.randomUUID().replace(/-/g, "")}`);
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -226,29 +232,29 @@ function SendResults({
     setError(null);
     try {
       await apiFetch(`/check/${encodeURIComponent(inviteCode)}/report`, {
-        body: { reportId, name, browser: describeBrowser(navigator.userAgent), checks },
+        body: { reportId, name, browser: describeBrowser(navigator.userAgent), checks: report },
       });
-      setSent(JSON.stringify(checks));
+      setSent(JSON.stringify(report));
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Couldn't send. Try again.");
+      setError(err instanceof ApiRequestError && err.code !== "network" ? err.message : t("check.sendFailed"));
     } finally {
       setBusy(false);
     }
   }
 
-  const changed = sent !== null && sent !== JSON.stringify(checks);
+  const changed = sent !== null && sent !== JSON.stringify(report);
   return (
     <form onSubmit={send} className="flex flex-col gap-3 border-t border-divider pt-3.5">
-      <Field label="Your name" hint={`So ${hostName} knows who checked.`}>
+      <Field label={t("common.yourName")} hint={t("check.nameHint", { host: hostName })}>
         <Input name="name" autoComplete="name" required maxLength={60} />
       </Field>
       <Button type="submit" disabled={!ready || busy} className="w-full">
-        {sent && !changed ? "✓ Sent" : sent ? "Send the new results" : `Send results to ${hostName}`}
+        {sent && !changed ? t("check.sent") : sent ? t("check.sendNew") : t("check.send", { host: hostName })}
       </Button>
       {sent && !changed && (
         <p className="flex items-start gap-2 text-[13.5px] leading-[1.45] text-ok-strong" data-testid="check-sent">
           <Icon d={ICON.checkCircle} className="mt-0.5 size-[15px]" />
-          {hostName} can see how your setup did. At session time, open the invite link {hostName} sent you.
+          {t("check.sentBody", { host: hostName })}
         </p>
       )}
       {error && <Notice tone="danger">{error}</Notice>}

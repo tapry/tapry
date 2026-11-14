@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Avatar, Button, Field, Input, Notice, RecDot, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError, loadTicketForInvite, saveTicket } from "@/lib/client/api";
 import { getPipeline } from "@/lib/client/recording";
+import { errorText, useT } from "@/lib/i18n/client";
 
 const RETRY_MS = 5_000;
 
@@ -22,6 +23,7 @@ export function JoinForm({
   consentHash: string;
 }) {
   const router = useRouter();
+  const { locale, t } = useT();
   const [error, setError] = useState<string | null>(null);
   const [waitingForHost, setWaitingForHost] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,7 +60,7 @@ export function JoinForm({
     setError(null);
     try {
       const ticket = await apiFetch<SessionTicket>("/join", {
-        body: { inviteCode, displayName: data.get("displayName"), consent: data.get("consent") === "on", consentHash },
+        body: { inviteCode, displayName: data.get("displayName"), consent: data.get("consent") === "on", consentHash, locale },
       });
       saveTicket(ticket, inviteCode);
       router.push(`/session/${ticket.sessionId}`);
@@ -68,11 +70,11 @@ export function JoinForm({
         // Show the new text (the page renders it on the server) and ask again.
         setWaitingForHost(false);
         setConsent(false);
-        setError(err.message);
+        setError(errorText(err, locale, t("error.generic")));
         router.refresh();
       } else {
         setWaitingForHost(false);
-        setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+        setError(errorText(err, locale, t("error.generic")));
       }
       setBusy(false);
     }
@@ -84,25 +86,22 @@ export function JoinForm({
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-3.5">
           <p className="flex items-center gap-2.5 text-[13.5px] text-text-2">
             <Avatar name={previous.name} className="size-6 text-[10px]" />
-            You already joined this session as {previous.name}.
+            {t("join.already", { name: previous.name })}
           </p>
           <Button variant="record" onClick={() => router.push(`/session/${previous.ticket.sessionId}`)}>
             <RecDot />
-            Continue as {previous.name}
+            {t("join.continueAs", { name: previous.name })}
           </Button>
         </div>
       )}
       {waitingForHost && (
         <Notice tone="warn" className="flex items-start gap-2.5">
           <StatusDot tone="warn" className="mt-1.5 animate-rec-pulse" />
-          <span>
-            {hostName} hasn&apos;t opened the studio yet. Keep this page open, and we&apos;ll try again for you every few
-            seconds.
-          </span>
+          <span>{t("join.waitingHost", { host: hostName })}</span>
         </Notice>
       )}
       <form ref={form} onSubmit={submit} className="flex flex-col gap-4">
-        <Field label="Your name" hint={`${hostName} and the other guests will see this.`}>
+        <Field label={t("common.yourName")} hint={t("join.nameHint", { host: hostName })}>
           <Input name="displayName" autoComplete="name" required maxLength={60} autoFocus={!previous} />
         </Field>
         <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
@@ -120,7 +119,7 @@ export function JoinForm({
         </label>
         {error && <Notice tone="danger">{error}</Notice>}
         <Button type="submit" variant={previous ? "secondary" : "primary"} disabled={busy && !waitingForHost} className="w-full">
-          {previous ? "Join as someone new" : "Continue"}
+          {previous ? t("join.asNew") : t("common.continue")}
         </Button>
       </form>
     </div>

@@ -24,6 +24,7 @@ import {
   clipBody,
   soloJoinBody,
   soloSettingsBody,
+  brandBody,
   guideBody,
   markerBody,
   producerBody,
@@ -46,6 +47,7 @@ import { readWebhook } from "./billing-webhooks";
 import { ApiError, isApiError, isZodError } from "./errors";
 import type { Participant } from "./live";
 import type { Services } from "./services";
+import { LOGO_MAX_BYTES } from "./brand";
 import { clientAddress, drainBody, siteCors, speedTestCors } from "./speed-test";
 import { APP_VERSION } from "./worker-info";
 import { contentDisposition } from "./storage";
@@ -253,6 +255,7 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       return json(200, { model: await svc.library.transcriptsModel(), transcripts: await svc.library.transcripts(user, q) });
     }),
     /** Space used; for admins also whether storage answers and how it's set up (never the secret). */
+    usageStats: asUser(async (svc, user) => json(200, await svc.library.usage(user))),
     storageOverview: asUser(async (svc, user) => json(200, await svc.library.storageOverview(user))),
     /** How this server is set up, read-only (admins only; others get 404). */
     workspaceSettings: asUser(async (svc, user) => json(200, await svc.library.workspace(user))),
@@ -553,6 +556,30 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     setSolo: asUser(async (svc, user, req, params) => json(200, await svc.studios.setSolo(user, params.studioId!, await parseBody(req, soloSettingsBody))), { log: "Changed a studio's solo link", keys: true }),
     /** Someone starts recording alone on a solo link. No account. */
     soloJoin: handler(async (svc, req) => json(201, await svc.studios.soloJoin(await parseBody(req, soloJoinBody), clientAddress(req)))),
+    /** A studio's logo and colour for the pages its guests open. */
+    getBrand: asUser(async (svc, user, _req, params) => json(200, await svc.brand.view(user, params.studioId!))),
+    setBrand: asUser(async (svc, user, req, params) => json(200, await svc.brand.setAccent(user, params.studioId!, (await parseBody(req, brandBody)).accent)), { log: "Changed a studio's branding" }),
+    /** The image itself is the request's body. */
+    setBrandLogo: asUser(async (svc, user, req, params) => json(200, await svc.brand.setLogo(user, params.studioId!, await readCapped(req.body, LOGO_MAX_BYTES))), { log: "Changed a studio's branding" }),
+    removeBrandLogo: asUser(async (svc, user, _req, params) => json(200, await svc.brand.removeLogo(user, params.studioId!)), { log: "Changed a studio's branding" }),
+    /** Public: guests see the logo before they have joined. Served as an image and nothing else. */
+    brandLogo: handler(async (svc, req, params) => {
+      const logo = await svc.brand.logo(params.studioId!);
+      if (!logo) return json(404, { error: "not_found", message: "No logo" });
+      const versioned = new URL(req.url).searchParams.has("v");
+      return new Response(Buffer.from(logo.bytes), {
+        status: 200,
+        headers: {
+          "Content-Type": logo.type,
+          "Content-Length": String(logo.bytes.byteLength),
+          "Cache-Control": versioned ? "public, max-age=31536000, immutable" : "public, max-age=300",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "default-src 'none'; sandbox",
+          "Cross-Origin-Resource-Policy": "cross-origin",
+        },
+      });
+    }),
+
     /** A studio's guide (run of show), for the people of its account. */
     getGuide: asUser(async (svc, user, _req, params) => json(200, { guide: await svc.guide.get(user, params.studioId!) })),
     setGuide: asUser(async (svc, user, req, params) => json(200, { guide: await svc.guide.set(user, params.studioId!, (await parseBody(req, guideBody)).guide) }), { log: "Changed a studio's guide", keys: true }),
@@ -707,6 +734,25 @@ function parseSeq(params: Params) {
   const seq = seqParam.safeParse(params.seq);
   if (!seq.success) throw new ApiError(400, "invalid_seq", "seq must be a non-negative integer");
   return seq.data;
+}
+
+/** A request body of at most `max` bytes; one byte more is read so a bigger one is told apart (and refused by the caller's own check). */
+async function readCapped(body: ReadableStream<Uint8Array> | null, max: number): Promise<Uint8Array> {
+  if (!body) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    chunks.push(value);
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+  }
+  return Buffer.concat(chunks);
 }
 
 function json(status: number, body: unknown, headers?: Record<string, string>) {

@@ -5,6 +5,25 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Studio branding.** A studio can show its own logo and accent colour on the pages its
+  guests open: the invite, the tech check, the green room, the solo link and shared
+  recordings (studio settings, Branding). The dashboard keeps Tapry's look. Logos are PNG,
+  JPEG or WebP up to 512 KB, kept in the database. On Tapry Cloud this is part of Studio and up.
+- **Guest pages in six languages.** The invite, tech check, solo link, green room, the room as
+  a guest sees it and the end screen follow the guest's browser language, or the one they pick:
+  English, French, Spanish, German, Portuguese, Arabic (right to left). The default consent
+  text is in the guest's language, and that exact text is what is kept with their consent; a
+  studio's own consent text is shown as written. Hosts' pages, and what hosts are sent, stay
+  English. The translations have not been reviewed by native speakers; a few parts of the room
+  (filters, the recap email form, file names) are still English.
+- **Guests on phones.** The room keeps the screen on while a session runs and until the upload
+  is done, stage buttons are thumb-sized on touch screens, form fields no longer make iOS zoom,
+  and wording says "this device". Tested at a phone's size in Chromium, not on real phones.
+- **Usage page.** Recordings, recorded time, guests and transcripts, in all and month by month
+  (`GET /api/usage`).
+- **Recording data map** (website, `/data-map`): a plain record of what your recordings
+  collect, where they go and how long they stay, for GDPR and ethics reviews. Runs in the page.
+
 - **API keys and webhooks.** The account's owner makes API keys (Settings, Account): the app's
   own API for your scripts, with a key instead of a log-in. A key reads what members read and
   changes studios and recordings; never the plan, members, storage, keys, or hosting. Webhooks

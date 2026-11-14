@@ -23,6 +23,14 @@ isn't Safari: codecs and permission prompts can differ), Edge (Chromium-based), 
 real cameras and microphones. Recording on phones also stops when the tab is backgrounded;
 the green room warns about it.
 
+**Phones.** `e2e/phone.spec.ts` takes a guest from the invite to the end screen in Chromium at a
+phone's size with touch: nothing wider than the screen, form fields at 16 px (iOS zooms into
+smaller ones), stage buttons 44 px, and the recording arrives. The room asks the browser to
+keep the screen on (Screen Wake Lock) while the session runs and until the upload is done;
+where a phone's browser has no wake lock, the room says to keep the screen on. This is a
+desktop engine at a phone's size: **no real iPhone or Android phone has been tried**, so phones
+stay outside the supported matrix.
+
 ## Screen sharing
 
 Tested end to end in Chromium only (Chrome for Testing 156, host shares, guest watches, the

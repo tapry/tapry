@@ -548,4 +548,15 @@ CREATE INDEX webhook_deliveries_due ON webhook_deliveries (next_at) WHERE status
 ALTER TABLE recordings ADD COLUMN share_code text UNIQUE;
 ALTER TABLE recordings ADD COLUMN share_transcript boolean NOT NULL DEFAULT false;
 `,
+  `
+-- Studio branding: a logo (base64 of a small PNG, JPEG or WebP) and an accent colour for the pages guests open.
+CREATE TABLE studio_brands (
+  studio_id text PRIMARY KEY REFERENCES studios(id) ON DELETE CASCADE,
+  accent text CHECK (accent ~ '^#[0-9a-f]{6}$'),
+  logo text,
+  logo_type text,
+  logo_hash text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+`,
 ];

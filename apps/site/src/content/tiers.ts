@@ -31,7 +31,7 @@ export const TIERS: Tier[] = [
     name: "Studio",
     plan: "studio",
     description: "For studios that record every week and share the work.",
-    features: ["40 recording hours a month", "3 seats", "Video up to 4K", "Finished files kept for 60 days", "Transcripts included"],
+    features: ["40 recording hours a month", "3 seats", "Video up to 4K", "Your logo and colour on guest pages", "Finished files kept for 60 days", "Transcripts included"],
     priceId: { month: "pri_01m79f3sbb5r30bzh4xpt9v2qk", year: "pri_01m79f4dh1y8yjzapav2d0909t" },
     listed: { month: "$39", year: "$390" },
   },

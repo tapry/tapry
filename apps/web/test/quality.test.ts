@@ -205,7 +205,7 @@ describe("upload lag", () => {
   it("reads as minutes for the host and as advice for the person", () => {
     expect(alertLabel("upload_behind", 90)).toBe("Upload behind");
     expect(alertLabel("upload_behind", 185)).toBe("Upload 3 min behind");
-    expect(alertAdvice("upload_behind", 185)).toMatch(/3 minutes behind.*safe on this computer/);
+    expect(alertAdvice("upload_behind", 185)).toMatch(/3 minutes behind.*safe on this device/);
     expect(alertAdvice("tab_hidden", null)).toBeNull(); // nothing to tell someone who isn't looking
   });
 });

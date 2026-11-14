@@ -12,7 +12,7 @@ import { LogOutButton } from "./studio-forms";
 import type { IconName } from "./ui-extra";
 import { Avatar, LogoMark } from "./ui";
 
-export type NavKey = "recordings" | "guests" | "transcripts" | "studios" | "storage" | "settings" | "health";
+export type NavKey = "recordings" | "guests" | "transcripts" | "studios" | "storage" | "usage" | "settings" | "health";
 
 const NAV: Array<{ key: NavKey | "home"; href: string; icon: IconName; label: string; admin?: boolean }> = [
   { key: "home", href: "/studios", icon: "home", label: "Home" },
@@ -21,6 +21,7 @@ const NAV: Array<{ key: NavKey | "home"; href: string; icon: IconName; label: st
   { key: "transcripts", href: "/transcripts", icon: "wave", label: "Transcripts" },
   { key: "studios", href: "/studios/all", icon: "studios", label: "Studios" },
   { key: "storage", href: "/storage", icon: "storage", label: "Storage" },
+  { key: "usage", href: "/usage", icon: "gauge", label: "Usage" },
   { key: "settings", href: "/settings", icon: "settings", label: "Settings" },
   { key: "health", href: "/admin/health", icon: "pulse", label: "Server health", admin: true },
 ];

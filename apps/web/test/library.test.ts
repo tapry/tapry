@@ -247,4 +247,20 @@ describe("storage and settings", () => {
     expect(maskKey("AKIAIOSFODNN7EXAMPLE")).toBe("AKIA…MPLE");
     expect(maskKey("tapry")).toBe("ta…");
   });
+
+  it("counts what an account recorded, month by month, and nobody else's", async () => {
+    const t = await twoHosts();
+    const usage = (await expectOk(t.admin.get("/usage"))).body;
+    expect(usage).toMatchObject({ recordings: 1, recordedMs: 60_000, guests: 1, transcripts: 0 });
+    expect(usage.months).toHaveLength(12);
+    const thisMonth = new Date(t.now()).toISOString().slice(0, 7);
+    expect(usage.months.at(-1)).toEqual({ month: thisMonth, recordings: 1, recordedMs: 60_000, guests: 1 });
+    expect(usage.months.slice(0, 11).every((m: { recordings: number }) => m.recordings === 0)).toBe(true);
+
+    expect((await expectOk(t.other.get("/usage"))).body).toMatchObject({ recordings: 0, recordedMs: 0, guests: 0 });
+
+    // A deleted recording leaves the count.
+    await expectOk(t.admin.del(`/studios/${t.studio.id}/recordings/${t.recordingId}`));
+    expect((await expectOk(t.admin.get("/usage"))).body).toMatchObject({ recordings: 0, guests: 0 });
+  });
 });

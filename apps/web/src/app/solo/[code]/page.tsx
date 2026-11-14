@@ -1,3 +1,5 @@
+import { LocaleProvider } from "@/lib/i18n/client";
+import { getT } from "@/lib/i18n/server";
 import { getServices } from "@/server/context";
 import { parseGuide } from "@/lib/guide";
 import { GuestHeading, GuestShell } from "../../join/shell";
@@ -13,27 +15,28 @@ export const metadata = { title: "Record your answer", robots: { index: false } 
  */
 export default async function SoloPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const preview = await (await getServices()).studios.soloPreview(code);
+  const services = await getServices();
+  const { locale, t } = await getT();
+  const [preview, brand] = await Promise.all([services.studios.soloPreview(code, locale), services.brand.forSolo(code)]);
   if (!preview) {
     return (
-      <GuestShell title="Tapry">
+      <GuestShell title="Tapry" locale={locale}>
         <div className="flex max-w-[520px] flex-col gap-4 p-[clamp(20px,4vw,36px)]">
-          <GuestHeading title="This link doesn't work">It may have been switched off, or the studio was deleted. Ask whoever sent it for the current link.</GuestHeading>
+          <GuestHeading title={t("solo.deadTitle")}>{t("solo.deadBody")}</GuestHeading>
         </div>
       </GuestShell>
     );
   }
   const questions = parseGuide(preview.prompt);
   return (
-    <GuestShell title={preview.studioName}>
+    <GuestShell title={preview.studioName} brand={brand} locale={locale}>
       <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6 p-[clamp(20px,4vw,36px)]">
-        <GuestHeading title={`Record for ${preview.hostName}`}>
-          You record on your own, when it suits you: {preview.settings.audioOnly ? "your microphone" : "your camera and microphone"}, in this browser. You start and stop it yourself, up to{" "}
-          {preview.maxMinutes} minutes, and it is sent to {preview.hostName} when you&apos;re done.
+        <GuestHeading title={t("solo.title", { host: preview.hostName })}>
+          {t(preview.settings.audioOnly ? "solo.bodyAudio" : "solo.body", { minutes: preview.maxMinutes, host: preview.hostName })}
         </GuestHeading>
         {questions.length > 0 && (
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4" data-testid="solo-prompt">
-            <span className="text-[13px] text-muted">What {preview.hostName} would like to hear about</span>
+            <span className="text-[13px] text-muted">{t("solo.prompt", { host: preview.hostName })}</span>
             {questions.map((q, i) =>
               q.kind === "section" ? (
                 <span key={i} className="pt-1 text-[12.5px] font-medium tracking-wide text-muted uppercase">
@@ -47,7 +50,9 @@ export default async function SoloPage({ params }: { params: Promise<{ code: str
             )}
           </div>
         )}
-        <SoloForm code={code} hostName={preview.hostName} consentText={preview.consentText} consentHash={preview.consentHash} />
+        <LocaleProvider locale={locale}>
+          <SoloForm code={code} hostName={preview.hostName} consentText={preview.consentText} consentHash={preview.consentHash} />
+        </LocaleProvider>
       </div>
     </GuestShell>
   );

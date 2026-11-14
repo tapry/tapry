@@ -355,9 +355,9 @@ export function alertAdvice(a: QualityAlert, behindS: number | null): string | n
     case "echo":
       return "Your microphone is picking up the others from your speakers, so they're in your recording too. Put on headphones, or turn your speakers down.";
     case "upload_behind":
-      return `Your upload is ${behindS !== null && behindS >= 120 ? `${Math.floor(behindS / 60)} minutes` : "a minute"} behind. The recording is safe on this computer and will catch up; keep this tab open.`;
+      return `Your upload is ${behindS !== null && behindS >= 120 ? `${Math.floor(behindS / 60)} minutes` : "a minute"} behind. The recording is safe on this device and will catch up; keep this tab open.`;
     case "low_disk":
-      return "This computer is running low on space for the recording. Free some up, or let the upload catch up before recording more.";
+      return "This device is running low on space for the recording. Free some up, or let the upload catch up before recording more.";
     default:
       return null;
   }

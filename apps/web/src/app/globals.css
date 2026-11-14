@@ -207,6 +207,14 @@ body {
   outline-offset: 2px;
 }
 
+/* iOS zooms the page into any field whose text is under 16 px, and doesn't zoom back. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--ink);
@@ -219,6 +227,29 @@ input[type="radio"] {
  */
 .bg-ember {
   background: linear-gradient(180deg, var(--ember-1) 0%, var(--ember-2) 34%, var(--ember-3) 68%, var(--ember-4) 100%) fixed;
+}
+/*
+ * A studio's own colour on the pages its guests open (set as --brand / --brand-text on the
+ * frame): the main action and the backdrop follow it. Text colours stay ours, so nothing a
+ * host picks can make the page unreadable.
+ */
+.branded {
+  --accent: var(--brand);
+  --accent-hover: color-mix(in oklab, var(--brand) 86%, black);
+  --accent-text: var(--brand-text);
+  --ember-1: color-mix(in oklab, var(--brand) 42%, black);
+  --ember-2: color-mix(in oklab, var(--brand) 62%, black);
+  --ember-3: color-mix(in oklab, var(--brand) 88%, black);
+  --ember-4: color-mix(in oklab, var(--brand) 40%, white);
+}
+@media (prefers-color-scheme: dark) {
+  .branded {
+    --accent-hover: color-mix(in oklab, var(--brand) 86%, white);
+    --ember-1: color-mix(in oklab, var(--brand) 10%, black);
+    --ember-2: color-mix(in oklab, var(--brand) 18%, black);
+    --ember-3: color-mix(in oklab, var(--brand) 28%, black);
+    --ember-4: color-mix(in oklab, var(--brand) 40%, black);
+  }
 }
 .bg-blush {
   background: linear-gradient(180deg, var(--accent-tint) 0%, var(--bg) 100%);

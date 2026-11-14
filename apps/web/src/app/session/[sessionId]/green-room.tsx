@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import { checkStorage, requestPersistentStorage } from "@tapry/recorder";
 import { NO_FILTERS, type SessionTicket, type StudioSettings, type TrackFilters } from "@tapry/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +39,7 @@ export interface ReadyToJoin {
  * to the room as-is, so guests don't see a second permission prompt or a flicker.
  */
 export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (ready: ReadyToJoin) => void }) {
+  const { t } = useT();
   const settings = ticket.studio.settings;
   // Key named before the rename to Tapry, so saved device choices carry over.
   const [choice, setChoice] = useStoredState<DeviceChoice>("devices", { headphones: false });
@@ -163,10 +165,10 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
         <LevelAdvice state={level.state} live={status === "live"} suspended={level.suspended} />
         {problem && (
           <Notice tone="danger">
-            <p className="font-medium">{problem.title}</p>
-            <p className="mt-1">{problem.help}</p>
+            <p className="font-medium">{t(`media.${problem.code}.title`)}</p>
+            <p className="mt-1">{t(`media.${problem.code}.help`)}</p>
             <Button variant="secondary" className="mt-3" onClick={retry}>
-              Try again
+              {t("common.tryAgain")}
             </Button>
           </Notice>
         )}
@@ -176,7 +178,7 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
         <DevicePickers settings={settings} devices={devices} choice={choice} setChoice={setChoice} />
 
         <HeadphonesBox checked={choice.headphones} onChange={(headphones) => setChoice({ ...choice, headphones })}>
-          I&apos;m wearing headphones, so other voices don&apos;t leak into my microphone.
+          {t("gr.wearing")}
         </HeadphonesBox>
 
         {ticket.role === "host" && (
@@ -187,17 +189,17 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
         )}
         {producerProblem && <Notice tone="danger">That couldn&apos;t be changed right now (a recording of you may be running). Try again.</Notice>}
 
-        <CheckList checks={checks} pending={measuring ? ["Checking your storage and connection…"] : []} />
+        <CheckList checks={checks} pending={measuring ? [t("gr.checking")] : []} />
 
         <Button variant="record" className="w-full" disabled={!canJoin} onClick={join}>
           <RecDot />
-          {ticket.role === "host" ? "Enter the studio" : "Join the studio"}
+          {ticket.role === "host" ? t("gr.enter") : t("gr.join")}
         </Button>
         {status === "live" && !clock ? (
-          <p className="-mt-1.5 text-center text-xs text-muted">Checking the connection…</p>
+          <p className="-mt-1.5 text-center text-xs text-muted">{t("gr.checkingConnection")}</p>
         ) : (
           status === "live" &&
-          level.state !== "good" && <p className="-mt-1.5 text-center text-xs text-muted">You can join anyway, but check the microphone first.</p>
+          level.state !== "good" && <p className="-mt-1.5 text-center text-xs text-muted">{t("gr.joinAnyway")}</p>
         )}
       </div>
     </div>
@@ -234,25 +236,26 @@ export function DevicePickers({
   choice: DeviceChoice;
   setChoice: (c: DeviceChoice) => void;
 }) {
+  const { t } = useT();
   return (
     <>
-      <Field label="Microphone">
+      <Field label={t("gr.microphone")}>
         <Select
           value={choice.audioDeviceId ?? ""}
           onChange={(e) => setChoice({ ...choice, audioDeviceId: e.target.value || undefined })}
         >
-          <option value="">System default</option>
+          <option value="">{t("gr.systemDefault")}</option>
           {devices.audioInputs
             .filter((d) => d.deviceId !== "default")
             .map((d, i) => (
               <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Microphone ${i + 1}`}
+                {d.label || t("gr.microphoneN", { n: i + 1 })}
               </option>
             ))}
         </Select>
       </Field>
       {!settings.audioOnly && (
-        <Field label="Camera">
+        <Field label={t("gr.camera")}>
           <Select
             value={choice.cameraOff ? "off" : (choice.videoDeviceId ?? "")}
             onChange={(e) =>
@@ -263,13 +266,13 @@ export function DevicePickers({
               })
             }
           >
-            <option value="">System default</option>
+            <option value="">{t("gr.systemDefault")}</option>
             {devices.videoInputs.map((d, i) => (
               <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Camera ${i + 1}`}
+                {d.label || t("gr.cameraN", { n: i + 1 })}
               </option>
             ))}
-            <option value="off">Camera off (audio only)</option>
+            <option value="off">{t("gr.cameraOffOption")}</option>
           </Select>
         </Field>
       )}
@@ -282,11 +285,12 @@ export function CheckList({
   checks,
   pending = [],
 }: {
-  checks: Array<{ id: string; tone: "ok" | "warn" | "danger"; label: string }>;
+  checks: Check[];
   pending?: string[];
 }) {
+  const { t } = useT();
   return (
-    <ul className="flex flex-col gap-[9px] border-t border-divider pt-3.5 text-sm" aria-label="Checks">
+    <ul className="flex flex-col gap-[9px] border-t border-divider pt-3.5 text-sm" aria-label={t("gr.checks")}>
       {checks.length === 0 && pending.length === 0 && (
         <li className="flex items-start gap-[9px] text-muted">
           <Icon d={ICON.loader} className="mt-0.5 animate-spin-fast" />
@@ -307,7 +311,7 @@ export function CheckList({
             d={c.tone === "ok" ? ICON.checkCircle : ICON.alert}
             className={cn("mt-0.5", c.tone === "ok" ? "text-ok" : c.tone === "warn" ? "text-warn" : "text-accent")}
           />
-          {c.label}
+          {c.msg ? t(...c.msg) : c.label}
         </li>
       ))}
       {pending.map((label) => (
@@ -321,14 +325,6 @@ export function CheckList({
 }
 
 type LevelState = keyof typeof LEVEL_ADVICE;
-
-/** Short words for the level pill on the camera preview; the full advice goes under it. */
-const LEVEL_SHORT: Record<LevelState, string> = {
-  silent: "Can't hear you",
-  quiet: "A bit quiet",
-  good: "Sounds good",
-  clipping: "Too loud",
-};
 
 /** Above this share of the meter, someone's talking: the pill's rings and bars come alive. */
 const TALKING_FRACTION = 0.35;
@@ -360,6 +356,7 @@ export function Preview({
   /** More round buttons for the bottom right corner, before the camera one (Filters). */
   controls?: React.ReactNode;
 }) {
+  const { t } = useT();
   const hasCamera = !!stream && stream.getVideoTracks().length > 0;
   const hasVideo = hasCamera && !cameraOff;
   const fraction = level ? meterFraction(level.db) : 0;
@@ -376,14 +373,14 @@ export function Preview({
       {!hasVideo && (
         <div className="absolute inset-0 grid place-items-center px-5 text-center text-[14.5px] text-white">
           {audioOnly
-            ? "This studio is sound only: just your microphone is recorded."
+            ? t("gr.soundOnlyStudio")
             : cameraOff
-              ? "Camera off. You'll be recorded with audio only."
+              ? t("gr.cameraOff")
               : stream
-                ? "No camera"
+                ? t("gr.noCamera")
                 : failed
-                  ? "Camera unavailable"
-                  : "Starting camera…"}
+                  ? t("gr.cameraUnavailable")
+                  : t("gr.startingCamera")}
         </div>
       )}
       {level && (
@@ -401,7 +398,7 @@ export function Preview({
           </span>
           <span
             role="meter"
-            aria-label="Microphone level"
+            aria-label={t("gr.micLevel")}
             aria-valuemin={-60}
             aria-valuemax={0}
             aria-valuenow={Math.round(Math.max(-60, level.db))}
@@ -417,7 +414,7 @@ export function Preview({
             ))}
           </span>
           <span className="text-[12.5px] whitespace-nowrap">
-            {!level.live ? (failed ? "No microphone" : "Starting…") : level.suspended ? "Click to start" : LEVEL_SHORT[level.state]}
+            {!level.live ? (failed ? t("gr.noMic") : t("gr.starting")) : level.suspended ? t("gr.clickToStart") : t(`level.short.${level.state}`)}
           </span>
         </span>
       )}
@@ -432,8 +429,8 @@ export function Preview({
           <button
             type="button"
             onClick={onToggleCamera}
-            aria-label={cameraOff ? "Record with video" : "Record without video (audio only)"}
-            title={cameraOff ? "Record with video" : "Record without video (audio only)"}
+            aria-label={cameraOff ? t("gr.withVideo") : t("gr.withoutVideo")}
+            title={cameraOff ? t("gr.withVideo") : t("gr.withoutVideo")}
             className={cn(
               "grid size-9 cursor-pointer place-items-center rounded-full transition-colors",
               cameraOff ? "bg-accent text-accent-text hover:bg-accent-hover" : "bg-black/55 text-white hover:bg-black/70",
@@ -454,6 +451,7 @@ export function FilterDot() {
 
 /** Under the preview: what to do about the level, when it isn't right yet. */
 export function LevelAdvice({ state, live, suspended }: { state: LevelState; live: boolean; suspended: boolean }) {
+  const { t } = useT();
   if (!live || (state === "good" && !suspended)) return null;
   return (
     <p
@@ -463,7 +461,7 @@ export function LevelAdvice({ state, live, suspended }: { state: LevelState; liv
       )}
     >
       <Icon d={suspended ? ICON.mic : ICON.alert} className="mt-0.5 size-[15px]" />
-      {suspended ? "Click anywhere to start the meter." : `${LEVEL_ADVICE[state]} Say a few words: the bars should move.`}
+      {suspended ? t("gr.clickAnywhere") : `${t(`level.advice.${state}`)} ${t("gr.sayWords")}`}
     </p>
   );
 }

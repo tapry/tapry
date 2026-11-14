@@ -6,9 +6,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button, Field, Input, Notice } from "@/components/ui";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
 import { getPipeline } from "@/lib/client/recording";
+import { errorText, useT } from "@/lib/i18n/client";
 
 export function SoloForm({ code, hostName, consentText, consentHash }: { code: string; hostName: string; consentText: string; consentHash: string }) {
   const router = useRouter();
+  const { locale, t } = useT();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [consent, setConsent] = useState(false);
@@ -22,7 +24,7 @@ export function SoloForm({ code, hostName, consentText, consentHash }: { code: s
     setBusy(true);
     setError(null);
     try {
-      const ticket = await apiFetch<SessionTicket>("/solo", { body: { code, displayName: data.get("displayName"), consent: data.get("consent") === "on", consentHash } });
+      const ticket = await apiFetch<SessionTicket>("/solo", { body: { code, displayName: data.get("displayName"), consent: data.get("consent") === "on", consentHash, locale } });
       saveTicket(ticket);
       router.push(`/session/${ticket.sessionId}`);
     } catch (err) {
@@ -30,14 +32,14 @@ export function SoloForm({ code, hostName, consentText, consentHash }: { code: s
         setConsent(false);
         router.refresh();
       }
-      setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      setError(errorText(err, locale, t("error.generic")));
       setBusy(false);
     }
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <Field label="Your name" hint={`${hostName} will see this with your recording.`}>
+      <Field label={t("common.yourName")} hint={t("solo.nameHint", { host: hostName })}>
         <Input name="displayName" autoComplete="name" required maxLength={60} autoFocus />
       </Field>
       <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] leading-[1.45] text-text-2">
@@ -48,7 +50,7 @@ export function SoloForm({ code, hostName, consentText, consentHash }: { code: s
       </label>
       {error && <Notice tone="danger">{error}</Notice>}
       <Button type="submit" disabled={busy} className="w-full">
-        Continue
+        {t("common.continue")}
       </Button>
     </form>
   );

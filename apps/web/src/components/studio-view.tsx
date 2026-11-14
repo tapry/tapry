@@ -4,6 +4,8 @@ import { BrowserIcon, browserOf } from "./browser-icons";
 import { ScheduleInvite } from "./schedule-invite";
 import { SoloLink } from "./solo-link";
 import { GuideEditor } from "./guide-editor";
+import { BrandEditor } from "./brand-editor";
+import type { BrandSettings } from "@/server/brand";
 import { recordingLabel } from "@/components/quality-options";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client/api";
@@ -27,6 +29,7 @@ export function StudioView({
   guide,
   solo,
   can4k = true,
+  brand,
 }: {
   studio: Studio;
   hostName: string;
@@ -36,6 +39,7 @@ export function StudioView({
   solo: { code: string | null; prompt: string };
   /** This account's studios may record in 4K. */
   can4k?: boolean;
+  brand?: BrandSettings;
   recordings: RecordingSummary[];
   checks: TechCheck[];
   studios: Array<{ id: string; name: string; bytes: number }>;
@@ -138,6 +142,7 @@ export function StudioView({
           <StudioSettingsForm studioId={studio.id} name={studio.name} settings={studio.settings} hostName={hostName} can4k={can4k} />
           <GuideEditor studioId={studio.id} initial={guide} />
           <SoloLink studioId={studio.id} initial={solo} />
+          {brand && <BrandEditor studioId={studio.id} studioName={studio.name} initial={brand} />}
           <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-accent-line bg-surface px-[18px] py-4">
             <span className="flex flex-[1_1_260px] flex-col gap-[3px]">
               <span className="font-medium">Delete this studio</span>

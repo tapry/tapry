@@ -1,5 +1,6 @@
 // The guest tech check (/join/<code>/check): the pieces that aren't React, kept apart so they
 // can be tested. Nothing here records or uploads media; the speed test sends throwaway bytes.
+import type { Check } from "@/lib/media/media";
 import { studioSettings, type StudioSettings, type TechCheckResult } from "@tapry/shared";
 import { AUDIO_BITRATE, videoBitrate } from "./recording";
 
@@ -20,21 +21,23 @@ const mbit = (x: number) => (x >= 10 ? Math.round(x).toString() : x.toFixed(1));
  * The upload-speed verdict. Slow is never a blocker: everything is kept on the guest's computer
  * and uploads as fast as it can, so a slow line only means it finishes after the session.
  */
-export function uploadCheck(mbps: number | null, settings: StudioSettings): TechCheckResult {
-  if (mbps === null) return { id: "upload", tone: "danger", label: "Couldn't test your upload. Check your connection and try again." };
+export function uploadCheck(mbps: number | null, settings: StudioSettings): Check {
+  if (mbps === null) return { id: "upload", tone: "danger", label: "Couldn't test your upload. Check your connection and try again.", msg: ["chk.uploadNone"] };
   const needed = neededMbps(settings);
-  if (mbps >= needed * 1.2) return { id: "upload", tone: "ok", label: `Upload ${mbit(mbps)} Mbit/s: keeps up with the recording` };
+  if (mbps >= needed * 1.2) return { id: "upload", tone: "ok", label: `Upload ${mbit(mbps)} Mbit/s: keeps up with the recording`, msg: ["chk.uploadOk", { mbps: mbit(mbps) }] };
   if (mbps >= needed * 0.5) {
     return {
       id: "upload",
       tone: "warn",
       label: `Upload ${mbit(mbps)} Mbit/s, a bit under the ${mbit(needed)} this studio sends. The last minutes may finish uploading after the session: keep the tab open until it says so.`,
+      msg: ["chk.uploadUnder", { mbps: mbit(mbps), needed: mbit(needed) }],
     };
   }
   return {
     id: "upload",
     tone: "warn",
     label: `Upload ${mbit(mbps)} Mbit/s, well under the ${mbit(needed)} this studio sends. Your recording is safe, but uploading may take a long while after the session. A wired connection or sitting closer to the Wi-Fi helps.`,
+    msg: ["chk.uploadLow", { mbps: mbit(mbps), needed: mbit(needed) }],
   };
 }
 
