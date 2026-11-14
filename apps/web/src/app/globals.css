@@ -226,20 +226,29 @@ input[type="radio"] {
  * has the designs' gradient, the dark theme a deeper one so the dark card doesn't sit in a glare.
  */
 /*
- * The studio room, a little smaller on a computer: the stage, the recording card and the
- * people panel are a lot to fit on a laptop screen. One step of zoom instead of retuning every
- * size; lengths taken from the window are divided by it so the room still fills the window.
- * Touch screens keep full size: the controls there are sized for thumbs.
+ * The whole app, a little smaller on a computer: one step of zoom out instead of retuning
+ * every size. Lengths taken from the window are divided by the zoom (--ui-zoom), so pages
+ * still fill the window: a new window-sized length must do the same. Touch screens keep full
+ * size: the controls there are sized for thumbs.
  */
-.room-scale {
-  --room-zoom: 1;
-  min-height: calc(100dvh / var(--room-zoom));
+:root {
+  --ui-zoom: 1;
 }
 @media (pointer: fine) and (min-width: 1024px) {
-  .room-scale {
-    --room-zoom: 0.9;
+  :root {
+    --ui-zoom: 0.9;
+  }
+  html {
     zoom: 0.9;
   }
+}
+/* Unlayered, so they win over Tailwind's own .min-h-dvh and .h-dvh (100dvh, which a zoom would shrink). */
+.min-h-dvh,
+.room-scale {
+  min-height: calc(100dvh / var(--ui-zoom));
+}
+.h-dvh {
+  height: calc(100dvh / var(--ui-zoom));
 }
 .bg-ember {
   background: linear-gradient(180deg, var(--ember-1) 0%, var(--ember-2) 34%, var(--ember-3) 68%, var(--ember-4) 100%) fixed;

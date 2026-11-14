@@ -5,9 +5,8 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
-- **The studio room is a little smaller on computers** (drawn at 90%), so the stage, the
-  recording card and the people panel fit a laptop screen better. Phones and tablets keep
-  full size.
+- **The app is a little smaller on computers** (drawn at 90%), so the dashboard and the
+  studio room fit a laptop screen better. Phones and tablets keep full size.
 
 - **Background blur: a steadier, tighter outline.** The outline of the person is steadied
   from frame to frame, so still edges stop shimmering while real movement is followed at once,
