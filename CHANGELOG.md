@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: a zoomed-in picture in 4K studios.** A camera without 4K could answer a 4K studio
+  with a 4:3 mode cut from the middle of its sensor, which looked zoomed in the call and in
+  the file. It is now asked again for its largest widescreen size.
+
 - **Education accounts (Tapry Cloud).** A verified education account records 10 hours a month
   on the Free plan instead of 2, and the checkout applies the education discount (30%) where
   one is set up (`BILLING_PADDLE_EDUCATION_DISCOUNT`). An account whose owner has a confirmed
