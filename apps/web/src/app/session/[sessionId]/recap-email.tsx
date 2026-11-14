@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import type { RecapStatus, SessionTicket } from "@tapry/shared";
 import { useState, type FormEvent } from "react";
 import { Button, Input } from "@/components/ui";
@@ -7,6 +8,7 @@ import { apiFetch, ApiRequestError } from "@/lib/client/api";
 
 /** "Email me my recording": asked for here, so nobody gets email unasked. */
 export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket; recap: RecapStatus; onChange: (next: RecapStatus) => void }) {
+  const { locale, t } = useT();
   const [editing, setEditing] = useState(false);
   const [email, setEmail] = useState(recap.email ?? "");
   const [busy, setBusy] = useState(false);
@@ -20,7 +22,7 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
       onChange(await apiFetch<RecapStatus>(`/sessions/${ticket.sessionId}/recap`, { method: "POST", token: ticket.token, body: { email } }));
       setEditing(false);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Couldn't save that. Check your connection and try again.");
+      setError(err instanceof ApiRequestError && err.code !== "network" && locale === "en" ? err.message : t("recap.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -32,7 +34,7 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
       {form && recap.canSend ? (
         <form onSubmit={submit} className="flex flex-col gap-2">
           <label htmlFor="recap-address" className="text-sm font-medium">
-            Email me a link to my recording
+            {t("recap.label")}
           </label>
           <div className="flex flex-wrap gap-2">
             <Input
@@ -46,18 +48,18 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
               className="min-w-0 flex-[1_1_220px]"
             />
             <Button type="submit" variant="secondary" disabled={busy}>
-              {busy ? "Saving…" : "Email me"}
+              {busy ? t("recap.saving") : t("recap.submit")}
             </Button>
           </div>
-          <p className="text-[13px] text-muted">Only used to send this one link, then deleted.</p>
+          <p className="text-[13px] text-muted">{t("recap.hint")}</p>
         </form>
       ) : (
         <p className="text-[13.5px] leading-normal text-text-2">
           {recap.status === "pending"
-            ? `We'll email ${recap.email} when your file is ready.`
+            ? t("recap.pending", { email: recap.email ?? "" })
             : recap.status === "sent"
-              ? "Sent. The link in the email works for 30 days."
-              : "We couldn't send the email. You can still download your file here."}{" "}
+              ? t("recap.sent")
+              : t("recap.failed")}{" "}
           {recap.canSend && (
             <button
               type="button"
@@ -67,7 +69,7 @@ export function RecapEmail({ ticket, recap, onChange }: { ticket: SessionTicket;
                 setEditing(true);
               }}
             >
-              {recap.status === "failed" ? "Try again" : "Use another address"}
+              {recap.status === "failed" ? t("common.tryAgain") : t("recap.another")}
             </button>
           )}
         </p>

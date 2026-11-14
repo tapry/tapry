@@ -1,3 +1,4 @@
+import { avatarUrl } from "./avatars";
 import {
   consentTextFor,
   type GuestLocale,
@@ -193,16 +194,16 @@ export class StudioService {
   async invitePreview(
     inviteCode: string,
     locale: GuestLocale = "en",
-  ): Promise<{ studioName: string; hostName: string; settings: StudioSettings; consentText: string; consentHash: string } | null> {
-    const [row] = await this.db.query<{ name: string; host: string; settings: unknown; owner_id: string }>(
-      `SELECT st.name, st.settings, st.owner_id, u.name AS host FROM studios st JOIN users u ON u.id = st.owner_id
+  ): Promise<{ studioName: string; hostName: string; hostAvatarUrl: string | null; settings: StudioSettings; consentText: string; consentHash: string } | null> {
+    const [row] = await this.db.query<{ name: string; host: string; settings: unknown; owner_id: string; avatar_hash: string | null }>(
+      `SELECT st.name, st.settings, st.owner_id, u.name AS host, u.avatar_hash FROM studios st JOIN users u ON u.id = st.owner_id
        WHERE st.invite_code = $1 AND st.deleted_at IS NULL`,
       [inviteCode],
     );
     if (!row) return null;
     const settings = await this.sessionSettings(row.settings, row.owner_id);
     const consentText = consentTextFor(settings, row.host, locale);
-    return { studioName: row.name, hostName: row.host, settings, consentText, consentHash: sha256Hex(consentText) };
+    return { studioName: row.name, hostName: row.host, hostAvatarUrl: avatarUrl(row.owner_id, row.avatar_hash), settings, consentText, consentHash: sha256Hex(consentText) };
   }
 
   /** The studio an invite code belongs to, for the tech check; 404 for a dead link. */

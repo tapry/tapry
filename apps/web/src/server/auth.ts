@@ -1,3 +1,4 @@
+import { avatarUrl } from "./avatars";
 import type { loginBody, signupBody } from "@tapry/shared";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { z } from "zod";
@@ -22,6 +23,8 @@ export interface User {
   viewer?: boolean;
   /** Not a person: an API key of the account (`id` is the key's, not a user's). */
   apiKey?: boolean;
+  /** Where their profile picture is served; null or absent: initials. */
+  avatarUrl?: string | null;
 }
 
 export interface AuthOptions {
@@ -202,6 +205,7 @@ interface UserRow {
   email_verified_at: Date | null;
   account_id: string | null;
   member_role?: string;
+  avatar_hash?: string | null;
 }
 
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null, accountId: r.account_id ?? r.id, viewer: r.account_id !== null && r.member_role === "viewer" });
+const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: r.is_admin, emailVerified: r.email_verified_at !== null, accountId: r.account_id ?? r.id, viewer: r.account_id !== null && r.member_role === "viewer", avatarUrl: avatarUrl(r.id, r.avatar_hash) });

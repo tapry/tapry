@@ -1,5 +1,7 @@
 "use client";
 
+import type { MessageKey } from "@/lib/i18n";
+import { useT } from "@/lib/i18n/client";
 import { hasAudioFilters, hasVideoFilters, LOOKS, NO_FILTERS, type Look, type TrackFilters } from "@tapry/shared";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { cn } from "@/components/ui";
@@ -10,16 +12,15 @@ import { Icon, ICON } from "./icons";
 /** Is anything on that changes what this person sends? (The dot on the Filters button.) */
 export const filtersOn = (filters: TrackFilters, hasCamera: boolean) => (hasCamera && hasVideoFilters(filters)) || hasAudioFilters(filters);
 
-const BRIGHTNESS: Array<[TrackFilters["brightness"], string]> = [
-  [0, "As it is"],
-  [1, "Brighter"],
-  [2, "For a dark room"],
+const BRIGHTNESS: Array<[TrackFilters["brightness"], MessageKey]> = [
+  [0, "filters.b0"],
+  [1, "filters.b1"],
+  [2, "filters.b2"],
 ];
-const BACKGROUND: Array<[TrackFilters["background"], string]> = [
-  ["none", "None"],
-  ["blur", "Blur"],
+const BACKGROUND: Array<[TrackFilters["background"], MessageKey]> = [
+  ["none", "filters.bg.none"],
+  ["blur", "filters.bg.blur"],
 ];
-const LOOK_NAMES: Record<Look, string> = { none: "None", warm: "Warm", cool: "Cool", mono: "Black & white" };
 
 /** "page": on the app's surface (green room). "stage": on the dark call stage, in both themes. */
 type Tone = "page" | "stage";
@@ -109,6 +110,7 @@ export function FiltersPanel({
   id?: string;
   className?: string;
 }) {
+  const { t: tr } = useT();
   const t = TONE[tone];
   const name = useId();
   const { filters, mirror } = prefs;
@@ -123,12 +125,12 @@ export function FiltersPanel({
       ref={panelRef}
       id={id}
       role="group"
-      aria-label="Filters"
+      aria-label={tr("filters.title")}
       data-testid="filters-panel"
       className={cn("flex flex-col gap-3.5 rounded-xl border p-3.5 text-sm", t.panel, className)}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium">Filters</span>
+        <span className="font-medium">{tr("filters.title")}</span>
         <span className="flex items-center gap-1">
           <button
             type="button"
@@ -136,12 +138,12 @@ export function FiltersPanel({
             disabled={!changed}
             className={cn("cursor-pointer rounded-md px-1.5 py-0.5 text-[13px] underline underline-offset-[3px] disabled:cursor-default disabled:opacity-40", t.muted)}
           >
-            Reset
+            {tr("filters.reset")}
           </button>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close filters"
+            aria-label={tr("filters.close")}
             className={cn("grid size-7 cursor-pointer place-items-center rounded-md transition-colors", t.muted, t.hover)}
           >
             <Icon d={ICON.close} className="size-[15px]" />
@@ -151,10 +153,10 @@ export function FiltersPanel({
 
       {hasCamera && (
         <>
-          <Switch tone={tone} label="Mirror my view" hint="Only changes what you see." checked={mirror} onChange={(v) => onChange({ ...prefs, mirror: v })} />
+          <Switch tone={tone} label={tr("filters.mirror")} hint={tr("filters.mirrorHint")} checked={mirror} onChange={(v) => onChange({ ...prefs, mirror: v })} />
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>Brightness</legend>
+            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>{tr("filters.brightness")}</legend>
             <div className={cn("grid grid-cols-3 gap-0.5 rounded-md p-0.5", t.group)}>
               {BRIGHTNESS.map(([value, label]) => (
                 <label key={value} className="relative flex cursor-pointer">
@@ -172,7 +174,7 @@ export function FiltersPanel({
                       t.option,
                     )}
                   >
-                    {label}
+                    {tr(label)}
                   </span>
                 </label>
               ))}
@@ -180,7 +182,7 @@ export function FiltersPanel({
           </fieldset>
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>Look</legend>
+            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>{tr("filters.look")}</legend>
             <div className="grid grid-cols-4 gap-2">
               {LOOKS.map((look) => (
                 <label key={look} className="relative flex cursor-pointer flex-col items-center gap-1.5 text-center text-xs leading-tight">
@@ -200,14 +202,14 @@ export function FiltersPanel({
                   >
                     <LookSwatch look={look} />
                   </span>
-                  <span className={cn("peer-checked:font-medium", filters.look !== look && t.muted)}>{LOOK_NAMES[look]}</span>
+                  <span className={cn("peer-checked:font-medium", filters.look !== look && t.muted)}>{tr(`filters.look.${look}`)}</span>
                 </label>
               ))}
             </div>
           </fieldset>
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>Background</legend>
+            <legend className={cn("mb-1.5 text-[13px]", t.muted)}>{tr("filters.background")}</legend>
             <div className={cn("grid grid-cols-2 gap-0.5 rounded-md p-0.5", t.group)}>
               {BACKGROUND.map(([value, label]) => (
                 <label key={value} className="relative flex cursor-pointer">
@@ -226,7 +228,7 @@ export function FiltersPanel({
                       t.option,
                     )}
                   >
-                    {label}
+                    {tr(label)}
                   </span>
                 </label>
               ))}
@@ -234,22 +236,22 @@ export function FiltersPanel({
             <BlurNote tone={tone} on={filters.background === "blur"} blur={blur} />
           </fieldset>
 
-          <Switch tone={tone} label="Touch-up" hint="Softens the picture a little." checked={filters.touchUp} onChange={(touchUp) => set({ touchUp })} />
+          <Switch tone={tone} label={tr("filters.touchUp")} hint={tr("filters.touchUpHint")} checked={filters.touchUp} onChange={(touchUp) => set({ touchUp })} />
         </>
       )}
 
       <Switch
         tone={tone}
-        label="Noise removal"
-        hint="Takes fans and hiss out of your sound."
+        label={tr("filters.noise")}
+        hint={tr("filters.noiseHint")}
         checked={filters.noiseRemoval}
         onChange={(noiseRemoval) => set({ noiseRemoval })}
       />
 
       <p className={cn("border-t pt-3 text-[12.5px] leading-normal text-pretty", t.line, t.muted)}>
-        Your original recording is kept. Filters are shown in the call and applied to your finished files, from start to end: a change now also applies to what was already recorded.
+        {tr("filters.kept")}
         {hasCamera && !canPreview && (
-          <span data-testid="filters-no-preview"> This browser can&apos;t preview filters; they&apos;re still applied to your files.</span>
+          <span data-testid="filters-no-preview"> {tr("filters.noPreview")}</span>
         )}
       </p>
     </div>
@@ -258,15 +260,16 @@ export function FiltersPanel({
 
 /** Under Background: what blur is doing, or why it isn't. Announced, since it can change by itself. */
 function BlurNote({ tone, on, blur }: { tone: Tone; on: boolean; blur: { status: "off" | "loading" | "ready"; problem: string | null; late?: boolean } }) {
+  const { t: tr } = useT();
   const text = blur.problem
     ? blur.problem
     : !on
       ? null
       : blur.status !== "ready"
-        ? "Getting ready…"
+        ? tr("filters.blurLoading")
         : blur.late
-          ? "Turn blur on before recording starts to have it in the finished file. This recording's file won't have it; the call does."
-          : "Blurred in the call now. The finished file is blurred from an outline of you that's recorded next to your camera.";
+          ? tr("filters.blurLate")
+          : tr("filters.blurOn");
   return (
     <p
       role="status"

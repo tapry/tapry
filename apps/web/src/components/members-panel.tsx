@@ -64,7 +64,7 @@ export function MembersPanel({ initial }: { initial: MembersView }) {
         {view.members.map((m) => (
           <div key={m.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-divider py-3 last:border-0" data-testid="member">
             <span className="flex min-w-0 flex-[1_1_220px] items-center gap-3">
-              <Avatar name={m.name} className="size-8 text-[11px]" />
+              <Avatar name={m.name} src={m.avatarUrl} className="size-8 text-[11px]" />
               <span className="flex min-w-0 flex-col gap-[2px]">
                 <span className="truncate font-medium">
                   {m.name}

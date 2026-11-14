@@ -61,7 +61,7 @@ Output kinds: `audio`, `video`, `screen` (one per person), `combined`, `transcri
 | `DELETE /api/studios/:studioId/recordings/:recordingId/clips/:clipId` | Deletes a clip |
 | `POST /api/studios/:studioId/recordings/:recordingId/notes` | Writes AI notes (again), where the account has them on |
 | `POST /api/recordings/:recordingId/comments` `{ body, atMs? }` | Adds a comment |
-| `POST /api/recordings/:recordingId/transcript/safe` `{ format, pseudonyms, contacts, terms }` | Returns a share-safe copy of the transcript |
+| `POST /api/recordings/:recordingId/transcript/safe` `{ format, pseudonyms, contacts, terms }` | Returns the transcript as a file, masked as asked (all off: as spoken). `format`: `txt`, `docx`, `srt`, `vtt`, or for research software `nvivo` (tab-delimited: timespan, speaker, content) and `maxqda` (f4 layout, also read by ATLAS.ti) |
 
 Everything else a person can do in the app (hosting, members, the plan, storage, keys, webhooks,
 deleting a studio) answers `403 not_for_keys`.

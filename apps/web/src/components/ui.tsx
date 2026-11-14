@@ -178,8 +178,12 @@ export function initials(name: string) {
 const AVATAR_COLORS = ["#fbd5cc", "#d6e4ff", "#e3d9ff", "#d4f0e0", "#fde7c2", "#f9d4e6"];
 
 /** Round initials avatar. The color is stable per name. */
-export function Avatar({ name, className }: { name: string; className?: string }) {
+export function Avatar({ name, className, src }: { name: string; className?: string; /** Their profile picture; without one, initials on a colour from the name. */ src?: string | null }) {
   const hash = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0);
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" aria-hidden data-avatar className={cn("shrink-0 rounded-full object-cover", className ?? "size-9")} />;
+  }
   return (
     <span
       aria-hidden

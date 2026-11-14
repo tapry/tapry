@@ -559,4 +559,13 @@ CREATE TABLE studio_brands (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 `,
+  `
+-- Profile pictures of hosts and members (base64 of a small PNG, JPEG or WebP). The hash on the user row versions its address.
+ALTER TABLE users ADD COLUMN avatar_hash text;
+CREATE TABLE user_avatars (
+  user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  image text NOT NULL,
+  type text NOT NULL
+);
+`,
 ];

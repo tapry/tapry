@@ -136,8 +136,8 @@ export function GreenRoom({ ticket, onJoin }: { ticket: SessionTicket; onJoin: (
                 onClick={filtersPanel.toggle}
                 aria-expanded={filtersPanel.open}
                 aria-controls="green-room-filters"
-                aria-label={filtersOn(prefs.filters, hasPicture) ? "Filters (on)" : "Filters"}
-                title="Filters"
+                aria-label={filtersOn(prefs.filters, hasPicture) ? t("filters.titleOn") : t("filters.title")}
+                title={t("filters.title")}
                 className={cn(
                   "relative grid size-9 cursor-pointer place-items-center rounded-full text-white transition-colors",
                   filtersPanel.open ? "bg-black/80" : "bg-black/55 hover:bg-black/70",
