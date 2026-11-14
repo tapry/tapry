@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Notice } from "./ui";
 import { Spinner } from "./ui-extra";
 
-export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email }: { priceId: string; clientToken: string; sandbox: boolean; accountId: string; email: string }) {
+export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email, discountId = null }: { priceId: string; clientToken: string; sandbox: boolean; accountId: string; email: string; /** A Paddle discount to open with (the education one). */ discountId?: string | null }) {
   const [state, setState] = useState<"loading" | "open" | "closed" | "failed" | "refused">("loading");
   const opened = useRef(false);
 
@@ -36,12 +36,13 @@ export function PaddleCheckout({ priceId, clientToken, sandbox, accountId, email
           items: [{ priceId, quantity: 1 }],
           customData: { user_id: accountId },
           customer: { email },
+          ...(discountId ? { discountId } : {}),
           settings: { displayMode: "overlay", variant: "one-page", successUrl: done },
         });
         setState("open");
       })
       .catch(() => setState("failed"));
-  }, [priceId, clientToken, sandbox, accountId, email]);
+  }, [priceId, clientToken, sandbox, accountId, email, discountId]);
 
   if (state === "failed") {
     return (

@@ -26,6 +26,7 @@ describe("Paddle's checkout on our own page", () => {
     expect(cfg.cloud!.paddle).toEqual({
       clientToken: "test_0123456789abcdef",
       sandbox: true,
+      educationDiscountId: null, // no BILLING_PADDLE_EDUCATION_DISCOUNT: no discount is applied
       prices: { creator: { monthly: "pri_cm", yearly: "pri_cy" }, studio: { monthly: "pri_sm" } },
     });
     expect(cfg.cloud!.webhook!.prices).toEqual({ pri_cm: "creator", pri_cy: "creator", pri_sm: "studio" });

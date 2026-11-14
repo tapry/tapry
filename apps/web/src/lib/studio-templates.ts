@@ -4,18 +4,20 @@
 import type { StudioSettings } from "@tapry/shared";
 
 export interface StudioTemplate {
-  id: "blank" | "podcast" | "research" | "newsroom";
+  id: "blank" | "podcast" | "research" | "newsroom" | "class";
   name: string;
   /** One line under the name. */
   about: string;
   guests: number;
   quality: "audio" | "720p" | "1080p";
   /** Settings beyond what the form shows. */
-  settings: Partial<Pick<StudioSettings, "guestDownloads" | "audioFormat">>;
+  settings: Partial<Pick<StudioSettings, "guestDownloads" | "audioFormat" | "deleteAfterDays">>;
   /** The consent text guests agree to; empty: the default. `{host}` is the host's name. */
   consent: string;
   /** The studio's guide: a line per item, # for sections. */
   guide: string;
+  /** With this, the studio's solo link is switched on and asks this (a line per question): people record alone, without a call. */
+  solo?: string;
 }
 
 export const STUDIO_TEMPLATES: StudioTemplate[] = [
@@ -75,6 +77,18 @@ export const STUDIO_TEMPLATES: StudioTemplate[] = [
       "Anything to add or correct?",
       "Best way to reach you for follow-up",
     ].join("\n"),
+  },
+  {
+    id: "class",
+    name: "Class",
+    about: "Students record alone on a link, no accounts",
+    guests: 3,
+    quality: "1080p",
+    // Students keep their own file; the class's recordings go after a term.
+    settings: { guestDownloads: true, deleteAfterDays: 120 },
+    consent: "",
+    guide: ["# In a live session", "Welcome and today's task", "Each group presents", "Questions and feedback", "# After", "What to hand in, and by when"].join("\n"),
+    solo: ["# Your assignment", "Say your name and your group", "Present your work in your own words (up to 10 minutes)", "What would you do differently next time?"].join("\n"),
   },
 ];
 

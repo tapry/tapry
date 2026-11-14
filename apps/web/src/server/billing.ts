@@ -1,7 +1,7 @@
 // Tapry Cloud: plans, what a host has used of theirs, and what a payment provider tells us.
 // Off unless the server runs with TAPRY_CLOUD=true: a self-hosted server has no plans, no
 // limits and none of these endpoints (they answer 404).
-import { PLANS, PLAN_IDS, planRank, type BillingOverview, type Plan, type PlanId, type PlanStatus } from "@tapry/shared";
+import { PLANS, PLAN_IDS, planRank, type BillingOverview, type Plan, type PlanId, type PlanStatus, EDUCATION_FREE_HOURS } from "@tapry/shared";
 import type { User } from "./auth";
 import type { Db, Queryable } from "./db";
 import { ApiError } from "./errors";
@@ -35,6 +35,8 @@ export interface PaddleCheckoutConfig {
   sandbox: boolean;
   /** The price of each plan sold, by the month and by the year. */
   prices: Partial<Record<PlanId, { monthly?: string; yearly?: string }>>;
+  /** Paddle's id of the education discount (dsc_…), applied at checkout for verified education accounts. */
+  educationDiscountId?: string | null;
 }
 
 /** What the checkout page needs to open Paddle's checkout for one plan. */
@@ -79,9 +81,16 @@ export interface PlanRow {
   plan_ends_at: Date | null;
   plan_period_start: Date | null;
   billing_subscription: string | null;
+  /** Set on a verified education account. */
+  education_at?: Date | null;
 }
 
-const PLAN_COLUMNS = "plan, plan_status, plan_ends_at, plan_period_start, billing_subscription, billing_customer";
+const PLAN_COLUMNS = "plan, plan_status, plan_ends_at, plan_period_start, billing_subscription, billing_customer, education_at";
+
+/** The plan as this account has it: a verified education account has more hours on Free. Nothing else differs. */
+export function withEducation(plan: Plan, row: Pick<PlanRow, "education_at">): Plan {
+  return plan.id === "free" && row.education_at ? { ...plan, hours: EDUCATION_FREE_HOURS } : plan;
+}
 
 /** The plan an account has right now: a plan past its end is Free. */
 export function effectivePlan(row: Pick<PlanRow, "plan" | "plan_ends_at">, now: number): Plan {
@@ -218,7 +227,7 @@ export class BillingService {
     this.requireCloud();
     const row = await this.row(user.accountId);
     const now = this.now();
-    const plan = effectivePlan(row, now);
+    const plan = withEducation(effectivePlan(row, now), row);
     // A plan that has ended counts by the calendar month again, like Free.
     const period = billingPeriod(plan.id === "free" ? null : row.plan_period_start, now);
     // Buying and the provider's portal are the owner's; a member sees the plan and what is used.
@@ -273,6 +282,14 @@ export class BillingService {
     return { plan: PLANS[known], yearly, priceId, clientToken: paddle.clientToken, sandbox: paddle.sandbox, accountId: user.accountId, email: user.email };
   }
 
+  /** The discount the checkout opens with for this account: the education one for a verified education account, where one is set up. */
+  async checkoutDiscount(user: User): Promise<string | null> {
+    const id = this.opts.cloud ? this.opts.paddle?.educationDiscountId : null;
+    if (!id) return null;
+    const [row] = await this.db.query<{ education_at: Date | null }>("SELECT education_at FROM users WHERE id = $1", [user.accountId]);
+    return row?.education_at ? id : null;
+  }
+
   /**
    * Before a recording starts in a session: refuse when its host's hours for this billing month
    * are used up. Only ever before Record: a recording that is running is never stopped for this.
@@ -280,13 +297,13 @@ export class BillingService {
   async checkCanRecord(sessionId: string) {
     if (!this.opts.cloud) return;
     const [row] = await this.db.query<PlanRow & { id: string }>(
-      `SELECT u.id, u.plan, u.plan_status, u.plan_ends_at, u.plan_period_start, u.billing_subscription
+      `SELECT u.id, u.plan, u.plan_status, u.plan_ends_at, u.plan_period_start, u.billing_subscription, u.education_at
        FROM sessions s JOIN studios st ON st.id = s.studio_id JOIN users u ON u.id = st.owner_id WHERE s.id = $1`,
       [sessionId],
     );
     if (!row) return;
     const now = this.now();
-    const plan = effectivePlan(row, now);
+    const plan = withEducation(effectivePlan(row, now), row);
     if (plan.hours === null) return;
     const period = billingPeriod(plan.id === "free" ? null : row.plan_period_start, now);
     if ((await this.usedMs(row.id, period.start)) < plan.hours * 3_600_000) return;

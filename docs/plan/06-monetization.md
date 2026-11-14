@@ -31,7 +31,7 @@ Prices in USD. Yearly billing is ten months' price (2 months free).
 - Recording quality is never locked behind payment. Plans differ by hours, retention, seats and organisation features.
 - Transcripts are included everywhere.
 - Hosted plans remove the original uploads 7 days after processing and keep the finished files for the plan's retention. This is what makes the plans profitable (see below), so it is not negotiable below Business.
-- Education and non-profit: **30% off** Creator, Studio and Team (the common level among small open-source vendors; was 50%).
+- Education and non-profit: **30% off** Creator, Studio and Team (the common level among small open-source vendors; was 50%). Built 14 Nov 2026 for education: verified accounts also get 10 free hours a month instead of 2 (`docs/cloud-billing.md`, "Education accounts"). Non-profits: by hand for now.
 - Never sell a hosted-storage plan below $19.
 - The self-hosted release never loses a feature it has. Paid self-hosting adds support and organisation features (SSO, audit log), which is what every comparable open-source product reserves.
 

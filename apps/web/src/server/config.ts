@@ -109,6 +109,8 @@ const env = z.object({
    * server's own checkout page (/checkout/<plan>), which opens Paddle's checkout.
    */
   BILLING_PADDLE_CLIENT_TOKEN: unsetIfEmpty(z.string().min(8)),
+  /** Paddle's id of the education discount (dsc_…): applied at checkout for verified education accounts. Unset: no discount is applied. */
+  BILLING_PADDLE_EDUCATION_DISCOUNT: unsetIfEmpty(z.string().regex(/^dsc_[a-z0-9]+$/)),
   /**
    * Paddle's API key, for customer portal sessions (Settings, Plan: card, invoices, cancelling).
    * A secret: server-side only. Unset: the portal falls back to BILLING_MANAGE_URL, if any.
@@ -260,6 +262,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
               ? {
                   clientToken: cfg.BILLING_PADDLE_CLIENT_TOKEN,
                   sandbox: cfg.BILLING_PADDLE_ENVIRONMENT === "sandbox",
+                  educationDiscountId: cfg.BILLING_PADDLE_EDUCATION_DISCOUNT ?? null,
                   prices: prices.reduce<PaddleCheckoutConfig["prices"]>((all, [id, p]) => ({ ...all, [p.plan]: { ...all[p.plan], [p.yearly ? "yearly" : "monthly"]: id } }), {}),
                 }
               : null,

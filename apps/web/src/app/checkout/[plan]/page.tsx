@@ -36,7 +36,7 @@ export default async function CheckoutPage({ params, searchParams }: { params: P
   return (
     <AuthShell title={`${checkout.plan.name} plan`} subtitle={`${price}. You can cancel at any time; the plan then runs to the end of the period you paid for.`}>
       {checkout.sandbox && <Notice tone="warn">Test mode: no real money is taken.</Notice>}
-      <PaddleCheckout priceId={checkout.priceId} clientToken={checkout.clientToken} sandbox={checkout.sandbox} accountId={checkout.accountId} email={checkout.email} />
+      <PaddleCheckout priceId={checkout.priceId} clientToken={checkout.clientToken} sandbox={checkout.sandbox} accountId={checkout.accountId} email={checkout.email} discountId={await services.billing.checkoutDiscount(user)} />
       <p className="text-center text-sm text-muted">
         <Link className={link} href="/settings?tab=plan">
           Back to the plan

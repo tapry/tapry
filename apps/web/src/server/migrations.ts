@@ -580,4 +580,10 @@ CREATE TABLE guest_notes (
   PRIMARY KEY (account_id, name_key)
 );
 `,
+  `
+-- Education accounts (Tapry Cloud): verified when education_at is set; a request waits for an admin.
+ALTER TABLE users ADD COLUMN education_at timestamptz;
+ALTER TABLE users ADD COLUMN education_requested_at timestamptz;
+ALTER TABLE users ADD COLUMN education_school text NOT NULL DEFAULT '';
+`,
 ];
