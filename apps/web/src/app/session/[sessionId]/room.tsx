@@ -502,7 +502,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const recLabel = canRecord ? (recording ? "Stop recording" : "Start recording") : recording ? t("room.recording") : t("room.waitingRecord");
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="room-scale flex flex-col">
       <header inert={fullOpen} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-[clamp(14px,3vw,28px)] py-3">
         <span className="flex min-w-0 flex-wrap items-center gap-3">
           <LogoMark className="size-[26px]" />
@@ -822,7 +822,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
 
           {panelOpen && (
             <aside inert={fullOpen} className="w-full shrink-0 border-t border-border bg-canvas lg:w-[380px] lg:border-t-0 lg:border-l">
-              <div className="flex flex-col gap-4 p-4 lg:sticky lg:top-0 lg:max-h-dvh lg:min-h-[calc(100dvh-58px)] lg:overflow-auto">
+              <div className="flex flex-col gap-4 p-4 lg:sticky lg:top-0 lg:max-h-[calc(100dvh/var(--room-zoom))] lg:min-h-[calc(100dvh/var(--room-zoom)-58px)] lg:overflow-auto">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-[15px] font-medium">{t("room.inStudio", { count: participants.length })}</h2>
                   <span className="flex items-center gap-2">
