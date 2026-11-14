@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Background blur: a steadier, tighter outline.** The outline of the person is steadied
+  from frame to frame, so still edges stop shimmering while real movement is followed at once,
+  and its edge sits a little tighter, so no sharp band of the room shows round the person.
+
 - **Fix: a zoomed-in picture in 4K studios.** A camera without 4K could answer a 4K studio
   with a 4:3 mode cut from the middle of its sensor, which looked zoomed in the call and in
   the file. It is now asked again for its largest widescreen size.

@@ -5,7 +5,7 @@ import { BRIGHTNESS_VALUES, createTrackBody, NO_FILTERS, type TrackFilters } fro
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { describeOutput } from "../src/components/recordings";
 import { BACKGROUND_BLUR, canvasFilter, fitSize, kelvinGains, picturePlan, tintColor, TOUCH_UP } from "../src/lib/client/filter-picture";
-import { FULL_PACE, MASK, MASK_EDGE, maskLevel, maskPixels, nextPace, SLOW } from "../src/lib/client/person-mask";
+import { FULL_PACE, MASK, MASK_EDGE, maskLevel, maskPixels, nextPace, SLOW, STEADY, steadyMask } from "../src/lib/client/person-mask";
 import {
   createFilterSync,
   DEFAULT_PREFS,
@@ -197,15 +197,40 @@ describe("the mask of where the person is", () => {
   it("is black for background, white for the person, with a short smooth step between", () => {
     expect(maskLevel(0)).toBe(0);
     expect(maskLevel(MASK_EDGE.low)).toBe(0);
-    expect(maskLevel(0.5)).toBeCloseTo(0.5, 5);
+    expect(maskLevel((MASK_EDGE.low + MASK_EDGE.high) / 2)).toBeCloseTo(0.5, 5);
+    // A little on the sure side: where the model is undecided, it's mostly background.
+    expect(maskLevel(0.5)).toBeLessThan(0.5);
     expect(maskLevel(MASK_EDGE.high)).toBe(1);
     expect(maskLevel(1)).toBe(1);
     expect(maskLevel(0.45)).toBeLessThan(maskLevel(0.55));
   });
 
+  it("is steadied from frame to frame: small changes ease in, a real movement is taken at once", () => {
+    const out = new Float32Array(4);
+    // Nothing before: the answer as it is.
+    steadyMask(null, new Float32Array([0, 0.5, 1, 0.2]), out);
+    expect([...out]).toEqual([0, 0.5, 1, 0.20000000298023224]);
+    // A shimmer on a still edge moves only part of the way; a hand arriving or leaving jumps.
+    const previous = new Float32Array([0.5, 0.5, 0.05, 0.95]);
+    steadyMask(previous, new Float32Array([0.6, 0.4, 0.9, 0.1]), out);
+    expect(out[0]).toBeCloseTo(0.5 + 0.1 * STEADY.follow, 5);
+    expect(out[1]).toBeCloseTo(0.5 - 0.1 * STEADY.follow, 5);
+    expect(out[2]).toBeCloseTo(0.9, 5);
+    expect(out[3]).toBeCloseTo(0.1, 5);
+    // Fed the same answer again and again, it gets there.
+    const still = new Float32Array([0.6]);
+    const eased = new Float32Array([0.5]);
+    for (let i = 0; i < 12; i++) steadyMask(eased, still, eased);
+    expect(eased[0]).toBeCloseTo(0.6, 3);
+    // A different size (the model changed its output): start again from the new answer.
+    const other = new Float32Array(2);
+    steadyMask(new Float32Array(4), new Float32Array([0.3, 0.7]), other);
+    expect(other[0]).toBeCloseTo(0.3, 5);
+  });
+
   it("becomes white pixels as opaque as the model is sure", () => {
     const out = new Uint8ClampedArray(12);
-    maskPixels(new Float32Array([0.05, 0.5, 0.98]), out);
+    maskPixels(new Float32Array([0.05, 0.55, 0.98]), out);
     expect([...out]).toEqual([255, 255, 255, 0, 255, 255, 255, 128, 255, 255, 255, 255]);
   });
 
