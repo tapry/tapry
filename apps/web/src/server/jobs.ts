@@ -889,6 +889,7 @@ export class JobRunner {
       videoQuality: settings.videoQuality,
       frameRate: settings.frameRate,
       font: this.opts.font,
+      nameLabels: settings.nameLabels,
       loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
       audioFormat: settings.audioFormat,
       onProgress: (p) => void this.progress(rec, { stage: "rendering", ...p }),

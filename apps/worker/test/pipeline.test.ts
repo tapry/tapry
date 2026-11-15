@@ -14,6 +14,7 @@ import {
   filterDelaySamples,
   measureNoiseFloor,
   findFont,
+  fontForName,
   gridLayout,
   loudnessGain,
   measureLoudness,
@@ -530,6 +531,25 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       expect(brightest(plain, region), `no text at ${region} without names`).toBeLessThan(60);
       expect(brightest(labelled, region), `text at ${region}`).toBeGreaterThan(180);
     }
+  });
+
+  it("leaves names off the camera tiles when the studio switches them off, and still names a person with no camera", async () => {
+    const font = await findFont();
+    const people: TrackInput[] = [
+      { trackId: "trk_v", participantId: "par_1", participantName: "Host", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      { trackId: "trk_a", participantId: "par_1", participantName: "Host", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_g", participantId: "par_2", participantName: "Sam Guest", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+    ];
+    const file = (await renderRecording(people, { ffmpeg, ffprobe, workDir: join(dir, "names-off"), durationMs: 2000, videoQuality: "720p", font, nameLabels: false })).find(
+      (o) => o.kind === "combined",
+    )!.path;
+    const brightest = (crop: string) =>
+      Number.parseFloat(
+        execFileSync(ffmpeg, ["-v", "error", "-ss", "1", "-i", file, "-frames:v", "1", "-vf", `crop=${crop},signalstats,metadata=print:key=lavfi.signalstats.YMAX:file=-`, "-f", "null", "-"])
+          .toString().match(/YMAX=([\d.]+)/)![1]!,
+      );
+    expect(brightest("110:50:4:755"), "no tag on the camera tile").toBeLessThan(60);
+    expect(brightest("560:60:1150:505"), "the cameraless tile keeps its name").toBeGreaterThan(180);
   });
 
   it("gives two people with the same name distinct files", async () => {
@@ -1094,5 +1114,16 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         expect(skipped.map((s) => s.trackId)).toEqual(["trk_bad"]);
       });
     });
+  });
+});
+
+describe("the font for a name on the combined video", () => {
+  it("is the usual one, and the wide one when the name has letters the usual one lacks", () => {
+    const inter = "/fonts/Inter-Medium.otf";
+    const wide = "/fonts/DejaVuSans.ttf";
+    for (const name of ["Sam Guest", "Zoë O'Brien-Müller", "Łukasz Żółć", "Дмитрий", "Ελένη", "Dr. A. B. (host) – 100% €"]) expect(fontForName(name, inter, wide), name).toBe(inter);
+    for (const name of ["محمد اليعقوبي", "דנה", "山田太郎", "Sam 😀"]) expect(fontForName(name, inter, wide), name).toBe(wide);
+    // No wide font on this machine: the usual one, whatever the name.
+    expect(fontForName("محمد", inter, null)).toBe(inter);
   });
 });

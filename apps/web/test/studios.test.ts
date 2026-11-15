@@ -140,6 +140,7 @@ describe("studios", () => {
       audioFormat: "wav",
       frameRate: "30",
       deleteAfterDays: null,
+      nameLabels: true,
     });
     expect(updated.body.name).toBe("Weekly Studio");
 

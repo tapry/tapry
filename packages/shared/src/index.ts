@@ -169,6 +169,8 @@ const settingsFields = {
   levelLoudness: z.boolean(),
   /** Sound only: nobody's camera is asked for, the call is voice only, recordings have no video. */
   audioOnly: z.boolean(),
+  /** Write each person's name on their picture in the combined video. (A tile with no camera always carries its name: there is nothing else on it.) */
+  nameLabels: z.boolean(),
   /** Guests can download their own recording (their WAV, and MP4 with a camera) from the end screen. */
   guestDownloads: z.boolean(),
   /** Per-person audio (and the mix of an audio-only recording): WAV opens anywhere, FLAC is lossless at about half the size. */
@@ -189,6 +191,7 @@ export const studioSettings = z.object({
   audioFormat: settingsFields.audioFormat.default("wav"),
   frameRate: settingsFields.frameRate.default("30"),
   deleteAfterDays: settingsFields.deleteAfterDays.default(null),
+  nameLabels: settingsFields.nameLabels.default(true),
 });
 
 /** The languages the pages a guest opens can be in (the app's guest-page languages). */
