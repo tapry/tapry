@@ -188,6 +188,8 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     // The host gets the audio-only guest as a tile with a live mic.
     const guestTile = host.locator('[data-testid="remote-tile"][data-name="Sam Guest"]');
     await expect(guestTile).toHaveAttribute("data-mic", "on", { timeout: 20_000 });
+    // The host's device hears the guest's (beeping) microphone and lights their tile.
+    await expect(guestTile).toHaveAttribute("data-speaking", "yes", { timeout: 20_000 });
     await expect(guestTile.locator("audio")).toHaveCount(1);
 
     // Mute reaches the other side, and mutes the real mic track (so the recording too).

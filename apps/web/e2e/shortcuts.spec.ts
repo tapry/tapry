@@ -24,6 +24,9 @@ test("host shortcuts: record and stop, mute and unmute, copy the invite link", a
   await expect(page.getByTestId("self-tile")).toHaveAttribute("data-mic", "on");
   // Unmuted: the mic is shown as on (or as speaking, while the test microphone's tone is heard).
   await expect(page.getByTestId("self-tile").getByTestId("mic-indicator")).toHaveAttribute("data-state", /^(on|speaking)$/);
+  // The test microphone beeps: this device hears its own voice, with no one else in the call to tell it.
+  await expect(page.getByTestId("self-tile")).toHaveAttribute("data-speaking", "yes", { timeout: 15_000 });
+  await expect(page.getByTestId("self-tile").getByTestId("mic-indicator")).toHaveAttribute("data-state", "speaking");
 
   await page.keyboard.press("ControlOrMeta+Shift+L");
   await expect(page.getByTestId("shortcut-flash")).toHaveText("Invite link copied");

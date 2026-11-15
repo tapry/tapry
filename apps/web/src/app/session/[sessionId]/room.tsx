@@ -1,12 +1,13 @@
 "use client";
 
+import { useHeardTalking } from "@/lib/client/voice";
 import { isTouchDevice, keepAwake, wakeLockSupported } from "@/lib/client/wake-lock";
 import { translateMaybe } from "@/lib/i18n";
 import { useT } from "@/lib/i18n/client";
 import { GuidePanel } from "./guide-panel";
 import type { UploadProgress } from "@tapry/recorder";
 import { STALE_REPORT_MS, type OwnRecordings, type RecapStatus, type SessionState, type SessionTicket } from "@tapry/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OwnFiles } from "@/components/own-files";
 import { Avatar, Button, cn, LogoMark, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
@@ -195,6 +196,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     recordingId: recording?.id ?? null,
     active: !ended,
   });
+  // Who is talking, as this device hears it: lit as soon as there is a voice, not only when
+  // the call server calls someone an "active speaker" (which a quiet voice never became).
+  const heard = useHeardTalking(call.peers.map((p) => ({ id: p.id, track: p.micMuted ? undefined : p.audio?.mediaStreamTrack })));
+  const peersHeard = useMemo(() => call.peers.map((p) => (p.micMuted || p.speaking || !heard.has(p.id) ? p : { ...p, speaking: true })), [call.peers, heard]);
   const advice = quality.alerts
     .map((a) => {
       const english = alertAdvice(a, quality.uploadBehindS);
@@ -615,10 +620,10 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     selfName={selfName}
                     selfMicMuted={micMuted}
                     selfCameraOff={cameraOff}
-                    selfSpeaking={call.localSpeaking}
+                    selfSpeaking={quality.talking || call.localSpeaking}
                     selfFilters={prefs.filters}
                     selfMirror={prefs.mirror}
-                    peers={call.peers}
+                    peers={peersHeard}
                     recording={!!recording}
                     layout={layout}
                     variant={fullOpen ? "full" : "stage"}
