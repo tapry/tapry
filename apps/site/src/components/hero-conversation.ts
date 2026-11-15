@@ -1,4 +1,4 @@
-/** Full speaking turns in podcast-turns-v3.mp4; transitions remain in the quiet gaps. */
+/** Full speaking turns in podcast-turns-v4.mp4; transitions remain in the quiet gaps. */
 export const HERO_CONVERSATION_DURATION = 12.25;
 
 export function heroSpeakerAt(time: number): number {
