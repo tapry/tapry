@@ -123,7 +123,10 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
           setState((s) => ({ ...s, status: "off" }));
           return;
         }
-        const r = new Room({ adaptiveStream: true, dynacast: true, stopLocalTrackOnUnpublish: true });
+        // No adaptive stream: it pauses a person's picture whenever it decides their tile isn't
+        // visible (a hidden tab, a tile being moved), and a paused tile looks like a broken guest.
+        // The call's pictures are one small 360p stream each, so there is little to save.
+        const r = new Room({ adaptiveStream: false, dynacast: true, stopLocalTrackOnUnpublish: true });
         current = r;
         room.current = r;
         const update = () => snapshot(r);

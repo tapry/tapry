@@ -228,6 +228,7 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - LiveKit, one room per session, identity = participant id. Optional: no `LIVEKIT_URL` → recording works without a call.
 - The call publishes **clones** of the camera/mic tracks (scaled to 360p). Never publish, constrain or stop the tracks the recorder uses.
 - Mute/camera-off disable the original tracks too: muted means silent in the recording as well.
+- A camera tile whose frames stopped (`PictureWatch` in `src/lib/client/picture.ts`, 2.5 s, counted on the `<video>` itself, never while the tab is hidden) dims and says "Picture interrupted" (`room.pictureStalled`): a dead connection otherwise leaves a frozen last frame until LiveKit drops the person. Not for a shared screen (a still screen sends few frames). `adaptiveStream` is off on purpose: it paused tiles it judged invisible. `e2e/call-drop.spec.ts` kills the guest's browser to check both.
 - TURN: LiveKit's built-in relay at `turns:turn.<domain>:443`, routed by SNI in Caddy (caddy-l4). LiveKit and Caddy need `network_mode: host`; LiveKit excludes Docker bridge IPs for media. `?relay=1` on a session URL forces relay-only (for testing). Test: `e2e/turn.spec.ts` against a Linux host (see docs/dev-setup.md).
 - No macOS LiveKit binaries exist; the dev build is compiled from source with a CGO-free CPU-stats patch: see `docs/dev-setup.md`.
 

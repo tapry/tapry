@@ -160,6 +160,7 @@ export const en = {
   "room.host": "host",
   "room.inCall": "In the call",
   "room.notConnected": "Not connected",
+  "room.pictureStalled": "Picture interrupted",
   "room.tipDrops": "If your internet drops, keep talking. Your recording is saved here first.",
   "room.tipTab": "Keep this tab open until your upload is finished.",
   "room.tipPower": "Plug in to power if you can.",
