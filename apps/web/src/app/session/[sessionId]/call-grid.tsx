@@ -5,6 +5,8 @@ import type { RemoteAudioTrack, RemoteVideoTrack } from "livekit-client";
 import { useEffect, useRef, useState } from "react";
 import { Avatar as Initials, cn } from "@/components/ui";
 import type { RemotePeer } from "@/lib/client/call";
+import { framesShown, PictureWatch } from "@/lib/client/picture";
+import { useT } from "@/lib/i18n/client";
 import { Icon, ICON } from "./icons";
 import { SelfVideo } from "./self-video";
 
@@ -251,15 +253,42 @@ function Tile({
 
 function TrackVideo({ track, contain = false }: { track: RemoteVideoTrack; /** Show all of it (a screen), not a filled tile (a face). */ contain?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const { t } = useT();
+  // A camera whose frames stopped coming: said on the tile, since a frozen last frame looks like
+  // someone sitting still. Not for a screen: a still screen sends hardly any frames.
+  const [stalled, setStalled] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     track.attach(el);
+    setStalled(false);
+    if (contain) return () => void track.detach(el);
+    const watch = new PictureWatch();
+    let nudged = false;
+    const timer = setInterval(() => {
+      const now = performance.now();
+      watch.add(framesShown(el), now, !document.hidden);
+      const stopped = watch.stalled(now);
+      setStalled(stopped);
+      // A player the browser paused by itself shows the same thing: start it once before saying so.
+      if (stopped && !nudged && el.paused) void el.play().catch(() => {});
+      nudged = stopped;
+    }, 500);
     return () => {
+      clearInterval(timer);
       track.detach(el);
     };
-  }, [track]);
-  return <video ref={ref} autoPlay playsInline muted className={cn("size-full", contain ? "object-contain" : "object-cover")} />;
+  }, [track, contain]);
+  return (
+    <>
+      <video ref={ref} autoPlay playsInline muted data-picture={stalled ? "stalled" : "live"} className={cn("size-full transition-[filter,opacity] duration-300", contain ? "object-contain" : "object-cover", stalled && "opacity-45 grayscale")} />
+      {stalled && (
+        <span role="status" data-testid="picture-stalled" className="absolute inset-0 grid place-items-center px-4 text-center text-sm font-medium text-white">
+          <span className="rounded-lg bg-black/60 px-3 py-1.5 backdrop-blur-md">{t("room.pictureStalled")}</span>
+        </span>
+      )}
+    </>
+  );
 }
 
 function TrackAudio({ track }: { track: RemoteAudioTrack }) {

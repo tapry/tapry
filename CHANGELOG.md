@@ -5,6 +5,14 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: a guest whose connection died stayed on screen as a frozen picture.** The browser
+  keeps showing the last frame until the call server gives up on them (up to about 20 s),
+  which looked like someone sitting still. The tile now dims and says "Picture interrupted"
+  as soon as no frame has arrived for 2.5 s, and clears by itself when the picture returns.
+- **The call no longer pauses a person's picture when it thinks their tile isn't visible**
+  (LiveKit's adaptive stream is off). A paused tile could be mistaken for a missing camera
+  after switching layouts or tabs; the call's pictures are small, so little is saved by it.
+
 - **Website: the legal page names who runs Tapry Cloud from the build's settings**
   (`NEXT_PUBLIC_LEGAL_NAME`, `_ADDRESS`, `_LAW`, `_COURTS`, `_PUBLISHED`), so those details
   are on the published page without being in the source code. Unset, nothing changes.

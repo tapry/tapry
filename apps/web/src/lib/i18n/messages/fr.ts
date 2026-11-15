@@ -153,6 +153,7 @@ export const fr: Messages = {
   "room.host": "hôte",
   "room.inCall": "Dans l'appel",
   "room.notConnected": "Non connecté",
+  "room.pictureStalled": "Image interrompue",
   "room.tipDrops": "Si votre connexion tombe, continuez à parler. Votre enregistrement est d'abord sauvegardé ici.",
   "room.tipTab": "Gardez cet onglet ouvert jusqu'à la fin de votre envoi.",
   "room.tipPower": "Branchez-vous sur secteur si possible.",

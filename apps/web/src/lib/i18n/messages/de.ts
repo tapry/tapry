@@ -153,6 +153,7 @@ export const de: Messages = {
   "room.host": "Gastgeber",
   "room.inCall": "Im Gespräch",
   "room.notConnected": "Nicht verbunden",
+  "room.pictureStalled": "Bild unterbrochen",
   "room.tipDrops": "Wenn Ihr Internet ausfällt, sprechen Sie weiter. Ihre Aufnahme wird zuerst hier gespeichert.",
   "room.tipTab": "Lassen Sie diesen Tab offen, bis Ihr Upload fertig ist.",
   "room.tipPower": "Schließen Sie das Gerät möglichst ans Stromnetz an.",

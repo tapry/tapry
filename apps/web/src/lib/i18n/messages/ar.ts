@@ -153,6 +153,7 @@ export const ar: Messages = {
   "room.host": "المضيف",
   "room.inCall": "في المكالمة",
   "room.notConnected": "غير متصل",
+  "room.pictureStalled": "انقطعت الصورة",
   "room.tipDrops": "إذا انقطع الإنترنت فواصل الحديث. يُحفظ تسجيلك هنا أولًا.",
   "room.tipTab": "أبقِ هذا التبويب مفتوحًا حتى ينتهي الرفع.",
   "room.tipPower": "وصّل جهازك بالكهرباء إن أمكن.",

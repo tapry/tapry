@@ -153,6 +153,7 @@ export const pt: Messages = {
   "room.host": "anfitrião",
   "room.inCall": "Na chamada",
   "room.notConnected": "Sem ligação",
+  "room.pictureStalled": "Imagem interrompida",
   "room.tipDrops": "Se a internet cair, continue a falar. A sua gravação é guardada primeiro aqui.",
   "room.tipTab": "Mantenha este separador aberto até o envio terminar.",
   "room.tipPower": "Ligue à corrente, se puder.",
