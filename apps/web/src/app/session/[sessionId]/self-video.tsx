@@ -33,7 +33,25 @@ export function SelfVideo({
   const [canPreview, setCanPreview] = useState(false);
   useEffect(() => setCanPreview(canPreviewFilters()), []);
   useEffect(() => {
-    if (video.current) video.current.srcObject = stream;
+    const v = video.current;
+    if (!v) return;
+    v.srcObject = stream;
+    // Safari pauses a camera's <video> when it interrupts the capture (another tab or app took
+    // the camera, the page went to the background) and doesn't always start it again by itself,
+    // which leaves a black tile over a camera that is on. Start it whenever the camera comes back.
+    const resume = () => {
+      if (v.paused && v.srcObject) void v.play().catch(() => {});
+    };
+    const tracks = stream?.getVideoTracks() ?? [];
+    for (const t of tracks) t.addEventListener("unmute", resume);
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("pageshow", resume);
+    resume();
+    return () => {
+      for (const t of tracks) t.removeEventListener("unmute", resume);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("pageshow", resume);
+    };
   }, [stream]);
 
   const filtered = canPreview && !!stream && stream.getVideoTracks().length > 0 && hasVideoFilters(filters);
