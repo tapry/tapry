@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { postHref, posts } from "@/content/blog";
 import { customers } from "@/content/customers";
 import { DOCS, docHref } from "@/content/docs";
-import { HAS_SPEED_TEST, SITE_URL } from "@/content/site";
+import { HAS_SPEED_TEST, LEGAL, SITE_URL } from "@/content/site";
 
 export const dynamic = "force-static";
 
@@ -26,6 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/consent-form/",
     "/data-map/",
     ...(HAS_SPEED_TEST ? ["/upload-speed-test/"] : []),
+    ...(LEGAL.published ? ["/legal/"] : []),
     ...(posts.length ? ["/blog/", ...posts.map(postHref)] : []),
     ...(customers.length ? ["/customers/", ...customers.map((c) => `/customers/${c.slug}/`)] : []),
   ];

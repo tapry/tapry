@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Website: the legal page names who runs Tapry Cloud from the build's settings**
+  (`NEXT_PUBLIC_LEGAL_NAME`, `_ADDRESS`, `_LAW`, `_COURTS`, `_PUBLISHED`), so those details
+  are on the published page without being in the source code. Unset, nothing changes.
+
 - **Beta labels** on what has only been tuned on test material so far: the combined video
   that follows the speaker, background blur, noise removal and AI notes. Nothing about how
   they work changed, and all stay off until chosen.
