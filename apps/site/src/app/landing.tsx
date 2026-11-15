@@ -434,7 +434,7 @@ function HeroStudio() {
               <div style={{ position: "relative", display: "grid", gap: "1.0869565217%", gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}>
                 {/* One frame contains all three feeds: speech and reactions cannot drift apart. */}
                 <div style={{ position: "absolute", inset: 0, maskImage: HERO_VIDEO_MASK, WebkitMaskImage: HERO_VIDEO_MASK, maskSize: "100% 100%", maskRepeat: "no-repeat" }}>
-                  <HeroVideo src="/media/hero/podcast-turns-v3.mp4" poster="/media/hero/podcast-turns-v3.webp" paused={videosPaused} onProgress={onProgress} />
+                  <HeroVideo src="/media/hero/podcast-turns-v4.mp4" poster="/media/hero/podcast-turns-v4.webp" paused={videosPaused} onProgress={onProgress} />
                 </div>
                 {PEOPLE.map(([name], i) => (
                   <div key={name} style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", borderRadius: 8, transition: "outline-color .15s", outline: `2px solid ${sp === i ? "#ff8f78" : "transparent"}`, outlineOffset: -2 }}>
