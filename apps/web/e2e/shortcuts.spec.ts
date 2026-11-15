@@ -13,13 +13,17 @@ test("host shortcuts: record and stop, mute and unmute, copy the invite link", a
   await expect(page.getByText("Connected", { exact: true })).toBeVisible();
 
   await page.keyboard.press("ControlOrMeta+Shift+R");
-  await expect(page.getByText(/REC 00:0\d/)).toBeVisible();
+  // The confirmation first: it shows at once and for under two seconds, while the clock waits for the server.
   await expect(page.getByTestId("shortcut-flash")).toHaveText("Recording started");
+  await expect(page.getByText(/REC 00:[01]\d/)).toBeVisible();
 
   await page.keyboard.press("ControlOrMeta+Shift+M");
   await expect(page.getByTestId("self-tile")).toHaveAttribute("data-mic", "muted");
+  await expect(page.getByTestId("self-tile").getByTestId("mic-indicator")).toHaveAttribute("data-state", "muted");
   await page.keyboard.press("ControlOrMeta+Shift+M");
   await expect(page.getByTestId("self-tile")).toHaveAttribute("data-mic", "on");
+  // Unmuted: the mic is shown as on (or as speaking, while the test microphone's tone is heard).
+  await expect(page.getByTestId("self-tile").getByTestId("mic-indicator")).toHaveAttribute("data-state", /^(on|speaking)$/);
 
   await page.keyboard.press("ControlOrMeta+Shift+L");
   await expect(page.getByTestId("shortcut-flash")).toHaveText("Invite link copied");

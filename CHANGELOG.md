@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **A microphone indicator on every tile in the session**: a mic when it's on, bars that move
+  while that person speaks, a crossed-out mic when muted. Until now a tile only showed
+  something when someone was muted.
+
 - **A combined video that follows the speaker** (studio setting "Combined video"): whoever
   has the floor fills the frame, and everyone is side by side while several talk or nobody
   does. Worked out from each person's own audio, with a calm cut: no shot under 2.5 s, a short
