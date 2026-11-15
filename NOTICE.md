@@ -38,7 +38,8 @@ Its model card is linked from the
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | MIT | `tapry-web` image, built from source |
 | Whisper `base` model ([ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp)), from OpenAI Whisper | MIT | `tapry-web` image |
 | Silero VAD model ([ggml-org/whisper-vad](https://huggingface.co/ggml-org/whisper-vad)) | MIT | `tapry-web` image |
-| DejaVu fonts | Bitstream Vera / public domain | `tapry-web` image (names on the combined video) |
+| Inter (Debian's `fonts-inter`) | SIL Open Font License 1.1 | `tapry-web` image (names on the combined video) |
+| DejaVu fonts | Bitstream Vera / public domain | `tapry-web` image (names in scripts Inter has no letters for) |
 | Node.js and Debian bookworm base | MIT and various free licenses | `tapry-web` image |
 | [Caddy](https://caddyserver.com) and [caddy-l4](https://github.com/mholt/caddy-l4) | Apache-2.0 | `tapry-caddy` image |
 

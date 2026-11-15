@@ -129,6 +129,7 @@ export function StudioSettingsForm({
             maxGuests: guests,
             echoCancellation: f.get("echoCancellation") === "on",
             levelLoudness: f.get("levelLoudness") === "on",
+            nameLabels: f.get("nameLabels") === "on",
             guestDownloads: f.get("guestDownloads") === "on",
             consentText: String(f.get("consentText") ?? ""),
             audioFormat: f.get("audioFormat") === "flac" ? "flac" : "wav",
@@ -201,6 +202,12 @@ export function StudioSettingsForm({
             defaultChecked={settings.levelLoudness}
             label="Even out everyone's volume"
             help="Quiet guests are brought up to the same level as everyone else (−16 LUFS, a common level for spoken audio). Only the volume changes, never how anyone sounds. Applies to recordings processed from now on."
+          />
+          <SwitchRow
+            name="nameLabels"
+            defaultChecked={settings.nameLabels}
+            label="Names on the combined video"
+            help="Each person's name in the corner of their picture. Off: only a person without a camera is named. Per-person files never have names on them. Applies to recordings processed from now on."
           />
           <Row
             label={<label htmlFor="audio-format">Audio files</label>}

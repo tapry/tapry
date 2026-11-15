@@ -81,6 +81,8 @@ export interface PipelineOptions {
   timeoutMs?: number;
   /** Font for names on the combined video's tiles. Unset: found automatically; null: no names. */
   font?: string | null;
+  /** Names on the camera tiles of the combined video (default: yes). A tile without a camera always has its name. */
+  nameLabels?: boolean;
   /** Level every person's audio, and the combined mix, to this target. Unset or null: left as recorded. */
   loudness?: LoudnessTarget | null;
   /** Audio files as WAV (default) or FLAC (lossless, about half the size). */
@@ -832,10 +834,15 @@ function groupBy<T>(items: T[], key: (item: T) => string): T[][] {
   return [...groups.values()];
 }
 
-/** Fonts tried for tile names when none is configured: Debian's DejaVu (Docker), then macOS. */
+/**
+ * Fonts tried for tile names when none is configured: Inter (the app's typeface; Debian's
+ * fonts-inter in Docker), then DejaVu, then macOS.
+ */
 export const FONT_CANDIDATES = [
-  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+  "/usr/share/fonts/opentype/inter/Inter-Medium.otf",
+  "/usr/share/fonts/opentype/inter/Inter-Regular.otf",
   "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
   "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
   "/System/Library/Fonts/Supplemental/Arial.ttf",
   "/System/Library/Fonts/Helvetica.ttc",
@@ -849,6 +856,21 @@ export async function findFont(candidates = FONT_CANDIDATES): Promise<string | n
     } catch {}
   }
   return null;
+}
+
+/** Fonts with many scripts (Arabic, Hebrew, Armenian…), for names Inter has no letters for. */
+export const WIDE_FONT_CANDIDATES = [
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+  "/System/Library/Fonts/Supplemental/Arial.ttf",
+];
+
+/** Latin, Greek and Cyrillic letters, digits, punctuation and currency signs: what Inter can write. */
+const NARROW_SCRIPTS = /^[\u0020-\u024F\u0370-\u03FF\u0400-\u04FF\u1E00-\u1EFF\u2000-\u206F\u20A0-\u20CF]*$/;
+
+/** The font for one name: the usual one, or the wide one when the name has letters the usual one lacks. */
+export function fontForName(name: string, font: string, wide: string | null): string {
+  return wide && !NARROW_SCRIPTS.test(name) ? wide : font;
 }
 
 const MAX_LABEL_CHARS = 32;
@@ -866,13 +888,16 @@ async function nameLabel(font: string, name: string, tile: { w: number; h: numbe
   await writeFile(textPath, text);
   const common = `fontfile='${font}':textfile='${textPath}':expansion=none:fontcolor=white`;
   if (centred) {
-    const size = Math.max(18, Math.round(tile.h * 0.08));
+    const size = Math.max(16, Math.round(tile.h * 0.06));
     return `,drawtext=${common}:fontsize=${size}:x=(w-tw)/2:y=(h-th)/2`;
   }
-  const size = Math.max(14, Math.round(tile.h * 0.045));
-  const margin = Math.round(size * 0.8);
+  // A small tag in the corner: lighter and smaller than a caption, so it names the person
+  // without sitting on the picture.
+  const size = Math.max(12, Math.round(tile.h * 0.034));
+  const pad = Math.round(size * 0.5);
+  const margin = Math.round(size * 0.9) + pad;
   return (
-    `,drawtext=${common}:fontsize=${size}:box=1:boxcolor=black@0.55:boxborderw=${Math.round(size * 0.35)}` +
+    `,drawtext=${common}:fontsize=${size}:box=1:boxcolor=black@0.42:boxborderw=${pad}` +
     `:x=${margin}:y=h-th-${margin}`
   );
 }
@@ -897,6 +922,8 @@ async function renderCombined(
   let canvas = "base";
 
   const font = opts.font === undefined ? await findFont() : opts.font;
+  // A font set by hand is used for every name; found automatically, names in other scripts get a font that has them.
+  const wide = opts.font === undefined && font ? await findFont(WIDE_FONT_CANDIDATES) : null;
 
   for (const [i, pid] of participants.entries()) {
     const tile = tiles[i]!;
@@ -904,7 +931,9 @@ async function renderCombined(
     const audio = rendered.find((o) => o.participantId === pid && o.kind === "audio" && !o.original);
     const name = tracks.find((t) => t.participantId === pid)!.participantName;
     // Name tag like in the room: bottom-left on a camera, centred on an audio-only tile.
-    const label = font ? await nameLabel(font, name, tile, !video, join(opts.workDir, `label-${i}.txt`)) : "";
+    // Switched off in the studio's settings: only a tile with no picture keeps its name, since nothing else says whose it is.
+    const wanted = opts.nameLabels !== false || !video;
+    const label = font && wanted ? await nameLabel(fontForName(name, font, wide), name, tile, !video, join(opts.workDir, `label-${i}.txt`)) : "";
     if (video) {
       args.push("-i", video.path);
       filters.push(

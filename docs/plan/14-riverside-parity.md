@@ -137,3 +137,48 @@ Ordered by what a buyer would notice first, then by cost. Effort is a rough buil
 
 Unchanged: live streaming and scenes stay in Later; webinars, hosting, newsletters, social
 scheduling and all generative media stay in Skip.
+
+## Benchmark refresh: what they offer and we don't (15 Nov 2026)
+
+From each vendor's own pages on 15 Nov 2026 (Riverside, Descript, Zencastr, StreamYard, Async
+(formerly Podcastle), Boomcaster, Iris, Cleanfeed, Waveroom, Zoom). Several pages could not be
+loaded (Riverside's feature and security pages, Zencastr's and StreamYard's feature pages), and
+Riverside's pricing page carried a "may be outdated" notice: treat prices as needing a check.
+Everything in "Gaps to fill" above is built except real-phone testing.
+
+### Missing, and worth building
+
+| Gap | Who has it | What we have today |
+|---|---|---|
+| Combined video that follows the speaker (automatic layouts) | Riverside, Descript, Zencastr, Boomcaster | A fixed grid, plus the screen overlay while someone shares |
+| Captions burned into the video, styled | Riverside, Descript, Zencastr, Async | SRT/VTT files only |
+| Vertical and square versions (9:16, 1:1) of a clip | Riverside, Descript, Zencastr | Clips in 16:9 only |
+| Logo, intro/outro and lower third (name and title) on the video | Riverside, StreamYard, Boomcaster, Descript | A name tag; branding on guest pages only |
+| Filler-word removal | Riverside, Descript, Zencastr, Boomcaster | Pauses only (segment-level transcript, no word times) |
+| 10 recorded participants | Riverside, Descript, Async, StreamYard | 8 (host + 7) |
+| Delivery to Google Drive / Dropbox | Zencastr, Iris, Boomcaster, Descript | Download, zip, own S3 bucket, webhooks |
+| Live captions in the session | Descript, Iris, Zoom | None (needs streaming transcription) |
+| Teleprompter that guests see and that scrolls | Riverside, Async, StreamYard (hosts) | A guide for hosts, ticked by hand |
+| Media board / soundboard | Riverside, Zencastr, Boomcaster | None |
+| Virtual background images | Riverside (Mac app), Descript (green screen) | Blur only (images were planned as phase 3) |
+| SSO | Riverside, Descript, Boomcaster (top plans) | None (`/ee`, planned) |
+| Premiere / Resolve named exports | Riverside, Descript, Boomcaster | OTIO, FCPXML, REAPER (Resolve and Premiere read OTIO; not verified by us) |
+| MCP server | Riverside, Descript | An API and webhooks |
+| Search across recordings by meaning | Riverside (through MCP), Descript | Keyword search in transcripts |
+| Phone as a second camera, in-person multi-camera | Riverside | None |
+| Native mobile and desktop apps | Riverside, Zencastr, StreamYard (iOS guests), Descript | Browser only |
+| SOC 2 / ISO 27001 | Riverside, Descript | None (a certification, not a feature) |
+
+### Missing on purpose (stays in Later or Skip)
+
+Live streaming and multistream, webinars, audience call-in and chat, backstage; a text-based or
+timeline editor and chat-driven editing; AI highlight clips, eye contact, B-roll, dubbing, voice
+clones, avatars; podcast hosting, RSS, social scheduling, analytics and ads.
+
+### What we have that they gate or lack
+
+Self-hosting, and AI that runs on the server: none of them. Own storage bucket: Boomcaster only,
+on request at Enterprise. A consent record per recording: none found. Recording alone on a link,
+a producer seat, an API, timeline export and frame-rate choice: Business or Enterprise elsewhere,
+included here. Guest tech-check link, per-guest live upload status and quality alerts, research
+exports (NVivo, MAXQDA, ATLAS.ti), share-safe transcripts.

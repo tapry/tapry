@@ -5,6 +5,12 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Names on the combined video are a studio setting** (Settings, "Names on the combined
+  video", on by default). Off: no name on anyone's camera picture; a person without a camera
+  is still named. Applies to recordings processed from now on, and to "Process again".
+- **A smaller, lighter name tag** on the combined video, in Inter. Names in scripts Inter has
+  no letters for (Arabic, Hebrew, Chinese…) are written in DejaVu.
+
 - **Appearance: light, dark or system** (Settings, Account). Kept in the browser, applied
   before the page paints. Until now the app only followed the system.
 - **A warmer light theme.** Paper-toned neutrals instead of cold greys and near-white, white
