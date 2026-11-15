@@ -40,6 +40,8 @@ x-app-env: &app-env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMTP_FROM: ${SMTP_FROM:-}
   SMTP_INSECURE: ${SMTP_INSECURE:-false}
+  # Somewhere fontconfig may keep its cache (captions on clips look fonts up): without it every clip warns and scans the fonts again.
+  XDG_CACHE_HOME: /tmp/.cache
   # Each account's own S3 bucket (Storage page): their secret keys are encrypted with this.
   # Empty: off. Once set, never change it.
   STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
