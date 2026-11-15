@@ -38,6 +38,25 @@ export const STUDIO_URL = `${APP_URL}/studios`;
 export const checkoutUrl = (plan: "creator" | "studio" | "team" | "own_storage", yearly: boolean) => `${APP_URL}/checkout/${plan}${yearly ? "?yearly=1" : ""}`;
 export const CONTACT_EMAIL = "hello@tapry.app";
 
+/**
+ * Who runs Tapry Cloud, for the legal page. These come from the build's settings (Cloudflare's
+ * build variables), never from a file in this repository: the page publishes them, the source
+ * code doesn't carry them. Unset, the page leaves the operator out and stays a draft.
+ */
+const setting = (v: string | undefined) => v?.trim() || undefined;
+export const LEGAL = {
+  /** The person or company that runs Tapry Cloud and signs the terms. */
+  name: setting(process.env.NEXT_PUBLIC_LEGAL_NAME),
+  /** A postal address for it (a registered or business address). */
+  address: setting(process.env.NEXT_PUBLIC_LEGAL_ADDRESS),
+  /** The country whose law the terms are under, e.g. "Morocco". */
+  law: setting(process.env.NEXT_PUBLIC_LEGAL_LAW),
+  /** Where disputes go, e.g. "the courts of Casablanca". */
+  courts: setting(process.env.NEXT_PUBLIC_LEGAL_COURTS),
+  /** "true" once the owner has signed the text off: takes "Draft for review" off and lets the page be indexed. Needs a name and an address. */
+  published: process.env.NEXT_PUBLIC_LEGAL_PUBLISHED === "true" && !!setting(process.env.NEXT_PUBLIC_LEGAL_NAME) && !!setting(process.env.NEXT_PUBLIC_LEGAL_ADDRESS),
+};
+
 export const GET_STARTED = HAS_CLOUD ? SIGNUP_URL : "/pricing/";
 
 /** A page's metadata: title, description, canonical address (with its trailing slash) and the same for link previews. */

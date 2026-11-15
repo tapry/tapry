@@ -1,13 +1,13 @@
 import { Shell } from "@/components/ui";
-import { pageMeta } from "@/content/site";
+import { LEGAL, pageMeta } from "@/content/site";
 import { Legal } from "./legal";
 
-// Not indexed until the owner has signed the text off (it says "Draft for review").
+// Not indexed until the owner has signed the text off (NEXT_PUBLIC_LEGAL_PUBLISHED): until then it says "Draft for review".
 export const metadata = pageMeta({
   title: "Privacy and terms · Tapry",
-  description: "What this website and self-hosted Tapry do with your data, and the terms for using them. Draft for review.",
+  description: "What this website and self-hosted Tapry do with your data, and the terms for using them." + (LEGAL.published ? "" : " Draft for review."),
   path: "/legal/",
-  index: false,
+  index: LEGAL.published,
 });
 
 export default function LegalPage() {

@@ -9,6 +9,23 @@ plus the list of sub-processors a data processing agreement needs.
 read them before they go on the website, then move them into `apps/site/src/app/legal/` and take
 "Draft for review" off that page.
 
+## Your details stay out of this repository
+
+Don't write your name or address into this file or any other file here: the repository is
+public. The website's legal page takes them from the build's settings instead (Cloudflare,
+the site's Worker, Settings, Build, Variables), and shows the operator only when they are set:
+
+| Variable | What it is |
+|---|---|
+| `NEXT_PUBLIC_LEGAL_NAME` | The person or company that runs Tapry Cloud |
+| `NEXT_PUBLIC_LEGAL_ADDRESS` | A postal address (a registered or business address, not necessarily a home) |
+| `NEXT_PUBLIC_LEGAL_LAW` | The country whose law the terms are under |
+| `NEXT_PUBLIC_LEGAL_COURTS` | Where disputes go, e.g. "the courts of …" (optional) |
+| `NEXT_PUBLIC_LEGAL_PUBLISHED` | `true` once you have signed the text off: removes "Draft for review" and lets search engines index the page |
+
+They are published on the page (that is what the page is for), so they are not secrets; they
+just aren't in the source code. The blanks below stay blanks.
+
 ## To fill in first
 
 | Blank | What it is |

@@ -3,8 +3,17 @@
 // this website, the self-hosted software and (with the hosted app's address set) Tapry Cloud as
 // they are. The Cloud sections state what the software does (docs/cloud-billing.md) and who
 // handles data; the fuller texts, with the operator's legal details, are in docs/legal-drafts.md.
-import { CONTACT_EMAIL, HAS_CLOUD, HAS_SPEED_TEST, HAS_WAITLIST } from "@/content/site";
+import { CONTACT_EMAIL, HAS_CLOUD, HAS_SPEED_TEST, HAS_WAITLIST, LEGAL } from "@/content/site";
 import { HAS_CHECKOUT, PADDLE_TOKEN } from "@/content/tiers";
+
+// Who runs the service: shown only when the build was given a name and an address (content/site.ts).
+const OPERATOR = LEGAL.name && LEGAL.address ? `${LEGAL.name}, ${LEGAL.address}` : null;
+const WHO_PRIVACY: Array<[string, string]> = OPERATOR
+  ? [["Who is responsible", `Tapry Cloud and this website are run by ${OPERATOR}. Write to ${CONTACT_EMAIL}. For what hosts record on Tapry Cloud, the host decides why and how it is recorded; we store and process it for them.`]]
+  : [];
+const WHO_TERMS: Array<[string, string]> = OPERATOR ? [["Who we are", `Tapry Cloud is run by ${OPERATOR} (“we”). Write to us at ${CONTACT_EMAIL}. The self-hosted software is separate: its licences apply, not these terms.`]] : [];
+const LAW_TERMS: Array<[string, string]> =
+  OPERATOR && LEGAL.law ? [["Law", `These terms are under the law of ${LEGAL.law}${LEGAL.courts ? `, and disputes go to ${LEGAL.courts}` : ""}, unless consumer law where you live says otherwise.`]] : [];
 
 type Doc = { id: "privacy" | "terms"; title: string; sections: Array<[string, string]> };
 
@@ -51,6 +60,7 @@ const DOCS: Doc[] = [
     id: "privacy",
     title: "Privacy Policy",
     sections: [
+      ...WHO_PRIVACY,
       [
         "This website",
         PADDLE_TOKEN
@@ -84,6 +94,7 @@ const DOCS: Doc[] = [
     id: "terms",
     title: "Terms of Service",
     sections: [
+      ...WHO_TERMS,
       ["The software", "Tapry’s server is licensed under AGPL-3.0 and the recorder core under MIT. Those licences govern your use of the code."],
       ["Your recordings", "You own what you record. You are responsible for having each guest’s permission to record them and to publish what you record."],
       ["Acceptable use", "Don’t use Tapry to record people without their knowledge, or to break the law where you or your guests are."],
@@ -94,6 +105,7 @@ const DOCS: Doc[] = [
         "No warranty",
         `The self-hosted software is provided as is, without warranty. Keep your own backups of anything you can’t afford to lose.${HAS_CLOUD ? " We work to keep Tapry Cloud running and your recordings safe, but don’t promise uninterrupted service." : ""}`,
       ],
+      ...LAW_TERMS,
     ],
   },
 ];
@@ -104,7 +116,7 @@ export function Legal() {
       <section style={{ background: "linear-gradient(180deg,#fbe3d8 0%,#fff 100%)", padding: "80px 28px 32px" }}>
         <div style={{ margin: "0 auto", display: "flex", maxWidth: 760, flexDirection: "column", gap: 18 }}>
           <h1 style={{ margin: 0, fontSize: "clamp(34px,4vw,48px)", lineHeight: 1.08, fontWeight: 500, letterSpacing: "-.03em" }}>Privacy and terms</h1>
-          <span style={{ fontSize: 14, color: "#5f6470" }}>Draft for review · last updated November 2026</span>
+          <span style={{ fontSize: 14, color: "#5f6470" }}>{LEGAL.published ? "Last updated November 2026" : "Draft for review · last updated November 2026"}</span>
           <nav aria-label="On this page" style={{ display: "flex", alignSelf: "flex-start", gap: 2, borderRadius: 8, background: "#f4f4f5", padding: 3 }}>
             {DOCS.map((d) => (
               <a key={d.id} href={`#${d.id}`} className="chip" style={{ display: "inline-flex", height: 30, alignItems: "center", borderRadius: 6, padding: "0 12px", fontSize: 14, fontWeight: 500, background: "#fff", color: "#09090b", boxShadow: "0 1px 3px rgba(0,0,0,.1)" }}>
