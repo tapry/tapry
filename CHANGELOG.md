@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Your own camera view restarts after Safari interrupts it.** Safari pauses a camera's
+  picture when another tab or app takes the camera or the page goes to the background, and
+  could leave the tile black over a camera that was on.
+
 - **Fix: a guest whose connection died stayed on screen as a frozen picture.** The browser
   keeps showing the last frame until the call server gives up on them (up to about 20 s),
   which looked like someone sitting still. The tile now dims and says "Picture interrupted"
