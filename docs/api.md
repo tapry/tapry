@@ -57,7 +57,7 @@ Output kinds: `audio`, `video`, `screen` (one per person), `combined`, `transcri
 | `PUT /api/studios/:studioId/solo` `{ enabled, prompt }` | Turns the solo link on or off and sets its questions |
 | `POST /api/studios/:studioId/recordings/:recordingId/process` | Makes the files again |
 | `DELETE /api/studios/:studioId/recordings/:recordingId` | Deletes a stopped recording and its files |
-| `POST /api/studios/:studioId/recordings/:recordingId/clips` `{ startMs, endMs, title? }` | Cuts a clip |
+| `POST /api/studios/:studioId/recordings/:recordingId/clips` `{ startMs, endMs, title?, shape?, captions? }` | Cuts a clip. `shape`: `wide` (default), `square` or `vertical`; `captions: true` writes what is said on the picture |
 | `DELETE /api/studios/:studioId/recordings/:recordingId/clips/:clipId` | Deletes a clip |
 | `POST /api/studios/:studioId/recordings/:recordingId/notes` | Writes AI notes (again), where the account has them on |
 | `POST /api/recordings/:recordingId/comments` `{ body, atMs? }` | Adds a comment |

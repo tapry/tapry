@@ -22,7 +22,7 @@ export const TIERS: Tier[] = [
     name: "Creator",
     plan: "creator",
     description: "The same software on a server you don’t have to run, for one host.",
-    features: ["15 recording hours a month", "Full HD video", "Finished files kept for 30 days", "Transcripts included", "Up to 8 people in a recording"],
+    features: ["15 recording hours a month", "Full HD video", "Finished files kept for 30 days", "Transcripts included", "Up to 10 people in a recording"],
     priceId: { month: "pri_01m79er3538jn4a8pfs74h959s", year: "pri_01m79ese1xv5g21e7nkf17qt1b" },
     listed: { month: "$19", year: "$190" },
     highlight: true,

@@ -5,6 +5,17 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **A combined video that follows the speaker** (studio setting "Combined video"): whoever
+  has the floor fills the frame, and everyone is side by side while several talk or nobody
+  does. Worked out from each person's own audio, with a calm cut: no shot under 2.5 s, a short
+  word from someone else doesn't take the picture. The default is still everyone side by side.
+- **Clips for phones and feeds.** A clip can be square (1:1) or vertical (9:16), built again
+  from each person's camera and filled to the frame, and can have captions written on the
+  picture from the transcript, a few words at a time.
+- **The studio's logo on the combined video** (studio settings, Branding): small, in the
+  top-right corner.
+- **Up to 10 people in a recording** (the host and nine guests; was 8).
+
 - **Names on the combined video are a studio setting** (Settings, "Names on the combined
   video", on by default). Off: no name on anyone's camera picture; a person without a camera
   is still named. Applies to recordings processed from now on, and to "Process again".

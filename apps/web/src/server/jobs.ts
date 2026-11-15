@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { studioSettings, trackFilters, type TrackFilters } from "@tapry/shared";
+import { ffmpegFrameRate, studioSettings, trackFilters, type ClipShape, type TrackFilters } from "@tapry/shared";
 import {
   concatChunks,
   FfmpegError,
@@ -21,10 +21,12 @@ import {
   type TrackInput,
   type WhisperOptions,
 } from "@tapry/worker";
-import { EXPIRY_NOTICE_MS, planRetention, warnExpiring } from "./billing";
+import { EXPIRY_NOTICE_MS, planOfRecording, planRetention, warnExpiring } from "./billing";
+import { videoLogo } from "./brand";
 import type { Db, Queryable } from "./db";
 import { isApiError } from "./errors";
-import { clipArgs, clipFileName } from "./clips";
+import { captionsAss, clipArgs, clipFileName, shapedClipArgs } from "./clips";
+import { parseVtt, type Cue } from "./library";
 import { newId } from "./ids";
 import { deliverWebhooks, emitWebhook } from "./integrations";
 import { NOTES_ERROR_TEXT, NOTES_FILE, NOTES_MAX_CHARS, NotesError, notesModelFor, notesModels, queueNotes, type NotesConfig, type NotesModel } from "./notes";
@@ -626,7 +628,7 @@ export class JobRunner {
   private async cutClips(job: JobRow) {
     const [rec] = await this.db.query<{ id: string; session_id: string }>("SELECT id, session_id FROM recordings WHERE id = $1 AND deleted_at IS NULL", [job.recording_id]);
     const clips = rec
-      ? await this.db.query<{ id: string; start_ms: number; end_ms: number; title: string }>("SELECT id, start_ms, end_ms, title FROM clips WHERE recording_id = $1 AND status = 'queued' ORDER BY created_at", [rec.id])
+      ? await this.db.query<{ id: string; start_ms: number; end_ms: number; title: string; shape: ClipShape; captions: boolean }>("SELECT id, start_ms, end_ms, title, shape, captions FROM clips WHERE recording_id = $1 AND status = 'queued' ORDER BY created_at", [rec.id])
       : [];
     const [source] = rec ? await this.db.query<{ storage_key: string; file_name: string }>("SELECT storage_key, file_name FROM outputs WHERE recording_id = $1 AND kind = 'combined' LIMIT 1", [rec.id]) : [];
     if (!rec || clips.length === 0 || !source) {
@@ -642,10 +644,40 @@ export class JobRunner {
     try {
       const src = join(work, `source.${srcExt}`);
       await this.storage.downloadTo(source.storage_key, src);
+      // Square and vertical clips are built from each person's own camera file; captions from the transcript.
+      const people: string[] = [];
+      if (kind === "video" && clips.some((c) => c.shape !== "wide")) {
+        const videos = await this.db.query<{ id: string; storage_key: string }>("SELECT id, storage_key FROM outputs WHERE recording_id = $1 AND kind = 'video' ORDER BY file_name, id", [rec.id]);
+        for (const v of videos) {
+          const path = join(work, `person-${v.id}.mp4`);
+          await this.storage.downloadTo(v.storage_key, path);
+          people.push(path);
+        }
+      }
+      let cues: Cue[] = [];
+      if (kind === "video" && clips.some((c) => c.captions)) {
+        const [vtt] = await this.db.query<{ storage_key: string }>("SELECT storage_key FROM outputs WHERE recording_id = $1 AND kind = 'transcript' AND file_name = 'Transcript.vtt'", [rec.id]);
+        if (vtt) {
+          const path = join(work, "transcript.vtt");
+          await this.storage.downloadTo(vtt.storage_key, path);
+          cues = parseVtt(await readFile(path, "utf8"));
+        }
+      }
+      const [studio] = await this.db.query<{ settings: unknown }>("SELECT st.settings FROM studios st JOIN sessions s ON s.studio_id = st.id WHERE s.id = $1", [rec.session_id]);
+      const fps = ffmpegFrameRate(studioSettings.parse(studio?.settings ?? {}).frameRate);
       for (const clip of clips) {
         const out = join(work, `${clip.id}.${ext}`);
         try {
-          await runFfmpeg(this.opts.ffmpeg, clipArgs(src, out, Number(clip.start_ms), Number(clip.end_ms), kind), { timeoutMs: 10 * 60 * 1000 });
+          const [from, to] = [Number(clip.start_ms), Number(clip.end_ms)];
+          // A shape that can't be built here (no cameras after all) is cut wide; captions that can't be read are left off.
+          const shape: ClipShape = kind === "video" && clip.shape !== "wide" && people.length > 0 ? clip.shape : "wide";
+          let ass: string | null = null;
+          if (kind === "video" && clip.captions && cues.length > 0) {
+            ass = join(work, `${clip.id}.ass`);
+            await writeFile(ass, captionsAss(cues, from, to, shape));
+          }
+          const args = kind === "video" && (shape !== "wide" || ass) ? shapedClipArgs({ combined: src, people, out, startMs: from, endMs: to, shape, ass, fps }) : clipArgs(src, out, from, to, kind);
+          await runFfmpeg(this.opts.ffmpeg, args, { timeoutMs: 10 * 60 * 1000 });
           const id = newId("out");
           const key = `outputs/${rec.session_id}/${rec.id}/${id}.${ext}`;
           const bytes = await this.storage.uploadFrom(key, out, type);
@@ -653,7 +685,7 @@ export class JobRunner {
             // Deleted while it was being cut: the file isn't wanted.
             const [still] = await tx.query("SELECT 1 FROM clips WHERE id = $1 FOR UPDATE", [clip.id]);
             if (!still) return false;
-            await insertOutput(tx, rec.id, { id, key, bytes, kind: "clip", fileName: clipFileName({ startMs: Number(clip.start_ms), endMs: Number(clip.end_ms), title: clip.title }, ext), contentType: type, durationMs: Number(clip.end_ms) - Number(clip.start_ms) });
+            await insertOutput(tx, rec.id, { id, key, bytes, kind: "clip", fileName: clipFileName({ startMs: Number(clip.start_ms), endMs: Number(clip.end_ms), title: clip.title, shape }, ext), contentType: type, durationMs: Number(clip.end_ms) - Number(clip.start_ms) });
             await tx.query("UPDATE clips SET status = 'ready', output_id = $2 WHERE id = $1", [clip.id, id]);
             return true;
           });
@@ -676,6 +708,26 @@ export class JobRunner {
     } finally {
       await rm(work, { recursive: true, force: true });
       this.opts.onChange?.(rec.session_id);
+    }
+  }
+
+  /**
+   * The studio's logo as a PNG in the work folder, when it is to go on the combined video and
+   * (on Tapry Cloud) the plan covers branding. A logo that can't be read is left off: it must
+   * never cost anyone their video.
+   */
+  private async logoFor(recordingId: string, work: string): Promise<string | undefined> {
+    try {
+      const logo = await videoLogo(this.db, recordingId);
+      if (!logo) return undefined;
+      if (this.opts.cloud && !(await planOfRecording(this.db, recordingId, Date.now())).branding) return undefined;
+      const raw = join(work, `logo.${logo.type.split("/")[1]}`);
+      const png = join(work, "logo.png");
+      await writeFile(raw, logo.bytes);
+      await runFfmpeg(this.opts.ffmpeg, ["-y", "-hide_banner", "-nostdin", "-i", raw, "-frames:v", "1", png], { timeoutMs: 30_000 });
+      return png;
+    } catch {
+      return undefined;
     }
   }
 
@@ -890,6 +942,8 @@ export class JobRunner {
       frameRate: settings.frameRate,
       font: this.opts.font,
       nameLabels: settings.nameLabels,
+      combinedLayout: settings.combinedLayout,
+      logoPath: await this.logoFor(rec.id, work),
       loudness: settings.levelLoudness ? PODCAST_LOUDNESS : null,
       audioFormat: settings.audioFormat,
       onProgress: (p) => void this.progress(rec, { stage: "rendering", ...p }),

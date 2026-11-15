@@ -122,13 +122,18 @@ describe("gridLayout", () => {
     ]);
     const four = gridLayout(4);
     expect(four.map((t) => [t.x, t.y])).toEqual([[0, 0], [960, 0], [0, 540], [960, 540]]);
-    for (const n of [1, 2, 3, 4, 5, 8]) {
-      for (const t of gridLayout(n)) {
+    for (const n of [1, 2, 3, 4, 5, 8, 9, 10]) {
+      const tiles = gridLayout(n);
+      expect(tiles).toHaveLength(n);
+      for (const [i, t] of tiles.entries()) {
         expect(t.x + t.w).toBeLessThanOrEqual(1920);
         expect(t.y + t.h).toBeLessThanOrEqual(1080);
         expect(t.w % 2 + (t.h % 2)).toBe(0); // H.264 needs even sizes
+        for (const o of tiles.slice(i + 1)) expect(t.x + t.w <= o.x || o.x + o.w <= t.x || t.y + t.h <= o.y || o.y + o.h <= t.y, `${n} people overlap`).toBe(true);
       }
     }
+    // Ten people: four across, each tile a camera's shape.
+    expect(gridLayout(10)[0]).toMatchObject({ w: 480, h: 270 });
   });
 });
 
@@ -550,6 +555,68 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       );
     expect(brightest("110:50:4:755"), "no tag on the camera tile").toBeLessThan(60);
     expect(brightest("560:60:1150:505"), "the cameraless tile keeps its name").toBeGreaterThan(180);
+  });
+
+  it("follows the speaker: full frame on whoever has the floor, the grid in between", async () => {
+    // Two people with cameras: the host talks from 0.5 to 5 s, the guest from 7 to 11.5 s, then nobody.
+    const voice = async (name: string, from: number, to: number) => {
+      const file = join(dir, `${name}.webm`);
+      await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc=size=640x360:rate=24:duration=16",
+        "-f", "lavfi", "-i", `sine=frequency=330:sample_rate=48000:duration=16,volume='if(between(t,${from},${to}),4,0)':eval=frame`,
+        "-c:v", "libvpx", "-deadline", "realtime", "-b:v", "400k", "-c:a", "libopus", "-shortest", file]);
+      return file;
+    };
+    const host = await voice("speaks-first", 0.5, 5);
+    const guest = await voice("speaks-second", 7, 11.5);
+    const people: TrackInput[] = [
+      { trackId: "trk_hv", participantId: "par_1", participantName: "Host", kind: "video", rawPath: host, offsetMs: 0 },
+      { trackId: "trk_ha", participantId: "par_1", participantName: "Host", kind: "audio", rawPath: host, offsetMs: 0 },
+      { trackId: "trk_gv", participantId: "par_2", participantName: "Guest", kind: "video", rawPath: guest, offsetMs: 0 },
+      { trackId: "trk_ga", participantId: "par_2", participantName: "Guest", kind: "audio", rawPath: guest, offsetMs: 0 },
+    ];
+    const render = async (combinedLayout: "grid" | "speaker") =>
+      (await renderRecording(people, { ffmpeg, ffprobe, workDir: join(dir, `layout-${combinedLayout}`), durationMs: 16_000, videoQuality: "720p", font: null, combinedLayout })).find(
+        (o) => o.kind === "combined",
+      )!.path;
+    // The band above the two side-by-side tiles is black in the grid, and picture when one person fills the frame.
+    const topBand = (file: string, at: number) =>
+      Number.parseFloat(
+        execFileSync(ffmpeg, ["-v", "error", "-ss", String(at), "-i", file, "-frames:v", "1", "-vf", "crop=1920:200:0:20,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-", "-f", "null", "-"])
+          .toString().match(/YAVG=([\d.]+)/)![1]!,
+      );
+    const grid = await render("grid");
+    const speaker = await render("speaker");
+    for (const at of [3, 9, 15]) expect(topBand(grid, at), `grid at ${at} s`).toBeLessThan(25);
+    expect(topBand(speaker, 3), "the host has the floor").toBeGreaterThan(60);
+    expect(topBand(speaker, 9), "the guest has the floor").toBeGreaterThan(60);
+    expect(topBand(speaker, 15), "nobody is talking: everyone").toBeLessThan(25);
+  });
+
+  it("puts the studio's logo in the top-right corner of the combined video, small, when given one", async () => {
+    const logo = join(dir, "logo.png");
+    // A wide white logo: it must be fitted into the corner, not stretched over the picture.
+    await run(ffmpeg, ["-y", "-f", "lavfi", "-i", "color=c=white:s=900x300", "-frames:v", "1", logo]);
+    const people: TrackInput[] = [
+      { trackId: "trk_v", participantId: "par_1", participantName: "Host", kind: "video", rawPath: videoWebm, offsetMs: 0 },
+      { trackId: "trk_a", participantId: "par_1", participantName: "Host", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+      { trackId: "trk_g", participantId: "par_2", participantName: "Guest", kind: "audio", rawPath: audioWebm, offsetMs: 0 },
+    ];
+    const render = async (logoPath: string | undefined, name: string) =>
+      (await renderRecording(people, { ffmpeg, ffprobe, workDir: join(dir, name), durationMs: 2000, videoQuality: "720p", font: null, logoPath })).find((o) => o.kind === "combined")!.path;
+    const average = (file: string, crop: string) =>
+      Number.parseFloat(
+        execFileSync(ffmpeg, ["-v", "error", "-ss", "1", "-i", file, "-frames:v", "1", "-vf", `crop=${crop},signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-`, "-f", "null", "-"])
+          .toString().match(/YAVG=([\d.]+)/)![1]!,
+      );
+    const withLogo = await render(logo, "with-logo");
+    const without = await render(undefined, "without-logo");
+    // 900x300 fitted into 300x64 is 192x64, 36 px in from the top-right corner.
+    const corner = "180:56:1698:40";
+    expect(average(without, corner)).toBeLessThan(30);
+    expect(average(withLogo, corner)).toBeGreaterThan(170);
+    // Nothing of it further left or lower.
+    expect(average(withLogo, "400:60:1000:40")).toBeLessThan(30);
+    expect(average(withLogo, "180:56:1698:160")).toBeLessThan(30);
   });
 
   it("gives two people with the same name distinct files", async () => {

@@ -27,7 +27,7 @@ Prices in USD. Yearly billing is ten months' price (2 months free).
 - One-off installation on the customer's server, without a subscription: **$900**. No published benchmark exists for this; treat it as a first guess and change it after the first three jobs.
 
 **Rules**
-- Hours are counted per recording, not per person: an hour with four people is one hour. Up to 8 people in a recording, as in the software.
+- Hours are counted per recording, not per person: an hour with four people is one hour. Up to 10 people in a recording, as in the software.
 - Recording quality is never locked behind payment. Plans differ by hours, retention, seats and organisation features.
 - Transcripts are included everywhere.
 - Hosted plans remove the original uploads 7 days after processing and keep the finished files for the plan's retention. This is what makes the plans profitable (see below), so it is not negotiable below Business.

@@ -31,7 +31,7 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Where files live", "Bundled SeaweedFS or your S3 bucket", "Tapry Cloud, in the EU", "Tapry Cloud, in the EU", "Tapry Cloud, in the EU"],
   ["Support", "GitHub issues", "—", "—", "Email"],
   ["The software today"],
-  ["People per recording", "Up to 8"],
+  ["People per recording", "Up to 10"],
   ["Audio", "48 kHz WAV or FLAC"],
   ["Video", "Up to 4K, 1080p, 720p or audio only"],
   ["Per-person files + combined video", "✓"],

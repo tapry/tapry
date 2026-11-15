@@ -141,6 +141,7 @@ describe("studios", () => {
       frameRate: "30",
       deleteAfterDays: null,
       nameLabels: true,
+      combinedLayout: "grid",
     });
     expect(updated.body.name).toBe("Weekly Studio");
 
