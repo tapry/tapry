@@ -89,6 +89,11 @@ export class MicAlerts {
     if (countTalk && now - this.lastSpeech <= SPEECH_HANGOVER_MS) this.talkMs += ms;
   }
 
+  /** Talking right now: a speech reading within the last moment (so the gaps between words don't flicker). */
+  talking(now: number) {
+    return now - this.lastSpeech <= SPEECH_HANGOVER_MS;
+  }
+
   /** A new recording: count its talk time from zero. */
   resetTalk() {
     this.talkMs = 0;
@@ -195,6 +200,9 @@ const DISK_EVERY_MS = 30_000;
 /** This device's current alerts, also reported to the server for the host. */
 export function useQualityAlerts(q: QualityInputs) {
   const [alerts, setAlerts] = useState<QualityAlert[]>([]);
+  // Whether this microphone hears its person talking right now: read off the recorder's own
+  // stream, so it is immediate and doesn't depend on the call.
+  const [talking, setTalking] = useState(false);
   const [behindS, setBehindS] = useState<number | null>(null);
   const latest = useRef(q);
   latest.current = q;
@@ -251,6 +259,8 @@ export function useQualityAlerts(q: QualityInputs) {
       analyser.getFloatTimeDomainData(buf);
       const { rmsDb, peakDb } = measureLevel(buf);
       mic.addLevel(10 ** (peakDb / 20), rmsDb, Date.now(), !!recordingId && !latest.current.micMuted);
+      const now = !latest.current.micMuted && mic.talking(Date.now());
+      setTalking((was) => (was === now ? was : now));
       syncFarSources();
       if (farSources.size === 0 || latest.current.micMuted) return echo.clear();
       farAnalyser!.getFloatTimeDomainData(farBuf);
@@ -316,7 +326,7 @@ export function useQualityAlerts(q: QualityInputs) {
     };
   }, [q.active, q.stream, q.ticket]);
 
-  return { alerts, uploadBehindS: behindS };
+  return { alerts, uploadBehindS: behindS, talking };
 }
 
 /** Short label for the host's list ("Upload 2 min behind"). */

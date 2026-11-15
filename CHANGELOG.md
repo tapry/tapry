@@ -5,6 +5,11 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: the speaking mark didn't light up for an ordinary voice.** It followed the call
+  server's "active speaker" list, which only reacts to fairly loud speech and with a delay.
+  Each device now measures the sound itself, its own microphone and each person it hears,
+  against that person's background noise, so a quiet voice lights up at once.
+
 - **A microphone indicator on every tile in the session**: a mic when it's on, bars that move
   while that person speaks, a crossed-out mic when muted. Until now a tile only showed
   something when someone was muted.

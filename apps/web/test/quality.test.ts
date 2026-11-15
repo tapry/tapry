@@ -1,3 +1,4 @@
+import { VoiceActivity } from "../src/lib/client/voice";
 import { describe, expect, it } from "vitest";
 import {
   alertAdvice,
@@ -268,5 +269,52 @@ describe("quality reports (server)", () => {
     const state = (await expectOk(t.client({ token: t.host.token }).get(`/sessions/${t.sessionId}/state`))).body;
     expect(state.health[0].talk).toEqual({ recordingId: "rec_x", ms: 6_000 });
     unsubscribe();
+  });
+});
+
+describe("who is talking, from the level of their sound", () => {
+  // A reading every 100 ms, as the room takes them.
+  const feed = (v: VoiceActivity | MicAlerts, from: number, to: number, rmsDb: number) => {
+    for (let t = from; t < to; t += 100) {
+      if (v instanceof VoiceActivity) v.add(rmsDb, t);
+      else v.addLevel(10 ** (rmsDb / 20), rmsDb, t);
+    }
+  };
+
+  it("lights up for a quiet voice in a quiet room, and stays lit over the gaps between words", () => {
+    const voice = new VoiceActivity();
+    feed(voice, 0, 3000, -62); // the room
+    expect(voice.talking(3000)).toBe(false);
+    feed(voice, 3000, 3300, -44); // a soft voice: far below what a call server calls an active speaker
+    expect(voice.talking(3300)).toBe(true);
+    feed(voice, 3300, 3600, -62); // a breath between words
+    expect(voice.talking(3600)).toBe(true);
+    feed(voice, 3600, 4400, -62); // they stopped
+    expect(voice.talking(4400)).toBe(false);
+  });
+
+  it("measures against the room's own noise, so a fan isn't a voice and a voice over a fan is", () => {
+    const voice = new VoiceActivity();
+    feed(voice, 0, 5000, -40); // a loud fan
+    expect(voice.talking(5000)).toBe(false);
+    feed(voice, 5000, 5300, -32); // a little louder than the fan: still not talking
+    expect(voice.talking(5300)).toBe(false);
+    feed(voice, 6000, 6300, -24); // well above it
+    expect(voice.talking(6300)).toBe(true);
+    // Digital silence is never a voice, whatever the floor.
+    const silent = new VoiceActivity();
+    feed(silent, 0, 2000, -100);
+    feed(silent, 2000, 2300, -70);
+    expect(silent.talking(2300)).toBe(false);
+  });
+
+  it("says the same for a device's own microphone", () => {
+    const mic = new MicAlerts(0);
+    feed(mic, 0, 3000, -62);
+    expect(mic.talking(3000)).toBe(false);
+    feed(mic, 3000, 3300, -44);
+    expect(mic.talking(3300)).toBe(true);
+    feed(mic, 3300, 4400, -62);
+    expect(mic.talking(4400)).toBe(false);
   });
 });
