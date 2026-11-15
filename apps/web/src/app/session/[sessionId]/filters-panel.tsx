@@ -4,7 +4,7 @@ import type { MessageKey } from "@/lib/i18n";
 import { useT } from "@/lib/i18n/client";
 import { hasAudioFilters, hasVideoFilters, LOOKS, NO_FILTERS, type Look, type TrackFilters } from "@tapry/shared";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
-import { cn } from "@/components/ui";
+import { Beta, cn } from "@/components/ui";
 import { canPreviewFilters, canvasFilter, tintColor } from "@/lib/client/filter-picture";
 import { DEFAULT_PREFS, type FilterPrefs } from "@/lib/client/filters";
 import { Icon, ICON } from "./icons";
@@ -209,7 +209,7 @@ export function FiltersPanel({
           </fieldset>
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className={cn("mb-1.5 text-[14px]", t.muted)}>{tr("filters.background")}</legend>
+            <legend className={cn("mb-1.5 text-[14px]", t.muted)}>{tr("filters.background")} <Beta>{tr("filters.beta")}</Beta></legend>
             <div className={cn("grid grid-cols-2 gap-0.5 rounded-md p-0.5", t.group)}>
               {BACKGROUND.map(([value, label]) => (
                 <label key={value} className="relative flex cursor-pointer">
@@ -243,6 +243,7 @@ export function FiltersPanel({
       <Switch
         tone={tone}
         label={tr("filters.noise")}
+        beta={tr("filters.beta")}
         hint={tr("filters.noiseHint")}
         checked={filters.noiseRemoval}
         onChange={(noiseRemoval) => set({ noiseRemoval })}
@@ -304,12 +305,15 @@ function LookSwatch({ look }: { look: Look }) {
 function Switch({
   tone,
   label,
+  beta,
   hint,
   checked,
   onChange,
 }: {
   tone: Tone;
   label: string;
+  /** The word for "beta" when this one isn't tuned on real use yet. */
+  beta?: string;
   hint: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -327,7 +331,7 @@ function Switch({
       className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md text-left"
     >
       <span className="flex min-w-0 flex-col gap-px">
-        <span className="font-medium">{label}</span>
+        <span className="font-medium">{label}{beta && <> <Beta className="font-medium">{beta}</Beta></>}</span>
         <span id={hintId} className={cn("text-[13.5px] leading-snug", t.muted)}>
           {hint}
         </span>

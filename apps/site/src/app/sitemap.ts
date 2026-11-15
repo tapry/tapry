@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const paths = [
     "/",
     "/use-cases/",
+    "/compare/",
     "/self-hosting/",
     "/pricing/",
     ...DOCS.map(docHref),

@@ -5,6 +5,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
+import { Beta } from "./ui";
 
 export function NotesCard({
   studioId,
@@ -54,7 +55,7 @@ export function NotesCard({
   return (
     <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-3.5" data-testid="notes" data-notes={state}>
       <span className="flex items-center justify-between gap-2 pt-3 pb-2 font-medium">
-        AI notes
+        <span>AI notes <Beta /></span>
         <span className="flex items-center gap-[5px]">
           {downloadHref && (
             <a href={downloadHref} data-file-name="Notes.md" className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-normal text-text transition-colors hover:bg-surface-2 hover:text-text">

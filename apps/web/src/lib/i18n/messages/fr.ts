@@ -212,6 +212,7 @@ export const fr: Messages = {
   "filters.touchUp": "Retouche",
   "filters.touchUpHint": "Adoucit un peu l'image.",
   "filters.noise": "Réduction du bruit",
+  "filters.beta": "Bêta",
   "filters.noiseHint": "Retire les ventilateurs et le souffle de votre son.",
   "filters.kept": "Votre enregistrement d'origine est conservé. Les filtres sont visibles dans l'appel et appliqués à vos fichiers finaux, du début à la fin : un changement fait maintenant s'applique aussi à ce qui est déjà enregistré.",
   "filters.noPreview": "Ce navigateur ne peut pas prévisualiser les filtres ; ils sont tout de même appliqués à vos fichiers.",

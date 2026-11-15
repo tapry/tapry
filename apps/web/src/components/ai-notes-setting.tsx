@@ -6,7 +6,7 @@
 import type { AiNotesView } from "@tapry/shared";
 import { useState } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
-import { cn } from "./ui";
+import { Beta, cn } from "./ui";
 import { ListCard } from "./ui-extra";
 
 export function AiNotesSetting({ initial }: { initial: AiNotesView }) {
@@ -26,7 +26,7 @@ export function AiNotesSetting({ initial }: { initial: AiNotesView }) {
     }
   }
 
-  const title = <span className="font-medium">AI notes</span>;
+  const title = <span className="font-medium">AI notes <Beta /></span>;
   const what = "A summary, chapters, key points, quotes and show notes, written from each recording's transcript as a draft for you to edit.";
 
   if (view.localModel) {

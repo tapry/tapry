@@ -4,10 +4,11 @@ Studio-quality remote recording you can host yourself. Guests join from a link i
 browser; everyone is recorded **on their own device** at full quality, uploaded while you talk,
 and turned into separate tracks you can edit. Open source, with recordings in your own storage.
 
-> **Status: 0.2.0.** The full recording flow works and is tested end to end, including an
+> **Status: 0.3, early.** The full recording flow works and is tested end to end, including an
 > hour-long two-person recording in Chromium and with Safari as the guest: nothing lost, no
-> drift (see [what's tested](docs/browser-support.md)). Expect rough edges; please
-> [report them](../../issues).
+> drift (see [what's tested](docs/browser-support.md)). It has had little use by real people
+> on real networks yet, so expect rough edges and please [report them](../../issues).
+> Everything that's built, and what hasn't been tried for real: [docs/features.md](docs/features.md).
 
 ## What it does
 
@@ -32,8 +33,16 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
   without compression. Download one by one or all as a zip; guests can download their own.
 - **Transcripts** (whisper.cpp, runs on your server, 99 languages) as TXT, Word, SRT and VTT,
   labelled by speaker.
-- **Easy to run:** a server health page for the admin, and a recording timeline that studios what's
+- **Easy to run:** a server health page for the admin, and a recording timeline that shows what's
   happening from Stop to files.
+- **Up to ten people**, in 720p, 1080p or each camera's best up to 4K; screen sharing recorded
+  as its own file; audio-only studios; solo links for recording alone.
+- **After the recording:** clips (wide, square or vertical, with captions), timelines for
+  Final Cut, REAPER and OpenTimelineIO with pauses cut, a share page, a share-safe transcript
+  with names and contact details masked, exports for NVivo and MAXQDA.
+- **AI notes that stay home:** a summary, chapters and quotes written by a model on your own
+  server (Ollama). An outside model is used only if the account's owner turns it on.
+- **For teams:** members and viewers, comments, an activity log, API keys and signed webhooks.
 - **Yours:** recordings live in your S3-compatible storage (SeaweedFS included; R2, AWS,
   Backblaze work). Storage usage per studio; deleting removes the files.
 
@@ -48,6 +57,13 @@ and turned into separate tracks you can edit. Open source, with recordings in yo
 | Open source | ✅ AGPL-3.0 | ❌ | ❌ |
 | Transcripts on your own server | ✅ | cloud | cloud |
 | Cost | your server | subscription | subscription |
+| Live streaming, webinars, a built-in editor | ❌ | ✅ | partly |
+| Mobile and desktop apps | ❌ (browser) | ✅ | ✅ |
+| Years of use at scale | ❌ (new) | ✅ | ✅ |
+
+New since the last release and still **beta** (tuned on test material, not yet on real
+sessions): the combined video that follows the speaker, background blur, noise removal and AI
+notes. All are off unless you turn them on.
 
 ## Install
 

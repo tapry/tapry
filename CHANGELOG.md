@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Beta labels** on what has only been tuned on test material so far: the combined video
+  that follows the speaker, background blur, noise removal and AI notes. Nothing about how
+  they work changed, and all stay off until chosen.
+- **Website: a comparison page** (`/compare`) against Riverside and the other studios,
+  including what Tapry doesn't do. **`docs/features.md`** lists everything that's built and
+  what hasn't been tried for real.
+
 - **Fix: the speaking mark didn't light up for an ordinary voice.** It followed the call
   server's "active speaker" list, which only reacts to fairly loud speech and with a delay.
   Each device now measures the sound itself, its own microphone and each person it hears,

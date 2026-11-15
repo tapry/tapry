@@ -50,6 +50,15 @@ export const Button = forwardRef<
 });
 
 /** The white dot in terracotta buttons that start something (Record, Join the studio). */
+/** Marks a feature that works but hasn't been tuned on real use yet. */
+export function Beta({ children = "Beta", className }: { children?: ReactNode; className?: string }) {
+  return (
+    <span data-beta className={cn("inline-block rounded border border-current px-1 align-[1px] text-[11px] leading-[1.45] font-medium tracking-wide uppercase opacity-60", className)}>
+      {children}
+    </span>
+  );
+}
+
 export function RecDot({ className }: { className?: string }) {
   return <span aria-hidden className={cn("size-[9px] rounded-full bg-current", className)} />;
 }
