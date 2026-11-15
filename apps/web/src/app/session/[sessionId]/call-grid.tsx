@@ -211,6 +211,7 @@ function Tile({
       data-testid={testId}
       data-name={name}
       data-mic={micMuted ? "muted" : "on"}
+      data-speaking={speaking && !micMuted ? "yes" : "no"}
       data-recording={recording ? "on" : "off"}
       className={cn(
         "relative overflow-hidden text-white transition-[outline-color] duration-300",
@@ -228,7 +229,7 @@ function Tile({
           full ? "bottom-3 left-3 gap-2 rounded-lg px-[11px] py-1.5 text-sm font-medium backdrop-blur-md" : "bottom-2.5 left-2.5 gap-[7px] rounded-[7px] px-[9px] py-1 text-[14px]",
         )}
       >
-        {micMuted && <MicOffIcon />}
+        <MicIndicator muted={micMuted} speaking={speaking} />
         <span className="truncate">{label}</span>
         {name !== label && <span className="text-white/60">(you)</span>}
       </span>
@@ -282,9 +283,32 @@ function Avatar({ name }: { name: string }) {
   );
 }
 
+/**
+ * Each person's microphone, always there to read: crossed out when muted, a quiet mic when
+ * it's on, and three bars that move while the call hears them speak (never otherwise: a
+ * meter that moves by itself would say a dead mic is fine).
+ */
+function MicIndicator({ muted, speaking }: { muted: boolean; speaking: boolean }) {
+  if (muted) return <MicOffIcon />;
+  if (speaking) {
+    return (
+      <span role="img" aria-label="Speaking" data-testid="mic-indicator" data-state="speaking" className="flex h-[13px] w-[13px] shrink-0 items-center justify-center gap-[2px] text-[#4ade80]">
+        {[0.9, 0.6, 0.75].map((d, i) => (
+          <span key={i} className="h-full w-[2.5px] origin-center rounded-full bg-current" style={{ animation: `eq ${d}s ease-in-out ${(-i * 0.17).toFixed(2)}s infinite` }} />
+        ))}
+      </span>
+    );
+  }
+  return (
+    <svg role="img" aria-label="Microphone on" data-testid="mic-indicator" data-state="on" viewBox="0 0 24 24" className="size-[13px] shrink-0 text-white/75" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={ICON.mic} />
+    </svg>
+  );
+}
+
 function MicOffIcon() {
   return (
-    <svg aria-label="Muted" viewBox="0 0 24 24" className="size-[13px] shrink-0 text-[#ff8f78]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg role="img" aria-label="Muted" data-testid="mic-indicator" data-state="muted" viewBox="0 0 24 24" className="size-[13px] shrink-0 text-[#ff8f78]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d={ICON.micOff} />
     </svg>
   );
