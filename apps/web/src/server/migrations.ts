@@ -586,4 +586,13 @@ ALTER TABLE users ADD COLUMN education_at timestamptz;
 ALTER TABLE users ADD COLUMN education_requested_at timestamptz;
 ALTER TABLE users ADD COLUMN education_school text NOT NULL DEFAULT '';
 `,
+  `
+-- Clips for phones and feeds: square or vertical frames built from each person's camera, and captions burned in.
+ALTER TABLE clips ADD COLUMN shape text NOT NULL DEFAULT 'wide' CHECK (shape IN ('wide', 'square', 'vertical'));
+ALTER TABLE clips ADD COLUMN captions boolean NOT NULL DEFAULT false;
+`,
+  `
+-- The studio's logo in a corner of the combined video.
+ALTER TABLE studio_brands ADD COLUMN on_video boolean NOT NULL DEFAULT false;
+`,
 ];

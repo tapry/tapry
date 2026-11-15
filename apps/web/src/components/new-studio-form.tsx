@@ -7,12 +7,12 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
 import { STUDIO_TEMPLATES, templateConsent, type StudioTemplate } from "@/lib/studio-templates";
+import { MAX_GUESTS } from "@tapry/shared";
 import { Stepper } from "./studio-forms";
 import { Icon, Spinner } from "./ui-extra";
 import { Avatar, CheckboxRow, cn, Logo, Notice } from "./ui";
 
 const MAX_NAME = 100;
-const MAX_GUESTS = 7;
 
 /** The "New studio" screen: a name, how many guests, video quality and sound options. */
 export function NewStudioForm({ hostName, firstStudio, can4k = true }: { hostName: string; firstStudio: boolean; /** This account may record in 4K. */ can4k?: boolean }) {

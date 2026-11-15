@@ -1,7 +1,7 @@
 // Studio branding: a logo and a colour for the pages guests open. Kept per studio, shown only
 // while the account may brand (its plan, on Tapry Cloud), and the logo is only ever an image.
 import { describe, expect, it } from "vitest";
-import { sniffImage, textOn } from "../src/server/brand";
+import { sniffImage, textOn, videoLogo } from "../src/server/brand";
 import { createServer, expectOk } from "./harness";
 
 const PASSWORD = "correct horse battery";
@@ -32,7 +32,7 @@ describe("studio branding", () => {
   it("gives a studio's guests its colour and logo, on every page they open", async () => {
     const t = await setup();
     expect(await t.services.brand.forInvite(t.studio.inviteCode)).toBeNull();
-    expect((await expectOk(t.host.get(`/studios/${t.studio.id}/brand`))).body).toEqual({ accent: null, accentText: null, logoUrl: null, allowed: true });
+    expect((await expectOk(t.host.get(`/studios/${t.studio.id}/brand`))).body).toEqual({ accent: null, accentText: null, logoUrl: null, allowed: true, onVideo: false });
 
     const set = (await expectOk(t.host.put(`/studios/${t.studio.id}/brand`, { accent: "#1D4ED8" }))).body;
     expect(set).toMatchObject({ accent: "#1d4ed8", accentText: "#ffffff", logoUrl: null });
@@ -70,6 +70,15 @@ describe("studio branding", () => {
     expect((await t.fetchFor()(new Request(`https://app.test${next}`))).headers.get("content-type")).toBe("image/jpeg");
     expect((await put(new Uint8Array(600 * 1024).fill(1))).status).toBe(413);
     expect((await put(jpeg, {})).status).toBe(401);
+
+    // The logo on the combined video: off until asked for, and only this studio's recordings get it.
+    const recordingId = (await expectOk(t.client({ token: ticket.token }).post(`/sessions/${ticket.sessionId}/recordings`))).body.recording.id;
+    expect(await videoLogo(t.db, recordingId)).toBeNull();
+    expect((await expectOk(t.host.put(`/studios/${t.studio.id}/brand`, { onVideo: true }))).body).toMatchObject({ onVideo: true, accent: "#1d4ed8" });
+    expect((await videoLogo(t.db, recordingId))!.type).toBe("image/jpeg");
+    expect(await videoLogo(t.db, "rec_nope")).toBeNull();
+    await expectOk(t.host.put(`/studios/${t.studio.id}/brand`, { onVideo: false }));
+    expect(await videoLogo(t.db, recordingId)).toBeNull();
 
     // Removing each part puts Tapry's back.
     expect((await expectOk(t.host.del(`/studios/${t.studio.id}/brand/logo`))).body.logoUrl).toBeNull();

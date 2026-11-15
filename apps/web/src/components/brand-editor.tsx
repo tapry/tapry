@@ -97,6 +97,22 @@ export function BrandEditor({ studioId, studioName, initial }: { studioId: strin
           )}
           <span className="text-[14px] text-muted">PNG, JPEG or WebP, 512 KB at most.</span>
         </div>
+        {brand.logoUrl && (
+          <label className="flex cursor-pointer items-start gap-2.5 text-[14.5px] leading-snug">
+            <input
+              type="checkbox"
+              checked={brand.onVideo}
+              disabled={busy || (!brand.allowed && !brand.onVideo)}
+              data-testid="brand-on-video"
+              onChange={(e) => void run(() => apiFetch<BrandSettings>(`/studios/${studioId}/brand`, { method: "PUT", body: { onVideo: e.target.checked } }))}
+              className="mt-0.5 size-4 shrink-0"
+            />
+            <span>
+              Put the logo in the corner of the combined video
+              <span className="block text-[13.5px] text-muted">For recordings processed from now on. Per-person files never carry it.</span>
+            </span>
+          </label>
+        )}
 
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="flex items-center gap-2.5 text-sm">

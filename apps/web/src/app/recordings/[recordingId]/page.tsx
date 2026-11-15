@@ -244,7 +244,14 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
           {ready && sound && <ShareCard studioId={r.studioId} recordingId={r.id} initial={share} hasTranscript={r.transcript === "ready"} video={sound.fileName.endsWith(".mp4")} />}
           <CommentsCard recordingId={r.id} comments={comments} />
           {r.transcript === "ready" && transcript.turns && transcript.turns.length > 0 && <SafeTranscript recordingId={r.id} />}
-          {ready && r.outputs.some((o) => o.kind === "combined") && <ClipsCard studioId={r.studioId} recordingId={r.id} clips={clips} lengthMs={lengthMs} />}
+          {ready && r.outputs.some((o) => o.kind === "combined") && <ClipsCard
+              studioId={r.studioId}
+              recordingId={r.id}
+              clips={clips}
+              lengthMs={lengthMs}
+              shapes={r.outputs.some((o) => o.kind === "video")}
+              captions={r.transcript === "ready" && r.outputs.some((o) => o.kind === "combined" && o.fileName.toLowerCase().endsWith(".mp4"))}
+            />}
           {markers.length > 0 && (
             <div className="flex flex-col rounded-xl border border-border bg-surface px-[18px] pt-1 pb-2" data-testid="markers">
               <span className="pt-3 pb-2 font-medium">Markers</span>

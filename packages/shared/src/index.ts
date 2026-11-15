@@ -63,7 +63,17 @@ export const safeTranscriptBody = z.object({
   preview: z.boolean().optional(),
 });
 /** Cut a clip out of a finished recording: from and to in ms from its start, and an optional title for the file's name. */
-export const clipBody = z.object({ startMs: z.number().min(0), endMs: z.number().min(0), title: plainText(80).optional() });
+/** The frame of a clip: as the combined video (16:9), or built again from each person's camera for phones and feeds. */
+export const CLIP_SHAPES = ["wide", "square", "vertical"] as const;
+export type ClipShape = (typeof CLIP_SHAPES)[number];
+export const clipBody = z.object({
+  startMs: z.number().min(0),
+  endMs: z.number().min(0),
+  title: plainText(80).optional(),
+  shape: z.enum(CLIP_SHAPES).optional(),
+  /** What is said, written on the picture (from the transcript). */
+  captions: z.boolean().optional(),
+});
 /** A studio's solo link: on or off, and what the person is asked to talk about (one question per line). */
 export const soloSettingsBody = z.object({ enabled: z.boolean(), prompt: z.string().max(4000) });
 /** Someone opens a solo link to record alone. */
@@ -85,7 +95,11 @@ export const markerBody = z.object({ label: plainText(200).optional() });
 export const producerBody = z.object({ producer: z.boolean() });
 /** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
 /** A studio's accent colour for guest pages; null puts Tapry's back. */
-export const brandBody = z.object({ accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable() });
+export const brandBody = z.object({
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  /** The logo in a corner of the combined video. */
+  onVideo: z.boolean().optional(),
+});
 /** What a host keeps about a guest, by the name they record under. Both empty: nothing is kept. */
 export const guestNoteBody = z.object({
   name: plainText(60),
@@ -156,13 +170,16 @@ export type FrameRate = (typeof FRAME_RATES)[number];
 /** The rate as ffmpeg takes it: 29.97 is exactly 30000/1001. */
 export const ffmpegFrameRate = (rate: FrameRate) => (rate === "29.97" ? "30000/1001" : rate);
 
+/** The most guests a studio can have besides the host. */
+export const MAX_GUESTS = 9;
+
 const settingsFields = {
   videoQuality: z.enum(VIDEO_QUALITIES),
   frameRate: z.enum(FRAME_RATES),
   /** Delete each recording this many days after its files are ready. Null: keep until someone deletes it. */
   deleteAfterDays: z.number().int().min(1).max(3650).nullable(),
-  /** Guests besides the host. v1 targets 2–4 people in total. */
-  maxGuests: z.number().int().min(1).max(7),
+  /** Guests besides the host: up to ten people in all. */
+  maxGuests: z.number().int().min(1).max(MAX_GUESTS),
   /** Off gives better audio for guests on headphones. */
   echoCancellation: z.boolean(),
   /** Bring each person's audio, and the combined mix, to a common level for spoken audio (-16 LUFS) after recording. */
@@ -171,6 +188,8 @@ const settingsFields = {
   audioOnly: z.boolean(),
   /** Write each person's name on their picture in the combined video. (A tile with no camera always carries its name: there is nothing else on it.) */
   nameLabels: z.boolean(),
+  /** The combined video: everyone side by side throughout, or full frame on whoever is speaking (the grid while several talk or nobody does). */
+  combinedLayout: z.enum(["grid", "speaker"]),
   /** Guests can download their own recording (their WAV, and MP4 with a camera) from the end screen. */
   guestDownloads: z.boolean(),
   /** Per-person audio (and the mix of an audio-only recording): WAV opens anywhere, FLAC is lossless at about half the size. */
@@ -192,6 +211,7 @@ export const studioSettings = z.object({
   frameRate: settingsFields.frameRate.default("30"),
   deleteAfterDays: settingsFields.deleteAfterDays.default(null),
   nameLabels: settingsFields.nameLabels.default(true),
+  combinedLayout: settingsFields.combinedLayout.default("grid"),
 });
 
 /** The languages the pages a guest opens can be in (the app's guest-page languages). */

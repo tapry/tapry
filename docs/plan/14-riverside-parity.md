@@ -182,3 +182,8 @@ on request at Enterprise. A consent record per recording: none found. Recording 
 a producer seat, an API, timeline export and frame-rate choice: Business or Enterprise elsewhere,
 included here. Guest tech-check link, per-guest live upload status and quality alerts, research
 exports (NVivo, MAXQDA, ATLAS.ti), share-safe transcripts.
+
+Built 15 Nov 2026 from the table above: a combined video that follows the speaker, captions
+burned into clips, square and vertical clips, the studio's logo on the combined video, and ten
+recorded people. Not built from it: intro/outro and a name-and-title lower third, filler-word
+removal (needs word times), Drive/Dropbox delivery (needs their developer accounts).

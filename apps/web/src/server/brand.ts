@@ -22,6 +22,8 @@ export interface Brand {
 export interface BrandSettings extends Brand {
   /** The account may brand its studios (its plan, on Tapry Cloud). */
   allowed: boolean;
+  /** The logo is put in a corner of the combined video (recordings processed from then on). */
+  onVideo: boolean;
 }
 
 /** The image types a logo may be, told from the file's first bytes, never from what the browser says. */
@@ -104,8 +106,8 @@ export class BrandService {
   /** The studio's settings page. */
   async view(user: User, studioId: string): Promise<BrandSettings> {
     await this.owned(user, studioId);
-    const [row] = await this.db.query<Row>("SELECT studio_id, '' AS owner_id, accent, logo_hash FROM studio_brands WHERE studio_id = $1", [studioId]);
-    return { ...this.toBrand(row), allowed: await this.allows(user.accountId) };
+    const [row] = await this.db.query<Row & { on_video: boolean }>("SELECT studio_id, '' AS owner_id, accent, logo_hash, on_video FROM studio_brands WHERE studio_id = $1", [studioId]);
+    return { ...this.toBrand(row), allowed: await this.allows(user.accountId), onVideo: !!row?.on_video };
   }
 
   /** Clearing is always possible, whatever the plan. */
@@ -116,6 +118,18 @@ export class BrandService {
       `INSERT INTO studio_brands (studio_id, accent) VALUES ($1, $2)
        ON CONFLICT (studio_id) DO UPDATE SET accent = EXCLUDED.accent, updated_at = now()`,
       [studioId, accent?.toLowerCase() ?? null],
+    );
+    return this.view(user, studioId);
+  }
+
+  /** The logo on the combined video, on or off. Off is always possible, whatever the plan. */
+  async setOnVideo(user: User, studioId: string, on: boolean): Promise<BrandSettings> {
+    if (on) await this.check(user, studioId);
+    else await this.owned(user, studioId);
+    await this.db.query(
+      `INSERT INTO studio_brands (studio_id, on_video) VALUES ($1, $2)
+       ON CONFLICT (studio_id) DO UPDATE SET on_video = EXCLUDED.on_video, updated_at = now()`,
+      [studioId, on],
     );
     return this.view(user, studioId);
   }
@@ -151,4 +165,17 @@ export class BrandService {
     if (!row?.logo || !row.logo_type || !row.logo_hash) return null;
     return { bytes: Buffer.from(row.logo, "base64"), type: row.logo_type, hash: row.logo_hash };
   }
+}
+
+/**
+ * The logo to put on a recording's combined video: the studio's, when its settings say so.
+ * (Whether the account's plan covers branding is the caller's to check.)
+ */
+export async function videoLogo(db: { query: Db["query"] }, recordingId: string): Promise<{ bytes: Uint8Array; type: string } | null> {
+  const [row] = await db.query<{ logo: string | null; logo_type: string | null }>(
+    `SELECT b.logo, b.logo_type FROM studio_brands b JOIN sessions s ON s.studio_id = b.studio_id JOIN recordings r ON r.session_id = s.id
+     WHERE r.id = $1 AND b.on_video AND b.logo IS NOT NULL`,
+    [recordingId],
+  );
+  return row?.logo && row.logo_type ? { bytes: Buffer.from(row.logo, "base64"), type: row.logo_type } : null;
 }

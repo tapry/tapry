@@ -4,7 +4,7 @@
 // delete, and logging out. Creating a studio has its own page (new-studio-form.tsx).
 import { SELECTED_CARD, UNSELECTED_CARD } from "./quality-options";
 import { qualityOptions, type QualityChoice } from "./quality-options";
-import { defaultConsentText, type SessionTicket, type StudioSettings, FRAME_RATES, type FrameRate } from "@tapry/shared";
+import { defaultConsentText, MAX_GUESTS, type SessionTicket, type StudioSettings, FRAME_RATES, type FrameRate } from "@tapry/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
 import { apiFetch, ApiRequestError, saveTicket } from "@/lib/client/api";
@@ -130,6 +130,7 @@ export function StudioSettingsForm({
             echoCancellation: f.get("echoCancellation") === "on",
             levelLoudness: f.get("levelLoudness") === "on",
             nameLabels: f.get("nameLabels") === "on",
+            combinedLayout: f.get("combinedLayout") === "speaker" ? "speaker" : "grid",
             guestDownloads: f.get("guestDownloads") === "on",
             consentText: String(f.get("consentText") ?? ""),
             audioFormat: f.get("audioFormat") === "flac" ? "flac" : "wav",
@@ -189,7 +190,7 @@ export function StudioSettingsForm({
             </div>
           </fieldset>
           <Row label={<span id="guests-label">Number of guests</span>} help="Not counting you.">
-            <Stepper value={guests} min={1} max={7} onChange={setGuests} labelledBy="guests-label" />
+            <Stepper value={guests} min={1} max={MAX_GUESTS} onChange={setGuests} labelledBy="guests-label" />
           </Row>
           <SwitchRow
             name="echoCancellation"
@@ -203,6 +204,15 @@ export function StudioSettingsForm({
             label="Even out everyone's volume"
             help="Quiet guests are brought up to the same level as everyone else (−16 LUFS, a common level for spoken audio). Only the volume changes, never how anyone sounds. Applies to recordings processed from now on."
           />
+          <Row
+            label={<label htmlFor="combined-layout">Combined video</label>}
+            help="One video of everyone, made after each recording. Following the speaker shows whoever is talking full frame, and everyone side by side while several talk or nobody does. Applies to recordings processed from now on."
+          >
+            <Select id="combined-layout" name="combinedLayout" defaultValue={settings.combinedLayout} className="sm:w-[280px]">
+              <option value="grid">Everyone side by side</option>
+              <option value="speaker">Follows the speaker</option>
+            </Select>
+          </Row>
           <SwitchRow
             name="nameLabels"
             defaultChecked={settings.nameLabels}

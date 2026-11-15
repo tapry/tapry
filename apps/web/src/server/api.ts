@@ -602,7 +602,16 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
 
     /** A studio's logo and colour for the pages its guests open. */
     getBrand: asUser(async (svc, user, _req, params) => json(200, await svc.brand.view(user, params.studioId!))),
-    setBrand: asUser(async (svc, user, req, params) => json(200, await svc.brand.setAccent(user, params.studioId!, (await parseBody(req, brandBody)).accent)), { log: "Changed a studio's branding" }),
+    setBrand: asUser(
+      async (svc, user, req, params) => {
+        const body = await parseBody(req, brandBody);
+        let view = await svc.brand.view(user, params.studioId!);
+        if (body.accent !== undefined) view = await svc.brand.setAccent(user, params.studioId!, body.accent);
+        if (body.onVideo !== undefined) view = await svc.brand.setOnVideo(user, params.studioId!, body.onVideo);
+        return json(200, view);
+      },
+      { log: "Changed a studio's branding" },
+    ),
     /** The image itself is the request's body. */
     setBrandLogo: asUser(async (svc, user, req, params) => json(200, await svc.brand.setLogo(user, params.studioId!, await readCapped(req.body, LOGO_MAX_BYTES))), { log: "Changed a studio's branding" }),
     removeBrandLogo: asUser(async (svc, user, _req, params) => json(200, await svc.brand.removeLogo(user, params.studioId!)), { log: "Changed a studio's branding" }),

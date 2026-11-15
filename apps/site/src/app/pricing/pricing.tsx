@@ -33,7 +33,7 @@ export function Plans() {
       name: "Self-hosted",
       price: "$0",
       per: "forever",
-      desc: "Everything, on your server. Unlimited recordings and hours, up to 8 people in each.",
+      desc: "Everything, on your server. Unlimited recordings and hours, up to 10 people in each.",
       cta: { label: "Read the setup guide", href: "/self-hosting/" },
       highlight: false,
       tag: null,

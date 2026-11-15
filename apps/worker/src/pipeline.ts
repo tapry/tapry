@@ -1,3 +1,4 @@
+import { detectSpeech, speakerShots, type Interval } from "./speaker.js";
 import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -83,6 +84,13 @@ export interface PipelineOptions {
   font?: string | null;
   /** Names on the camera tiles of the combined video (default: yes). A tile without a camera always has its name. */
   nameLabels?: boolean;
+  /**
+   * The combined video: everyone side by side throughout ("grid", the default), or the person
+   * who has the floor full frame and the grid while several talk or nobody does ("speaker").
+   */
+  combinedLayout?: "grid" | "speaker";
+  /** A PNG to put in the top-right corner of the combined video (the studio's logo). */
+  logoPath?: string;
   /** Level every person's audio, and the combined mix, to this target. Unset or null: left as recorded. */
   loudness?: LoudnessTarget | null;
   /** Audio files as WAV (default) or FLAC (lossless, about half the size). */
@@ -148,6 +156,8 @@ function cappedVideo(height: VideoHeight) {
 const TILE_BG = "0x202020";
 /** The sharer's camera in the corner of the combined video while their screen fills it. */
 const PIP = { w: 352, h: 198, margin: 28 };
+/** The studio's logo on the combined video: at most this big, this far from the corner, slightly see-through. */
+const LOGO = { maxW: 300, h: 64, margin: 36, opacity: 0.9 };
 
 /** Join chunk files into one, in the order given. MediaRecorder chunks are byte-continuous. */
 export async function concatChunks(chunkPaths: string[], outPath: string) {
@@ -454,7 +464,8 @@ const volumeFilter = (gainDb: number | undefined) => (gainDb && Math.abs(gainDb)
 
 /** Grid for n tiles in a 16:9 frame: 1 → 1×1, 2 → 2×1, 3–4 → 2×2, 5–9 → 3×3. */
 export function gridLayout(n: number, width = 1920, height = 1080) {
-  const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
+  // Ten people are four across in three rows, so every tile keeps a camera's shape.
+  const cols = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4;
   const rows = Math.ceil(n / cols);
   const even = (x: number) => Math.floor(x / 2) * 2;
   const tileW = even(width / cols);
@@ -948,6 +959,32 @@ async function renderCombined(
     canvas = `c${i}`;
     if (audio) voices.push(audio.path);
   }
+  // Follows the speaker: whoever has the floor fills the frame; the grid stays under it for the
+  // rest. Worked out from each person's own audio, so it needs no transcript. If it can't be
+  // worked out, the video is the grid: never a reason to fail.
+  if (opts.combinedLayout === "speaker" && participants.length >= 2) {
+    const durationS = opts.durationMs / 1000;
+    const speech = new Map<string, Interval[]>();
+    const withCamera = new Set<string>();
+    for (const pid of participants) {
+      const audio = rendered.find((o) => o.participantId === pid && o.kind === "audio" && !o.original);
+      if (rendered.some((o) => o.participantId === pid && o.kind === "video")) withCamera.add(pid);
+      speech.set(pid, audio ? await detectSpeech(opts.ffmpeg, audio.path, durationS, timeoutMs).catch(() => []) : []);
+    }
+    const shots = speakerShots(speech, durationS, withCamera);
+    const full = { w: 1920, h: 1080 };
+    for (const [k, pid] of [...new Set(shots.map((s) => s.id))].entries()) {
+      const video = rendered.find((o) => o.participantId === pid && o.kind === "video")!;
+      const name = tracks.find((t) => t.participantId === pid)!.participantName;
+      const when = shots.filter((s) => s.id === pid).map((s) => `between(t,${num(s.start)},${num(s.end)})`).join("+");
+      const label = font && opts.nameLabels !== false ? await nameLabel(fontForName(name, font, wide), name, full, false, join(opts.workDir, `label-full-${k}.txt`)) : "";
+      args.push("-i", video.path);
+      filters.push(`[${input}:v]scale=${full.w}:${full.h}:force_original_aspect_ratio=decrease,pad=${full.w}:${full.h}:(ow-iw)/2:(oh-ih)/2:color=${TILE_BG},setsar=1${label}[f${k}]`);
+      filters.push(`[${canvas}][f${k}]overlay=x=0:y=0:shortest=0:enable='${when}'[cf${k}]`);
+      canvas = `cf${k}`;
+      input++;
+    }
+  }
   // While someone shares their screen it fills the frame, with their camera small in a corner;
   // the grid is back when they stop. (The screen's file is black outside those times.)
   for (const [j, screen] of rendered.filter((o) => o.kind === "screen" && o.intervals?.length).entries()) {
@@ -965,6 +1002,14 @@ async function renderCombined(
       canvas = `cp${j}`;
       input++;
     }
+  }
+  // The studio's logo, small in the top-right corner, over everything.
+  if (opts.logoPath) {
+    args.push("-i", opts.logoPath);
+    filters.push(`[${input}:v]scale=${LOGO.maxW}:${LOGO.h}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa=${LOGO.opacity}[logo]`);
+    filters.push(`[${canvas}][logo]overlay=x=W-w-${LOGO.margin}:y=${LOGO.margin}:shortest=0[cl]`);
+    canvas = "cl";
+    input++;
   }
   // Voices go in after the cameras, so their input numbers follow.
   if (!opts.loudness) {

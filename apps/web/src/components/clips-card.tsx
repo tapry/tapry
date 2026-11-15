@@ -16,7 +16,25 @@ export function parseClock(text: string): number | null {
   return Math.round(parts.reduce((total, p) => total * 60 + Number(p), 0) * 1000);
 }
 
-export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId: string; recordingId: string; clips: Clip[]; lengthMs: number }) {
+const SHAPE_NAMES = { wide: "Wide (16:9)", square: "Square (1:1)", vertical: "Vertical (9:16)" } as const;
+
+export function ClipsCard({
+  studioId,
+  recordingId,
+  clips,
+  lengthMs,
+  shapes = false,
+  captions = false,
+}: {
+  studioId: string;
+  recordingId: string;
+  clips: Clip[];
+  lengthMs: number;
+  /** Someone had a camera on: square and vertical clips can be built from the cameras. */
+  shapes?: boolean;
+  /** The recording has a picture and a transcript: captions can be written on a clip. */
+  captions?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -39,7 +57,10 @@ export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId
     setProblem(null);
     try {
       const title = String(data.get("title") ?? "").trim();
-      await apiFetch(`/studios/${studioId}/recordings/${recordingId}/clips`, { body: { startMs, endMs, ...(title ? { title } : {}) } });
+      const shape = String(data.get("shape") ?? "wide");
+      await apiFetch(`/studios/${studioId}/recordings/${recordingId}/clips`, {
+        body: { startMs, endMs, ...(title ? { title } : {}), ...(shape !== "wide" ? { shape } : {}), ...(data.get("captions") === "on" ? { captions: true } : {}) },
+      });
       form.reset();
       router.refresh();
     } catch (err) {
@@ -79,10 +100,32 @@ export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId
           Name (optional)
           <input name="title" maxLength={80} placeholder="The hard year" className={field} />
         </label>
+        {shapes && (
+          <label className="flex flex-col gap-1 text-[13.5px] text-muted">
+            Shape
+            <select name="shape" defaultValue="wide" className={`${field} w-[150px]`}>
+              <option value="wide">{SHAPE_NAMES.wide}</option>
+              <option value="square">{SHAPE_NAMES.square}</option>
+              <option value="vertical">{SHAPE_NAMES.vertical}</option>
+            </select>
+          </label>
+        )}
+        {captions && (
+          <label className="flex h-[34px] cursor-pointer items-center gap-2 text-[14.5px] text-text-2">
+            <input type="checkbox" name="captions" className="size-4" />
+            Captions on the picture
+          </label>
+        )}
         <Button type="submit" size="sm" disabled={busy}>
           Cut the clip
         </Button>
       </form>
+      {shapes && (
+        <span className="pt-2 text-[13.5px] leading-normal text-pretty text-muted">
+          Square and vertical clips are built from each person&apos;s camera, filled to the frame; a shared screen isn&apos;t in them.
+          {captions ? " Captions come from the transcript, a few words at a time." : ""}
+        </span>
+      )}
       {problem && (
         <span role="alert" className="pt-2 text-[14px] text-danger">
           {problem}
@@ -96,6 +139,8 @@ export function ClipsCard({ studioId, recordingId, clips, lengthMs }: { studioId
                 <span className="truncate">
                   {shortClock(c.startMs)} to {shortClock(c.endMs)}
                   {c.title && ` · ${c.title}`}
+                  {c.shape !== "wide" && ` · ${c.shape}`}
+                  {c.captions && " · captions"}
                 </span>
                 <span className="text-[13.5px] text-muted">{c.status === "queued" ? "Being cut…" : c.status === "failed" ? "Couldn't be cut. Delete it and try again." : `${c.output!.fileName.split(".").pop()!.toUpperCase()} · ${formatBytes(c.output!.bytes)}`}</span>
               </span>
