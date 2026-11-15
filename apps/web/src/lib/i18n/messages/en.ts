@@ -220,6 +220,7 @@ export const en = {
   "filters.touchUp": "Touch-up",
   "filters.touchUpHint": "Softens the picture a little.",
   "filters.noise": "Noise removal",
+  "filters.beta": "Beta",
   "filters.noiseHint": "Takes fans and hiss out of your sound.",
   "filters.kept": "Your original recording is kept. Filters are shown in the call and applied to your finished files, from start to end: a change now also applies to what was already recorded.",
   "filters.noPreview": "This browser can't preview filters; they're still applied to your files.",

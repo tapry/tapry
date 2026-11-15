@@ -206,11 +206,11 @@ export function StudioSettingsForm({
           />
           <Row
             label={<label htmlFor="combined-layout">Combined video</label>}
-            help="One video of everyone, made after each recording. Following the speaker shows whoever is talking full frame, and everyone side by side while several talk or nobody does. Applies to recordings processed from now on."
+            help="One video of everyone, made after each recording. Following the speaker shows whoever is talking full frame, and everyone side by side while several talk or nobody does; it is new, so check the result before you publish it. Applies to recordings processed from now on."
           >
             <Select id="combined-layout" name="combinedLayout" defaultValue={settings.combinedLayout} className="sm:w-[280px]">
               <option value="grid">Everyone side by side</option>
-              <option value="speaker">Follows the speaker</option>
+              <option value="speaker">Follows the speaker (beta)</option>
             </Select>
           </Row>
           <SwitchRow

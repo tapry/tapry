@@ -14,9 +14,9 @@ const developers: Array<[string, string]> = [
 ];
 const help: Col = ["Help", [["Support", "/resources/#help"], ["Changelog", "/resources/#changelog"], ["Free tools", "/tools/"], ["Privacy", "/legal/#privacy"], ["Terms", "/legal/#terms"]]];
 
-const PAGE_COLS: Col[] = [["Product", [["Studio", "/#capture"], ["Use cases", "/use-cases/"], ["Pricing", "/pricing/"]]], ["Company", company], ["Developers", developers], help];
+const PAGE_COLS: Col[] = [["Product", [["Studio", "/#capture"], ["Use cases", "/use-cases/"], ["Compare", "/compare/"], ["Pricing", "/pricing/"]]], ["Company", company], ["Developers", developers], help];
 
-const LANDING_COLS: Col[] = [["Product", [["Studio", "#capture"], ["Storage", "#formats"], ["Use cases", "/use-cases/"], ["Pricing", "/pricing/"]]], ["Company", company], ["Developers", developers], help];
+const LANDING_COLS: Col[] = [["Product", [["Studio", "#capture"], ["Storage", "#formats"], ["Use cases", "/use-cases/"], ["Compare", "/compare/"], ["Pricing", "/pricing/"]]], ["Company", company], ["Developers", developers], help];
 
 export function Footer({ landing = false }: { landing?: boolean }) {
   const cols = landing ? LANDING_COLS : PAGE_COLS;

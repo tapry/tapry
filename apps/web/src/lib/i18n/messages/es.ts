@@ -212,6 +212,7 @@ export const es: Messages = {
   "filters.touchUp": "Retoque",
   "filters.touchUpHint": "Suaviza un poco la imagen.",
   "filters.noise": "Reducción de ruido",
+  "filters.beta": "Beta",
   "filters.noiseHint": "Quita ventiladores y siseo de tu sonido.",
   "filters.kept": "Tu grabación original se conserva. Los filtros se ven en la llamada y se aplican a tus archivos finales, de principio a fin: un cambio ahora también se aplica a lo ya grabado.",
   "filters.noPreview": "Este navegador no puede previsualizar los filtros; aun así se aplican a tus archivos.",

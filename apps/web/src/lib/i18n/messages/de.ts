@@ -212,6 +212,7 @@ export const de: Messages = {
   "filters.touchUp": "Weichzeichnen",
   "filters.touchUpHint": "Macht das Bild etwas weicher.",
   "filters.noise": "Rauschunterdrückung",
+  "filters.beta": "Beta",
   "filters.noiseHint": "Entfernt Lüfter und Rauschen aus Ihrem Ton.",
   "filters.kept": "Ihre Originalaufnahme bleibt erhalten. Filter sind im Gespräch zu sehen und werden auf Ihre fertigen Dateien angewendet, von Anfang bis Ende: Eine Änderung jetzt gilt auch für bereits Aufgenommenes.",
   "filters.noPreview": "Dieser Browser kann Filter nicht in der Vorschau zeigen; auf Ihre Dateien werden sie trotzdem angewendet.",

@@ -212,6 +212,7 @@ export const pt: Messages = {
   "filters.touchUp": "Retoque",
   "filters.touchUpHint": "Suaviza um pouco a imagem.",
   "filters.noise": "Redução de ruído",
+  "filters.beta": "Beta",
   "filters.noiseHint": "Tira ventoinhas e ruído de fundo do seu som.",
   "filters.kept": "A sua gravação original é mantida. Os filtros aparecem na chamada e são aplicados aos seus ficheiros finais, do início ao fim: uma alteração agora aplica-se também ao que já foi gravado.",
   "filters.noPreview": "Este navegador não consegue pré-visualizar os filtros; são aplicados aos seus ficheiros na mesma.",
