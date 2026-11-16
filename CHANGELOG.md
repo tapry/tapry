@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: on an iPhone, a camera turned off and on again stayed dark for the others** while the
+  person's own view was back. On iPhones, iPads and Safari the call now gets a fresh copy of
+  the camera when it comes back on. The call diagnostics note each switch.
+
 - **A phone held upright sends the call a proper small picture.** The call's copy of the
   camera is scaled by its short side, so an iPhone's 2160x3840 becomes 360x640 (it was scaled
   by its height to about 200x360).
