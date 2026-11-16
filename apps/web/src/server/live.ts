@@ -98,6 +98,12 @@ export class LiveService {
     await this.publish(p.sessionId);
   }
 
+  /** How this person is shown in the call: mirrored on everyone's screen, or as the camera sees them. Display only. */
+  async setAppearance(p: Participant, mirrored: boolean) {
+    const [changed] = await this.db.query("UPDATE participants SET mirrored = $2 WHERE id = $1 AND mirrored <> $2 RETURNING id", [p.id, mirrored]);
+    if (changed) await this.publish(p.sessionId);
+  }
+
   async state(sessionId: string): Promise<SessionState> {
     const [session] = await this.db.query<{ id: string; studio_id: string; status: "open" | "solo" | "ended" }>(
       "SELECT id, studio_id, status FROM sessions WHERE id = $1",
@@ -114,8 +120,8 @@ export class LiveService {
        ORDER BY (status = 'recording') DESC, started_at DESC LIMIT 1`,
       [sessionId],
     );
-    const participants = await this.db.query<{ id: string; display_name: string; role: "host" | "guest"; producer: boolean }>(
-      "SELECT id, display_name, role, producer FROM participants WHERE session_id = $1 ORDER BY created_at",
+    const participants = await this.db.query<{ id: string; display_name: string; role: "host" | "guest"; producer: boolean; mirrored: boolean }>(
+      "SELECT id, display_name, role, producer, mirrored FROM participants WHERE session_id = $1 ORDER BY created_at",
       [sessionId],
     );
     const uploads = recording
@@ -141,7 +147,7 @@ export class LiveService {
       recording: recording
         ? { id: recording.id, status: recording.status, startedAt: recording.started_at, stoppedAt: recording.stopped_at }
         : null,
-      participants: participants.map((p) => ({ id: p.id, displayName: p.display_name, role: p.role, producer: p.producer })),
+      participants: participants.map((p) => ({ id: p.id, displayName: p.display_name, role: p.role, producer: p.producer, mirrored: p.mirrored })),
       health: [...(this.hub.health.get(sessionId)?.values() ?? [])].filter((h) => participants.some((p) => p.id === h.participantId)),
       serverTime: this.now(),
     };

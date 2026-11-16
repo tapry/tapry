@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **"Others see me mirrored"** (Filters, under "Mirror my view"): flips your picture on
+  everyone's screen in the call, including people who join later. Off by default. The
+  recording is never flipped, so writing you hold up still reads correctly in the files.
+
 - **Storage that refuses uploads is now seen.** Every worker checks that the server's storage
   takes a small write every 5 minutes (every 30 s while it fails); when it doesn't, every
   dashboard page says recordings can't be uploaded right now, nothing is lost, and when it

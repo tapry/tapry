@@ -93,6 +93,8 @@ export const guideBody = z.object({ guide: z.string().max(8000) });
 export const markerBody = z.object({ label: plainText(200).optional() });
 /** A host joins as a producer (in the call, never recorded) or as someone who is recorded. */
 export const producerBody = z.object({ producer: z.boolean() });
+/** How a person asks to be shown in the call: `mirrored`, flipped on everyone's screen (never in the files). */
+export const appearanceBody = z.object({ mirrored: z.boolean() });
 /** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
 /** A studio's accent colour for guest pages; null puts Tapry's back. */
 export const brandBody = z.object({
@@ -384,7 +386,8 @@ export interface SessionState {
   /** The running recording, else the most recent one, else null. */
   recording: { id: string; status: "recording" | "stopped"; startedAt: number; stoppedAt: number | null } | null;
   /** `producer`: a host who is in the call and at the controls but is never recorded. */
-  participants: Array<{ id: string; displayName: string; role: "host" | "guest"; producer: boolean }>;
+  /** `mirrored`: the person asked to be shown flipped in the call, on every screen (never in the files). Optional for older servers. */
+  participants: Array<{ id: string; displayName: string; role: "host" | "guest"; producer: boolean; mirrored?: boolean }>;
   /** Upload progress per participant for `recording`, so the host can see who is still uploading. */
   uploads: Array<{
     participantId: string;

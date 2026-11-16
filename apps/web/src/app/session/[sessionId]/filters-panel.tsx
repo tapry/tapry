@@ -113,12 +113,12 @@ export function FiltersPanel({
   const { t: tr } = useT();
   const t = TONE[tone];
   const name = useId();
-  const { filters, mirror } = prefs;
+  const { filters, mirror, mirrorForOthers } = prefs;
   const set = (change: Partial<TrackFilters>) => onChange({ ...prefs, filters: { ...filters, ...change } });
   // Asked after mounting: the answer depends on the browser.
   const [canPreview, setCanPreview] = useState(true);
   useEffect(() => setCanPreview(canPreviewFilters()), []);
-  const changed = mirror !== DEFAULT_PREFS.mirror || hasVideoFilters(filters) || hasAudioFilters(filters);
+  const changed = mirror !== DEFAULT_PREFS.mirror || mirrorForOthers !== DEFAULT_PREFS.mirrorForOthers || hasVideoFilters(filters) || hasAudioFilters(filters);
 
   return (
     <div
@@ -154,6 +154,13 @@ export function FiltersPanel({
       {hasCamera && (
         <>
           <Switch tone={tone} label={tr("filters.mirror")} hint={tr("filters.mirrorHint")} checked={mirror} onChange={(v) => onChange({ ...prefs, mirror: v })} />
+          <Switch
+            tone={tone}
+            label={tr("filters.mirrorOthers")}
+            hint={tr("filters.mirrorOthersHint")}
+            checked={mirrorForOthers}
+            onChange={(v) => onChange({ ...prefs, mirrorForOthers: v })}
+          />
 
           <fieldset className="flex flex-col gap-1.5">
             <legend className={cn("mb-1.5 text-[14px]", t.muted)}>{tr("filters.brightness")}</legend>

@@ -147,7 +147,7 @@ export function CallGrid({
           testId="remote-tile"
           {...tile(p.id)}
         >
-          {p.video && !p.cameraOff ? <TrackVideo track={p.video} /> : <Avatar name={p.name} />}
+          {p.video && !p.cameraOff ? <TrackVideo track={p.video} mirror={!!p.mirrored} /> : <Avatar name={p.name} />}
           {p.audio && <TrackAudio track={p.audio} />}
         </Tile>
       ))}
@@ -251,7 +251,17 @@ function Tile({
   );
 }
 
-function TrackVideo({ track, contain = false }: { track: RemoteVideoTrack; /** Show all of it (a screen), not a filled tile (a face). */ contain?: boolean }) {
+function TrackVideo({
+  track,
+  contain = false,
+  mirror = false,
+}: {
+  track: RemoteVideoTrack;
+  /** Show all of it (a screen), not a filled tile (a face). */
+  contain?: boolean;
+  /** The person asked to be shown mirrored ("Others see me mirrored"). Never a screen. */
+  mirror?: boolean;
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   const { t } = useT();
   // A camera whose frames stopped coming: said on the tile, since a frozen last frame looks like
@@ -283,7 +293,7 @@ function TrackVideo({ track, contain = false }: { track: RemoteVideoTrack; /** S
   }, [track, contain]);
   return (
     <>
-      <video ref={ref} autoPlay playsInline muted data-picture={stalled ? "stalled" : "live"} className={cn("size-full transition-[filter,opacity] duration-300", contain ? "object-contain" : "object-cover", stalled && "opacity-45 grayscale")} />
+      <video ref={ref} autoPlay playsInline muted data-picture={stalled ? "stalled" : "live"} className={cn("size-full transition-[filter,opacity] duration-300", contain ? "object-contain" : "object-cover", mirror && !contain && "-scale-x-100", stalled && "opacity-45 grayscale")} />
       {stalled && (
         <span role="status" data-testid="picture-stalled" className="absolute inset-0 grid place-items-center px-4 text-center text-sm font-medium text-white">
           <span className="rounded-lg bg-black/60 px-3 py-1.5 backdrop-blur-md">{t("room.pictureStalled")}</span>

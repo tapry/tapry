@@ -199,7 +199,24 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   // Who is talking, as this device hears it: lit as soon as there is a voice, not only when
   // the call server calls someone an "active speaker" (which a quiet voice never became).
   const heard = useHeardTalking(call.peers.map((p) => ({ id: p.id, track: p.micMuted ? undefined : p.audio?.mediaStreamTrack })));
-  const peersHeard = useMemo(() => call.peers.map((p) => (p.micMuted || p.speaking || !heard.has(p.id) ? p : { ...p, speaking: true })), [call.peers, heard]);
+  // Who asked to be shown mirrored, from the session's state (kept by the server, so it holds for people who join later).
+  const mirroredIds = useMemo(() => new Set((state?.participants ?? []).filter((p) => p.mirrored).map((p) => p.id)), [state?.participants]);
+  const peersHeard = useMemo(
+    () =>
+      call.peers.map((p) => {
+        const speaking = p.speaking || (!p.micMuted && heard.has(p.id));
+        const mirrored = mirroredIds.has(p.id);
+        return speaking === p.speaking && mirrored === !!p.mirrored ? p : { ...p, speaking, mirrored };
+      }),
+    [call.peers, heard, mirroredIds],
+  );
+  // This person's "Others see me mirrored", told to the server whenever it differs from what the server has.
+  const mirrorForOthers = prefs.mirrorForOthers;
+  const serverMirrored = state?.participants.find((p) => p.id === ticket.participantId)?.mirrored;
+  useEffect(() => {
+    if (serverMirrored === undefined || serverMirrored === mirrorForOthers) return;
+    void apiFetch(`/sessions/${ticket.sessionId}/appearance`, { method: "PUT", body: { mirrored: mirrorForOthers }, token: ticket.token }).catch(() => {});
+  }, [mirrorForOthers, serverMirrored, ticket.sessionId, ticket.token]);
   const advice = quality.alerts
     .map((a) => {
       const english = alertAdvice(a, quality.uploadBehindS);

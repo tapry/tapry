@@ -27,22 +27,26 @@ describe("a person's filters, as kept on their device", () => {
     expect(parsePrefs("not json")).toEqual(DEFAULT_PREFS);
     expect(parsePrefs("null")).toEqual(DEFAULT_PREFS);
     expect(parsePrefs('"warm"')).toEqual(DEFAULT_PREFS);
-    expect(DEFAULT_PREFS).toEqual({ filters: NO_FILTERS, mirror: true });
+    expect(DEFAULT_PREFS).toEqual({ filters: NO_FILTERS, mirror: true, mirrorForOthers: false });
   });
 
   it("read what was stored, filling in what an older version didn't have", () => {
-    expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, background: "blur", noiseRemoval: true }, mirror: false }))).toEqual({
+    expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, background: "blur", noiseRemoval: true }, mirror: false, mirrorForOthers: false }))).toEqual({
       filters: { brightness: 2, look: "cool", touchUp: true, background: "blur", noiseRemoval: true },
       mirror: false,
+      mirrorForOthers: false,
     });
+    // Saved before "Others see me mirrored" existed: off. Kept when it is there.
+    expect(parsePrefs(JSON.stringify({ filters: {}, mirror: true })).mirrorForOthers).toBe(false);
+    expect(parsePrefs(JSON.stringify({ filters: {}, mirror: true, mirrorForOthers: true })).mirrorForOthers).toBe(true);
     // Saved before background blur existed: no blur.
     expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, noiseRemoval: true } })).filters.background).toBe("none");
-    expect(parsePrefs(JSON.stringify({ filters: { look: "warm" } }))).toEqual({ filters: { ...NO_FILTERS, look: "warm" }, mirror: true });
-    expect(parsePrefs(JSON.stringify({ mirror: false }))).toEqual({ filters: NO_FILTERS, mirror: false });
+    expect(parsePrefs(JSON.stringify({ filters: { look: "warm" } }))).toEqual({ filters: { ...NO_FILTERS, look: "warm" }, mirror: true, mirrorForOthers: false });
+    expect(parsePrefs(JSON.stringify({ mirror: false, mirrorForOthers: false }))).toEqual({ filters: NO_FILTERS, mirror: false, mirrorForOthers: false });
   });
 
   it("drop filters that aren't ours (never a half-understood choice), keeping the mirror", () => {
-    expect(parsePrefs(JSON.stringify({ filters: { brightness: 7, look: "mono" }, mirror: false }))).toEqual({ filters: NO_FILTERS, mirror: false });
+    expect(parsePrefs(JSON.stringify({ filters: { brightness: 7, look: "mono" }, mirror: false, mirrorForOthers: false }))).toEqual({ filters: NO_FILTERS, mirror: false, mirrorForOthers: false });
     expect(parsePrefs(JSON.stringify({ filters: "mono", mirror: "yes" }))).toEqual(DEFAULT_PREFS);
     expect(parsePrefs(JSON.stringify({ filters: { look: "sepia" } })).filters).toEqual(NO_FILTERS);
   });
@@ -64,18 +68,18 @@ describe("a person's filters, as kept on their device", () => {
 
     it("are saved next to the device choices and found again by the next page", () => {
       expect(getFilterPrefs()).toEqual(DEFAULT_PREFS);
-      setFilterPrefs({ filters: mono, mirror: false });
+      setFilterPrefs({ filters: mono, mirror: false, mirrorForOthers: false });
       expect(FILTERS_KEY).toBe("filters");
-      expect(JSON.parse(stored.get("tapry:filters")!)).toEqual({ filters: mono, mirror: false });
+      expect(JSON.parse(stored.get("tapry:filters")!)).toEqual({ filters: mono, mirror: false, mirrorForOthers: false });
       reloadFilterPrefs(); // a new page
-      expect(getFilterPrefs()).toEqual({ filters: mono, mirror: false });
+      expect(getFilterPrefs()).toEqual({ filters: mono, mirror: false, mirrorForOthers: false });
     });
 
     it("finds what a version from before the rename saved, and saves under the new name", () => {
-      stored.set("opentake:filters", JSON.stringify({ filters: mono, mirror: false }));
+      stored.set("opentake:filters", JSON.stringify({ filters: mono, mirror: false, mirrorForOthers: false }));
       reloadFilterPrefs();
-      expect(getFilterPrefs()).toEqual({ filters: mono, mirror: false });
-      setFilterPrefs({ filters: mono, mirror: true });
+      expect(getFilterPrefs()).toEqual({ filters: mono, mirror: false, mirrorForOthers: false });
+      setFilterPrefs({ filters: mono, mirror: true, mirrorForOthers: false });
       expect(JSON.parse(stored.get("tapry:filters")!).mirror).toBe(true);
       reloadFilterPrefs();
       expect(getFilterPrefs().mirror).toBe(true); // the new one wins
@@ -92,7 +96,7 @@ describe("a person's filters, as kept on their device", () => {
       });
       reloadFilterPrefs();
       expect(getFilterPrefs()).toEqual(DEFAULT_PREFS);
-      setFilterPrefs({ filters: mono, mirror: true });
+      setFilterPrefs({ filters: mono, mirror: true, mirrorForOthers: false });
       expect(getFilterPrefs().filters).toEqual(mono);
     });
   });
