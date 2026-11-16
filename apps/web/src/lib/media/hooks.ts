@@ -69,6 +69,24 @@ async function keepWidescreen(stream: MediaStream, c: MediaStreamConstraints) {
     .catch(() => {});
 }
 
+/**
+ * Camera and mic requests on this page, one after the other. A returning visitor's remembered
+ * device choice arrives a moment after the first render, so the green room would ask for the
+ * camera with the defaults and again with the choice while the first request was still open.
+ * An iPhone has one camera capture for the page: the later request takes it, and the picture
+ * that was kept could stay black with the camera on. Nothing here is ever open twice.
+ */
+let lastOpen: Promise<unknown> = Promise.resolve();
+function afterOtherOpens<T>(job: () => Promise<T>): Promise<T> {
+  const run = lastOpen.then(job, job);
+  lastOpen = run.catch(() => {});
+  return run;
+}
+
+/** A camera that stays blank this long on a page that's in view is opened again (twice at most). */
+const BLANK_CAMERA_MS = 2000;
+const BLANK_CAMERA_RETRIES = 2;
+
 export function useLocalMedia(constraints: MediaStreamConstraints) {
   const key = JSON.stringify(constraints);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -77,6 +95,8 @@ export function useLocalMedia(constraints: MediaStreamConstraints) {
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const owned = useRef<MediaStream | null>(null);
+  /** Times the camera was reopened by itself because it came up blank; a person's own retry isn't counted. */
+  const reopened = useRef(0);
 
   /** Take over the live stream: the hook will no longer stop it when it unmounts. */
   const handOff = useCallback(() => {
@@ -87,10 +107,39 @@ export function useLocalMedia(constraints: MediaStreamConstraints) {
 
   useEffect(() => {
     let cancelled = false;
+    let blank: ReturnType<typeof setTimeout> | undefined;
+    let unwatch = () => {};
     setStatus("starting");
     setProblem(null);
 
+    // The browser muted the camera itself (Safari does when something else takes it): the
+    // picture is black though the camera is on. Before anyone has joined, opening it again is
+    // safe and usually brings it back. Once the room owns the stream this hook is gone.
+    const watchBlank = (s: MediaStream) => {
+      const track = s.getVideoTracks()[0];
+      if (!track) return;
+      const check = () => {
+        clearTimeout(blank);
+        if (!track.muted || track.readyState !== "live" || reopened.current >= BLANK_CAMERA_RETRIES) return;
+        blank = setTimeout(() => {
+          if (cancelled || owned.current !== s || !track.muted || document.hidden) return;
+          reopened.current++;
+          setAttempt((n) => n + 1);
+        }, BLANK_CAMERA_MS);
+      };
+      track.addEventListener("mute", check);
+      track.addEventListener("unmute", check);
+      document.addEventListener("visibilitychange", check);
+      unwatch = () => {
+        track.removeEventListener("mute", check);
+        track.removeEventListener("unmute", check);
+        document.removeEventListener("visibilitychange", check);
+      };
+      check();
+    };
+
     const open = async (c: MediaStreamConstraints, fallback: boolean): Promise<void> => {
+      if (cancelled) return; // replaced before its turn came: never opened at all
       try {
         const s = await navigator.mediaDevices.getUserMedia(c);
         await keepWidescreen(s, c);
@@ -98,6 +147,7 @@ export function useLocalMedia(constraints: MediaStreamConstraints) {
         owned.current = s;
         setStream(s);
         setStatus("live");
+        watchBlank(s);
       } catch (err) {
         if (cancelled) return;
         const p = describeMediaError(err);
@@ -107,10 +157,12 @@ export function useLocalMedia(constraints: MediaStreamConstraints) {
         setStatus("error");
       }
     };
-    void open(JSON.parse(key) as MediaStreamConstraints, true);
+    void afterOtherOpens(() => open(JSON.parse(key) as MediaStreamConstraints, true));
 
     return () => {
       cancelled = true;
+      clearTimeout(blank);
+      unwatch();
       owned.current?.getTracks().forEach((t) => t.stop());
       owned.current = null;
     };

@@ -219,6 +219,7 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - ffmpeg and ffprobe read raw uploads with `-format_whitelist` (`RAW_FORMATS`): only the WebM and MP4 demuxers see a guest's bytes.
 
 ## Recovery on the guest's device
+- Camera and mic are asked for **one request at a time** on a page (`afterOtherOpens` in `src/lib/media/hooks.ts`), and a request replaced before its turn is never made: overlapping requests leave an iPhone's camera black with the light on (a returning guest's remembered choice arrives after the first render). `e2e/return-visit.spec.ts` counts the requests. In the green room only, a camera the browser muted for 2 s on a visible page is reopened (twice at most); once the room owns the stream nothing reopens it, since the recorder is using it.
 - One tab per session (`holdSessionLock`, Web Lock `tapry:session:<id>`): a second tab waits and continues when the first closes, since two would record the person twice.
 - A track keeps the token it was recorded under in its `meta` (`uploadToken` in `recording.ts`), so joining again as someone new doesn't strand it. The current ticket wins for the same person, because a host's token changes on reopening.
 - `followSession` reconnects after 45 s without a byte (the server pings every 15 s), so a half-open connection can't make someone miss Record. The host sees "Not recording yet" after 20 s without a track.

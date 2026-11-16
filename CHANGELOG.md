@@ -5,6 +5,12 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: a returning guest's camera could stay black on an iPhone.** With a remembered device
+  choice, the green room asked for the camera several times at once (the defaults, then the
+  choice). A phone has one camera for the page, and the request that was kept could be left
+  blank with the camera on. The camera is now asked for one request at a time, and a camera
+  that still comes up blank in the green room is opened again by itself (twice at most).
+
 - **Your own camera view restarts after Safari interrupts it.** Safari pauses a camera's
   picture when another tab or app takes the camera or the page goes to the background, and
   could leave the tile black over a camera that was on.
