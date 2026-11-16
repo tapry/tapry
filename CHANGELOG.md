@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: the bundled storage stopped taking uploads after about 8 GB.** SeaweedFS kept its
+  default of 8 volumes of 1 GB, so once they were full every upload was refused and recordings
+  stayed "Still arriving" with 0 bytes (nothing was lost: devices keep their pieces until the
+  server has them). The Compose file now lets it use as many volumes as the disk has room for,
+  and stops writes when under 5 GiB is free so the database keeps its room. **Self-hosted
+  installs: update `docker-compose.yml` and run `docker compose up -d seaweedfs`.**
+
 - **Fix: an iPhone's picture froze for the others a few seconds into a call**, and after the
   camera was turned off and on, while the person's own view and their recording went on. The
   call diagnostics showed the call's copy of the camera simply stopped getting frames. On

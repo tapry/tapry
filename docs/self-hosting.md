@@ -88,6 +88,13 @@ first (or the other way round).
 | seaweedfs | `chrislusf/seaweedfs:4.51` | recordings in `seaweedfs-data` |
 | livekit | `livekit/livekit-server:v1.13.11` | — |
 
+The bundled storage (SeaweedFS) uses as much of the disk as it needs and stops taking uploads
+when less than 5 GiB is left, so the database never runs out of room. When it stops, guests'
+devices keep their recordings and send them once there is space again; the admin health page
+(`/admin/health`) shows storage failing. Before 0.4 the Compose file let it hold only about
+8 GB in all: if uploads stall with "0 bytes so far" on an older install, update the Compose
+file and run `docker compose up -d seaweedfs`.
+
 ## Even volume
 
 Studios level everyone's audio by default ("Even out volume" in the studio's settings): each

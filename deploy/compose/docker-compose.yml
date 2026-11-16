@@ -170,7 +170,11 @@ services:
       - |
         printf '{"identities":[{"name":"tapry","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","List","Tagging","Write"]}]}' \
           "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json
-        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+        # -volume.max=0: as many 1 GB volumes as the disk has room for. The default (8) let the
+        # server hold about 8 GB in all, then refuse every upload (studio.tapry.app, 16 Nov 2026).
+        # -volume.minFreeSpace: below 5 GiB free, storage stops taking writes instead of filling
+        # the disk the database is on (devices keep their recordings until it takes them again).
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024 -volume.max=0 -volume.minFreeSpace=5GiB
     volumes:
       - seaweedfs-data:/data
     healthcheck:

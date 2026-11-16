@@ -248,6 +248,7 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - Browser support claims must match the tested matrix in `docs/browser-support.md`.
 
 ## Backups
+- SeaweedFS in Compose runs with `-volume.max=0` (volumes as the disk allows) and `-volume.minFreeSpace=5GiB`. Its default of 8 one-GB volumes filled up on studio.tapry.app (16 Nov 2026) and every upload was refused for 16 hours without anyone seeing it. Check `/admin/health` (storage writes) after any storage change.
 - `deploy/compose/backup.sh`: `pg_dump -Fc` of the database plus a copy of `.env` into `/var/backups/tapry` (700, root), kept only if `pg_restore --list` reads it back; older than `KEEP_DAYS` (14) removed, never the last one. It does not copy the media. Restore steps are in the script's header and docs/self-hosting.md.
 - studio.tapry.app runs it nightly at 03:17 UTC from `/etc/cron.d/tapry-backup` (log: `/var/log/tapry-backup.log`). The script lives in the deployed code, so a deploy must keep `deploy/compose/backup.sh` in place. Those backups are on the server's own disk: off-server copies depend on the owner enabling Hetzner Backups or giving a destination.
 
