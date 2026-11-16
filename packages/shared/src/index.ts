@@ -355,6 +355,25 @@ export const telemetryBody = z.object({
   talk: talkTime.nullable().optional(),
 });
 
+/**
+ * What a device says happened to its call (connected, camera published, a browser error's
+ * name): technical events only, for finding out why a call misbehaves on a device we can't
+ * look at. Never media, names or anything a person typed. Written to the server's log.
+ */
+export const diagBody = z.object({
+  events: z
+    .array(
+      z.object({
+        code: z.string().regex(/^[a-z0-9_.]{1,48}$/),
+        detail: z.string().max(240).optional(),
+        /** Milliseconds since the page loaded. */
+        atMs: z.number().int().min(0).max(7 * 86_400_000),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
+
 // ── Live session state (pushed over SSE, also returned by GET .../state) ─────
 
 export interface SessionState {

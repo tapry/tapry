@@ -1,8 +1,11 @@
-import { STALE_REPORT_MS, type QualityAlert, type SessionState, type TalkTime, type telemetryBody } from "@tapry/shared";
+import { STALE_REPORT_MS, type diagBody, type QualityAlert, type SessionState, type TalkTime, type telemetryBody } from "@tapry/shared";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
 import { hashToken, newId } from "./ids";
+
+/** Lines of call diagnostics one person may add to the log in an hour. */
+const DIAG_PER_HOUR = 400;
 
 export interface Participant {
   id: string;
@@ -198,6 +201,26 @@ export class LiveService {
     for (const r of stopped) await this.onStopped(r.id);
     return this.state(host.sessionId);
   }
+
+  /**
+   * What a device says happened to its call: technical events, written to the log so a call
+   * that misbehaves on someone's phone can be understood. At most DIAG_PER_HOUR lines an hour
+   * per person; the rest are dropped. Nothing is stored.
+   */
+  reportDiag(p: Participant, body: z.infer<typeof diagBody>) {
+    const now = Date.now();
+    let seen = this.diagSeen.get(p.id);
+    if (!seen || now - seen.since > 3_600_000) this.diagSeen.set(p.id, (seen = { since: now, count: 0 }));
+    for (const e of body.events) {
+      if (seen.count >= DIAG_PER_HOUR) return;
+      seen.count++;
+      // One line each, with nothing in it that could break the line.
+      const detail = e.detail ? `: ${e.detail.replace(/[^\x20-\x7e]+/g, " ").trim()}` : "";
+      console.log(`[diag] ${p.sessionId} ${p.id} ${p.role} +${(e.atMs / 1000).toFixed(1)}s ${e.code}${detail}`);
+    }
+    if (this.diagSeen.size > 5000) for (const [id, s] of this.diagSeen) if (now - s.since > 3_600_000) this.diagSeen.delete(id);
+  }
+  private diagSeen = new Map<string, { since: number; count: number }>();
 
   /**
    * A device's quality report (metadata only). Kept in memory, and pushed to the session when

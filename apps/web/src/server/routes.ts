@@ -106,6 +106,7 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["POST", "/api/sessions/[sessionId]/end", "endSession"],
   ["POST", "/api/sessions/[sessionId]/call-token", "callToken"],
   ["POST", "/api/sessions/[sessionId]/telemetry", "telemetry"],
+  ["POST", "/api/sessions/[sessionId]/diag", "diag"],
   ["PUT", "/api/sessions/[sessionId]/filters", "setFilters"],
   ["GET", "/api/sessions/[sessionId]/my-recordings", "ownRecordings"],
   ["GET", "/api/sessions/[sessionId]/recap", "recapStatus"],
