@@ -31,6 +31,7 @@ import {
   guideBody,
   markerBody,
   producerBody,
+  appearanceBody,
   removeWaitlistBody,
   setPlanBody,
   waitlistBody,
@@ -655,6 +656,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     setProducer: asParticipant(async (svc, p, req) => {
       await svc.live.setProducer(p, (await parseBody(req, producerBody)).producer);
       return json(200, { ok: true });
+    }),
+    /** Shown mirrored on everyone's screen in the call, or not. Display only. */
+    setAppearance: asParticipant(async (svc, p, req) => {
+      await svc.live.setAppearance(p, (await parseBody(req, appearanceBody)).mirrored);
+      return new Response(null, { status: 204 });
     }),
     recapStatus: asParticipant(async (svc, p) => json(200, await svc.recaps.status(p))),
     requestRecap: asParticipant(async (svc, p, req) => json(200, await svc.recaps.request(p, (await parseBody(req, recapBody)).email))),

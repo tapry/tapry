@@ -199,6 +199,8 @@ export const pt: Messages = {
   "filters.close": "Fechar os filtros",
   "filters.mirror": "Espelhar a minha imagem",
   "filters.mirrorHint": "Só muda o que você vê.",
+  "filters.mirrorOthers": "Os outros veem-me espelhado",
+  "filters.mirrorOthersHint": "Espelha a sua imagem no ecrã de todos durante a chamada. A sua gravação não é espelhada.",
   "filters.brightness": "Brilho",
   "filters.b0": "Como está",
   "filters.b1": "Mais claro",

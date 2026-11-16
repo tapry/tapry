@@ -31,6 +31,8 @@ export interface RemotePeer {
   micMuted: boolean;
   cameraOff: boolean;
   speaking: boolean;
+  /** They asked to be shown mirrored (from the session's state, not the call). */
+  mirrored?: boolean;
 }
 
 export interface CallState {

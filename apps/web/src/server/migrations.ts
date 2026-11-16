@@ -599,4 +599,8 @@ ALTER TABLE studio_brands ADD COLUMN on_video boolean NOT NULL DEFAULT false;
 -- The host stopped a job that a worker is on: the worker sees this within a few seconds and stops.
 ALTER TABLE jobs ADD COLUMN cancel_requested boolean NOT NULL DEFAULT false;
 `,
+  `
+-- A person who asked to be shown mirrored in the call, on everyone's screen. Display only: never in the files.
+ALTER TABLE participants ADD COLUMN mirrored boolean NOT NULL DEFAULT false;
+`,
 ];

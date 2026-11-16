@@ -207,6 +207,8 @@ export const en = {
   "filters.close": "Close filters",
   "filters.mirror": "Mirror my view",
   "filters.mirrorHint": "Only changes what you see.",
+  "filters.mirrorOthers": "Others see me mirrored",
+  "filters.mirrorOthersHint": "Flips your picture on everyone's screen in the call. Your recording isn't flipped.",
   "filters.brightness": "Brightness",
   "filters.b0": "As it is",
   "filters.b1": "Brighter",

@@ -18,21 +18,24 @@ export interface FilterPrefs {
   filters: TrackFilters;
   /** "Mirror my view": flips only this person's own preview. Never sent, never in the files. */
   mirror: boolean;
+  /** "Others see me mirrored": everyone's screen shows this person flipped in the call. Never in the files. */
+  mirrorForOthers: boolean;
 }
 
 /** No filters, and your own view mirrored, as it always was. */
-export const DEFAULT_PREFS: FilterPrefs = { filters: NO_FILTERS, mirror: true };
+export const DEFAULT_PREFS: FilterPrefs = { filters: NO_FILTERS, mirror: true, mirrorForOthers: false };
 
 /** What storage holds, read safely: anything unreadable or out of range means no filters. */
 export function parsePrefs(raw: string | null | undefined): FilterPrefs {
   if (!raw) return DEFAULT_PREFS;
   try {
-    const value = JSON.parse(raw) as { filters?: unknown; mirror?: unknown } | null;
+    const value = JSON.parse(raw) as { filters?: unknown; mirror?: unknown; mirrorForOthers?: unknown } | null;
     if (!value || typeof value !== "object") return DEFAULT_PREFS;
     const filters = trackFilters.safeParse(value.filters ?? {});
     return {
       filters: filters.success ? filters.data : NO_FILTERS,
       mirror: typeof value.mirror === "boolean" ? value.mirror : DEFAULT_PREFS.mirror,
+      mirrorForOthers: typeof value.mirrorForOthers === "boolean" ? value.mirrorForOthers : DEFAULT_PREFS.mirrorForOthers,
     };
   } catch {
     return DEFAULT_PREFS;

@@ -199,6 +199,8 @@ export const ar: Messages = {
   "filters.close": "إغلاق الفلاتر",
   "filters.mirror": "اعكس صورتي",
   "filters.mirrorHint": "يغيّر ما تراه أنت فقط.",
+  "filters.mirrorOthers": "يراني الآخرون معكوسًا",
+  "filters.mirrorOthersHint": "يعكس صورتك على شاشة الجميع أثناء المكالمة. لا يُعكس تسجيلك.",
   "filters.brightness": "السطوع",
   "filters.b0": "كما هو",
   "filters.b1": "أكثر سطوعًا",
