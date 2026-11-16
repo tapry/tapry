@@ -56,6 +56,7 @@ Output kinds: `audio`, `video`, `screen` (one per person), `combined`, `transcri
 | `PUT /api/studios/:studioId/guide` `{ guide }` | Sets the host's guide |
 | `PUT /api/studios/:studioId/solo` `{ enabled, prompt }` | Turns the solo link on or off and sets its questions |
 | `POST /api/studios/:studioId/recordings/:recordingId/process` | Makes the files again |
+| `DELETE /api/studios/:studioId/recordings/:recordingId/process` | Stops the files or the transcript being made (409 `not_processing` when nothing is); the uploads are kept |
 | `DELETE /api/studios/:studioId/recordings/:recordingId` | Deletes a stopped recording and its files |
 | `POST /api/studios/:studioId/recordings/:recordingId/clips` `{ startMs, endMs, title?, shape?, captions? }` | Cuts a clip. `shape`: `wide` (default), `square` or `vertical`; `captions: true` writes what is said on the picture |
 | `DELETE /api/studios/:studioId/recordings/:recordingId/clips/:clipId` | Deletes a clip |

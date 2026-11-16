@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 
 export class FfmpegError extends Error {
@@ -9,13 +10,35 @@ export class FfmpegError extends Error {
   }
 }
 
+/** The work was stopped on purpose (the host cancelled it): not a failure of any file. */
+export class CancelledError extends Error {
+  constructor() {
+    super("Stopped before it finished");
+  }
+}
+
+const cancelScope = new AsyncLocalStorage<AbortSignal>();
+
+/**
+ * Runs `work` so that every binary it starts (through `run`, however deep) is killed when
+ * `signal` aborts, and none is started after that: each rejects with CancelledError. Lets a
+ * job be stopped without handing a signal to every step of the pipeline.
+ */
+export function withCancel<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  return cancelScope.run(signal, work);
+}
+
 /**
  * Run a binary; resolves with stdout on exit 0 (or the end of stderr, with `stderr: true`:
  * ffmpeg's filters report measurements there), rejects with the end of stderr otherwise.
  */
 export function run(bin: string, args: string[], opts: { timeoutMs?: number; stderr?: boolean } = {}): Promise<string> {
+  const cancel = cancelScope.getStore();
   return new Promise((resolve, reject) => {
+    if (cancel?.aborted) return reject(new CancelledError());
     const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const stop = () => child.kill("SIGKILL");
+    cancel?.addEventListener("abort", stop, { once: true });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
@@ -26,10 +49,14 @@ export function run(bin: string, args: string[], opts: { timeoutMs?: number; std
       : undefined;
     child.on("error", (err) => {
       clearTimeout(timer);
+      cancel?.removeEventListener("abort", stop);
       reject(new FfmpegError(`Could not run ${bin}: ${err.message}`, ""));
     });
     child.on("close", (code, signal) => {
       clearTimeout(timer);
+      cancel?.removeEventListener("abort", stop);
+      // Killed because the work was cancelled: said as that, so nothing treats it as a bad file.
+      if (cancel?.aborted) return reject(new CancelledError());
       if (code === 0) resolve(opts.stderr ? stderr : stdout);
       else reject(new FfmpegError(`${bin} exited with ${signal ?? code}`, stderr.slice(-2000)));
     });

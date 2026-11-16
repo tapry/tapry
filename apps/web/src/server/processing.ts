@@ -7,6 +7,9 @@ import type { Participant } from "./live";
 import type { Storage } from "./storage";
 
 /** See `maybeEnqueue`: the most a mask still uploading holds processing back. */
+/** What a recording says after its host stopped its files being made. */
+export const PROCESSING_STOPPED_TEXT = "You stopped this before the files were finished. The uploads are safe: process it again whenever you like.";
+
 export const MASK_GRACE_MS = 15_000;
 
 export type ProcessingStatus = "pending" | "queued" | "processing" | "ready" | "failed";
@@ -182,6 +185,38 @@ export class ProcessingService {
     }
     // A run already under way read the old choice when it started, so it goes again after.
     await this.enqueue(recordingId, { rerunIfRunning: opts.filters !== undefined });
+  }
+
+  /**
+   * Host stops the making of a recording's files or transcript. A job still waiting is ended
+   * here; one a worker is on is flagged, and the worker kills what it is running within a few
+   * seconds. The uploads are untouched: it can be processed again whenever.
+   */
+  async cancelProcessing(owner: User, studioId: string, recordingId: string) {
+    await this.ownedRecording(owner, studioId, recordingId);
+    const { stopped, sessionId } = await this.db.transaction(async (tx) => {
+      const [rec] = await tx.query<{ session_id: string }>("SELECT session_id FROM recordings WHERE id = $1 FOR UPDATE", [recordingId]);
+      const waiting = await tx.query<{ type: string }>(
+        `UPDATE jobs SET status = 'failed', finished_at = now(), locked_until = NULL, error = 'cancelled'
+         WHERE recording_id = $1 AND type IN ('process_recording', 'transcribe_recording')
+           AND (status = 'queued' OR (status = 'running' AND locked_until < now())) RETURNING type`,
+        [recordingId],
+      );
+      const running = await tx.query<{ type: string }>(
+        `UPDATE jobs SET cancel_requested = true
+         WHERE recording_id = $1 AND type IN ('process_recording', 'transcribe_recording') AND status = 'running' RETURNING type`,
+        [recordingId],
+      );
+      if (waiting.some((j) => j.type === "process_recording")) {
+        await tx.query("UPDATE recordings SET processing = 'failed', processing_error = $2, rerun_requested = false, progress = NULL WHERE id = $1", [recordingId, PROCESSING_STOPPED_TEXT]);
+      }
+      if (waiting.some((j) => j.type === "transcribe_recording")) await tx.query("UPDATE recordings SET transcript = 'failed' WHERE id = $1", [recordingId]);
+      // A run that is going must not start another when it ends.
+      if (running.length > 0) await tx.query("UPDATE recordings SET rerun_requested = false WHERE id = $1", [recordingId]);
+      return { stopped: waiting.length + running.length, sessionId: rec!.session_id };
+    });
+    if (stopped === 0) throw new ApiError(409, "not_processing", "Nothing is being made for this recording right now");
+    this.onChange(sessionId);
   }
 
   /**
