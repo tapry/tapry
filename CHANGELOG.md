@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: "Picture interrupted" shown over a picture that was playing, on iPhones.** Their
+  browsers don't count a live picture's frames the way the notice relied on. Frames are now
+  counted three ways, and a picture is only called interrupted after its frames were seen to
+  move and then stop.
+- **The camera is asked for once on a return visit**, after the remembered device choice has
+  loaded, instead of once with the defaults and again with the choice.
+
 - **Stop a recording's files being made** (the recording's card, while it is processing: "Stop
   making the files", and "Stop the transcript"). A recording left running for hours takes
   hours to process, and until now only a server admin could stop that. The worker stops within

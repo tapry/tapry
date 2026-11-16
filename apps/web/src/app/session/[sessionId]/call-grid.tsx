@@ -5,7 +5,7 @@ import type { RemoteAudioTrack, RemoteVideoTrack } from "livekit-client";
 import { useEffect, useRef, useState } from "react";
 import { Avatar as Initials, cn } from "@/components/ui";
 import type { RemotePeer } from "@/lib/client/call";
-import { framesShown, PictureWatch } from "@/lib/client/picture";
+import { countFrames, PictureWatch } from "@/lib/client/picture";
 import { useT } from "@/lib/i18n/client";
 import { Icon, ICON } from "./icons";
 import { SelfVideo } from "./self-video";
@@ -264,10 +264,11 @@ function TrackVideo({ track, contain = false }: { track: RemoteVideoTrack; /** S
     setStalled(false);
     if (contain) return () => void track.detach(el);
     const watch = new PictureWatch();
+    const frames = countFrames(el);
     let nudged = false;
     const timer = setInterval(() => {
       const now = performance.now();
-      watch.add(framesShown(el), now, !document.hidden);
+      watch.add(frames.read(), now, !document.hidden);
       const stopped = watch.stalled(now);
       setStalled(stopped);
       // A player the browser paused by itself shows the same thing: start it once before saying so.
@@ -276,6 +277,7 @@ function TrackVideo({ track, contain = false }: { track: RemoteVideoTrack; /** S
     }, 500);
     return () => {
       clearInterval(timer);
+      frames.stop();
       track.detach(el);
     };
   }, [track, contain]);
