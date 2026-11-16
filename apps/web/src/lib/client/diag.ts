@@ -96,3 +96,11 @@ export async function receivedVideoLine(receiver: RTCRtpReceiver | undefined) {
     line: `${num(i.frameWidth)}x${num(i.frameHeight)} at ${num(i.framesPerSecond)} fps, ${num(i.framesReceived)} received, ${num(i.framesDecoded)} decoded, ${num(i.framesDropped)} dropped, ${num(i.packetsLost)} lost, ${num(i.freezeCount)} freezes, ${codec}, ${String(i.decoderImplementation ?? "?")}`,
   };
 }
+
+/** Frames this device's camera copy has encoded so far; null when that can't be read. */
+export async function sentFrames(sender: RTCRtpSender | undefined): Promise<number | null> {
+  if (!sender) return null;
+  const found = readReport(await sender.getStats(), "outbound-rtp");
+  const n = found?.rtp.framesEncoded;
+  return typeof n === "number" ? n : null;
+}
