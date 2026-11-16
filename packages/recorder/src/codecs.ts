@@ -25,8 +25,17 @@ const SCREEN_TYPES = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/w
 export function pickMimeType(
   kind: TrackKind,
   isTypeSupported: (type: string) => boolean = (t) => MediaRecorder.isTypeSupported(t),
+  opts: {
+    /**
+     * Pictures in MP4 (H.264) before WebM, where the device encodes H.264 in hardware and WebM
+     * in software: Apple's. An iPhone recording WebM (VP9) at its camera's size wrote black
+     * frames after a few seconds. Sound is unaffected.
+     */
+    preferMp4?: boolean;
+  } = {},
 ): string {
-  const candidates = kind === "video" ? VIDEO_TYPES : kind === "mask" ? MASK_TYPES : kind === "screen" ? SCREEN_TYPES : AUDIO_TYPES;
+  let candidates = kind === "video" ? VIDEO_TYPES : kind === "mask" ? MASK_TYPES : kind === "screen" ? SCREEN_TYPES : AUDIO_TYPES;
+  if (opts.preferMp4 && kind !== "audio") candidates = [...candidates.filter((t) => t.startsWith("video/mp4")), ...candidates.filter((t) => !t.startsWith("video/mp4"))];
   const found = candidates.find((t) => isTypeSupported(t));
   if (!found) throw new Error(`No supported MediaRecorder ${kind} format in this browser`);
   return found;

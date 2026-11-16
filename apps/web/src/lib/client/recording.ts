@@ -21,6 +21,10 @@ import type { SessionTicket } from "@tapry/shared";
 import { loadTicket } from "./api";
 import { getFilterPrefs, parseFilters, trackRegistered } from "./filters";
 import { localNow } from "./clock";
+import { diagFor, isAppleWebKit, type Note } from "./diag";
+
+/** Apple's devices record pictures in MP4 (H.264, their hardware codec): see pickMimeType. */
+const applePictures = () => typeof navigator !== "undefined" && isAppleWebKit(navigator.userAgent, navigator.maxTouchPoints);
 
 // ── Transport ────────────────────────────────────────────────────────────────
 
@@ -307,7 +311,7 @@ export class RecordingController {
         stream: new MediaStream(stream.getVideoTracks()),
         store,
         queue,
-        mimeType: pickMimeType("screen"),
+        mimeType: pickMimeType("screen", undefined, { preferMp4: applePictures() }),
         videoBitsPerSecond: SCREEN_BITRATE,
         // The same clock as the camera's track, so the worker knows when it was shared.
         now: () => Math.round(localNow() + clockOffsetMs),
@@ -355,7 +359,7 @@ export class RecordingController {
         stream,
         store,
         queue: maskQueue,
-        mimeType: pickMimeType("mask"),
+        mimeType: pickMimeType("mask", undefined, { preferMp4: applePictures() }),
         videoBitsPerSecond: MASK_BITRATE,
         // The same clock as the camera's track, so the worker can lay one over the other.
         now: () => Math.round(localNow() + clockOffsetMs),
@@ -409,6 +413,9 @@ export class RecordingController {
     await this.startScreen(active);
   }
 
+  /** What each recorder starts with, for the call diagnostics (diag.ts): format and camera, no media. */
+  private note: Note | null = null;
+
   private async startTrack(active: NonNullable<RecordingController["active"]>, p: PlannedTrack) {
     const { ticket, clockOffsetMs } = this.opts;
     const { store, queue } = await getPipeline();
@@ -420,7 +427,7 @@ export class RecordingController {
       stream: p.stream,
       store,
       queue,
-      mimeType: pickMimeType(p.kind),
+      mimeType: pickMimeType(p.kind, undefined, { preferMp4: applePictures() }),
       videoBitsPerSecond: p.videoBitsPerSecond,
       audioBitsPerSecond: AUDIO_BITRATE,
       // The same clock the offset was measured on (Date.now() can jump if the system clock is
@@ -433,6 +440,12 @@ export class RecordingController {
     });
     await recorder.start();
     active.recorders.push(recorder);
+    const video = p.stream.getVideoTracks()[0];
+    const s = video?.getSettings();
+    (this.note ??= diagFor(ticket))(
+      "recording.track_started",
+      `${p.kind}, ${recorder.mimeType}${s ? `, ${s.width ?? "?"}x${s.height ?? "?"} at ${s.frameRate ? Math.round(s.frameRate) : "?"} fps${video!.muted ? ", camera muted" : ""}${video!.enabled ? "" : ", camera off"}` : ""}`,
+    );
     return trackId;
   }
 

@@ -71,9 +71,18 @@ export function tintColor(f: Pick<TrackFilters, "look">): string | null {
 /** Touch-up: blur radius for a 360-line picture, and how much of the blurred frame goes on top. */
 export const TOUCH_UP = { blurPx: 3, alpha: 0.4 };
 
-/** Older Safari has no `ctx.filter`: there, the live picture is left alone (files still get the filters). */
-export function canPreviewFilters(): boolean {
+/** Whether this browser has the canvas `filter` (Safari and every iPhone browser don't). */
+export function hasCanvasFilter(): boolean {
   return typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
+}
+
+/**
+ * Whether the live picture can show filters here. With the canvas `filter` they are drawn as
+ * described above; without it (Apple's WebKit) by blend modes and scaling (drawWithoutFilter),
+ * a close likeness. Only a browser without a 2D canvas at all has none.
+ */
+export function canPreviewFilters(): boolean {
+  return typeof CanvasRenderingContext2D !== "undefined";
 }
 
 /**
@@ -137,6 +146,7 @@ export function drawFiltered(
   f: TrackFilters,
   mask: CanvasImageSource | null = null,
 ) {
+  if (!hasCanvasFilter()) return drawWithoutFilter(ctx, source, width, height, f, mask);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
   for (const step of picturePlan(f, height, !!mask)) {
@@ -187,6 +197,115 @@ export function drawFiltered(
     }
   }
   ctx.filter = "none";
+}
+
+// ── Without the canvas `filter` (Apple's WebKit) ────────────────────────────────
+//
+// The same plan, with what every canvas has: brightness k as the picture added onto itself at
+// strength k - 1 ("lighter": src + (k-1)·src = k·src), black and white as grey painted with the
+// "saturation" blend, the tint multiplied as always, and blurs as the picture scaled down and
+// back up (bilinear, about the same softness as the Gaussian). The small contrast and saturation
+// steps of the other looks are left out. Brightness and black and white are applied last, over
+// the whole picture: both are per-pixel and linear, so it comes to the same.
+
+/** Scratch canvases for the blurs and the brightness pass, one set per drawing canvas. */
+const scratches = new WeakMap<CanvasRenderingContext2D, { small: HTMLCanvasElement; copy: HTMLCanvasElement }>();
+function scratchFor(ctx: CanvasRenderingContext2D) {
+  let s = scratches.get(ctx);
+  if (!s) scratches.set(ctx, (s = { small: document.createElement("canvas"), copy: document.createElement("canvas") }));
+  return s;
+}
+
+/** `source` softened by about `blurPx`: drawn small, to be drawn back up at full size. */
+function softened(ctx: CanvasRenderingContext2D, source: CanvasImageSource, width: number, height: number, blurPx: number) {
+  const { small } = scratchFor(ctx);
+  const factor = Math.max(2, blurPx * 1.6);
+  const w = Math.max(2, Math.round(width / factor));
+  const h = Math.max(2, Math.round(height / factor));
+  if (small.width !== w || small.height !== h) {
+    small.width = w;
+    small.height = h;
+  }
+  const s = small.getContext("2d")!;
+  s.imageSmoothingEnabled = true;
+  s.imageSmoothingQuality = "high";
+  s.drawImage(source, 0, 0, w, h);
+  return small;
+}
+
+function drawWithoutFilter(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  f: TrackFilters,
+  mask: CanvasImageSource | null,
+) {
+  const px = (at360: number) => (at360 * height) / 360;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  if (f.background === "blur") {
+    ctx.drawImage(softened(ctx, source, width, height, px(BACKGROUND_BLUR.px)), 0, 0, width, height);
+    if (mask) {
+      let layer = scratch.get(ctx);
+      if (!layer) scratch.set(ctx, (layer = document.createElement("canvas")));
+      if (layer.width !== width || layer.height !== height) {
+        layer.width = width;
+        layer.height = height;
+      }
+      const l = layer.getContext("2d")!;
+      l.globalCompositeOperation = "source-over";
+      l.clearRect(0, 0, width, height);
+      l.imageSmoothingEnabled = true;
+      l.drawImage(mask, 0, 0, width, height); // scaled up from the mask's size: soft enough an edge
+      l.globalCompositeOperation = "source-in";
+      l.drawImage(source, 0, 0, width, height);
+      ctx.drawImage(layer, 0, 0);
+    }
+  } else {
+    ctx.drawImage(source, 0, 0, width, height);
+  }
+  if (f.touchUp) {
+    const { copy } = scratchFor(ctx);
+    if (copy.width !== width || copy.height !== height) {
+      copy.width = width;
+      copy.height = height;
+    }
+    copy.getContext("2d")!.drawImage(ctx.canvas, 0, 0);
+    ctx.globalAlpha = TOUCH_UP.alpha;
+    ctx.drawImage(softened(ctx, copy, width, height, px(TOUCH_UP.blurPx)), 0, 0, width, height);
+    ctx.globalAlpha = 1;
+  }
+  const b = BRIGHTNESS_VALUES[f.brightness];
+  const k = (Math.pow(0.5, 1 / b.gamma) + b.brightness) / 0.5;
+  if (k > 1.005) {
+    const { copy } = scratchFor(ctx);
+    if (copy.width !== width || copy.height !== height) {
+      copy.width = width;
+      copy.height = height;
+    }
+    copy.getContext("2d")!.drawImage(ctx.canvas, 0, 0);
+    ctx.globalCompositeOperation = "lighter";
+    for (let extra = k - 1; extra > 0.005; extra -= 1) {
+      ctx.globalAlpha = Math.min(1, extra);
+      ctx.drawImage(copy, 0, 0);
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (LOOK_VALUES[f.look].saturation === 0) {
+    ctx.globalCompositeOperation = "saturation";
+    ctx.fillStyle = "#808080";
+    ctx.fillRect(0, 0, width, height);
+  }
+  const tint = tintColor(f);
+  if (tint) {
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.globalCompositeOperation = "source-over";
 }
 
 /** The canvas size for a picture: at most `maxHeight` lines, the source's shape, even numbers. */
