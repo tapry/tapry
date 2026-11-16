@@ -14,7 +14,7 @@ import {
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
-import { deviceLine, diagFor, errorLine, isAppleWebKit, receivedVideoLine, sentVideoLine, type Note } from "./diag";
+import { deviceLine, diagFor, errorLine, isAppleWebKit, receivedVideoLine, sentFrames, sentVideoLine, type Note } from "./diag";
 import { canPreviewFilters, startFilteredTrack, type FilteredTrack } from "./filter-picture";
 import { getPersonMask } from "./person-mask";
 
@@ -52,6 +52,10 @@ interface LocalTracks {
   cam?: MediaStreamTrack;
   /** While the person has picture filters: the camera copy drawn with them, sent instead of it. */
   picture?: FilteredTrack;
+  /** What a picture is drawn from: `cam`, or on Apple's WebKit the camera itself (only read, never stopped). */
+  source?: MediaStreamTrack;
+  /** Apple's WebKit: the call always sends a drawn picture, filters or not (see publishCamera). */
+  alwaysPicture?: boolean;
   /** Noise removal on the mic copy: whether it is on, and what the copy had before. */
   noise?: { on: boolean; before: boolean | undefined };
   /** This browser can't give the mic copy its own noise removal: the live part is skipped. */
@@ -261,23 +265,6 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
       const video = tracks.video;
       const note = noteRef.current;
       note(off ? "call.camera_off" : "call.camera_on");
-      // On an iPhone a copy of the camera that was switched off can stay dark when it is switched
-      // on again: the call showed nothing while the person's own view was back (owner's test,
-      // 16 Nov 2026). Coming back on, the call gets a fresh copy of the camera instead.
-      const cam = stream.getVideoTracks()[0];
-      if (!off && video && cam && !tracks.picture && tracks.cam && isAppleWebKit(navigator.userAgent, navigator.maxTouchPoints)) {
-        const fresh = cam.clone();
-        fresh.enabled = true;
-        try {
-          await video.replaceTrack(fresh, true);
-          tracks.cam.stop();
-          tracks.cam = fresh;
-          note("call.camera_fresh_copy", `${fresh.getSettings().width ?? "?"}x${fresh.getSettings().height ?? "?"}${fresh.muted ? ", muted" : ""}`);
-        } catch (err) {
-          fresh.stop();
-          note("call.camera_fresh_copy_failed", errorLine(err));
-        }
-      }
       if (video) await (off ? video.mute() : video.unmute());
       // With picture filters the call sends the canvas, not the camera copy: keep the copy in step.
       if (tracks.picture && tracks.cam) tracks.cam.enabled = !off;
@@ -353,10 +340,80 @@ function reportSent(video: LocalVideoTrack, note: Note) {
     }, wait);
   };
   next();
+  // Whether the picture keeps going out: said once when it stops (and again when it starts),
+  // with the line that shows why. Not while the camera is off or the page is in the background.
+  let last: number | null = null;
+  let still = 0;
+  let stalled = false;
+  const watch = setInterval(() => {
+    if (video.isMuted || document.hidden) {
+      still = 0;
+      last = null;
+      return;
+    }
+    void sentFrames(video.sender)
+      .then((n) => {
+        if (n === null) return;
+        still = last !== null && n === last ? still + 1 : 0;
+        last = n;
+        if (still >= 2 && !stalled) {
+          stalled = true;
+          void sentVideoLine(video.sender).then((line) => note("call.video_stalled", line), () => {});
+        } else if (still === 0 && stalled) {
+          stalled = false;
+          note("call.video_flowing");
+        }
+      })
+      .catch(() => {});
+  }, 3000);
   return () => {
     clearTimeout(timer);
     timer = undefined;
+    clearInterval(watch);
   };
+}
+
+/**
+ * Apple's WebKit (every iPhone and iPad browser, and Safari): the call is sent a picture drawn on
+ * a canvas from the camera itself, filters or not. A copy (clone) of the camera stopped getting
+ * frames there a few seconds into the call, while the camera itself, the person's own view and
+ * the recording went on (the call diagnostics: frames encoded stuck at 150, then 812; owner's
+ * test, 16 Nov 2026). The canvas is drawn at the call's size, so the encoder gets a small picture.
+ * The camera is only read here: never sized, disabled or stopped by the call.
+ */
+async function publishDrawnCamera(r: Room, cam: MediaStreamTrack, local: LocalTracks, filters: TrackFilters, note: Note) {
+  for (let attempt = 1; attempt <= CAMERA_TRIES; attempt++) {
+    if (r.state !== ConnectionState.Connected) return;
+    const began = performance.now();
+    const picture = filteredCopy(cam, drawable(filters), true);
+    let video: LocalVideoTrack | undefined;
+    try {
+      local.source = cam;
+      local.alwaysPicture = true;
+      local.picture = picture;
+      video = new LocalVideoTrack(picture.track, undefined, true);
+      local.video = video;
+      await r.localParticipant.publishTrack(video, {
+        source: Track.Source.Camera,
+        simulcast: false,
+        videoEncoding: { maxBitrate: 600_000, maxFramerate: CALL_VIDEO.frameRate },
+      });
+      const s = cam.getSettings();
+      note("call.video_published", `try ${attempt}, ${Math.round(performance.now() - began)} ms, drawn from ${s.width ?? "?"}x${s.height ?? "?"}`);
+      local.stopStats?.();
+      local.stopStats = reportSent(video, note);
+      return;
+    } catch (err) {
+      note("call.video_publish_failed", `try ${attempt}, drawn: ${errorLine(err)}`);
+      console.warn("[call] camera", err);
+      if (video) await r.localParticipant.unpublishTrack(video).catch(() => {});
+      picture.stop();
+      if (local.picture === picture) local.picture = undefined;
+      if (local.video === video) local.video = undefined;
+      if (attempt < CAMERA_TRIES) await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
+  note("call.video_given_up");
 }
 
 /** How many times the camera is offered to a call before it carries on with sound only. */
@@ -374,6 +431,7 @@ async function publishCamera(r: Room, cam: MediaStreamTrack, local: LocalTracks,
   // Apple's WebKit has one capture for every copy of a camera: asking this copy for a small
   // size can change or stall the camera the recorder is using. There the encoder scales instead.
   const shared = typeof navigator !== "undefined" && isAppleWebKit(navigator.userAgent, navigator.maxTouchPoints);
+  if (shared) return publishDrawnCamera(r, cam, local, filters, note);
   for (let attempt = 1; attempt <= CAMERA_TRIES; attempt++) {
     if (r.state !== ConnectionState.Connected) return;
     const began = performance.now();
@@ -392,6 +450,7 @@ async function publishCamera(r: Room, cam: MediaStreamTrack, local: LocalTracks,
             new Promise<string>((resolve) => setTimeout(() => resolve("timed out"), SIZE_WAIT_MS)),
           ]);
       local.cam = clone;
+      local.source = clone;
       // With picture filters, the others never see the plain picture, not even for a moment.
       if (hasVideoFilters(filters) && canPreviewFilters()) local.picture = filteredCopy(clone, filters);
       video = new LocalVideoTrack(local.picture?.track ?? clone, undefined, true);
@@ -435,16 +494,22 @@ async function publishCamera(r: Room, cam: MediaStreamTrack, local: LocalTracks,
 
 // ── Filters on the call's copies ─────────────────────────────────────────────
 
-const filteredCopy = (clone: MediaStreamTrack, filters: TrackFilters) =>
+const filteredCopy = (source: MediaStreamTrack, filters: TrackFilters, inPage = false) =>
   // Background blur uses the mask the room keeps running (person-mask.ts); until there is one, the whole picture is blurred.
-  startFilteredTrack(clone, { maxHeight: CALL_VIDEO.height, frameRate: CALL_VIDEO.frameRate, filters, mask: getPersonMask });
+  startFilteredTrack(source, { maxHeight: CALL_VIDEO.height, frameRate: CALL_VIDEO.frameRate, filters, mask: getPersonMask, inPage });
+
+/** The filters a drawn picture can show here: none where the canvas can't draw them. */
+const drawable = (filters: TrackFilters) => (hasVideoFilters(filters) && canPreviewFilters() ? filters : NO_FILTERS);
 
 /** Stops the canvas picture, and the camera copy behind it (LiveKit only stops the track it holds). */
 function releasePicture(local: LocalTracks) {
   if (!local.picture) return;
   local.picture.stop();
   local.picture = undefined;
+  // The call's own copy only: on Apple's WebKit the picture is drawn from the camera itself,
+  // which is the recorder's and is never stopped here.
   local.cam?.stop();
+  local.alwaysPicture = undefined;
 }
 
 /**
@@ -464,6 +529,8 @@ function syncFilters(local: LocalTracks, stream: MediaStream, latest: () => Trac
 
 async function syncPicture(local: LocalTracks, filters: TrackFilters) {
   const { video, cam } = local;
+  // Apple's WebKit: always a drawn picture; only what it is drawn with changes.
+  if (local.alwaysPicture) return local.picture?.setFilters(drawable(filters));
   if (!video || !cam || !video.sender) return;
   const want = hasVideoFilters(filters) && canPreviewFilters() && cam.readyState === "live";
   if (want && local.picture) return local.picture.setFilters(filters);

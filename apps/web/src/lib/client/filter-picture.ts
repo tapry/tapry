@@ -247,9 +247,9 @@ export interface FilteredTrack {
 }
 
 /**
- * A video track showing `source` with the filters. `source` must be the call's own copy of the
- * camera, never the track the recorder uses: it is only read here, but it is the caller's copy
- * that gets sized for the call.
+ * A video track showing `source` with the filters. `source` is only read here, never sized or
+ * stopped. It is the call's own copy of the camera, except on Apple's WebKit, where the call
+ * draws from the camera itself (its copies stop getting frames there; see call.ts).
  */
 export function startFilteredTrack(
   source: MediaStreamTrack,
@@ -259,12 +259,20 @@ export function startFilteredTrack(
     filters: TrackFilters;
     /** Where the person is right now, for background blur; null when not known (see person-mask.ts). */
     mask?: () => CanvasImageSource | null;
+    /** Keep the reading <video> in the page (invisible): iPhones may not decode one that isn't. */
+    inPage?: boolean;
   },
 ): FilteredTrack {
   let filters = opts.filters;
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
+  video.setAttribute("playsinline", "");
+  if (opts.inPage) {
+    video.setAttribute("aria-hidden", "true");
+    video.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1";
+    document.body.appendChild(video);
+  }
   video.srcObject = new MediaStream([source]);
   void video.play().catch(() => {});
 
@@ -297,6 +305,7 @@ export function startFilteredTrack(
     track.stop();
     video.pause();
     video.srcObject = null;
+    video.remove();
   };
   // The camera went away (unplugged): nothing more to draw.
   source.addEventListener("ended", stop);
