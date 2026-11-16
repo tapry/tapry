@@ -1,7 +1,7 @@
 // Call diagnostics: which browsers share one camera capture between copies, how a device is
 // named in the log, and the endpoint that writes a device's technical events to the log.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isAppleWebKit } from "../src/lib/client/diag";
+import { isAppleWebKit, receivedVideoLine, sentVideoLine } from "../src/lib/client/diag";
 import { setup } from "./harness";
 
 const UA = {
@@ -25,6 +25,26 @@ describe("which browsers share one camera between copies", () => {
   });
   it("not Chrome, Edge or Firefox elsewhere", () => {
     for (const ua of [UA.macChrome, UA.macEdge, UA.androidChrome, UA.firefox]) expect(isAppleWebKit(ua)).toBe(false);
+  });
+});
+
+describe("what a picture sends and receives, as one line for the log", () => {
+  const stats = (...entries: Array<Record<string, unknown>>) => ({ getStats: async () => new Map(entries.map((e, i) => [String(i), e])) });
+  it("says the size, the rate, the codec and what holds the encoder back", async () => {
+    const sender = stats(
+      { type: "outbound-rtp", kind: "video", codecId: "c1", frameWidth: 360, frameHeight: 640, framesPerSecond: 3.4, framesEncoded: 120, framesSent: 118, encoderImplementation: "libvpx", qualityLimitationReason: "cpu", bytesSent: 204_800 },
+      { type: "codec", id: "c1", mimeType: "video/VP8" },
+    );
+    expect(await sentVideoLine(sender as unknown as RTCRtpSender)).toBe("360x640 at 3 fps, 120 encoded, 118 sent, VP8, libvpx, limited by cpu, 200 KB");
+    expect(await sentVideoLine(undefined)).toBe("no sender");
+    expect(await sentVideoLine(stats() as unknown as RTCRtpSender)).toBe("nothing sent yet");
+  });
+  it("says how many frames arrived and were shown, and gives the count to notice one that stopped", async () => {
+    const receiver = stats({ type: "inbound-rtp", kind: "video", codecId: "c", frameWidth: 360, frameHeight: 640, framesPerSecond: 0, framesReceived: 80, framesDecoded: 79, framesDropped: 1, packetsLost: 12, freezeCount: 2 });
+    expect(await receivedVideoLine(receiver as unknown as RTCRtpReceiver)).toEqual({
+      decoded: 79,
+      line: "360x640 at 0 fps, 80 received, 79 decoded, 1 dropped, 12 lost, 2 freezes, ?, ?",
+    });
   });
 });
 

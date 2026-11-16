@@ -14,7 +14,7 @@ import {
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
-import { deviceLine, diagFor, errorLine, isAppleWebKit, type Note } from "./diag";
+import { deviceLine, diagFor, errorLine, isAppleWebKit, receivedVideoLine, sentVideoLine, type Note } from "./diag";
 import { canPreviewFilters, startFilteredTrack, type FilteredTrack } from "./filter-picture";
 import { getPersonMask } from "./person-mask";
 
@@ -58,6 +58,8 @@ interface LocalTracks {
   noiseUnavailable?: boolean;
   /** Filter changes, one after the other. */
   chain?: Promise<void>;
+  /** Stops reporting what the camera copy sends (diagnostics). */
+  stopStats?: () => void;
   /** The call's copy of the shared screen, while one is shared. */
   screen?: LocalVideoTrack;
 }
@@ -96,6 +98,25 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     camera?.addEventListener("ended", onEnded);
     const onVisibility = () => note(document.hidden ? "page.hidden" : "page.visible");
     document.addEventListener("visibilitychange", onVisibility);
+    // What arrives of each person's picture: three times at first, then only when it stopped
+    // moving (the tile then says "Picture interrupted"), so the log shows why.
+    const heard = new Map<string, { times: number; decoded: number }>();
+    const watchPictures = setInterval(() => {
+      const r = current;
+      if (!r || r.state !== ConnectionState.Connected) return;
+      for (const p of r.remoteParticipants.values()) {
+        const track = p.getTrackPublication(Track.Source.Camera)?.videoTrack as RemoteVideoTrack | undefined;
+        if (!track) continue;
+        void receivedVideoLine(track.receiver)
+          .then(({ line, decoded }) => {
+            const seen = heard.get(p.identity) ?? { times: 0, decoded: -2 };
+            const stopped = seen.decoded >= 0 && decoded === seen.decoded;
+            if (seen.times < 3 || stopped) note(stopped ? "call.peer_video_stopped" : "call.peer_video", `${p.identity}: ${line}`);
+            heard.set(p.identity, { times: seen.times + 1, decoded });
+          })
+          .catch(() => {});
+      }
+    }, 10_000);
 
     // One retry at a time. A failure can surface twice (connect or publish throws, and the room
     // also emits Disconnected): two retries would join the same person twice, and LiveKit kicks
@@ -200,6 +221,8 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
       cancelled = true;
       clearTimeout(retry);
       note("call.left");
+      clearInterval(watchPictures);
+      local.current.stopStats?.();
       camera?.removeEventListener("mute", onMute);
       camera?.removeEventListener("unmute", onUnmute);
       camera?.removeEventListener("ended", onEnded);
@@ -289,6 +312,30 @@ async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters
   if (cam) await publishCamera(r, cam, local, filters, note);
 }
 
+/** What the camera copy is sending, a few times early on and then every minute: for the log only. */
+function reportSent(video: LocalVideoTrack, note: Note) {
+  const at = [5_000, 15_000, 30_000, 60_000];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let step = 0;
+  const next = () => {
+    const wait = step < at.length ? at[step]! - (at[step - 1] ?? 0) : 60_000;
+    step++;
+    timer = setTimeout(() => {
+      void sentVideoLine(video.sender)
+        .then((line) => note("call.video_sent", line))
+        .catch(() => {})
+        .finally(() => {
+          if (timer !== undefined) next();
+        });
+    }, wait);
+  };
+  next();
+  return () => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+}
+
 /** How many times the camera is offered to a call before it carries on with sound only. */
 const CAMERA_TRIES = 3;
 /** Longer than this and a camera copy that won't take its size is published as it is. */
@@ -333,14 +380,17 @@ async function publishCamera(r: Room, cam: MediaStreamTrack, local: LocalTracks,
       });
       // Firefox ignores those constraints on a cloned camera track and keeps its full size, and
       // on Apple's WebKit they are never asked. Then the encoder scales the call's copy down
-      // instead (the camera itself is left alone). The filtered picture is at the call's size already.
+      // instead (the camera itself is left alone), by its short side, so a phone held upright
+      // (2160x3840) becomes 360x640. The filtered picture is at the call's size already.
       const settings = clone.getSettings();
-      const height = local.picture ? 0 : (settings.height ?? 0);
-      if (height > CALL_VIDEO.height * 1.1) await scaleDown(video, height / CALL_VIDEO.height);
+      const short = local.picture ? 0 : Math.min(settings.width ?? 0, settings.height ?? 0);
+      if (short > CALL_VIDEO.height * 1.1) await scaleDown(video, short / CALL_VIDEO.height);
       note(
         "call.video_published",
         `try ${attempt}, ${took()}, ${settings.width ?? "?"}x${settings.height ?? "?"}, size ${sized}${local.picture ? ", filtered" : ""}${clone.muted ? ", copy muted" : ""}`,
       );
+      local.stopStats?.();
+      local.stopStats = reportSent(video, note);
       clone.addEventListener("mute", () => note("call.video_copy_muted"));
       clone.addEventListener("unmute", () => note("call.video_copy_unmuted"));
       clone.addEventListener("ended", () => note("call.video_copy_ended"));

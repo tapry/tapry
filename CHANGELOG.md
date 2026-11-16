@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **A phone held upright sends the call a proper small picture.** The call's copy of the
+  camera is scaled by its short side, so an iPhone's 2160x3840 becomes 360x640 (it was scaled
+  by its height to about 200x360).
+- **The call diagnostics say what each picture sends and receives**: size, frame rate, codec
+  and what limits the encoder on the sending device; frames received, shown, dropped and lost
+  on the receiving one, and again whenever a person's picture stops arriving.
+
 - **Fix: a camera that wouldn't publish took the whole call down with it.** The call's sound
   and picture are now published separately: if the camera can't be published the call stays
   up with sound, and the camera is offered again up to three times. Before, the device left
