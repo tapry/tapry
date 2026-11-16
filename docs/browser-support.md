@@ -11,7 +11,7 @@ matrix. Last run: 31 Oct 2026, macOS (Apple Silicon), Playwright 1.64.
 |---|---|---|---|
 | Chromium | Chrome for Testing 156 | WebM VP9 + Opus | ✅ |
 | Firefox | 157 | WebM **VP8** + Opus (no VP9 in Firefox's MediaRecorder) | ✅ |
-| WebKit | 27.2 (Playwright build) | WebM VP9 + Opus | ✅ |
+| WebKit | 27.2 (Playwright build) | **MP4** (H.264) for pictures, WebM Opus for sound: Apple's devices encode H.264 in hardware (iPhone videos recorded as WebM VP9 went black, 16 Nov 2026) | ✅ |
 | WebKit, MP4 only | 27.2, WebM hidden | **MP4** (H.264 + AAC), the path of Safari < 18.4 and iOS | ✅ |
 
 Each run checks: the green room preview and mic meter, one audio-only and one camera recorder

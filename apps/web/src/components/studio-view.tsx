@@ -47,10 +47,12 @@ export function StudioView({
   const [tab, setTab] = useState<Tab>("recordings");
   const [recordings, setRecordings] = useState(initial);
   useEffect(() => setRecordings(initial), [initial]);
-  const now = useNow(recordings.some((e) => e.status === "recording") ? 1000 : null);
-
   // Keep the list fresh while anything is recording, uploading or processing.
   const inFlight = recordings.some((e) => !settled(e));
+  // The clock ticks while anything is in flight, not only while recording: the processing step
+  // says how long it has been going ("8 min so far"), and read "under a minute" for as long as
+  // the page was open (owner's test, 16 Nov 2026).
+  const now = useNow(recordings.some((e) => e.status === "recording") ? 1000 : inFlight ? 5000 : null);
   useEffect(() => {
     if (!inFlight) return;
     const id = setInterval(async () => {

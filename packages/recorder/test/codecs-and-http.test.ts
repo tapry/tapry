@@ -14,6 +14,18 @@ describe("pickMimeType", () => {
     );
   });
 
+  // Every iPhone video recorded in WebM (VP9) went black after a few seconds (16 Nov 2026).
+  it("puts MP4 first for pictures where asked (Apple's hardware codec), never for sound", () => {
+    const all = supports("video/webm;codecs=vp9,opus", "video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "audio/webm;codecs=opus", "audio/mp4");
+    expect(pickMimeType("video", all, { preferMp4: true })).toBe("video/mp4;codecs=avc1.42E01E,mp4a.40.2");
+    expect(pickMimeType("screen", all, { preferMp4: true })).toBe("video/mp4");
+    expect(pickMimeType("mask", all, { preferMp4: true })).toBe("video/mp4");
+    expect(pickMimeType("audio", all, { preferMp4: true })).toBe("audio/webm;codecs=opus");
+    expect(pickMimeType("video", all)).toBe("video/webm;codecs=vp9,opus");
+    // No MP4 at all: WebM as before.
+    expect(pickMimeType("video", supports("video/webm;codecs=vp9,opus"), { preferMp4: true })).toBe("video/webm;codecs=vp9,opus");
+  });
+
   it("falls back to MP4 (Safari)", () => {
     expect(pickMimeType("video", supports("video/mp4"))).toBe("video/mp4");
     expect(pickMimeType("audio", supports("audio/mp4;codecs=mp4a.40.2", "audio/mp4"))).toBe(

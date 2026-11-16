@@ -15,7 +15,7 @@ import {
 const EXPECTED_FORMAT: Record<string, RegExp> = {
   chromium: /^video\/webm;codecs=vp9,opus$/,
   firefox: /^video\/webm;codecs=vp8,opus$/, // Firefox has no VP9 in MediaRecorder
-  webkit: /^video\/webm/,
+  webkit: /^video\/mp4/, // Apple's devices record pictures in MP4 (H.264): their WebM is encoded in software
   "webkit-mp4": /^video\/mp4/,
 };
 

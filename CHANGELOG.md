@@ -5,6 +5,21 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: iPhone guests' videos went black a few seconds into a recording.** Every iPhone
+  video in a 4K studio did, back to the first ones (the sound was fine). They were recorded in
+  WebM (VP9), which Apple's devices encode in software; iPhones, iPads and Safari now record
+  pictures in MP4 (H.264), their hardware codec, as Safari did before it had WebM. Each
+  device also notes its recording format and camera size in the call diagnostics. Not yet
+  confirmed on a real iPhone.
+- **The processing step's clock keeps counting** ("8 min so far") while the studio page is
+  open; it stayed at "under a minute".
+
+- **Filters show live on iPhones and in Safari.** Their browsers have no canvas filters, so
+  until now brightness, looks, touch-up and blur appeared only in the finished files. They are
+  now drawn with blend modes and scaling there: the same brightness, black and white and tint,
+  a close likeness of the softening and the blur (the small contrast and saturation steps of
+  Warm and Cool are left out live). Background blur becomes available in those browsers too.
+
 - **"Others see me mirrored"** (Filters, under "Mirror my view"): flips your picture on
   everyone's screen in the call, including people who join later. Off by default. The
   recording is never flipped, so writing you hold up still reads correctly in the files.
