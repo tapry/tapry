@@ -35,6 +35,7 @@ import {
   setPlanBody,
   waitlistBody,
   telemetryBody,
+  diagBody,
   techCheckReport,
   SPEED_TEST_MAX_BYTES,
   signupBody,
@@ -564,6 +565,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     /** A device's quality report: alert codes and upload lag, no media. Every few seconds. */
     telemetry: asParticipant(async (svc, p, req) => {
       svc.live.reportHealth(p, await parseBody(req, telemetryBody));
+      return new Response(null, { status: 204 });
+    }),
+    /** Technical events from a device's call, for the server's log (no media, nothing a person wrote). */
+    diag: asParticipant(async (svc, p, req) => {
+      svc.live.reportDiag(p, await parseBody(req, diagBody));
       return new Response(null, { status: 204 });
     }),
     /** A person's filters (how they look and sound in their files), for their tracks in the running recording. */

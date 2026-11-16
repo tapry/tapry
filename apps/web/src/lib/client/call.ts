@@ -14,6 +14,7 @@ import {
 } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "./api";
+import { deviceLine, diagFor, errorLine, isAppleWebKit, type Note } from "./diag";
 import { canPreviewFilters, startFilteredTrack, type FilteredTrack } from "./filter-picture";
 import { getPersonMask } from "./person-mask";
 
@@ -82,6 +83,19 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     let cancelled = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let current: Room | null = null;
+    // What this device's call does, for the server's log (diag.ts): steps and errors, no media.
+    const note = diagFor(ticket);
+    note("call.start", deviceLine());
+    const camera = stream.getVideoTracks()[0];
+    const cameraSays = (what: string) => () => note(`camera.${what}`);
+    const onMute = cameraSays("muted_by_browser");
+    const onUnmute = cameraSays("unmuted");
+    const onEnded = cameraSays("ended");
+    camera?.addEventListener("mute", onMute);
+    camera?.addEventListener("unmute", onUnmute);
+    camera?.addEventListener("ended", onEnded);
+    const onVisibility = () => note(document.hidden ? "page.hidden" : "page.visible");
+    document.addEventListener("visibilitychange", onVisibility);
 
     // One retry at a time. A failure can surface twice (connect or publish throws, and the room
     // also emits Disconnected): two retries would join the same person twice, and LiveKit kicks
@@ -106,6 +120,7 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     };
 
     const connect = async (attempt: number) => {
+      note("call.connecting", `attempt ${attempt + 1}`);
       setState((s) => ({ ...s, status: attempt === 0 ? "connecting" : "reconnecting" }));
       // Drop the previous room completely before joining again.
       const previous = current;
@@ -147,8 +162,10 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
         ]) {
           r.on(e, update);
         }
-        r.on(RoomEvent.Disconnected, () => {
+        r.on(RoomEvent.ConnectionStateChanged, (s) => note("call.state", String(s)));
+        r.on(RoomEvent.Disconnected, (reason) => {
           if (cancelled || r !== current) return;
+          note("call.disconnected", `reason ${reason ?? "unknown"}`);
           snapshot(r);
           // LiveKit gave up reconnecting by itself: start over with a fresh token.
           retryLater(attempt + 1);
@@ -159,8 +176,9 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
         const relayOnly = new URLSearchParams(window.location.search).get("relay") === "1";
         await r.connect(t.url, t.token, relayOnly ? { rtcConfig: { iceTransportPolicy: "relay" } } : undefined);
         if (cancelled) return void r.disconnect();
+        note("call.connected");
         releasePicture(tracks); // a rejoin starts from fresh clones
-        await publish(r, stream, tracks, wanted.current);
+        await publish(r, stream, tracks, wanted.current, note);
         // Whatever changed while this was publishing (nothing to do when there are no filters).
         await syncFilters(tracks, stream, () => wanted.current);
         // Sharing a screen when the call (re)connected: the others get it again.
@@ -170,6 +188,7 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
       } catch (err) {
         releasePicture(tracks);
         if (cancelled) return;
+        note("call.failed", errorLine(err));
         console.error("[call]", err);
         setState((s) => ({ ...s, status: "failed" }));
         retryLater(attempt + 1);
@@ -180,6 +199,11 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     return () => {
       cancelled = true;
       clearTimeout(retry);
+      note("call.left");
+      camera?.removeEventListener("mute", onMute);
+      camera?.removeEventListener("unmute", onUnmute);
+      camera?.removeEventListener("ended", onEnded);
+      document.removeEventListener("visibilitychange", onVisibility);
       void current?.disconnect(); // stops the call clones only; the recording's tracks are untouched
       releasePicture(local.current);
       room.current = null;
@@ -250,7 +274,7 @@ async function publishScreen(r: Room, local: LocalTracks, track: MediaStreamTrac
   });
 }
 
-async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters: TrackFilters) {
+async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters: TrackFilters, note: Note) {
   const mic = stream.getAudioTracks()[0];
   const cam = stream.getVideoTracks()[0];
   if (mic) {
@@ -260,29 +284,80 @@ async function publish(r: Room, stream: MediaStream, local: LocalTracks, filters
     local.noise = undefined;
     local.audio = new LocalAudioTrack(clone, undefined, true);
     await r.localParticipant.publishTrack(local.audio, { source: Track.Source.Microphone, dtx: true, red: true });
+    note("call.audio_published");
   }
-  if (cam) {
+  if (cam) await publishCamera(r, cam, local, filters, note);
+}
+
+/** How many times the camera is offered to a call before it carries on with sound only. */
+const CAMERA_TRIES = 3;
+/** Longer than this and a camera copy that won't take its size is published as it is. */
+const SIZE_WAIT_MS = 2000;
+
+/**
+ * The camera's place in the call. It never throws: a camera that can't be published must not
+ * take the sound down with it, so the call stays up and the camera is offered again a few
+ * times. (It used to fail the whole call, which then left and rejoined every ten seconds on
+ * an iPhone whose camera wouldn't publish: seen in the call server's log, 16 Nov 2026.)
+ */
+async function publishCamera(r: Room, cam: MediaStreamTrack, local: LocalTracks, filters: TrackFilters, note: Note) {
+  // Apple's WebKit has one capture for every copy of a camera: asking this copy for a small
+  // size can change or stall the camera the recorder is using. There the encoder scales instead.
+  const shared = typeof navigator !== "undefined" && isAppleWebKit(navigator.userAgent, navigator.maxTouchPoints);
+  for (let attempt = 1; attempt <= CAMERA_TRIES; attempt++) {
+    if (r.state !== ConnectionState.Connected) return;
+    const began = performance.now();
+    const took = () => `${Math.round(performance.now() - began)} ms`;
     const clone = cam.clone();
     clone.enabled = cam.enabled;
-    // Scales only the clone; the original keeps recording at full resolution.
-    await clone
-      .applyConstraints({ width: { ideal: CALL_VIDEO.width }, height: { ideal: CALL_VIDEO.height }, frameRate: { max: CALL_VIDEO.frameRate } })
-      .catch(() => {});
-    local.cam = clone;
-    // With picture filters, the others never see the plain picture, not even for a moment.
-    if (hasVideoFilters(filters) && canPreviewFilters()) local.picture = filteredCopy(clone, filters);
-    local.video = new LocalVideoTrack(local.picture?.track ?? clone, undefined, true);
-    await r.localParticipant.publishTrack(local.video, {
-      source: Track.Source.Camera,
-      simulcast: false,
-      videoEncoding: { maxBitrate: 600_000, maxFramerate: CALL_VIDEO.frameRate },
-    });
-    // Firefox ignores those constraints on a cloned camera track and keeps its full size. Then
-    // the encoder scales the call's copy down instead (the camera itself is left alone).
-    // (The filtered picture is drawn at the call's size already.)
-    const height = local.picture ? 0 : (clone.getSettings().height ?? 0);
-    if (height > CALL_VIDEO.height * 1.1) await scaleDown(local.video, height / CALL_VIDEO.height);
+    let video: LocalVideoTrack | undefined;
+    try {
+      // Scales only the clone; the original keeps recording at full resolution.
+      const sized = shared
+        ? "left to the encoder"
+        : await Promise.race([
+            clone
+              .applyConstraints({ width: { ideal: CALL_VIDEO.width }, height: { ideal: CALL_VIDEO.height }, frameRate: { max: CALL_VIDEO.frameRate } })
+              .then(() => "applied", () => "refused"),
+            new Promise<string>((resolve) => setTimeout(() => resolve("timed out"), SIZE_WAIT_MS)),
+          ]);
+      local.cam = clone;
+      // With picture filters, the others never see the plain picture, not even for a moment.
+      if (hasVideoFilters(filters) && canPreviewFilters()) local.picture = filteredCopy(clone, filters);
+      video = new LocalVideoTrack(local.picture?.track ?? clone, undefined, true);
+      local.video = video;
+      await r.localParticipant.publishTrack(video, {
+        source: Track.Source.Camera,
+        simulcast: false,
+        videoEncoding: { maxBitrate: 600_000, maxFramerate: CALL_VIDEO.frameRate },
+      });
+      // Firefox ignores those constraints on a cloned camera track and keeps its full size, and
+      // on Apple's WebKit they are never asked. Then the encoder scales the call's copy down
+      // instead (the camera itself is left alone). The filtered picture is at the call's size already.
+      const settings = clone.getSettings();
+      const height = local.picture ? 0 : (settings.height ?? 0);
+      if (height > CALL_VIDEO.height * 1.1) await scaleDown(video, height / CALL_VIDEO.height);
+      note(
+        "call.video_published",
+        `try ${attempt}, ${took()}, ${settings.width ?? "?"}x${settings.height ?? "?"}, size ${sized}${local.picture ? ", filtered" : ""}${clone.muted ? ", copy muted" : ""}`,
+      );
+      clone.addEventListener("mute", () => note("call.video_copy_muted"));
+      clone.addEventListener("unmute", () => note("call.video_copy_unmuted"));
+      clone.addEventListener("ended", () => note("call.video_copy_ended"));
+      return;
+    } catch (err) {
+      note("call.video_publish_failed", `try ${attempt}, ${took()}: ${errorLine(err)}`);
+      console.warn("[call] camera", err);
+      // Leave nothing half-published behind, then offer it again with a fresh copy.
+      if (video) await r.localParticipant.unpublishTrack(video).catch(() => {});
+      releasePicture(local);
+      clone.stop();
+      if (local.video === video) local.video = undefined;
+      if (local.cam === clone) local.cam = undefined;
+      if (attempt < CAMERA_TRIES) await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
   }
+  note("call.video_given_up");
 }
 
 // ── Filters on the call's copies ─────────────────────────────────────────────

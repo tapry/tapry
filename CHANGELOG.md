@@ -5,6 +5,18 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: a camera that wouldn't publish took the whole call down with it.** The call's sound
+  and picture are now published separately: if the camera can't be published the call stays
+  up with sound, and the camera is offered again up to three times. Before, the device left
+  and rejoined the call every ten seconds (seen with an iPhone in the call server's log).
+- **On iPhones, iPads and Safari the call's copy of the camera is no longer asked for a
+  smaller size**; the encoder scales it down instead. Apple's WebKit has one capture for every
+  copy of a camera, so that request could change or stall the camera the recorder is using.
+- **Call diagnostics in the server's log.** Each device reports the steps and errors of its
+  call (connected, camera published and how long it took, an error's name, the browser muting
+  the camera, the page going to the background) as `[diag]` lines: technical events only,
+  never media or anything a person wrote, at most 400 lines an hour per person, not stored.
+
 - **Fix: "Picture interrupted" shown over a picture that was playing, on iPhones.** Their
   browsers don't count a live picture's frames the way the notice relied on. Frames are now
   counted three ways, and a picture is only called interrupted after its frames were seen to
