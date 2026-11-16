@@ -5,6 +5,12 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Stop a recording's files being made** (the recording's card, while it is processing: "Stop
+  making the files", and "Stop the transcript"). A recording left running for hours takes
+  hours to process, and until now only a server admin could stop that. The worker stops within
+  a few seconds; the uploads are kept, so "Try again" makes the files whenever you want.
+  API: `DELETE /api/studios/:studioId/recordings/:recordingId/process`.
+
 - **Fix: a returning guest's camera could stay black on an iPhone.** With a remembered device
   choice, the green room asked for the camera several times at once (the defaults, then the
   choice). A phone has one camera for the page, and the request that was kept could be left

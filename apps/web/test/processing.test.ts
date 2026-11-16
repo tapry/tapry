@@ -158,6 +158,48 @@ describe("recording processing", () => {
       await running;
     });
 
+    it("stops a running job when the host asks: the work is killed, nothing retries, and it can be processed again", async () => {
+      await uploadTrack([Buffer.from("a")]);
+      await stop();
+      // Would run for a minute: a recording of hours takes hours (found on the live server, 16 Nov 2026).
+      const path = join(mkdtempSync(join(tmpdir(), "tapry-slow-")), "ffmpeg");
+      writeFileSync(path, "#!/bin/sh\nexec sleep 60\n");
+      chmodSync(path, 0o755);
+      const runner = new JobRunner(t.db, storage, { ffmpeg: path, ffprobe: path });
+      const running = runner.drain();
+      await waitFor(async () => (await jobs())[0]?.status === "running");
+
+      const began = Date.now();
+      const res = await t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`);
+      expect(res).toMatchObject({ status: 202, body: { stopping: true } });
+      await running;
+      expect(Date.now() - began).toBeLessThan(15_000); // within a few seconds, not the minute it had left
+
+      expect(await t.db.query("SELECT status, error FROM jobs WHERE recording_id = $1", [t.recordingId])).toEqual([{ status: "failed", error: "cancelled" }]);
+      const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
+      expect(recordings[0]).toMatchObject({ processing: "failed", processingError: expect.stringContaining("You stopped this") });
+      // The uploads are untouched: the same recording can be queued again.
+      expect((await t.hostBrowser.post(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`)).status).toBe(202);
+      expect(await processing()).toBe("queued");
+    }, 30_000);
+
+    it("stops a job that is still waiting, and says so when there is nothing to stop", async () => {
+      await uploadTrack([Buffer.from("a")]);
+      await stop();
+      expect(await processing()).toBe("queued");
+      const stranger = t.client();
+      expect((await stranger.del(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`)).status).toBe(401);
+
+      expect((await t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`)).status).toBe(202);
+      expect(await processing()).toBe("failed");
+      expect(await t.db.query("SELECT status, error FROM jobs WHERE recording_id = $1", [t.recordingId])).toEqual([{ status: "failed", error: "cancelled" }]);
+      // No worker finds anything to do.
+      const runner = new JobRunner(t.db, storage, { ffmpeg: "ffmpeg", ffprobe: "ffprobe" });
+      expect(await (runner as unknown as { claim(): Promise<unknown> }).claim()).toBeNull();
+
+      expect(await t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${t.recordingId}/process`)).toMatchObject({ status: 409, body: { error: "not_processing" } });
+    });
+
     it("hands a running job back to the queue on shutdown, without counting it as a failure", async () => {
       await uploadTrack([Buffer.from("a")]);
       await stop();

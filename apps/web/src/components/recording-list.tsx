@@ -46,6 +46,16 @@ export function RecordingList({
     }
   }
 
+  async function stopProcessing(e: Recording) {
+    setError(null);
+    try {
+      await apiFetch(`/studios/${studioId}/recordings/${e.id}/process`, { method: "DELETE" });
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : "Couldn't stop it.");
+    }
+  }
+
   async function remove(e: Recording) {
     await apiFetch(`/studios/${studioId}/recordings/${e.id}`, { method: "DELETE" });
     onChange((list) => list.filter((x) => x.id !== e.id));
@@ -79,6 +89,7 @@ export function RecordingList({
               levelLoudness={levelLoudness}
               onToggle={() => setOpen(open === e.id ? null : e.id)}
               onProcessNow={() => processNow(e)}
+              onStopProcessing={() => stopProcessing(e)}
               onFiltersQueued={(applyFilters) =>
                 onChange((list) => list.map((x) => (x.id === e.id ? { ...x, processing: "queued", applyFilters } : x)))
               }
@@ -99,6 +110,7 @@ function RecordingRow({
   levelLoudness,
   onToggle,
   onProcessNow,
+  onStopProcessing,
   onFiltersQueued,
   onRemove,
 }: {
@@ -109,6 +121,7 @@ function RecordingRow({
   levelLoudness: boolean;
   onToggle: () => void;
   onProcessNow: () => void;
+  onStopProcessing: () => Promise<void>;
   onFiltersQueued: (applyFilters: boolean) => void;
   onRemove: () => Promise<void>;
 }) {
@@ -117,6 +130,9 @@ function RecordingRow({
   const length = e.stoppedAt ? formatDuration(e.stoppedAt - e.startedAt) : `${formatClock(now - e.startedAt)} so far`;
   const missing = e.people.filter((x) => x.completeTracks < x.tracks).map((x) => x.name);
   const waiting = e.status === "stopped" && e.processing === "pending" && e.incompleteTracks > 0;
+
+  const makingFiles = e.processing === "queued" || e.processing === "processing";
+  const makingTranscript = !makingFiles && (e.transcript === "queued" || e.transcript === "processing");
 
   let note: { text: string; tone: "warn" | "danger" } | null = null;
   if (e.status === "recording") note = { text: "You're live. Everyone's recording is being saved and sent as you talk.", tone: "warn" };
@@ -185,6 +201,11 @@ function RecordingRow({
           )}
 
           {e.status === "stopped" && <RecordingTimeline recording={e} now={now} levelLoudness={levelLoudness} />}
+
+          {/* A long recording takes long to make: the host can stop it. The uploads stay, so it can be made again. */}
+          {e.status === "stopped" && (makingFiles || makingTranscript) && (
+            <StopProcessing what={makingFiles ? "files" : "transcript"} onStop={onStopProcessing} />
+          )}
 
           {/* Who is still sending: while recording, and until processing starts. */}
           {e.processing === "pending" && e.people.length > 0 && <PeopleProgress recording={e} />}
@@ -370,4 +391,30 @@ function listNames(names: string[]) {
   if (names.length === 0) return "A guest";
   if (names.length === 1) return names[0]!;
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** "Stop making the files": asks once, since the work done so far is thrown away. */
+function StopProcessing({ what, onStop }: { what: "files" | "transcript"; onStop: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const question =
+    what === "files"
+      ? "Stop making the files? What's been made so far is thrown away. The uploads are kept, so you can process it again."
+      : "Stop making the transcript? The files stay as they are.";
+  return (
+    <div className="-mt-1 flex items-center gap-2 text-[14px] text-muted">
+      <button
+        type="button"
+        disabled={busy}
+        data-testid="stop-processing"
+        className="cursor-pointer underline underline-offset-[3px] hover:text-text disabled:cursor-default disabled:opacity-50"
+        onClick={() => {
+          if (!confirm(question)) return;
+          setBusy(true);
+          void onStop().finally(() => setBusy(false));
+        }}
+      >
+        {busy ? "Stopping…" : what === "files" ? "Stop making the files" : "Stop the transcript"}
+      </button>
+    </div>
+  );
 }

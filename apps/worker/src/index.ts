@@ -14,7 +14,7 @@ export {
   type SkippedTrack,
   type TrackInput,
 } from "./pipeline.js";
-export { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, run } from "./ffmpeg.js";
+export { CancelledError, FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, run, withCancel } from "./ffmpeg.js";
 export {
   findFont,
   FONT_CANDIDATES,

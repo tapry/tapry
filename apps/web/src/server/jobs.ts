@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ffmpegFrameRate, studioSettings, trackFilters, type ClipShape, type TrackFilters } from "@tapry/shared";
 import {
+  CancelledError,
   concatChunks,
   FfmpegError,
   mergeSpeakers,
@@ -20,7 +21,11 @@ import {
   type SpeakerTranscript,
   type TrackInput,
   type WhisperOptions,
+  withCancel,
 } from "@tapry/worker";
+
+/** How often a running job looks for its host's "stop". */
+const CANCEL_CHECK_MS = 3000;
 import { EXPIRY_NOTICE_MS, planOfRecording, planRetention, warnExpiring } from "./billing";
 import { videoLogo } from "./brand";
 import type { Db, Queryable } from "./db";
@@ -30,7 +35,7 @@ import { parseVtt, type Cue } from "./library";
 import { newId } from "./ids";
 import { deliverWebhooks, emitWebhook } from "./integrations";
 import { NOTES_ERROR_TEXT, NOTES_FILE, NOTES_MAX_CHARS, NotesError, notesModelFor, notesModels, queueNotes, type NotesConfig, type NotesModel } from "./notes";
-import { deleteRecordingIn, type RecordingProgress } from "./processing";
+import { deleteRecordingIn, PROCESSING_STOPPED_TEXT, type RecordingProgress } from "./processing";
 import { sendDueRecaps, sweepRecaps, type RecapMail } from "./recap";
 import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
 
@@ -353,13 +358,39 @@ export class JobRunner {
         )
         .catch((err) => console.error(`[worker] could not renew the lock on ${job.id}`, err));
     }, Math.min(60_000, (this.lockSeconds() * 1000) / 3));
+    // The host can stop it (cancel_requested on the job): looked for every few seconds, and at
+    // once, for a job that was stopped while it waited to be picked up again.
+    const stop = new AbortController();
+    const lookForStop = () =>
+      this.db
+        .query<{ cancel_requested: boolean }>("SELECT cancel_requested FROM jobs WHERE id = $1", [job.id])
+        .then(([row]) => {
+          if (row?.cancel_requested) stop.abort();
+        })
+        .catch((err) => console.error(`[worker] could not check ${job.id} for a stop`, err));
+    await lookForStop();
+    const watch = setInterval(() => void lookForStop(), CANCEL_CHECK_MS);
     const work = await mkdtemp(join(tmpdir(), "tapry-job-"));
     const started = Date.now();
     try {
-      if (job.type === "process_recording") await this.processRecording(rec, work, job);
-      else await this.transcribeRecording(rec, work, job);
+      await withCancel(stop.signal, async () => {
+        if (stop.signal.aborted) throw new CancelledError();
+        if (job.type === "process_recording") await this.processRecording(rec, work, job);
+        else await this.transcribeRecording(rec, work, job);
+      });
       console.log(`[worker] ${job.type} ${job.id} for ${rec.id} done in ${((Date.now() - started) / 1000).toFixed(1)} s`);
     } catch (err) {
+      if (stop.signal.aborted) {
+        // Stopped on purpose: no retry, and nothing is wrong with the recording.
+        console.log(`[worker] ${job.type} ${job.id} for ${rec.id} stopped by the host after ${((Date.now() - started) / 1000).toFixed(1)} s`);
+        await this.db.query("UPDATE jobs SET status = 'failed', finished_at = now(), locked_until = NULL, error = 'cancelled' WHERE id = $1", [job.id]);
+        if (job.type === "process_recording") {
+          await this.db.query("UPDATE recordings SET processing = 'failed', processing_error = $2, rerun_requested = false WHERE id = $1", [rec.id, PROCESSING_STOPPED_TEXT]);
+        } else {
+          await this.db.query("UPDATE recordings SET transcript = 'failed' WHERE id = $1", [rec.id]);
+        }
+        return;
+      }
       // Logs and the database get the reason only, never media.
       const reason = err instanceof FfmpegError ? `${err.message}: ${err.stderrTail.split("\n").slice(-3).join(" ")}` : String(err);
       console.error(`[worker] ${job.type} ${job.id} attempt ${job.attempts} failed:`, reason);
@@ -383,6 +414,7 @@ export class JobRunner {
       }
     } finally {
       clearInterval(renew);
+      clearInterval(watch);
       await this.db.query("UPDATE recordings SET progress = NULL WHERE id = $1", [rec.id]).catch(() => {});
       await rm(work, { recursive: true, force: true });
       this.opts.onChange?.(rec.session_id);

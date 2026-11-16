@@ -225,6 +225,11 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       await svc.processing.processNow(user, params.studioId!, params.recordingId!, { filters });
       return json(202, { queued: true });
     }, { log: "Processed a recording again", keys: true }),
+    /** Stop making this recording's files or transcript. The uploads stay; it can be processed again. */
+    cancelProcessing: asUser(async (svc, user, _req, params) => {
+      await svc.processing.cancelProcessing(user, params.studioId!, params.recordingId!);
+      return json(202, { stopping: true });
+    }, { log: "Stopped processing a recording", keys: true }),
     /** Redirects to a short-lived signed storage URL, so big files never pass through this server. */
     downloadOutput: asUser(async (svc, user, _req, params) => {
       const url = await svc.processing.downloadUrl(user, params.studioId!, params.recordingId!, params.outputId!);

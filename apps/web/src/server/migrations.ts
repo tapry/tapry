@@ -595,4 +595,8 @@ ALTER TABLE clips ADD COLUMN captions boolean NOT NULL DEFAULT false;
 -- The studio's logo in a corner of the combined video.
 ALTER TABLE studio_brands ADD COLUMN on_video boolean NOT NULL DEFAULT false;
 `,
+  `
+-- The host stopped a job that a worker is on: the worker sees this within a few seconds and stops.
+ALTER TABLE jobs ADD COLUMN cancel_requested boolean NOT NULL DEFAULT false;
+`,
 ];
