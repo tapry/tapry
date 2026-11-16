@@ -61,3 +61,38 @@ export function isAppleWebKit(ua: string, maxTouchPoints = 0) {
   if (/Macintosh/.test(ua) && maxTouchPoints > 1) return true; // an iPad saying it is a Mac
   return /Safari\//.test(ua) && !/Chrome|Chromium|Edg\/|OPR\//.test(ua);
 }
+
+type Stat = Record<string, unknown> & { type: string; kind?: string; codecId?: string; mimeType?: string };
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : "?");
+
+function readReport(report: RTCStatsReport, type: "outbound-rtp" | "inbound-rtp") {
+  let rtp: Stat | undefined;
+  const codecs = new Map<string, string>();
+  report.forEach((v: Stat) => {
+    if (v.type === type && (v.kind ?? "video") === "video") rtp = v;
+    else if (v.type === "codec" && typeof v.mimeType === "string") codecs.set(String(v.id), v.mimeType.replace(/^video\//, ""));
+  });
+  return rtp ? { rtp, codec: (rtp.codecId && codecs.get(String(rtp.codecId))) || "?" } : null;
+}
+
+/** What this device's camera copy is sending the call, as one line: size, rate, codec, what holds it back. */
+export async function sentVideoLine(sender: RTCRtpSender | undefined) {
+  if (!sender) return "no sender";
+  const found = readReport(await sender.getStats(), "outbound-rtp");
+  if (!found) return "nothing sent yet";
+  const { rtp: o, codec } = found;
+  return `${num(o.frameWidth)}x${num(o.frameHeight)} at ${num(o.framesPerSecond)} fps, ${num(o.framesEncoded)} encoded, ${num(o.framesSent)} sent, ${codec}, ${String(o.encoderImplementation ?? "?")}, limited by ${String(o.qualityLimitationReason ?? "?")}, ${num(Number(o.bytesSent ?? 0) / 1024)} KB`;
+}
+
+/** What arrives of someone's picture here, as one line; `decoded` is for noticing a picture that stopped. */
+export async function receivedVideoLine(receiver: RTCRtpReceiver | undefined) {
+  if (!receiver) return { line: "no receiver", decoded: -1 };
+  const found = readReport(await receiver.getStats(), "inbound-rtp");
+  if (!found) return { line: "nothing received yet", decoded: 0 };
+  const { rtp: i, codec } = found;
+  const decoded = typeof i.framesDecoded === "number" ? i.framesDecoded : -1;
+  return {
+    decoded,
+    line: `${num(i.frameWidth)}x${num(i.frameHeight)} at ${num(i.framesPerSecond)} fps, ${num(i.framesReceived)} received, ${num(i.framesDecoded)} decoded, ${num(i.framesDropped)} dropped, ${num(i.packetsLost)} lost, ${num(i.freezeCount)} freezes, ${codec}, ${String(i.decoderImplementation ?? "?")}`,
+  };
+}
