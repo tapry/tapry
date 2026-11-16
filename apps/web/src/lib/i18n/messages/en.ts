@@ -185,6 +185,7 @@ export const en = {
   "advice.echo": "Your microphone is picking up the others from your speakers, so they're in your recording too. Put on headphones, or turn your speakers down.",
   "advice.upload_behind": "Your upload is a minute behind. The recording is safe on this device and will catch up; keep this tab open.",
   "advice.upload_behind_minutes": "Your upload is {minutes} minutes behind. The recording is safe on this device and will catch up; keep this tab open.",
+  "advice.upload_refused": "The server isn't accepting your recording right now. It's safe on this device and is sent as soon as the server takes it again; keep this tab open.",
   "advice.low_disk": "This device is running low on space for the recording. Free some up, or let the upload catch up before recording more.",
 
   // After the session

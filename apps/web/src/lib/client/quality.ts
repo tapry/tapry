@@ -287,6 +287,7 @@ export function useQualityAlerts(q: QualityInputs) {
       const list: QualityAlert[] = [...mic.alerts(now, cur.micMuted)];
       if (echo.echo()) list.push("echo");
       if (behind !== null && behind >= UPLOAD_BEHIND_AFTER_S) list.push("upload_behind");
+      if (uploadRefused(cur.upload, Date.now())) list.push("upload_refused");
       if (lowDisk) list.push("low_disk");
       if (document.visibilityState === "hidden") list.push("tab_hidden");
       if (cur.recorderError) list.push("recorder_error");
@@ -329,6 +330,12 @@ export function useQualityAlerts(q: QualityInputs) {
   return { alerts, uploadBehindS: behindS, talking };
 }
 
+/** Uploads answered with errors for this long count as refused (a few retries, not one hiccup). */
+export const UPLOAD_REFUSED_AFTER_MS = 20_000;
+export function uploadRefused(upload: { refusedSince: number | null } | null | undefined, now: number) {
+  return !!upload && upload.refusedSince !== null && now - upload.refusedSince >= UPLOAD_REFUSED_AFTER_MS;
+}
+
 /** Short label for the host's list ("Upload 2 min behind"). */
 export function alertLabel(a: QualityAlert, behindS: number | null): string {
   switch (a) {
@@ -342,6 +349,8 @@ export function alertLabel(a: QualityAlert, behindS: number | null): string {
       return "Echo";
     case "upload_behind":
       return behindS !== null && behindS >= 120 ? `Upload ${Math.floor(behindS / 60)} min behind` : "Upload behind";
+    case "upload_refused":
+      return "Server refusing uploads";
     case "low_disk":
       return "Low on space";
     case "tab_hidden":
@@ -366,6 +375,8 @@ export function alertAdvice(a: QualityAlert, behindS: number | null): string | n
       return "Your microphone is picking up the others from your speakers, so they're in your recording too. Put on headphones, or turn your speakers down.";
     case "upload_behind":
       return `Your upload is ${behindS !== null && behindS >= 120 ? `${Math.floor(behindS / 60)} minutes` : "a minute"} behind. The recording is safe on this device and will catch up; keep this tab open.`;
+    case "upload_refused":
+      return "The server isn't accepting your recording right now. It's safe on this device and is sent as soon as the server takes it again; keep this tab open.";
     case "low_disk":
       return "This device is running low on space for the recording. Free some up, or let the upload catch up before recording more.";
     default:

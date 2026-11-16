@@ -326,6 +326,8 @@ export const qualityAlert = z.enum([
   "echo",
   /** The oldest chunk not yet uploaded is more than a minute old. */
   "upload_behind",
+  /** The server or its storage keeps answering this device's uploads with errors: they are kept on the device. */
+  "upload_refused",
   /** Too little browser storage left to keep buffering the recording. */
   "low_disk",
   /** The tab is in the background; some browsers (phones especially) stop recording then. */

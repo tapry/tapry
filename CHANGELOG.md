@@ -5,6 +5,13 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Storage that refuses uploads is now seen.** Every worker checks that the server's storage
+  takes a small write every 5 minutes (every 30 s while it fails); when it doesn't, every
+  dashboard page says recordings can't be uploaded right now, nothing is lost, and when it
+  started, and admins get a link to the health page. In a session, a device whose uploads the
+  server keeps answering with errors for 20 s raises a new alert: the host sees "Uploads
+  refused" on that person, and the person is told their recording is safe on the device.
+
 - **Fix: the bundled storage stopped taking uploads after about 8 GB.** SeaweedFS kept its
   default of 8 volumes of 1 GB, so once they were full every upload was refused and recordings
   stayed "Still arriving" with 0 bytes (nothing was lost: devices keep their pieces until the

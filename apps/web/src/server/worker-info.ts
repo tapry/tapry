@@ -13,6 +13,11 @@ export interface WorkerInfo {
   whisper: { model: string; modelFound: boolean } | null;
   /** Free space where jobs work (recordings are unpacked there). Null when unknown. */
   tmpFreeBytes: number | null;
+  /**
+   * The server's storage, as this runner last found it (a small write, read and delete every
+   * few minutes): `since` is when it started failing. Missing from runners older than 0.4.
+   */
+  storage?: { ok: boolean; at: number; since?: number; error?: string } | null;
 }
 
 /** The version this build reports (set by the release images). */

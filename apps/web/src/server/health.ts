@@ -9,6 +9,7 @@ import type { Db } from "./db";
 import { HEARTBEAT_MS } from "./jobs";
 import { mailFailureReason, type Mailer } from "./mail";
 import { MIGRATIONS } from "./migrations";
+import { probeStorage } from "./storage-probe";
 import type { Storage } from "./storage";
 import { APP_VERSION, type WorkerInfo } from "./worker-info";
 
@@ -111,35 +112,33 @@ export class HealthService {
 
   /** Write, read back and delete a small object: the same calls recordings rely on. Also the admin's Storage page. */
   async storageCheck(): Promise<HealthCheck> {
-    const key = `health/check-${randomBytes(6).toString("hex")}.txt`;
-    const dir = await mkdtemp(join(tmpdir(), "tapry-health-"));
-    const t0 = performance.now();
-    try {
-      const path = join(dir, "check.txt");
-      await writeFile(path, "tapry health check\n");
-      await this.storage.uploadFrom(key, path, "text/plain");
-      const found = await this.storage.head(key);
-      await this.storage.delete([key]);
-      if (!found) throw new Error("The test file wasn't there after writing it");
-      return {
-        id: "storage",
-        label: "Storage",
-        tone: "ok",
-        summary: `Writes, reads and deletes (${Math.round(performance.now() - t0)} ms)`,
-        details: [],
-      };
-    } catch (err) {
-      return {
-        id: "storage",
-        label: "Storage",
-        tone: "danger",
-        summary: "Can't write to storage: uploads and downloads will fail",
-        details: [String(err).slice(0, 300), "Check S3_ENDPOINT, S3_BUCKET and the access keys, and that the storage service is running."],
-      };
-    } finally {
-      await rm(dir, { recursive: true, force: true });
+    const result = await probeStorage(this.storage);
+    if (result.ok) {
+      return { id: "storage", label: "Storage", tone: "ok", summary: `Writes, reads and deletes (${result.ms} ms)`, details: [] };
     }
+    return {
+      id: "storage",
+      label: "Storage",
+      tone: "danger",
+      summary: "Can't write to storage: uploads and downloads will fail",
+      details: [result.error, "Check S3_ENDPOINT, S3_BUCKET and the access keys, that the storage service is running and has room (docs/self-hosting.md)."],
+    };
   }
+
+  /**
+   * Whether the server's storage is refusing writes now, from the workers' own regular checks
+   * (JobRunner.heartbeat): shown on every dashboard page, since recordings can't arrive then.
+   * Null while it's fine or nothing has checked yet.
+   */
+  async storageTrouble(): Promise<{ since: number } | null> {
+    const rows = await this.db.query<{ info: { storage?: { ok: boolean; since?: number } | null } }>(
+      `SELECT info FROM workers WHERE seen_at > now() - make_interval(secs => $1)`,
+      [Math.round((HEARTBEAT_MS * 3) / 1000)],
+    );
+    const failing = rows.map((r) => r.info.storage).filter((s): s is { ok: false; since: number } => !!s && !s.ok && typeof s.since === "number");
+    return failing.length ? { since: Math.min(...failing.map((s) => s.since)) } : null;
+  }
+
 
   private async runners(): Promise<HealthReport["workers"]> {
     const rows = await this.db.query<{ id: string; kind: "inprocess" | "worker"; version: string; info: WorkerInfo; seen_at: Date; started_at: Date; age_ms: number }>(

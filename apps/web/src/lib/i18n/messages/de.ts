@@ -178,6 +178,7 @@ export const de: Messages = {
   "advice.echo": "Ihr Mikrofon nimmt die anderen über Ihre Lautsprecher auf, sie sind also auch in Ihrer Aufnahme. Setzen Sie Kopfhörer auf oder drehen Sie die Lautsprecher leiser.",
   "advice.upload_behind": "Ihr Upload liegt eine Minute zurück. Die Aufnahme ist auf diesem Gerät sicher und holt auf; lassen Sie diesen Tab offen.",
   "advice.upload_behind_minutes": "Ihr Upload liegt {minutes} Minuten zurück. Die Aufnahme ist auf diesem Gerät sicher und holt auf; lassen Sie diesen Tab offen.",
+  "advice.upload_refused": "Der Server nimmt Ihre Aufnahme gerade nicht an. Sie ist auf diesem Gerät sicher und wird gesendet, sobald der Server sie wieder annimmt; lassen Sie diesen Tab offen.",
   "advice.low_disk": "Auf diesem Gerät wird der Platz für die Aufnahme knapp. Geben Sie Speicher frei oder lassen Sie den Upload aufholen, bevor Sie weiter aufnehmen.",
 
   "end.thanksDone": "Danke, {name}. Alles erledigt!",

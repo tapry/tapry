@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryChunkStore } from "../src/store/memory.js";
 import { TrackGoneError, type ChunkMeta, type TrackInfo } from "../src/types.js";
-import { UploadQueue, type UploadProgress } from "../src/upload-queue.js";
+import { isRefusal, UploadQueue, type UploadProgress } from "../src/upload-queue.js";
 import { bytes, FakeTransport } from "./fakes.js";
 
 const track: TrackInfo = { sessionId: "s1", trackId: "t1", kind: "audio", mimeType: "audio/webm", startedAt: 0 };
@@ -80,6 +80,34 @@ describe("UploadQueue", () => {
     await vi.advanceTimersByTimeAsync(30_000); // backoff is capped at 30 s
     await queue.drain();
     expect(transport.uploaded.size).toBe(5);
+  });
+
+  it("says when the server answers uploads with errors, unlike when it can't be reached", async () => {
+    const [m] = await putChunks(store, 1);
+    // Offline: no answer at all. Not a refusal.
+    transport.failAll = true;
+    queue.enqueue(m!);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(queue.progress().refusedSince).toBeNull();
+
+    // The storage answers 500 (full): refused, since the first such answer.
+    transport.failAll = false;
+    transport.failWith = Object.assign(new Error("HTTP 500 from storage"), { status: 500 });
+    transport.failNext = 1_000;
+    const since = Date.now();
+    queue.retryNow();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(queue.progress().refusedSince).toBeGreaterThanOrEqual(since);
+    expect(queue.progress().refusedSince).toBeLessThan(since + 1_000);
+    expect(await store.listChunks("s1", "t1")).toHaveLength(1); // kept, as always
+
+    // It takes them again: cleared.
+    transport.failNext = 0;
+    queue.retryNow();
+    await queue.drain();
+    expect(queue.progress().refusedSince).toBeNull();
+    expect(isRefusal({ status: 404 })).toBe(true);
+    expect(isRefusal(new TypeError("Failed to fetch"))).toBe(false);
   });
 
   it("retryNow skips the remaining backoff", async () => {

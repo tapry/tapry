@@ -12,6 +12,12 @@ export interface UploadProgress {
   /** Stopped tracks whose completion the server has not confirmed yet. */
   pendingTracks: number;
   lastError: unknown;
+  /**
+   * When the server (or the storage behind it) began answering every upload with an error,
+   * by this queue's clock; null while uploads go through or simply can't reach it (offline).
+   * The recording is kept here meanwhile, as always: this is for telling someone.
+   */
+  refusedSince: number | null;
   idle: boolean;
 }
 
@@ -68,6 +74,7 @@ export class UploadQueue {
   private uploadedChunks = 0;
   private uploadedBytes = 0;
   private lastError: unknown = null;
+  private refusedSince: number | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private idleWaiters: Array<() => void> = [];
   private closed = false;
@@ -164,6 +171,7 @@ export class UploadQueue {
       oldestPendingTs,
       pendingTracks: this.tracksWaiting.size + this.tracksCompleting.size,
       lastError: this.lastError,
+      refusedSince: this.refusedSince,
       idle: this.isIdle(),
     };
   }
@@ -214,6 +222,7 @@ export class UploadQueue {
         await this.transport.uploadChunk(chunk, await this.mimeTypeFor(sessionId, trackId));
         this.uploadedChunks++;
         this.uploadedBytes += chunk.bytes;
+        this.refusedSince = null;
         if (!job.memoryData) await this.deleteQuietly(sessionId, trackId, seq);
       }
       // No chunk: another tab's recovery already uploaded and deleted it.
@@ -223,6 +232,8 @@ export class UploadQueue {
       if (isTrackGone(err)) await this.dropTrack(sessionId, trackId);
       else if (!this.gone.has(trackKey(sessionId, trackId))) {
         this.lastError = err;
+        // An answer that says no (a status code), as opposed to no answer at all (offline).
+        if (isRefusal(err)) this.refusedSince ??= this.now();
         this.waiting.set(key, this.backoff(job));
       }
     }
@@ -305,3 +316,9 @@ export class UploadQueue {
 
 const trackKey = (sessionId: string, trackId: string) => `${sessionId}\u0000${trackId}`;
 const chunkKey = (m: ChunkMeta) => `${trackKey(m.sessionId, m.trackId)}\u0000${m.seq}`;
+
+/** An upload the server answered with an error status, rather than one that never reached it. */
+export function isRefusal(err: unknown): boolean {
+  const status = (err as { status?: unknown } | null)?.status;
+  return typeof status === "number" && status >= 400;
+}
