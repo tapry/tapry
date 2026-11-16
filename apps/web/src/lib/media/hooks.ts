@@ -83,6 +83,9 @@ function afterOtherOpens<T>(job: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/** How long what is asked of the camera must hold still before it is asked for. */
+const OPEN_SETTLE_MS = 60;
+
 /** A camera that stays blank this long on a page that's in view is opened again (twice at most). */
 const BLANK_CAMERA_MS = 2000;
 const BLANK_CAMERA_RETRIES = 2;
@@ -157,10 +160,14 @@ export function useLocalMedia(constraints: MediaStreamConstraints) {
         setStatus("error");
       }
     };
-    void afterOtherOpens(() => open(JSON.parse(key) as MediaStreamConstraints, true));
+    // A moment's wait before asking: what is asked for often changes right after the first
+    // render (a remembered device choice loads), and a request that was never made can't
+    // fight the next one for the camera.
+    const start = setTimeout(() => void afterOtherOpens(() => open(JSON.parse(key) as MediaStreamConstraints, true)), OPEN_SETTLE_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(start);
       clearTimeout(blank);
       unwatch();
       owned.current?.getTracks().forEach((t) => t.stop());

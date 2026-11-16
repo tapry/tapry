@@ -25,8 +25,17 @@ describe("a picture that stopped arriving", () => {
     expect(new PictureWatch().stalled(60_000)).toBe(false);
   });
 
+  // An iPhone showed "Picture interrupted" over a host whose picture was playing: its browser
+  // doesn't count a live picture's frames, so the count never moved (owner's test, 16 Nov 2026).
+  it("never calls a picture stalled when its frame count has never moved", () => {
+    const w = new PictureWatch();
+    for (let t = 0; t <= 60_000; t += 500) w.add(0, t);
+    expect(w.stalled(60_000)).toBe(false);
+  });
+
   it("doesn't call a picture stalled because the tab was hidden", () => {
     const w = new PictureWatch();
+    w.add(90, 0);
     w.add(100, 0);
     for (let t = 500; t <= 20_000; t += 500) w.add(100, t, false); // hidden: the browser paints nothing
     expect(w.stalled(20_000)).toBe(false);
