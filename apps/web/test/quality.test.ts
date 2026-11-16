@@ -12,8 +12,7 @@ import {
   TALK_NUDGE_AFTER_MS,
   talkNudge,
   talkShares,
-  uploadBehindS,
-} from "../src/lib/client/quality";
+  uploadBehindS, uploadRefused, UPLOAD_REFUSED_AFTER_MS } from "../src/lib/client/quality";
 import { expectOk, setup } from "./harness";
 
 describe("mic alerts (on the device)", () => {
@@ -195,12 +194,23 @@ describe("talk balance (host)", () => {
 
 describe("upload lag", () => {
   const progress = (oldestPendingTs: number | null) =>
-    ({ oldestPendingTs, pendingChunks: 1, pendingBytes: 1, uploadedChunks: 0, uploadedBytes: 0, pendingTracks: 0, lastError: null, idle: false }) as const;
+    ({ oldestPendingTs, pendingChunks: 1, pendingBytes: 1, uploadedChunks: 0, uploadedBytes: 0, pendingTracks: 0, lastError: null, refusedSince: null, idle: false }) as const;
 
   it("is the age of the oldest unsent chunk, or null when caught up", () => {
     expect(uploadBehindS(progress(10_000), 100_000)).toBe(90);
     expect(uploadBehindS(progress(null), 100_000)).toBeNull();
     expect(uploadBehindS(null, 100_000)).toBeNull();
+  });
+
+  // Storage on studio.tapry.app refused every upload for 16 hours and the host saw only
+  // "Still arriving" (16 Nov 2026): a device whose uploads keep being refused now says so.
+  it("counts as refused once the server has answered with errors for a while, not on one", () => {
+    expect(uploadRefused({ refusedSince: null }, 100_000)).toBe(false);
+    expect(uploadRefused({ refusedSince: 100_000 - UPLOAD_REFUSED_AFTER_MS + 1 }, 100_000)).toBe(false);
+    expect(uploadRefused({ refusedSince: 100_000 - UPLOAD_REFUSED_AFTER_MS }, 100_000)).toBe(true);
+    expect(uploadRefused(null, 100_000)).toBe(false);
+    expect(alertLabel("upload_refused", null)).toBe("Server refusing uploads");
+    expect(alertAdvice("upload_refused", null)).toMatch(/safe on this device/);
   });
 
   it("reads as minutes for the host and as advice for the person", () => {

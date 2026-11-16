@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { compareVersions, HealthService, type HealthCheck } from "../src/server/health";
 import { JobRunner } from "../src/server/jobs";
 import { APP_VERSION } from "../src/server/worker-info";
@@ -38,6 +38,38 @@ describe("admin health checks", () => {
     };
     const { checks } = await s.services.health.report();
     expect(check(checks, "storage")).toMatchObject({ tone: "danger", details: [expect.stringContaining("AccessDenied"), expect.any(String)] });
+  });
+
+  // studio.tapry.app's storage refused every upload for 16 hours and nothing said so (16 Nov 2026).
+  it("each runner checks storage writes on its heartbeat, and the dashboard hears when they fail", async () => {
+    const s = await server();
+    const runner = new JobRunner(s.db, s.storage, { ffmpeg: "ffmpeg", ffprobe: "ffprobe", kind: "inprocess" });
+    await runner.heartbeat();
+    expect(await s.services.health.storageTrouble()).toBeNull();
+    expect([...s.storage.objects.keys()].filter((k) => k.startsWith("health/"))).toEqual([]);
+
+    const upload = s.storage.uploadFrom.bind(s.storage);
+    s.storage.uploadFrom = async () => {
+      throw new Error("InternalError: failed to find writable volumes");
+    };
+    // A failure isn't seen until the next check is due: force it, as five minutes passing would.
+    (runner as unknown as { storageState: unknown }).storageState = { ok: true, at: 0 };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await runner.heartbeat();
+    const trouble = await s.services.health.storageTrouble();
+    expect(trouble).toEqual({ since: expect.any(Number) });
+    expect(error).toHaveBeenCalledWith("[worker] storage is refusing writes:", expect.stringContaining("writable volumes"));
+    // While it fails it is checked every beat, and keeps the time it started.
+    await runner.heartbeat();
+    expect(await s.services.health.storageTrouble()).toEqual(trouble);
+    error.mockRestore();
+
+    s.storage.uploadFrom = upload;
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runner.heartbeat();
+    expect(await s.services.health.storageTrouble()).toBeNull();
+    expect(log).toHaveBeenCalledWith("[worker] storage is taking writes again");
+    log.mockRestore();
   });
 
   it("knows whether a worker is running, from their heartbeats", async () => {

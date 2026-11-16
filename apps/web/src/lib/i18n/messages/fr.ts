@@ -178,6 +178,7 @@ export const fr: Messages = {
   "advice.echo": "Votre micro capte les autres depuis vos haut-parleurs : ils sont donc aussi dans votre enregistrement. Mettez un casque, ou baissez vos haut-parleurs.",
   "advice.upload_behind": "Votre envoi a une minute de retard. L'enregistrement est en sécurité sur cet appareil et va rattraper ; gardez cet onglet ouvert.",
   "advice.upload_behind_minutes": "Votre envoi a {minutes} minutes de retard. L'enregistrement est en sécurité sur cet appareil et va rattraper ; gardez cet onglet ouvert.",
+  "advice.upload_refused": "Le serveur n'accepte pas votre enregistrement pour le moment. Il est en sécurité sur cet appareil et sera envoyé dès que le serveur l'acceptera ; gardez cet onglet ouvert.",
   "advice.low_disk": "Cet appareil manque d'espace pour l'enregistrement. Libérez-en, ou laissez l'envoi rattraper avant d'enregistrer davantage.",
 
   "end.thanksDone": "Merci, {name}. C'est terminé !",

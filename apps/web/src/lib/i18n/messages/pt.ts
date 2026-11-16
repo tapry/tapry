@@ -178,6 +178,7 @@ export const pt: Messages = {
   "advice.echo": "O seu microfone está a captar os outros pelas colunas, por isso eles também ficam na sua gravação. Ponha auscultadores ou baixe as colunas.",
   "advice.upload_behind": "O seu envio está um minuto atrasado. A gravação está segura neste dispositivo e vai recuperar; mantenha este separador aberto.",
   "advice.upload_behind_minutes": "O seu envio está {minutes} minutos atrasado. A gravação está segura neste dispositivo e vai recuperar; mantenha este separador aberto.",
+  "advice.upload_refused": "O servidor não está a aceitar a sua gravação neste momento. Está segura neste dispositivo e será enviada assim que o servidor a aceitar; mantenha este separador aberto.",
   "advice.low_disk": "Este dispositivo está a ficar sem espaço para a gravação. Liberte algum ou deixe o envio recuperar antes de gravar mais.",
 
   "end.thanksDone": "Obrigado, {name}. Está tudo feito!",

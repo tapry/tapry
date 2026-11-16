@@ -178,6 +178,7 @@ export const es: Messages = {
   "advice.echo": "Tu micrófono recoge a los demás desde tus altavoces, así que también salen en tu grabación. Ponte auriculares o baja los altavoces.",
   "advice.upload_behind": "Tu subida lleva un minuto de retraso. La grabación está a salvo en este dispositivo y se pondrá al día; deja esta pestaña abierta.",
   "advice.upload_behind_minutes": "Tu subida lleva {minutes} minutos de retraso. La grabación está a salvo en este dispositivo y se pondrá al día; deja esta pestaña abierta.",
+  "advice.upload_refused": "El servidor no está aceptando tu grabación en este momento. Está a salvo en este dispositivo y se enviará en cuanto el servidor la acepte; deja esta pestaña abierta.",
   "advice.low_disk": "A este dispositivo le queda poco espacio para la grabación. Libera algo o deja que la subida se ponga al día antes de grabar más.",
 
   "end.thanksDone": "Gracias, {name}. ¡Todo listo!",

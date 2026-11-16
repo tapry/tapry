@@ -51,6 +51,8 @@ export class FakeTransport implements ChunkTransport {
   maxInflight = 0;
   failNext = 0;
   failAll = false;
+  /** What a failed upload throws: by default a network error (no answer at all). */
+  failWith: Error | null = null;
   failComplete = 0;
   delayMs = 0;
 
@@ -62,7 +64,7 @@ export class FakeTransport implements ChunkTransport {
       if (this.delayMs) await new Promise((r) => setTimeout(r, this.delayMs));
       if (this.failAll || this.failNext > 0) {
         this.failNext = Math.max(0, this.failNext - 1);
-        throw new Error("network down");
+        throw this.failWith ?? new Error("network down");
       }
       this.uploaded.set(`${chunk.trackId}/${chunk.seq}`, { ...chunk, mimeType });
     } finally {

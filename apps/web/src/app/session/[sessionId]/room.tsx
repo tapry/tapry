@@ -359,6 +359,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const behind = new Map<string, number | null>();
   for (const h of health) if (!staleIds.has(h.participantId) && h.alerts.includes("upload_behind")) behind.set(h.participantId, h.uploadBehindS);
   const badges = new Map([...behind].map(([id, s]) => [id, behindText(s)]));
+  for (const h of health) if (!staleIds.has(h.participantId) && h.alerts.includes("upload_refused")) badges.set(h.participantId, "Uploads refused");
   for (const id of staleIds) if (id !== ticket.participantId) badges.set(id, "Not reporting");
   // Who needs the host's attention, in words: shown in the full-screen view, where the panel is hidden.
   const pastLateStart = usePast(recording ? recording.startedAt + LATE_START_MS - offsetMs : null);

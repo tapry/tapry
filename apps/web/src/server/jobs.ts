@@ -37,6 +37,7 @@ import { deliverWebhooks, emitWebhook } from "./integrations";
 import { NOTES_ERROR_TEXT, NOTES_FILE, NOTES_MAX_CHARS, NotesError, notesModelFor, notesModels, queueNotes, type NotesConfig, type NotesModel } from "./notes";
 import { deleteRecordingIn, PROCESSING_STOPPED_TEXT, type RecordingProgress } from "./processing";
 import { sendDueRecaps, sweepRecaps, type RecapMail } from "./recap";
+import { probeStorage } from "./storage-probe";
 import { APP_VERSION, freeBytes, gatherWorkerInfo, type WorkerInfo } from "./worker-info";
 
 /** "Sam - audio.wav" or "Sam - audio.flac" → the speaker. */
@@ -49,6 +50,8 @@ const EXPIRY_SWEEP_MS = 10 * 60_000;
 
 /** How often a runner says it's alive (the health page calls it gone after 3 missed beats). */
 export const HEARTBEAT_MS = 30_000;
+/** How often a runner checks that the server's storage still takes writes. */
+export const STORAGE_CHECK_MS = 5 * 60_000;
 import { UPLOAD_URL_TTL_S, type Storage } from "./storage";
 
 export interface JobRunnerOptions {
@@ -162,7 +165,7 @@ export class JobRunner {
   async heartbeat() {
     try {
       const info = await (this.info ??= gatherWorkerInfo({ ffmpeg: this.opts.ffmpeg, ffprobe: this.opts.ffprobe, whisper: this.opts.whisper }));
-      const current = { ...info, tmpFreeBytes: await freeBytes() };
+      const current = { ...info, tmpFreeBytes: await freeBytes(), storage: await this.checkStorage() };
       await this.db.query(
         `INSERT INTO workers (id, kind, version, info) VALUES ($1, $2, $3, $4)
          ON CONFLICT (id) DO UPDATE SET info = EXCLUDED.info, version = EXCLUDED.version, seen_at = now()`,
@@ -173,6 +176,27 @@ export class JobRunner {
       console.error("[worker] heartbeat failed:", String(err));
     }
   }
+
+  /**
+   * The server's storage, checked with a small write every STORAGE_CHECK_MS (every beat while
+   * it fails, so the all-clear comes quickly). Storage that refuses writes means no recording
+   * can arrive, and nothing else on the server would notice: uploads go from browsers straight
+   * to storage (studio.tapry.app refused every upload for 16 hours unseen, 16 Nov 2026).
+   */
+  private async checkStorage(): Promise<WorkerInfo["storage"]> {
+    const last = this.storageState;
+    const now = Date.now();
+    if (last && last.ok && now - last.at < STORAGE_CHECK_MS) return last;
+    const result = await probeStorage(this.storage);
+    const next = result.ok
+      ? { ok: true, at: now }
+      : { ok: false, at: now, since: last && !last.ok ? (last.since ?? now) : now, error: result.error.slice(0, 200) };
+    if (!result.ok && (!last || last.ok)) console.error("[worker] storage is refusing writes:", next.error);
+    if (result.ok && last && !last.ok) console.log("[worker] storage is taking writes again");
+    this.storageState = next;
+    return next;
+  }
+  private storageState: WorkerInfo["storage"] = null;
 
   /**
    * For a worker process that is about to exit: stop, and hand a running job straight back

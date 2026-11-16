@@ -7,6 +7,7 @@ import { AppFrame, CollapseSidebar } from "./app-frame";
 import { shortStatus } from "./recordings";
 import { PageNav, RecentNav, type PageLink, type RecentItem } from "./recent-nav";
 import { ConfirmEmailNotice } from "./confirm-email";
+import { StorageNotice } from "./storage-notice";
 import { CopyGuestLink, OpenStudioAction } from "./studio-actions";
 import { LogOutButton } from "./studio-forms";
 import type { IconName } from "./ui-extra";
@@ -52,6 +53,7 @@ export async function DashboardShell({
   children: ReactNode;
 }) {
   const services = await getServices();
+  const storageTrouble = await services.health.storageTrouble().catch(() => null);
   const serverNow = Date.now();
   const recent: RecentItem[] = (await services.processing.listForOwner(user, { limit: 5 })).map((r) => ({
     id: r.id,
@@ -124,6 +126,7 @@ export async function DashboardShell({
         </>
       }
     >
+      {storageTrouble && <StorageNotice since={storageTrouble.since} admin={user.isAdmin} />}
       {services.account.verificationRequired && !user.emailVerified && <ConfirmEmailNotice email={user.email} />}
       {children}
     </AppFrame>
