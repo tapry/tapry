@@ -79,6 +79,8 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
   wanted.current = filters;
   /** The screen the person is sharing (the recorder's track: the call only ever gets a copy). */
   const sharing = useRef<MediaStreamTrack | null>(null);
+  /** The running call's diagnostics, for the camera and mic switches too. */
+  const noteRef = useRef<Note>(() => {});
 
   useEffect(() => {
     if (!enabled) return;
@@ -87,6 +89,7 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
     let current: Room | null = null;
     // What this device's call does, for the server's log (diag.ts): steps and errors, no media.
     const note = diagFor(ticket);
+    noteRef.current = note;
     note("call.start", deviceLine());
     const camera = stream.getVideoTracks()[0];
     const cameraSays = (what: string) => () => note(`camera.${what}`);
@@ -254,10 +257,30 @@ export function useCall(ticket: SessionTicket, stream: MediaStream, enabled: boo
   const setCameraOff = useCallback(
     async (off: boolean) => {
       for (const t of stream.getVideoTracks()) t.enabled = !off;
-      const video = local.current.video;
+      const tracks = local.current;
+      const video = tracks.video;
+      const note = noteRef.current;
+      note(off ? "call.camera_off" : "call.camera_on");
+      // On an iPhone a copy of the camera that was switched off can stay dark when it is switched
+      // on again: the call showed nothing while the person's own view was back (owner's test,
+      // 16 Nov 2026). Coming back on, the call gets a fresh copy of the camera instead.
+      const cam = stream.getVideoTracks()[0];
+      if (!off && video && cam && !tracks.picture && tracks.cam && isAppleWebKit(navigator.userAgent, navigator.maxTouchPoints)) {
+        const fresh = cam.clone();
+        fresh.enabled = true;
+        try {
+          await video.replaceTrack(fresh, true);
+          tracks.cam.stop();
+          tracks.cam = fresh;
+          note("call.camera_fresh_copy", `${fresh.getSettings().width ?? "?"}x${fresh.getSettings().height ?? "?"}${fresh.muted ? ", muted" : ""}`);
+        } catch (err) {
+          fresh.stop();
+          note("call.camera_fresh_copy_failed", errorLine(err));
+        }
+      }
       if (video) await (off ? video.mute() : video.unmute());
       // With picture filters the call sends the canvas, not the camera copy: keep the copy in step.
-      if (local.current.picture && local.current.cam) local.current.cam.enabled = !off;
+      if (tracks.picture && tracks.cam) tracks.cam.enabled = !off;
     },
     [stream],
   );
