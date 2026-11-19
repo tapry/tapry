@@ -1,4 +1,5 @@
 import { detectSpeech, speakerShots, type Interval } from "./speaker.js";
+import { once } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -162,8 +163,18 @@ const LOGO = { maxW: 300, h: 64, margin: 36, opacity: 0.9 };
 /** Join chunk files into one, in the order given. MediaRecorder chunks are byte-continuous. */
 export async function concatChunks(chunkPaths: string[], outPath: string) {
   const out = createWriteStream(outPath);
-  for (const p of chunkPaths) await streamPipeline(createReadStream(p), out, { end: false });
-  await new Promise<void>((resolve, reject) => out.end((err?: Error | null) => (err ? reject(err) : resolve())));
+  // Written by hand: piping each chunk into the one output left its listeners on it, and Node
+  // warned of a leak for every recording of more than ten chunks.
+  const failed = new Promise<never>((_, reject) => out.once("error", reject));
+  const write = async () => {
+    for (const p of chunkPaths) {
+      for await (const part of createReadStream(p)) {
+        if (!out.write(part)) await once(out, "drain");
+      }
+    }
+    await new Promise<void>((resolve) => out.end(() => resolve()));
+  };
+  await Promise.race([write(), failed]);
 }
 
 const sec = (ms: number) => (ms / 1000).toFixed(3);

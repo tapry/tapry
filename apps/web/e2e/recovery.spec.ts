@@ -1,10 +1,10 @@
 // What goes wrong on real people's computers: a second tab, joining again as someone new, and a
 // recorder that stops by itself. Each should end with nothing lost.
 import { randomBytes } from "node:crypto";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 async function hostAndGuest(host: Page, browser: Browser) {
   await signInHost(host);
@@ -12,7 +12,7 @@ async function hostAndGuest(host: Page, browser: Browser) {
   await host.getByRole("button", { name: "Enter studio" }).click();
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 20_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
-  const context: BrowserContext = await browser.newContext();
+  const context: BrowserContext = await otherPerson(browser);
   const guest = await context.newPage();
   await guest.addInitScript(trackRecorders);
   await joinAs(guest, inviteUrl, "Sam Guest");

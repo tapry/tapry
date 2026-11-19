@@ -5,9 +5,9 @@
 import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 const SHOTS = "test-results/phone";
 // 1x1 PNG.
@@ -41,7 +41,7 @@ test("a guest on a phone joins, is recorded and sees the end screen; the studio'
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 20_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, permissions: ["camera", "microphone"] });
+  const phone = await otherPerson(browser, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2, permissions: ["camera", "microphone"] });
   const guest = await phone.newPage();
   await guest.goto(inviteUrl);
   // The studio's logo and colour.

@@ -336,6 +336,8 @@ export const qualityAlert = z.enum([
   "tab_hidden",
   /** A recorder failed on this device. */
   "recorder_error",
+  /** The camera is on but its picture is black: the recording of it is black too. */
+  "camera_black",
   /** Not on headphones: the main cause of echo. Information, not a fault. */
   "no_headphones",
 ]);

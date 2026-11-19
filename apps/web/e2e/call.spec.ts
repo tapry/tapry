@@ -177,7 +177,7 @@ async function callTest(host: Page, testInfo: TestInfo, guestEngine: Engine) {
 // copies kept kicking each other out. Here every attempt fails (relay-only, and the test
 // LiveKit has no TURN): retries must stay one at a time, backing off.
 test("a call that can't connect retries one attempt at a time", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "connection logic is the same in every engine");
+  test.skip(testInfo.project.name !== "chromium" && !process.env.E2E_ALL, "connection logic is the same in every engine");
   await signInHost(page);
   await createStudio(page, `Retry ${randomBytes(2).toString("hex")}`);
   await page.getByRole("button", { name: "Enter studio" }).click();

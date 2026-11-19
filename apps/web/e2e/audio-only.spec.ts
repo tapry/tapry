@@ -1,9 +1,9 @@
 // An audio-only studio: nobody is asked for a camera, the call and the recording are sound only,
 // and the recording's files are audio only, everyone mixed included (here as FLAC), with no video.
 import { randomBytes } from "node:crypto";
-import { createStudio, downloadOutputs, expect, signInHost, test } from "./fixtures";
+import { createStudio, downloadOutputs, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 test("audio-only studio: no cameras anywhere, FLAC files and a mix at the end", async ({ page: host, browser }) => {
   await signInHost(host);
@@ -22,7 +22,7 @@ test("audio-only studio: no cameras anywhere, FLAC files and a mix at the end", 
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
   await expect(host.getByRole("button", { name: "Turn camera off" })).toHaveCount(0);
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await guest.goto(inviteUrl);
   await expect(guest.getByText("My microphone is recorded")).toBeVisible();

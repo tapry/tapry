@@ -2,9 +2,9 @@
 // call, the person starts and stops it), and a host who joins as producer (in the call, at the
 // controls, never recorded).
 import { randomBytes } from "node:crypto";
-import { createStudio, downloadOutputs, expect, signInHost, test } from "./fixtures";
+import { createStudio, downloadOutputs, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 test("solo link: someone records alone, and it arrives as one of the studio's recordings", async ({ page: host, browser }) => {
   test.setTimeout(300_000);
@@ -17,7 +17,7 @@ test("solo link: someone records alone, and it arrives as one of the studio's re
   const link = await card.getByLabel("Solo link").inputValue();
   expect(link).toMatch(/\/solo\/[\w-]+$/);
 
-  const context = await browser.newContext();
+  const context = await otherPerson(browser);
   const person = await context.newPage();
   await person.goto(link);
   await expect(person.getByTestId("solo-prompt")).toContainText("What changed for you this year?");
@@ -50,7 +50,7 @@ test("producer: in the call and at the controls, not in the recording", async ({
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 30_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-  const context = await browser.newContext();
+  const context = await otherPerson(browser);
   const guest = await context.newPage();
   await guest.goto(inviteUrl);
   await guest.getByLabel("Your name").fill("Sam Guest");

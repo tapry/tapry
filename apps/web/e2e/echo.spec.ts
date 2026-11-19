@@ -4,7 +4,7 @@
 // Needs LiveKit: `LIVEKIT_BIN=… pnpm test:e2e e2e/echo.spec.ts`.
 import { randomBytes } from "node:crypto";
 import type { Page } from "@playwright/test";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
 test.skip(!process.env.LIVEKIT_E2E_URL, "needs a LiveKit server (set LIVEKIT_BIN)");
 test.skip(({ browserName }) => browserName !== "chromium", "measured once, in Chromium");
@@ -64,7 +64,7 @@ test("the host sees echo on a guest whose mic picks up the call", async ({ page:
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 20_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await fakeMic(guest, "echo");
   await guest.goto(inviteUrl);

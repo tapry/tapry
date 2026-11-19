@@ -1,9 +1,9 @@
 // After a recording: timeline projects, a clip, a comment, a public share page (and taking it
 // back), an API key that reads the recording, and a calendar invite for the next session.
 import { randomBytes } from "node:crypto";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, go, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 test("after a recording: timelines, a clip, a comment, sharing, an API key and a calendar invite", async ({ page: host, browser, request }) => {
   test.setTimeout(420_000);
@@ -27,7 +27,8 @@ test("after a recording: timelines, a clip, a comment, sharing, an API key and a
   await host.goto(studioUrl);
   await expect(host.getByTestId("recording-status").first()).toHaveText(/Ready/, { timeout: 240_000 });
   const recordingId: string = await host.evaluate(async (id) => (await (await fetch(`/api/studios/${id}/recordings`)).json()).recordings[0].id, studioId);
-  await host.goto(`/recordings/${recordingId}`);
+  // A refresh of the studio page may be on its way (it keeps itself current): let it land first.
+  await go(host, `/recordings/${recordingId}`);
 
   // Timeline projects for editors.
   const otioHref = (await host.getByTestId("timelines").getByRole("link", { name: "OpenTimelineIO" }).getAttribute("href"))!;
@@ -56,11 +57,11 @@ test("after a recording: timelines, a clip, a comment, sharing, an API key and a
   await share.getByRole("button", { name: "Share this recording" }).click();
   await expect(share).toHaveAttribute("data-shared", "yes");
   const link = await share.getByLabel("Share link").inputValue();
-  const visitor = await (await browser.newContext()).newPage();
+  const visitor = await (await otherPerson(browser)).newPage();
   await visitor.goto(link);
   const media = visitor.getByTestId("shared-media");
   await expect.poll(() => media.evaluate((v: HTMLVideoElement) => v.videoWidth), { timeout: 30_000 }).toBeGreaterThan(0);
-  await visitor.goto(link.replace("/share/", "/embed/"));
+  await go(visitor, link.replace("/share/", "/embed/"));
   await expect(visitor.getByTestId("shared-media")).toBeVisible();
   await share.getByRole("button", { name: "Stop sharing" }).click();
   await expect(share).toHaveAttribute("data-shared", "no");
@@ -69,7 +70,7 @@ test("after a recording: timelines, a clip, a comment, sharing, an API key and a
   await visitor.context().close();
 
   // An API key reads the recording, and can't do the owner's things.
-  await host.goto("/settings?tab=account");
+  await go(host, "/settings?tab=account");
   const panel = host.getByTestId("integrations");
   await panel.getByLabel("What it is for").fill("Test script");
   await panel.getByRole("button", { name: "Make a key" }).click();

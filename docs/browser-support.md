@@ -1,7 +1,22 @@
 # Browser support
 
 What is **tested**, not what should work. Per `CLAUDE.md`, claims here must match the test
-matrix. Last run: 31 Oct 2026, macOS (Apple Silicon), Playwright 1.64.
+matrix. Last run: 17 Nov 2026, macOS (Apple Silicon), Playwright 1.64.
+
+## Every flow, in every engine
+
+`E2E_ALL=1 pnpm test:e2e --project=firefox --project=webkit` runs the whole suite in Firefox and
+WebKit as well as Chromium: joining, the green room, the call, filters and blur, alerts,
+consent, languages, the phone-sized flow, solo links, the tech check, recovery after a closed
+tab, the emailed link, timelines, clips and sharing. Only what needs Chromium itself stays
+there (screen capture, the 4K fake camera, network throttling, the sync measurement, reading
+the clipboard). The first such run (17 Nov 2026) found that background blur didn't blur in
+WebKit; that is fixed. In WebKit each extra person in a test has a browser of their own: one
+WebKit browser gives the camera and microphone to one page at a time.
+
+What these runs can't show is what only real devices do. Found on a real iPhone in the same
+week and not by any of these tests: videos recorded black, the call's picture stopping after
+a few seconds, a camera left dark after being switched off and on.
 
 ## Recording (record → upload → process → download)
 

@@ -1,17 +1,17 @@
 // In-call quality alerts: a guest's device reports what it sees, the host gets it next to their name.
 import { randomBytes } from "node:crypto";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "same reporting in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "same reporting in every engine (E2E_ALL=1 runs it everywhere)");
 
-test("the host sees a guest's alerts, and when their device stops reporting", async ({ page: host, browser }) => {
+test("the host sees a guest's alerts, and when their device stops reporting", async ({ page: host, browser, browserName }) => {
   await signInHost(host);
   const { inviteUrl } = await createStudio(host, `Alerts ${randomBytes(2).toString("hex")}`);
   await host.getByRole("button", { name: "Enter studio" }).click();
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 20_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await guest.goto(inviteUrl);
   await guest.getByLabel("Your name").fill("Alex Guest");
@@ -43,6 +43,8 @@ test("the host sees a guest's alerts, and when their device stops reporting", as
   });
 
   await test.step("talk balance: while recording, the host sees each person's share of the talking", async () => {
+    // Firefox's test microphone is one steady tone: nothing in it rises above its own level, so nothing counts as talking.
+    if (browserName === "firefox") return;
     // Both fake mics beep every second, which counts as a little talking.
     await host.getByRole("button", { name: "Record", exact: true }).click();
     const shares = host.getByTestId("talk-share");

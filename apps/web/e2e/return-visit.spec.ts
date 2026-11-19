@@ -5,7 +5,7 @@
 // owner's own test session, 16 Nov 2026). The camera is now asked for one request at a time.
 import { randomBytes } from "node:crypto";
 import type { Page } from "@playwright/test";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
 /** Counts camera requests open at the same time; each is slowed down so an overlap can't hide. */
 const watchCameraRequests = (page: Page) =>
@@ -27,13 +27,13 @@ const watchCameraRequests = (page: Page) =>
   });
 
 test("a returning guest's camera is asked for one request at a time, and their picture is live", async ({ page: host, browser }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "the request order is ours, not the engine's");
+  test.skip(testInfo.project.name !== "chromium" && !process.env.E2E_ALL, "the request order is ours, not the engine's");
   await signInHost(host);
   const { inviteUrl } = await createStudio(host, `Return ${randomBytes(2).toString("hex")}`);
   await host.getByRole("button", { name: "Enter studio" }).click();
   await host.getByRole("button", { name: "Enter the studio" }).click();
 
-  const context = await browser.newContext({ permissions: ["camera", "microphone"] });
+  const context = await otherPerson(browser, { permissions: ["camera", "microphone"] });
   const guest = await context.newPage();
   await watchCameraRequests(guest);
   const visit = async () => {

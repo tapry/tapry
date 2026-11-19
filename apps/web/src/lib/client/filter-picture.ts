@@ -216,20 +216,40 @@ function scratchFor(ctx: CanvasRenderingContext2D) {
   return s;
 }
 
-/** `source` softened by about `blurPx`: drawn small, to be drawn back up at full size. */
+/** The part of a softened scratch canvas that holds the small picture (its top-left corner). */
+const softenedSize = new WeakMap<HTMLCanvasElement, { w: number; h: number }>();
+/** Draws what `softened` made back up over the given rectangle. */
+function drawSoft(ctx: CanvasRenderingContext2D, small: HTMLCanvasElement, x: number, y: number, width: number, height: number) {
+  const { w, h } = softenedSize.get(small)!;
+  ctx.drawImage(small, 0, 0, w, h, x, y, width, height);
+}
+
+/** `source` softened by about `blurPx`: drawn small, to be drawn back up at full size (drawSoft). */
 function softened(ctx: CanvasRenderingContext2D, source: CanvasImageSource, width: number, height: number, blurPx: number) {
   const { small } = scratchFor(ctx);
-  const factor = Math.max(2, blurPx * 1.6);
+  // A Gaussian of sigma s hides detail finer than about 4s: the picture is brought down to
+  // that, in halves (each half averages its neighbours, so nothing aliases), and drawn back up.
+  const factor = Math.max(2, blurPx * 4);
   const w = Math.max(2, Math.round(width / factor));
   const h = Math.max(2, Math.round(height / factor));
-  if (small.width !== w || small.height !== h) {
-    small.width = w;
-    small.height = h;
+  if (small.width !== width || small.height !== height) {
+    small.width = width;
+    small.height = height;
   }
   const s = small.getContext("2d")!;
   s.imageSmoothingEnabled = true;
   s.imageSmoothingQuality = "high";
-  s.drawImage(source, 0, 0, w, h);
+  let cw = Math.max(w, Math.round(width / 2));
+  let ch = Math.max(h, Math.round(height / 2));
+  s.drawImage(source, 0, 0, cw, ch);
+  while (cw > w || ch > h) {
+    const nw = Math.max(w, Math.round(cw / 2));
+    const nh = Math.max(h, Math.round(ch / 2));
+    s.drawImage(small, 0, 0, cw, ch, 0, 0, nw, nh);
+    cw = nw;
+    ch = nh;
+  }
+  softenedSize.set(small, { w: cw, h: ch });
   return small;
 }
 
@@ -247,7 +267,7 @@ function drawWithoutFilter(
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
   if (f.background === "blur") {
-    ctx.drawImage(softened(ctx, source, width, height, px(BACKGROUND_BLUR.px)), 0, 0, width, height);
+    drawSoft(ctx, softened(ctx, source, width, height, px(BACKGROUND_BLUR.px)), 0, 0, width, height);
     if (mask) {
       let layer = scratch.get(ctx);
       if (!layer) scratch.set(ctx, (layer = document.createElement("canvas")));
@@ -259,9 +279,13 @@ function drawWithoutFilter(
       l.globalCompositeOperation = "source-over";
       l.clearRect(0, 0, width, height);
       l.imageSmoothingEnabled = true;
-      l.drawImage(mask, 0, 0, width, height); // scaled up from the mask's size: soft enough an edge
-      l.globalCompositeOperation = "source-in";
+      // The frame first, then cut down to where the mask is. The other order (the mask, then
+      // the frame "source-in") leaves the whole frame in WebKit, which ignores that blend when
+      // what is drawn is a video: the blur was covered by the sharp picture.
       l.drawImage(source, 0, 0, width, height);
+      l.globalCompositeOperation = "destination-in";
+      l.drawImage(mask, 0, 0, width, height); // scaled up from the mask's size: soft enough an edge
+      l.globalCompositeOperation = "source-over";
       ctx.drawImage(layer, 0, 0);
     }
   } else {
@@ -275,7 +299,7 @@ function drawWithoutFilter(
     }
     copy.getContext("2d")!.drawImage(ctx.canvas, 0, 0);
     ctx.globalAlpha = TOUCH_UP.alpha;
-    ctx.drawImage(softened(ctx, copy, width, height, px(TOUCH_UP.blurPx)), 0, 0, width, height);
+    drawSoft(ctx, softened(ctx, copy, width, height, px(TOUCH_UP.blurPx)), 0, 0, width, height);
     ctx.globalAlpha = 1;
   }
   const b = BRIGHTNESS_VALUES[f.brightness];

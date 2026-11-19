@@ -2,18 +2,18 @@
 // (devices, browser, upload speed, a test recording played back) and sends the results, which
 // the host then sees on the studio page.
 import { randomBytes } from "node:crypto";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same page in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same page in every engine (E2E_ALL=1 runs it everywhere)");
 
-test("a guest tests their setup before the session and the host sees how it went", async ({ page: host, browser }) => {
+test("a guest tests their setup before the session and the host sees how it went", async ({ page: host, browser, browserName }) => {
   await signInHost(host);
   const { studioUrl } = await createStudio(host, `Check ${randomBytes(2).toString("hex")}`);
   const checkUrl = await host.getByLabel("Tech-check link").inputValue();
   expect(checkUrl).toMatch(/\/join\/[\w-]+\/check$/);
   await expect(host.getByText("Tech checks")).toHaveCount(0); // nothing yet
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await guest.goto(checkUrl);
   await expect(guest.getByRole("heading", { name: /Test your setup for/ })).toBeVisible();
@@ -44,9 +44,10 @@ test("a guest tests their setup before the session and the host sees how it went
 
   await host.goto(studioUrl);
   const row = host.getByTestId("tech-check").filter({ hasText: "Sam Guest" });
-  await expect(row).toContainText("Chrome on");
+  await expect(row).toContainText({ chromium: "Chrome on", firefox: "Firefox on", webkit: "Safari on" }[browserName]);
   // The fake mic's beeps may or may not count as "heard"; anything else should be fine on this machine.
   const issues = await row.locator("li").allTextContents();
-  expect(issues.filter((t) => !/haven't heard you/.test(t))).toEqual([]);
+  // (Playwright's WebKit gives a page 1 GB of storage, which the check rightly calls little.)
+  expect(issues.filter((t) => !/haven't heard you/.test(t) && !(browserName === "webkit" && /GB free/.test(t)))).toEqual([]);
   await guestContext.close();
 });

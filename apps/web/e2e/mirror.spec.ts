@@ -3,7 +3,7 @@
 // sees them again. The recording is never flipped (the recorder's track isn't touched).
 import { randomBytes } from "node:crypto";
 import { chromium, type Locator, type Page } from "@playwright/test";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
 test.skip(!process.env.LIVEKIT_E2E_URL, "needs a LiveKit server (set LIVEKIT_BIN)");
 
@@ -11,7 +11,7 @@ const flipped = (video: Locator) => video.evaluate((v) => getComputedStyle(v).sc
 const tile = (page: Page, name: string) => page.locator(`[data-testid="remote-tile"][data-name="${name}"]`).locator("video");
 
 test("a guest shown mirrored on everyone's screen", async ({ page: host }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "the tile's flip is plain CSS, the same everywhere");
+  test.skip(testInfo.project.name !== "chromium" && !process.env.E2E_ALL, "the tile's flip is plain CSS, the same everywhere");
   test.setTimeout(150_000);
   await signInHost(host);
   const { inviteUrl } = await createStudio(host, `Mirror ${randomBytes(2).toString("hex")}`);
@@ -20,7 +20,7 @@ test("a guest shown mirrored on everyone's screen", async ({ page: host }, testI
 
   const browser = await chromium.launch({ channel: "chromium", args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--mute-audio"] });
   try {
-    const guest = await (await browser.newContext({ permissions: ["camera", "microphone"] })).newPage();
+    const guest = await (await otherPerson(browser, { permissions: ["camera", "microphone"] })).newPage();
     await guest.goto(inviteUrl);
     await guest.getByLabel("Your name").fill("Mira");
     await guest.getByRole("checkbox").check();

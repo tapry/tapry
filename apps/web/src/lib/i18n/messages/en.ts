@@ -186,6 +186,7 @@ export const en = {
   "advice.upload_behind": "Your upload is a minute behind. The recording is safe on this device and will catch up; keep this tab open.",
   "advice.upload_behind_minutes": "Your upload is {minutes} minutes behind. The recording is safe on this device and will catch up; keep this tab open.",
   "advice.upload_refused": "The server isn't accepting your recording right now. It's safe on this device and is sent as soon as the server takes it again; keep this tab open.",
+  "advice.camera_black": "Your camera is on but its picture is black, so your video is being recorded black. Turn the camera off and on again; if it stays black, close other apps or tabs that use the camera and reload this page. Your sound is still recorded.",
   "advice.low_disk": "This device is running low on space for the recording. Free some up, or let the upload catch up before recording more.",
 
   // After the session

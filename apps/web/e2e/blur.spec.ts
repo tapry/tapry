@@ -5,7 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
-import { createStudio, downloadOutputs, expect, signInHost, test } from "./fixtures";
+import { createStudio, downloadOutputs, expect, otherPerson, signInHost, test } from "./fixtures";
 
 /** The tracks the recorder uses: the stream in this page's first <video> (green room preview, own tile). */
 const recorderTracks = (page: Page) =>
@@ -92,7 +92,7 @@ test("background blur: a mask track beside the untouched camera, and a blurred f
   await host.getByRole("button", { name: "Enter the studio" }).click();
   await expect(host.getByTestId("self-tile")).toBeVisible();
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   const guestTracks = watchTracks(guest);
   // Everything blur needs comes from this server: no request may go anywhere else for it.

@@ -2,7 +2,7 @@
 // site (the project website) the way browsers really do it, preflight included.
 import { expect, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same page in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same page in every engine (E2E_ALL=1 runs it everywhere)");
 
 test("the upload-speed check says which kinds of studio the line keeps up with", async ({ page }) => {
   await page.goto("/tools/upload-speed");
@@ -15,7 +15,8 @@ test("the upload-speed check says which kinds of studio the line keeps up with",
   expect(await page.locator('[data-verdict="ok"]').count()).toBeGreaterThanOrEqual(3);
 });
 
-test("the project website may use the public speed test; other sites may not", async ({ page, baseURL }) => {
+test("the project website may use the public speed test; other sites may not", async ({ page, baseURL, browserName }) => {
+  test.skip(browserName !== "chromium", "uses Chromium's Local Network Access permission");
   const endpoint = new URL("/api/speed-test", baseURL).href;
   const fromSite = async (origin: string) => {
     // Here the app runs on localhost; Chrome asks before a public page reaches a local address

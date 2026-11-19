@@ -4,8 +4,11 @@ import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 const MATRIX = /matrix\.spec\.ts/;
-/** Specs every engine runs: the recording matrix and the cross-engine live call. */
-const ENGINES = /(matrix|call)\.spec\.ts/;
+/**
+ * Specs every engine runs: the recording matrix and the cross-engine live call. E2E_ALL=1 runs
+ * every spec in Firefox and WebKit too (slow; for hunting browser bugs before a release).
+ */
+const ENGINES = process.env.E2E_ALL ? /\.spec\.ts$/ : /(matrix|call)\.spec\.ts/;
 
 // Run through `pnpm test:e2e`, which starts a throwaway SeaweedFS and sets S3_E2E_*.
 const PORT = 3100;

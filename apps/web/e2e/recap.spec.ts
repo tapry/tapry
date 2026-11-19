@@ -2,9 +2,9 @@
 // when their file is ready, and its link opens only their own file, with no account.
 import { randomBytes } from "node:crypto";
 import { startSmtpSink } from "../test/smtp-sink";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 test.skip(!!process.env.E2E_BASE_URL, "needs this test's mail server in the server's settings");
 
 test("a guest asks for their recording by email, and the link opens their own file", async ({ page: host, browser }) => {
@@ -16,7 +16,7 @@ test("a guest asks for their recording by email, and the link opens their own fi
     await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 20_000 });
     await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-    const guestContext = await browser.newContext();
+    const guestContext = await otherPerson(browser);
     const guest = await guestContext.newPage();
     await guest.goto(inviteUrl);
     await guest.getByLabel("Your name").fill("Sam Guest");
@@ -26,7 +26,8 @@ test("a guest asks for their recording by email, and the link opens their own fi
     await expect(guest.getByText("Waiting for the host to start recording.")).toBeVisible();
 
     await host.getByRole("button", { name: "Record", exact: true }).click();
-    await host.waitForTimeout(4_000);
+    // Long enough for every engine's recorder to have produced a piece (WebKit's MP4 can come up empty on a second or two).
+    await host.waitForTimeout(8_000);
     await host.getByRole("button", { name: "Stop recording" }).click();
     await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /✓ Uploaded/], { timeout: 60_000 });
     host.once("dialog", (d) => d.accept());
@@ -49,13 +50,12 @@ test("a guest asks for their recording by email, and the link opens their own fi
     const link = /http:\/\/localhost:\d+\/recap\/[\w-]+/.exec(mail!.decoded)![0];
 
     // Someone with just the link, in a browser that never joined.
-    const emailContext = await browser.newContext();
+    const emailContext = await otherPerson(browser);
     const reader = await emailContext.newPage();
     await reader.goto(link);
     await expect(reader.getByRole("heading", { name: "Your recording" })).toBeVisible();
     const files = reader.getByTestId("own-recording").locator("a[data-file-name]");
-    await expect(files).toHaveCount(2);
-    expect(await files.evaluateAll((as) => as.map((a) => a.getAttribute("data-file-name")))).toEqual([
+    await expect.poll(() => files.evaluateAll((as) => as.map((a) => a.getAttribute("data-file-name")))).toEqual([
       "Sam Guest - audio.wav",
       "Sam Guest - video.mp4",
     ]);

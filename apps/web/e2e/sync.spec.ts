@@ -21,7 +21,7 @@
 import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import type { Browser, Page } from "@playwright/test";
-import { createStudio, downloadOutputs, expect, signInHost, test } from "./fixtures";
+import { createStudio, downloadOutputs, expect, otherPerson, signInHost, test } from "./fixtures";
 import { SafariPage } from "./safari";
 
 test.skip(({ browserName }) => browserName !== "chromium", "measured once, in Chromium");
@@ -219,7 +219,7 @@ function checkSafari(wavs: Output[], files: Output[], recording: Recording, expe
 }
 
 async function joinChromium(browser: Browser, inviteUrl: string) {
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await beepingMic(guest, SKEW_HOST ? 0 : CLOCK_SKEW_MS);
   await guest.goto(inviteUrl);

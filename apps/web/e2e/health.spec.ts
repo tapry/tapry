@@ -1,7 +1,7 @@
 // The admin health page, against the real app: database, storage and the in-process worker.
 import { expect, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "a server page");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "a server page (E2E_ALL=1 runs it everywhere)");
 
 test("the admin sees what's working on the server", async ({ page }) => {
   await signInHost(page);

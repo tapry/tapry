@@ -2,9 +2,9 @@
 // guest's agreement is kept with the text (by its SHA-256) and the time, in the consent record.
 import { createHash } from "node:crypto";
 import { randomBytes } from "node:crypto";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 
@@ -22,7 +22,7 @@ test("guests agree to the studio's own consent text, and the record says who agr
   const first = "I agree to take part in this interview for the Long Table study.";
   await setConsent(first);
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await guest.goto(inviteUrl);
   await expect(guest.getByTestId("consent-text")).toHaveText(first);

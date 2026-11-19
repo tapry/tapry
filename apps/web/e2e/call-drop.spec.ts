@@ -3,7 +3,7 @@
 // Found in the owner's own test session (16 Nov 2026). Needs LiveKit (LIVEKIT_BIN).
 import { randomBytes } from "node:crypto";
 import { chromium, type Locator, type Page } from "@playwright/test";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
 test.skip(!process.env.LIVEKIT_E2E_URL, "needs a LiveKit server (set LIVEKIT_BIN)");
 
@@ -13,13 +13,20 @@ const tile = (page: Page, name: string) => page.locator(`[data-testid="remote-ti
 const framesInASecond = (video: Locator) =>
   video.evaluate(async (el) => {
     const v = el as HTMLVideoElement;
+    // Firefox's frame counter stays at zero for a live picture: count its per-frame callbacks too.
+    let called = 0;
+    const each = () => {
+      called++;
+      v.requestVideoFrameCallback?.(each);
+    };
+    v.requestVideoFrameCallback?.(each);
     const before = v.getVideoPlaybackQuality().totalVideoFrames;
     await new Promise((r) => setTimeout(r, 1000));
-    return v.getVideoPlaybackQuality().totalVideoFrames - before;
+    return Math.max(called, v.getVideoPlaybackQuality().totalVideoFrames - before);
   });
 
 test("a guest's picture plays in every layout, and says so when their connection dies", async ({ page: host }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "one engine is enough for the tile's own logic");
+  test.skip(testInfo.project.name !== "chromium" && !process.env.E2E_ALL, "one engine is enough for the tile's own logic");
   test.setTimeout(180_000);
   await signInHost(host);
   const { inviteUrl } = await createStudio(host, `Drop ${randomBytes(2).toString("hex")}`);
@@ -30,7 +37,7 @@ test("a guest's picture plays in every layout, and says so when their connection
   const server = await chromium.launchServer({ channel: "chromium", args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--mute-audio"] });
   try {
     const browser = await chromium.connect(server.wsEndpoint());
-    const guest = await (await browser.newContext({ permissions: ["camera", "microphone"] })).newPage();
+    const guest = await (await otherPerson(browser, { permissions: ["camera", "microphone"] })).newPage();
     await guest.goto(inviteUrl);
     await guest.getByLabel("Your name").fill("Gina");
     await guest.getByRole("checkbox").check();

@@ -3,16 +3,68 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { test as base, expect, webkit, type Browser, type BrowserContext, type BrowserContextOptions, type Locator, type Page } from "@playwright/test";
 
 export const PASSWORD = "e2e-only-throwaway-password";
 export const HOST_EMAIL = "host@tapry.test";
 
+/**
+ * `page.goto`, once more if another navigation cut in. A page that has just refreshed itself, or
+ * is still loading media, counts as navigating in WebKit and Firefox, and they then refuse the
+ * new address with "interrupted by another navigation" / NS_BINDING_ABORTED.
+ */
+export async function go(page: Page, url: string) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await page.goto(url);
+    } catch (err) {
+      if (attempt >= 5 || !/interrupted by another navigation|NS_BINDING_ABORTED/.test(String(err))) throw err;
+      // Let what cut in finish (a redirect can lead to another), then ask again.
+      await page.waitForLoadState("load").catch(() => {});
+      await page.waitForTimeout(500);
+    }
+  }
+}
+
+const otherBrowsers: Browser[] = [];
+
+/**
+ * A second person's browser context. WebKit lets only one page of a browser use the camera and
+ * microphone at a time (the other's are muted: its recording comes out empty and its picture
+ * never arrives), so there each further person gets a browser of their own, like real people
+ * have. Elsewhere it is `browser.newContext`.
+ */
+export async function otherPerson(browser: Browser, options: BrowserContextOptions = {}): Promise<BrowserContext> {
+  if (browser.browserType().name() === "firefox") {
+    // Firefox takes camera and microphone permission from its preferences, and refuses them here.
+    const { permissions: _, ...rest } = options;
+    return browser.newContext(rest);
+  }
+  if (browser.browserType().name() !== "webkit") return browser.newContext(options);
+  const own = await webkit.launch();
+  otherBrowsers.push(own);
+  const context = await own.newContext({ permissions: ["camera", "microphone"], ...options });
+  // The same muting of what plays as the test's own page gets (WebKit has no mute switch).
+  await context.addInitScript(() => {
+    document.addEventListener("play", (e) => ((e.target as HTMLMediaElement).muted = true), true);
+  });
+  return context;
+}
+
 export const test = base.extend<{
   /** Hide WebM from MediaRecorder.isTypeSupported, like Safari before 18.4 / iOS. */
   forceMp4: boolean;
+  closeOtherPeople: void;
 }>({
   forceMp4: [false, { option: true }],
+  // Browsers that otherPerson() started for this test.
+  closeOtherPeople: [
+    async ({}, use) => {
+      await use();
+      for (const b of otherBrowsers.splice(0)) await b.close().catch(() => {});
+    },
+    { auto: true },
+  ],
   page: async ({ page, forceMp4 }, use) => {
     // Headless browsers still play sound; WebKit has no mute switch, so mute media elements
     // as they start. The tests measure received audio from the streams, not the speakers.
