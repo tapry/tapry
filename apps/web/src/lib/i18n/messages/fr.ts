@@ -179,6 +179,7 @@ export const fr: Messages = {
   "advice.upload_behind": "Votre envoi a une minute de retard. L'enregistrement est en sécurité sur cet appareil et va rattraper ; gardez cet onglet ouvert.",
   "advice.upload_behind_minutes": "Votre envoi a {minutes} minutes de retard. L'enregistrement est en sécurité sur cet appareil et va rattraper ; gardez cet onglet ouvert.",
   "advice.upload_refused": "Le serveur n'accepte pas votre enregistrement pour le moment. Il est en sécurité sur cet appareil et sera envoyé dès que le serveur l'acceptera ; gardez cet onglet ouvert.",
+  "advice.camera_black": "Votre caméra est allumée mais son image est noire : votre vidéo est donc enregistrée en noir. Éteignez puis rallumez la caméra ; si elle reste noire, fermez les autres applications ou onglets qui utilisent la caméra et rechargez cette page. Votre son est toujours enregistré.",
   "advice.low_disk": "Cet appareil manque d'espace pour l'enregistrement. Libérez-en, ou laissez l'envoi rattraper avant d'enregistrer davantage.",
 
   "end.thanksDone": "Merci, {name}. C'est terminé !",

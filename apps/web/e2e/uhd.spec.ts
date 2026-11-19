@@ -26,7 +26,8 @@ test("4K studio: the camera is recorded at 4K and the person's file keeps it", a
   expect(Math.max(...heights)).toBe(2160);
 
   await host.getByRole("button", { name: "Record", exact: true }).click();
-  await host.waitForTimeout(6_000);
+  // With room to spare over the 5 s checked below: a 4K camera on a busy machine starts late.
+  await host.waitForTimeout(9_000);
   await host.getByRole("button", { name: "Stop recording" }).click();
   await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/], { timeout: 120_000 });
 

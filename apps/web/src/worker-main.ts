@@ -32,6 +32,11 @@ async function main() {
     onPoll: () => writeFileSync(HEARTBEAT_FILE, String(Date.now())),
   });
   runner.start();
+  // Also on a timer: a job that starts right after the worker does can run for an hour without
+  // a poll, and the container read as unhealthy the whole time though it was working.
+  const alive = setInterval(() => writeFileSync(HEARTBEAT_FILE, String(Date.now())), 20_000);
+  alive.unref();
+  writeFileSync(HEARTBEAT_FILE, String(Date.now()));
   console.log(
     `[worker] started: polling every ${config.worker.pollMs} ms, transcripts ${config.worker.whisper ? "on" : "off"}`,
   );

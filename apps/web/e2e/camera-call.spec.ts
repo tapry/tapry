@@ -4,7 +4,7 @@
 // project's browser as the one switching its camera, and a Chromium guest watching.
 import { randomBytes } from "node:crypto";
 import { chromium, type Locator } from "@playwright/test";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
 test.skip(!process.env.LIVEKIT_E2E_URL, "needs a LiveKit server (set LIVEKIT_BIN)");
 
@@ -27,7 +27,7 @@ test("the camera turned off and on again comes back for the others", async ({ pa
 
   const browser = await chromium.launch({ channel: "chromium", args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--mute-audio"] });
   try {
-    const guest = await (await browser.newContext({ permissions: ["camera", "microphone"] })).newPage();
+    const guest = await (await otherPerson(browser, { permissions: ["camera", "microphone"] })).newPage();
     await guest.goto(inviteUrl);
     await guest.getByLabel("Your name").fill("Watcher");
     await guest.getByRole("checkbox").check();

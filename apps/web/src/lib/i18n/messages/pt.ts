@@ -179,6 +179,7 @@ export const pt: Messages = {
   "advice.upload_behind": "O seu envio está um minuto atrasado. A gravação está segura neste dispositivo e vai recuperar; mantenha este separador aberto.",
   "advice.upload_behind_minutes": "O seu envio está {minutes} minutos atrasado. A gravação está segura neste dispositivo e vai recuperar; mantenha este separador aberto.",
   "advice.upload_refused": "O servidor não está a aceitar a sua gravação neste momento. Está segura neste dispositivo e será enviada assim que o servidor a aceitar; mantenha este separador aberto.",
+  "advice.camera_black": "A sua câmara está ligada mas a imagem é preta, por isso o seu vídeo está a ser gravado a preto. Desligue e volte a ligar a câmara; se continuar preta, feche outras aplicações ou separadores que usem a câmara e recarregue esta página. O seu som continua a ser gravado.",
   "advice.low_disk": "Este dispositivo está a ficar sem espaço para a gravação. Liberte algum ou deixe o envio recuperar antes de gravar mais.",
 
   "end.thanksDone": "Obrigado, {name}. Está tudo feito!",

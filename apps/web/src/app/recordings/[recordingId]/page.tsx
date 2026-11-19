@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { RecordingFilters } from "@/components/recording-filters";
 import { RecordingTimeline } from "@/components/recording-timeline";
+import { RefreshWhile } from "@/components/refresh-while";
 import { describeOutput, outputUrl, phase, shortStatus } from "@/components/recordings";
 import { Icon, PageTitle, Spinner } from "@/components/ui-extra";
 import { Avatar, cn } from "@/components/ui";
@@ -104,6 +105,8 @@ export default async function RecordingPage({ params }: { params: Promise<{ reco
           <RecordingPlayer src={outputUrl(r.studioId, r.id, sound.id)} bytes={sound.bytes} lengthMs={sound.durationMs ?? lengthMs} />
         ) : (
           <div className="flex flex-col gap-3">
+            {/* Still being uploaded, made or transcribed: the page keeps itself current. */}
+            <RefreshWhile active={r.status === "recording" || r.processing === "pending" || r.processing === "queued" || r.processing === "processing"} />
             <RecordingTimeline recording={r} now={now} levelLoudness={studio?.settings.levelLoudness ?? true} />
             {(r.processing === "failed" || (r.status === "stopped" && r.processing === "pending" && r.incompleteTracks > 0)) && (
               <p className="text-[14.5px] text-muted">

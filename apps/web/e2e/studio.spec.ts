@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import type { Page } from "@playwright/test";
-import { createStudio, expect, fileNames, mediaLinks, signInHost, test } from "./fixtures";
+import { createStudio, expect, fileNames, go, mediaLinks, otherPerson, signInHost, test } from "./fixtures";
 
 // The storage the test server writes to (started by scripts/with-seaweedfs.mjs).
 const s3 = new S3Client({
@@ -89,7 +89,7 @@ async function expectWorkingGreenRoom(page: Page) {
   await expect(page.getByText(/Connection OK \(\d+ ms\)/)).toBeVisible();
 }
 
-test("host and guest: green room, join, Record/Stop, end session", async ({ page: host, browser }) => {
+test("host and guest: green room, join, Record/Stop, end session", async ({ page: host, browser, browserName }) => {
   let inviteUrl = "";
   let studioUrl = "";
 
@@ -104,7 +104,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
   });
 
   await test.step("guest who comes too early is told to wait", async () => {
-    const early = await browser.newContext();
+    const early = await otherPerson(browser);
     const page = await early.newPage();
     await page.goto(inviteUrl);
     await page.getByLabel("Your name").fill("Too Early");
@@ -121,10 +121,12 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
   });
 
   await test.step("ticking headphones really turns off echo cancellation on the mic", async () => {
-    expect((await streamInfo(host)).audio[0]?.settings.echoCancellation).toBe(true);
+    // Firefox's test microphone reports no echo cancellation whatever is asked.
+    if (browserName !== "firefox") expect((await streamInfo(host)).audio[0]?.settings.echoCancellation).toBe(true);
     await host.getByLabel("I'm wearing headphones").check();
     await expect.poll(async () => (await streamInfo(host)).audio[0]?.settings.echoCancellation).toBe(false);
-    expect((await streamInfo(host)).audio[0]?.settings.autoGainControl).toBe(false);
+    // WebKit doesn't say (undefined); nowhere may it be on.
+    expect((await streamInfo(host)).audio[0]?.settings.autoGainControl).not.toBe(true);
   });
 
   await test.step("host enters the room and the camera survives the hand-off", async () => {
@@ -138,7 +140,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     expect(info.audio.map((t) => t.state)).toEqual(["live"]);
   });
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
 
   await test.step("guest joins with consent and goes through the green room audio-only", async () => {
@@ -229,8 +231,10 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     for (const track of tracks) {
       const first = objects.find((k) => k.includes(`/${track}/00000000.chunk`));
       expect(first, `track ${track} has a first chunk`).toBeTruthy();
-      // Every first chunk starts with the WebM (EBML) header.
-      expect((await readObject(first!)).subarray(0, 4).toString("hex")).toBe("1a45dfa3");
+      // Every first chunk starts with a container header: WebM (EBML), or MP4 (a box whose
+      // type is "ftyp"), which is what Apple's WebKit records pictures in.
+      const head = await readObject(first!);
+      expect(head.subarray(0, 4).toString("hex") === "1a45dfa3" || head.subarray(4, 8).toString() === "ftyp", `first chunk of ${track}`).toBe(true);
     }
     expect(objects.length).toBeGreaterThanOrEqual(3 * 2);
   });
@@ -308,10 +312,25 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await studioPage.goto(studioUrl);
     const recording = studioPage.getByTestId("recording").first();
     const names = await fileNames(recording.getByTestId("download"));
-    const [download] = await Promise.all([studioPage.waitForEvent("download"), recording.getByTestId("download-zip").click()]);
-    expect(download.suggestedFilename()).toMatch(/^E2E Studio \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
     const file = join(mkdtempSync(join(tmpdir(), "tapry-zip-")), "all.zip");
-    await download.saveAs(file);
+    if (browserName === "webkit") {
+      // Playwright's WebKit doesn't report a download started from a second tab: the same
+      // address is fetched by the page instead (a click in the first tab does download there).
+      const href = await recording.getByTestId("download-zip").getAttribute("href");
+      const got = await studioPage.evaluate(async (url) => {
+        const res = await fetch(url!);
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return { name: res.headers.get("content-disposition") ?? "", base64: btoa(binary) };
+      }, href);
+      expect(got.name).toMatch(/filename="E2E Studio \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip"/);
+      writeFileSync(file, Buffer.from(got.base64, "base64"));
+    } else {
+      const [download] = await Promise.all([studioPage.waitForEvent("download"), recording.getByTestId("download-zip").click()]);
+      expect(download.suggestedFilename()).toMatch(/^E2E Studio \w+ - \d{4}-\d\d-\d\d \d\d\.\d\d UTC\.zip$/);
+      await download.saveAs(file);
+    }
     // Python's zipfile checks every CRC and lists what's inside.
     const listed = execFileSync("python3", [
       "-I",
@@ -411,7 +430,7 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await studioPage.getByTestId("delete-studio-confirm").click();
     await expect(studioPage).not.toHaveURL(studioUrl);
     // The Studios page lists every studio the host has: the deleted one is gone from it.
-    await studioPage.goto("/studios/all");
+    await go(studioPage, "/studios/all");
     await expect(studioPage.getByRole("heading", { name: "Studios", exact: true })).toBeVisible();
     await expect(studioPage.getByTestId("studio-link").filter({ hasText: studioName })).toHaveCount(0);
     if (canReadStorage) await expect.poll(async () => listChunks(sessionId), { timeout: 15_000 }).toEqual([]);

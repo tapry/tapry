@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { OwnFiles } from "@/components/own-files";
 import { Avatar, Button, cn, LogoMark, Notice, StatusDot } from "@/components/ui";
 import { apiFetch, ApiRequestError } from "@/lib/client/api";
+import { useBlackCamera } from "@/lib/client/black-camera";
 import { mb } from "@/lib/format";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
@@ -184,6 +185,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     }
   }
 
+  // A camera that is on but black is recorded black: looked for on this person's own view.
+  const cameraBlack = useBlackCamera(ticket, !ended && !cameraOff && ready.stream.getVideoTracks().length > 0);
   const quality = useQualityAlerts({
     ticket,
     stream: ready.stream,
@@ -191,6 +194,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     micMuted,
     headphones: ready.choice.headphones,
     recorderError,
+    cameraBlack,
     clockOffsetMs: ready.clock?.offsetMs ?? 0,
     callAudio: call.peers.flatMap((p) => (p.audio ? [p.audio.mediaStreamTrack] : [])),
     recordingId: recording?.id ?? null,

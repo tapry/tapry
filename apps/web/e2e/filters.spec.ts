@@ -4,7 +4,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
-import { createStudio, downloadOutputs, expect, signInHost, test } from "./fixtures";
+import { createStudio, downloadOutputs, expect, otherPerson, signInHost, test } from "./fixtures";
 
 /** The tracks the recorder uses: the stream in this page's first <video> (green room preview, own tile). */
 const recorderTracks = (page: Page) =>
@@ -44,10 +44,13 @@ function saturation(file: string) {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/** "In colour" for this engine's test camera: WebKit's is mostly grey, with a little colour. */
+const inColour = (browserName: string) => (browserName === "webkit" ? 3.5 : 15);
+
 const filtersButton = (page: Page) => page.getByRole("button", { name: /^Filters/ });
 const panel = (page: Page) => page.getByTestId("filters-panel");
 
-test("a guest's filters: live in the call, never in the recorder, applied to the finished file", async ({ page: host, browser }) => {
+test("a guest's filters: live in the call, never in the recorder, applied to the finished file", async ({ page: host, browser, browserName }) => {
   const studioName = `E2E Filters ${randomBytes(3).toString("hex")}`;
   await signInHost(host);
   const { studioUrl, inviteUrl } = await createStudio(host, studioName);
@@ -57,7 +60,7 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
   await host.getByRole("button", { name: "Enter the studio" }).click();
   await expect(host.getByTestId("self-tile")).toBeVisible();
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await guest.goto(inviteUrl);
   await guest.getByLabel("Your name").fill("Sam Guest");
@@ -71,7 +74,7 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
   await test.step("green room: Black & white shows on the preview; the camera itself is untouched", async () => {
     before = await recorderTracks(guest);
     expect(before.map((t) => t.kind).sort()).toEqual(["audio", "video"]);
-    expect(await colourfulness(guest.locator("video").first())).toBeGreaterThan(15); // the fake camera is colourful
+    expect(await colourfulness(guest.locator("video").first())).toBeGreaterThan(inColour(browserName)); // the fake camera is colourful
 
     await expect(guest.getByTestId("filters-on")).toHaveCount(0);
     await filtersButton(guest).click();
@@ -84,8 +87,8 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
     // The preview is a canvas over the camera's <video>: grey, while the camera stays in colour.
     const picture = guest.getByTestId("filtered-picture");
     await expect(picture).toBeVisible();
-    await expect.poll(() => colourfulness(picture)).toBeLessThan(3);
-    expect(await colourfulness(guest.locator("video").first())).toBeGreaterThan(15);
+    await expect.poll(() => colourfulness(picture)).toBeLessThan(2);
+    expect(await colourfulness(guest.locator("video").first())).toBeGreaterThan(inColour(browserName));
     expect(await recorderTracks(guest)).toEqual(before);
 
     // Escape closes the panel and gives focus back to the button.
@@ -100,7 +103,7 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
     await guest.getByRole("button", { name: "Join the studio" }).click();
     await expect(guest.getByText("Waiting for the host to start recording.")).toBeVisible();
     await expect(guest.getByTestId("self-tile").getByTestId("filtered-picture")).toBeVisible();
-    await expect.poll(() => colourfulness(guest.getByTestId("self-tile").getByTestId("filtered-picture"))).toBeLessThan(3);
+    await expect.poll(() => colourfulness(guest.getByTestId("self-tile").getByTestId("filtered-picture"))).toBeLessThan(2);
     // The same tracks the green room opened, as they were.
     expect(await recorderTracks(guest)).toEqual(before);
 
@@ -119,7 +122,7 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
     expect(await guestTile.locator("video").evaluate((v) => (v as HTMLVideoElement).videoHeight)).toBeLessThanOrEqual(360);
     // The host, without filters, is in colour for the guest: the plain copy, as before.
     const hostTile = guest.locator('[data-testid="remote-tile"][data-name="Dev Host"]');
-    await expect.poll(() => colourfulness(hostTile.locator("video")), { timeout: 20_000 }).toBeGreaterThan(15);
+    await expect.poll(() => colourfulness(hostTile.locator("video")), { timeout: 20_000 }).toBeGreaterThan(inColour(browserName));
 
     // Noise removal in the call never changes the microphone the recorder uses.
     await filtersButton(guest).click();
@@ -175,8 +178,10 @@ test("a guest's filters: live in the call, never in the recorder, applied to the
     expect(hostVideo, files.map((f) => f.name).join(", ")).toBeTruthy();
     const guestSaturation = saturation(guestVideo!.path);
     const hostSaturation = saturation(hostVideo!.path);
-    expect(guestSaturation, "guest: black and white").toBeLessThan(2);
-    expect(hostSaturation, "host: in colour").toBeGreaterThan(10);
+    // WebKit's test camera has little colour to begin with (see inColour).
+    // (ffmpeg reports a black and white picture as 1; WebKit's host comes out between 1.4 and 2.5.)
+    expect(guestSaturation, "guest: black and white").toBeLessThan(browserName === "webkit" ? 1.2 : 2);
+    expect(hostSaturation, "host: in colour").toBeGreaterThan(browserName === "webkit" ? 1.3 : 10);
     await studioPage.close();
   });
 

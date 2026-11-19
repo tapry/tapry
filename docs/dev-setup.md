@@ -54,6 +54,8 @@ don't collide with the dev instance above.
 ```bash
 FFMPEG_PATH=… FFPROBE_PATH=… pnpm test
 WEED_BIN=… LIVEKIT_BIN=… FFMPEG_PATH=… FFPROBE_PATH=… pnpm --filter @tapry/web test:e2e
+# every spec in Firefox and WebKit too (slow; before a release):
+E2E_ALL=1 WEED_BIN=… LIVEKIT_BIN=… FFMPEG_PATH=… FFPROBE_PATH=… pnpm --filter @tapry/web test:e2e --project=firefox --project=webkit
 ```
 
 Add `WHISPER_PATH=… WHISPER_MODEL=… WHISPER_VAD_MODEL=…` (and `apps/web/.env.local`) for transcripts.

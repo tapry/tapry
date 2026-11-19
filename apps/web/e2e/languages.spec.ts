@@ -1,9 +1,9 @@
 // The pages a guest opens follow the guest's language: their browser's, or the one they pick.
 // The host's side stays English, and so does what the host is sent.
 import { randomBytes } from "node:crypto";
-import { createStudio, expect, signInHost, test } from "./fixtures";
+import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "the same in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "the same in every engine (E2E_ALL=1 runs it everywhere)");
 
 test("a French-speaking guest gets the invite, the consent, the green room and the room in French; Arabic reads right to left", async ({ page: host, browser }) => {
   await signInHost(host);
@@ -14,7 +14,7 @@ test("a French-speaking guest gets the invite, the consent, the green room and t
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 20_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-  const french = await browser.newContext({ locale: "fr-FR", permissions: ["camera", "microphone"] });
+  const french = await otherPerson(browser, { locale: "fr-FR", permissions: ["camera", "microphone"] });
   const guest = await french.newPage();
   await guest.goto(inviteUrl);
   await expect(guest.getByRole("heading", { name: "Dev Host vous invite à enregistrer" })).toBeVisible();
@@ -39,7 +39,7 @@ test("a French-speaking guest gets the invite, the consent, the green room and t
   await french.close();
 
   // Picking another language keeps it, and Arabic turns the page round.
-  const other = await browser.newContext({ locale: "en-US" });
+  const other = await otherPerson(browser, { locale: "en-US" });
   const page = await other.newPage();
   await page.goto(inviteUrl);
   await expect(page.getByRole("heading", { name: "Dev Host invited you to record" })).toBeVisible();

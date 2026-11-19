@@ -2,10 +2,12 @@
 import { randomBytes } from "node:crypto";
 import { createStudio, expect, signInHost, test } from "./fixtures";
 
-test.skip(({ browserName }) => browserName !== "chromium", "same handlers in every engine");
+test.skip(({ browserName }) => browserName !== "chromium" && !process.env.E2E_ALL, "same handlers in every engine (E2E_ALL=1 runs it everywhere)");
 
-test("host shortcuts: record and stop, mute and unmute, copy the invite link", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+test("host shortcuts: record and stop, mute and unmute, copy the invite link", async ({ page, context, browserName }) => {
+  // Only Chromium lets a test read the clipboard; elsewhere the shortcut's own confirmation is checked.
+  const clipboard = browserName === "chromium";
+  if (clipboard) await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await signInHost(page);
   const { inviteUrl } = await createStudio(page, `Keys ${randomBytes(2).toString("hex")}`);
   await page.getByRole("button", { name: "Enter studio" }).click();
@@ -30,7 +32,7 @@ test("host shortcuts: record and stop, mute and unmute, copy the invite link", a
 
   await page.keyboard.press("ControlOrMeta+Shift+L");
   await expect(page.getByTestId("shortcut-flash")).toHaveText("Invite link copied");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(inviteUrl);
+  if (clipboard) expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(inviteUrl);
 
   await page.keyboard.press("ControlOrMeta+Shift+R");
   await expect(page.getByText("Not recording")).toBeVisible();

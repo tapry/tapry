@@ -5,6 +5,19 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Fix: background blur didn't blur in Safari or on iPhones.** Their engine ignores the step
+  that keeps the sharp picture only where the person is when what is drawn is a video, so the
+  whole sharp frame covered the blur. The person is now cut out after the frame is drawn. The
+  blur itself is also stronger there.
+- **A camera that is on but black is now said.** The person is told their video is being
+  recorded black and what to try, and the host sees "Camera sending black" on them.
+- **A recording's own page keeps itself current** while its files are being uploaded or made,
+  instead of showing the state from when it was opened.
+- **The worker no longer reads as unhealthy during a long job** that started right after it
+  did, and no longer logs a listener-leak warning for every recording of more than ten chunks.
+- **Tests: every flow can run in every engine** (`E2E_ALL=1`). Until now most ran in Chromium
+  only, on the assumption that the engines behave alike.
+
 - **Fix: iPhone guests' videos went black a few seconds into a recording.** Every iPhone
   video in a 4K studio did, back to the first ones (the sound was fine). They were recorded in
   WebM (VP9), which Apple's devices encode in software; iPhones, iPads and Safari now record

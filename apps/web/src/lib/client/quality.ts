@@ -184,6 +184,8 @@ export interface QualityInputs {
   micMuted: boolean;
   headphones: boolean;
   recorderError: string | null;
+  /** The camera is on but sends a black picture (black-camera.ts). */
+  cameraBlack?: boolean;
   clockOffsetMs: number;
   /** What the call plays from everyone else (for the echo check); empty without a call. */
   callAudio: MediaStreamTrack[];
@@ -291,6 +293,7 @@ export function useQualityAlerts(q: QualityInputs) {
       if (lowDisk) list.push("low_disk");
       if (document.visibilityState === "hidden") list.push("tab_hidden");
       if (cur.recorderError) list.push("recorder_error");
+      if (cur.cameraBlack) list.push("camera_black");
       if (!cur.headphones && cur.stream.getAudioTracks().length > 0) list.push("no_headphones");
       list.sort();
       setAlerts((prev) => (prev.join() === list.join() ? prev : list));
@@ -357,6 +360,8 @@ export function alertLabel(a: QualityAlert, behindS: number | null): string {
       return "Tab in background";
     case "recorder_error":
       return "Recording problem";
+    case "camera_black":
+      return "Camera sending black";
     case "no_headphones":
       return "No headphones";
   }
@@ -375,6 +380,8 @@ export function alertAdvice(a: QualityAlert, behindS: number | null): string | n
       return "Your microphone is picking up the others from your speakers, so they're in your recording too. Put on headphones, or turn your speakers down.";
     case "upload_behind":
       return `Your upload is ${behindS !== null && behindS >= 120 ? `${Math.floor(behindS / 60)} minutes` : "a minute"} behind. The recording is safe on this device and will catch up; keep this tab open.`;
+    case "camera_black":
+      return "Your camera is on but its picture is black, so your video is being recorded black. Turn the camera off and on again; if it stays black, close other apps or tabs that use the camera and reload this page. Your sound is still recorded.";
     case "upload_refused":
       return "The server isn't accepting your recording right now. It's safe on this device and is sent as soon as the server takes it again; keep this tab open.";
     case "low_disk":

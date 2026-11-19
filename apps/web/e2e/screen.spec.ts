@@ -3,7 +3,7 @@
 // black from the moment sharing stopped.
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createStudio, downloadOutputs, expect, signInHost, test } from "./fixtures";
+import { createStudio, downloadOutputs, expect, otherPerson, signInHost, test } from "./fixtures";
 
 test.skip(({ browserName }) => browserName !== "chromium", "screen capture is automated in Chromium only");
 
@@ -23,7 +23,7 @@ test("a shared screen: seen by the guest, recorded on the host's device, a file 
   await host.getByRole("button", { name: "Enter the studio" }).click({ timeout: 30_000 });
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
 
-  const guestContext = await browser.newContext();
+  const guestContext = await otherPerson(browser);
   const guest = await guestContext.newPage();
   await guest.goto(inviteUrl);
   await guest.getByLabel("Your name").fill("Sam Guest");

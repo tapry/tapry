@@ -981,6 +981,21 @@ export class JobRunner {
 
     const settings = studioSettings.parse(rec.settings);
     const skipped: Array<{ name: string; kind: "audio" | "video" | "screen" }> = [];
+    // A camera or microphone track that was started and finished with nothing in it (a recorder
+    // that never produced a piece: seen from Safari on a recording of a second or two). Left
+    // out silently, the person simply had no file and nobody knew: it is named like any other
+    // part that couldn't be read. Not when another piece of theirs of that kind has something.
+    const empty = await this.db.query<{ participant_id: string; display_name: string; kind: "audio" | "video" | "screen" }>(
+      `SELECT DISTINCT t.participant_id, p.display_name, t.kind
+       FROM tracks t JOIN participants p ON p.id = t.participant_id
+       WHERE t.recording_id = $1 AND t.kind <> 'mask' AND NOT EXISTS (SELECT 1 FROM chunks c WHERE c.track_id = t.id)`,
+      [rec.id],
+    );
+    for (const e of empty) {
+      if (tracks.some((t) => t.participant_id === e.participant_id && t.kind === e.kind)) continue;
+      console.error(`[worker] ${rec.id}: ${e.kind} track of ${e.participant_id} has nothing in it`);
+      skipped.push({ name: e.display_name, kind: e.kind });
+    }
     const filtersFailed: Array<{ name: string; kind: "audio" | "video" }> = [];
     const files = await renderRecording(inputs, {
       // Metadata in the log, never the name. One bad upload must not cost everyone their files.

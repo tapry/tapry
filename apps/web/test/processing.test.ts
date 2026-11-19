@@ -338,6 +338,22 @@ describe("recording processing", () => {
       expect(job).toMatchObject({ status: "failed", error: expect.stringMatching(/ffmpeg exited/) });
     });
 
+    // A Safari guest's camera track finished with nothing in it on a recording of a few seconds:
+    // they got no video file and nobody was told (17 Nov 2026).
+    it("names a track that was recorded with nothing in it, unless another piece of theirs has something", async () => {
+      await uploadTrack(split(media, 3)); // the guest's sound: fine
+      await uploadTrack([], { kind: "video" }); // the guest's camera: started, finished, empty
+      await uploadTrack([], { token: t.host.token }); // the host's first piece of sound: empty...
+      await uploadTrack(split(media, 2), { token: t.host.token }); // ...and a second with something
+      t.tick(2000);
+      await stop();
+      await runner().drain();
+      expect(await processing()).toBe("ready");
+      const { recordings } = (await t.hostBrowser.get(`/studios/${t.studio.id}/recordings`)).body;
+      expect(recordings[0].skippedTracks).toEqual([{ name: "Guest", kind: "video" }]);
+      expect(recordings[0].outputs.map((o: { fileName: string }) => o.fileName).sort()).toEqual(expect.arrayContaining(["Guest - audio.wav", "Host - audio.wav"]));
+    });
+
     it("leaves a guest's unreadable upload out, gives everyone else their files, and tells the host", async () => {
       await uploadTrack(split(media, 3)); // the guest's: fine
       await uploadTrack([Buffer.from("not media".repeat(200))], { token: t.host.token }); // the host's: junk
