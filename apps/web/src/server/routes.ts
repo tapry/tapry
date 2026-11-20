@@ -113,6 +113,8 @@ export const ROUTES: ReadonlyArray<readonly ["GET" | "POST" | "PUT" | "PATCH" | 
   ["POST", "/api/sessions/[sessionId]/recap", "requestRecap"],
   ["PUT", "/api/sessions/[sessionId]/producer", "setProducer"],
   ["PUT", "/api/sessions/[sessionId]/appearance", "setAppearance"],
+  ["GET", "/api/sessions/[sessionId]/chat", "chat"],
+  ["POST", "/api/sessions/[sessionId]/chat", "sendChat"],
   ["GET", "/api/sessions/[sessionId]/guide", "sessionGuide"],
   ["POST", "/api/sessions/[sessionId]/markers", "addMarker"],
   ["GET", "/api/studios/[studioId]/solo", "getSolo"],

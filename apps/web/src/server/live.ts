@@ -1,4 +1,4 @@
-import { STALE_REPORT_MS, type diagBody, type QualityAlert, type SessionState, type TalkTime, type telemetryBody } from "@tapry/shared";
+import { STALE_REPORT_MS, type ChatMessage, type diagBody, type QualityAlert, type SessionState, type TalkTime, type telemetryBody } from "@tapry/shared";
 import type { z } from "zod";
 import type { Db } from "./db";
 import { ApiError } from "./errors";
@@ -6,6 +6,10 @@ import { hashToken, newId } from "./ids";
 
 /** Lines of call diagnostics one person may add to the log in an hour. */
 const DIAG_PER_HOUR = 400;
+
+/** Text messages kept per session (the newest), and how many one person may send in a minute. */
+export const CHAT_KEEP = 200;
+export const CHAT_PER_MINUTE = 30;
 
 export interface Participant {
   id: string;
@@ -28,6 +32,8 @@ export class LiveHub {
   readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
   /** Latest quality report per session and participant. In memory: it only matters live. */
   readonly health = new Map<string, Map<string, SessionState["health"][number]>>();
+  /** Text messages per session. In memory only: gone when the session ends or the server restarts. */
+  readonly chat = new Map<string, { seq: number; messages: ChatMessage[] }>();
 }
 
 /**
@@ -149,8 +155,36 @@ export class LiveService {
         : null,
       participants: participants.map((p) => ({ id: p.id, displayName: p.display_name, role: p.role, producer: p.producer, mirrored: p.mirrored })),
       health: [...(this.hub.health.get(sessionId)?.values() ?? [])].filter((h) => participants.some((p) => p.id === h.participantId)),
+      chatSeq: this.hub.chat.get(sessionId)?.seq ?? 0,
       serverTime: this.now(),
     };
+  }
+
+  /**
+   * Someone in the session writes to the others. Kept in memory (the newest CHAT_KEEP), handed
+   * to people in the session only, and dropped when the session ends. Never stored or logged.
+   */
+  async sendChat(p: Participant, text: string): Promise<ChatMessage> {
+    await this.requireOpen(p.sessionId);
+    const now = this.now();
+    let sent = this.chatSent.get(p.id);
+    if (!sent || now - sent.since > 60_000) this.chatSent.set(p.id, (sent = { since: now, count: 0 }));
+    if (sent.count >= CHAT_PER_MINUTE) throw new ApiError(429, "too_many_messages", "That's a lot of messages. Wait a moment.");
+    sent.count++;
+    if (this.chatSent.size > 5000) for (const [id, s] of this.chatSent) if (now - s.since > 60_000) this.chatSent.delete(id);
+    const chat = this.hub.chat.get(p.sessionId) ?? { seq: 0, messages: [] };
+    this.hub.chat.set(p.sessionId, chat);
+    const message: ChatMessage = { seq: ++chat.seq, participantId: p.id, text, at: this.now() };
+    chat.messages.push(message);
+    if (chat.messages.length > CHAT_KEEP) chat.messages.splice(0, chat.messages.length - CHAT_KEEP);
+    await this.publish(p.sessionId);
+    return message;
+  }
+  private chatSent = new Map<string, { since: number; count: number }>();
+
+  /** The session's messages after number `after`, oldest first. */
+  chatSince(p: Participant, after: number): { messages: ChatMessage[] } {
+    return { messages: (this.hub.chat.get(p.sessionId)?.messages ?? []).filter((m) => m.seq > after) };
   }
 
   /** Host presses Record. The server timestamp is the shared reference every track aligns to. */
@@ -203,6 +237,7 @@ export class LiveService {
       ]);
       return rows;
     });
+    this.hub.chat.delete(host.sessionId);
     await this.publish(host.sessionId);
     for (const r of stopped) await this.onStopped(r.id);
     return this.state(host.sessionId);

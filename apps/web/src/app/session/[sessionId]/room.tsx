@@ -21,6 +21,7 @@ import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from
 import { getPipeline, RecordingController } from "@/lib/client/recording";
 import { CallGrid, type Layout } from "./call-grid";
 import { FiltersPanel, filtersOn, useFiltersPanel } from "./filters-panel";
+import { ChatDot, ChatPanel, useChat, useChatPanel } from "./chat-panel";
 import { eqAnimation, Icon, ICON } from "./icons";
 import { RecapEmail } from "./recap-email";
 import { followSession, type ConnectionStatus } from "@/lib/client/session-events";
@@ -53,6 +54,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const call = useCall(ticket, ready.stream, !ended && !ticket.solo, prefs.filters);
   const hasCamera = ready.stream.getVideoTracks().length > 0;
   const filtersPanel = useFiltersPanel(true);
+  const chatPanel = useChatPanel();
   // Background blur: where the person is, from its own copy of the camera. The mask is drawn
   // into the call's copy and this person's tile, and recorded as a small third track; whatever
   // goes wrong with it turns blur off and never touches the camera and mic recording.
@@ -79,6 +81,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   }, [prefs.filters, ended]);
 
   useEffect(() => followSession(ticket.sessionId, ticket.token, setState, setConnection), [ticket]);
+  // Text messages: not for someone recording alone, who has nobody to write to.
+  const chat = useChat(ticket, ticket.solo ? 0 : (state?.chatSeq ?? 0), chatPanel.open);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -493,11 +497,31 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
         aria-controls="room-filters"
         aria-label={filtersOn(prefs.filters, hasCamera && !cameraOff) ? t("filters.titleOn") : t("filters.title")}
         title={t("filters.title")}
-        onClick={filtersPanel.toggle}
+        onClick={() => {
+          chatPanel.close();
+          filtersPanel.toggle();
+        }}
       >
         <Icon d={ICON.sliders} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
         {filtersOn(prefs.filters, hasCamera && !cameraOff) && <FilterDot />}
       </StageButton>
+      {!solo && (
+        <StageButton
+          ref={chatPanel.button}
+          size={size}
+          active={false}
+          className={cn("relative", chatPanel.open && "ring-2 ring-white/50")}
+          aria-expanded={chatPanel.open}
+          aria-controls="room-chat"
+          aria-label={chat.unread > 0 ? t("chat.titleNew", { count: chat.unread }) : t("chat.title")}
+          title={t("chat.title")}
+          data-testid="chat-button"
+          onClick={chatPanel.toggle}
+        >
+          <Icon d={ICON.chat} className={fullOpen ? "size-[19px]" : "size-[18px]"} />
+          {chat.unread > 0 && <ChatDot count={chat.unread} />}
+        </StageButton>
+      )}
       {/* The layouts only differ once someone else is in the call, and not at all on a phone's width, where tiles stack either way. */}
       {call.peers.length > 0 && (
         <span className={cn("flex items-center gap-1.5 max-sm:hidden", fullOpen && "gap-2")}>
@@ -709,6 +733,21 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                     className={cn(
                       "absolute z-10 w-[min(330px,calc(100%-24px))] animate-fade-up overflow-auto",
                       fullOpen ? "right-[18px] bottom-[92px] max-h-[calc(100%-104px)]" : "right-3 bottom-[62px] max-h-[calc(100%-74px)]",
+                    )}
+                  />
+                )}
+                {chatPanel.open && !solo && (
+                  <ChatPanel
+                    id="room-chat"
+                    panelRef={chatPanel.panel}
+                    messages={chat.messages}
+                    names={new Map((state?.participants ?? []).map((p) => [p.id, p.displayName]))}
+                    selfId={ticket.participantId}
+                    onSend={chat.send}
+                    onClose={chatPanel.close}
+                    className={cn(
+                      "absolute z-10 w-[min(330px,calc(100%-24px))] animate-fade-up",
+                      fullOpen ? "right-[18px] bottom-[92px] h-[min(440px,calc(100%-104px))]" : "right-3 bottom-[62px] h-[min(400px,calc(100%-74px))]",
                     )}
                   />
                 )}

@@ -116,6 +116,7 @@ Chosen by each person; the recorder always keeps the original.
 - **Background blur**: the person is found on the device, the outline steadied between
   frames; a mask is recorded beside the camera so the finished file is blurred the same way.
 - **Mirror my view** (local only).
+- **Chat**: text messages between everyone in the session, through the server (works without the call), with an unread count. In memory only until the session ends: never stored, logged or recorded.
 - Filters apply live in the call and in the finished files. The host can process again with
   or without them while the originals are kept.
 
