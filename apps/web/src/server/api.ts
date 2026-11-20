@@ -32,6 +32,7 @@ import {
   markerBody,
   producerBody,
   appearanceBody,
+  chatBody,
   removeWaitlistBody,
   setPlanBody,
   waitlistBody,
@@ -661,6 +662,12 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
     setAppearance: asParticipant(async (svc, p, req) => {
       await svc.live.setAppearance(p, (await parseBody(req, appearanceBody)).mirrored);
       return new Response(null, { status: 204 });
+    }),
+    /** Text messages between the people in the session: in memory only, never stored or logged. */
+    sendChat: asParticipant(async (svc, p, req) => json(201, await svc.live.sendChat(p, (await parseBody(req, chatBody)).text))),
+    chat: asParticipant(async (svc, p, req) => {
+      const after = Number(new URL(req.url).searchParams.get("after") ?? 0);
+      return json(200, svc.live.chatSince(p, Number.isFinite(after) ? after : 0));
     }),
     recapStatus: asParticipant(async (svc, p) => json(200, await svc.recaps.status(p))),
     requestRecap: asParticipant(async (svc, p, req) => json(200, await svc.recaps.request(p, (await parseBody(req, recapBody)).email))),

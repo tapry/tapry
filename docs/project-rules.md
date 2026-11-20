@@ -230,6 +230,11 @@ Done for v1: studios, invite links, green room, consent text per studio (kept pe
 - `followSession` reconnects after 45 s without a byte (the server pings every 15 s), so a half-open connection can't make someone miss Record. The host sees "Not recording yet" after 20 s without a track.
 - A recorder that stops by itself is restarted as a new track (up to 5 times; processing merges the pieces) unless the device is gone. No chunk for 15 s raises an alert, which clears when chunks return.
 
+## Session chat
+- Text messages between the people in a session (`LiveService.sendChat` / `chatSince`, `POST` and `GET /sessions/:id/chat`, `chat-panel.tsx`, `src/lib/client/chat.ts`). They go through the server like live status, so they work when the call doesn't. `SessionState.chatSeq` is the newest message's number; a device behind it fetches `?after=<seq>`, so reconnecting catches up.
+- **In memory only** (`LiveHub.chat`, newest `CHAT_KEEP` = 200, `CHAT_MAX_CHARS` = 500, `CHAT_PER_MINUTE` = 30 per person), dropped when the host ends the session and lost on a restart or deploy. Never stored, never logged, never in a recording or transcript, and the panel says so: keep it that way, or the consent text would have to cover it.
+- The button sits on the stage (works in full screen), hidden for a solo person. Translated for guests (`chat.*`).
+
 ## Live call
 - LiveKit, one room per session, identity = participant id. Optional: no `LIVEKIT_URL` → recording works without a call.
 - The call publishes **clones** of the camera/mic tracks (scaled to 360p). Never publish, constrain or stop the tracks the recorder uses.

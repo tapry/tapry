@@ -95,6 +95,27 @@ export const markerBody = z.object({ label: plainText(200).optional() });
 export const producerBody = z.object({ producer: z.boolean() });
 /** How a person asks to be shown in the call: `mirrored`, flipped on everyone's screen (never in the files). */
 export const appearanceBody = z.object({ mirrored: z.boolean() });
+/**
+ * A text message in the session. Lines are allowed, other control and format characters aren't.
+ * Kept in the server's memory while the session is open: never stored, never in a recording.
+ */
+export const CHAT_MAX_CHARS = 500;
+export const chatBody = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(CHAT_MAX_CHARS)
+    .regex(/^[^\p{Cc}\p{Cf}]+(\n+[^\p{Cc}\p{Cf}]+)*$/u, "Letters, numbers and punctuation only"),
+});
+export interface ChatMessage {
+  /** Counts up from 1 within a session. */
+  seq: number;
+  participantId: string;
+  text: string;
+  /** Server time. */
+  at: number;
+}
 /** The account's owner allows, or stops allowing, transcripts to be sent to an outside AI model for notes. */
 /** A studio's accent colour for guest pages; null puts Tapry's back. */
 export const brandBody = z.object({
@@ -408,6 +429,8 @@ export interface SessionState {
     /** Server time of the report. A device that stops reporting (offline, asleep) goes stale. */
     reportedAt: number;
   }>;
+  /** The number of the newest text message, 0 with none: a device behind it fetches the rest. Optional for older servers. */
+  chatSeq?: number;
   /** Server clock when this snapshot was made. */
   serverTime: number;
 }

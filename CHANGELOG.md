@@ -5,6 +5,11 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Chat in the session.** A Chat button on the stage lets everyone in a session write to
+  each other, with a count of what's new while the panel is closed. Messages go through the
+  server, so they work when the call doesn't, and a device that was away catches up. They are
+  kept in the server's memory only (the newest 200) until the session ends: never stored,
+  never logged, never in a recording. Not shown to someone recording alone on a solo link.
 - **Fix: background blur didn't blur in Safari or on iPhones.** Their engine ignores the step
   that keeps the sharp picture only where the person is when what is drawn is a video, so the
   whole sharp frame covered the blur. The person is now cut out after the frame is drawn. The
