@@ -805,6 +805,26 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       expect(stat(mono.path, "SATAVG")).toBeLessThan(1.5);
     });
 
+    it("a look switched on during the recording starts there: before it the picture is as recorded", async () => {
+      const mono = with_({ look: "mono" });
+      const [out] = await renderRecording([{ ...video(), filterSpans: [{ fromMs: 1500, toMs: null, filters: mono }] }], { ffmpeg, ffprobe, workDir: join(dir, "look-late"), durationMs: 3000, videoQuality: "720p" });
+      expect(stat(out!.path, "SATAVG", 0.7)).toBeGreaterThan(20);
+      expect(stat(out!.path, "SATAVG", 2.3)).toBeLessThan(1.5);
+      expect(shape(out!.path)).toBe(shape(plain.path));
+      expect(out!.durationMs).toBe(plain.durationMs);
+
+      // Switched off again, and on a track that started a second late: the times are the recording's.
+      const [late] = await renderRecording(
+        [{ ...video(undefined, 1000), filterSpans: [{ fromMs: 0, toMs: 2000, filters: mono }, { fromMs: 3000, toMs: null, filters: with_({ brightness: 2 }) }] }],
+        { ffmpeg, ffprobe, workDir: join(dir, "look-late-offset"), durationMs: 4000, videoQuality: "720p" },
+      );
+      expect(stat(late!.path, "YAVG", 0.5)).toBeLessThan(18); // still black before it starts
+      expect(stat(late!.path, "SATAVG", 1.5)).toBeLessThan(1.5); // black and white until 2 s
+      expect(stat(late!.path, "SATAVG", 2.5)).toBeGreaterThan(20); // as recorded in between
+      expect(stat(late!.path, "SATAVG", 3.5)).toBeGreaterThan(20); // brighter, in colour
+      expect(stat(late!.path, "YAVG", 3.5)).toBeGreaterThan(stat(late!.path, "YAVG", 2.5) + 6);
+    });
+
     describe("noise removal", () => {
       let noisy: string;
       const audio = (filters?: TrackFilters, offsetMs = 0): TrackInput =>
@@ -844,6 +864,22 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         // Same length, to the sample; and the mix is the cleaned sound, not the original.
         expect([cleaned.length, original.length]).toEqual([288_000, 288_000]);
         expect(Buffer.from(samples(outputs[2]!.path).buffer).equals(Buffer.from(cleaned.buffer))).toBe(true);
+      });
+
+      it("switched on during the recording: cleaned from there, as recorded before, nothing moved", async () => {
+        const asRecorded = await renderRecording([audio()], opts("noise-late-off"));
+        const outputs = await renderRecording([{ ...audio(), filterSpans: [{ fromMs: 3500, toMs: null, filters: with_({ noiseRemoval: true }) }] }], opts("noise-late"));
+        expect(outputs.map((o) => o.fileName)).toEqual(["Sam - audio.wav", "Sam - audio (original).wav", "Combined.wav"]);
+        const cleaned = samples(outputs[0]!.path);
+        const original = samples(asRecorded[0]!.path);
+        // The hiss before the switch is what was recorded; after it, at least 6 dB quieter.
+        expect(rms(cleaned, 2.3, 3.3) / rms(original, 2.3, 3.3)).toBeGreaterThan(0.9);
+        expect(rms(cleaned, 2.3, 3.3) / rms(original, 2.3, 3.3)).toBeLessThan(1.1);
+        expect(rms(cleaned, 4.2, 5.5)).toBeLessThan(rms(original, 4.2, 5.5) / 2);
+        // The voice (before the switch) is where and what it was.
+        expect(Math.abs(onset(cleaned) - onset(original))).toBeLessThanOrEqual(2);
+        expect(peak(cleaned, 0.5, 1.5) / peak(original, 0.5, 1.5)).toBeGreaterThan(0.95);
+        expect(cleaned.length).toBe(288_000);
       });
 
       it("measures the hiss between words as the noise floor, and how long this ffmpeg's filter holds sound back", async () => {
@@ -1020,6 +1056,49 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
         }
         expect(stat(video!.path, "YAVG", 3.5)).toBeLessThan(20);
         expect(Math.abs(video!.durationMs! - 7000)).toBeLessThan(80);
+      });
+
+      describe("switched on during the recording", () => {
+        const from = (ms: number) => [{ fromMs: ms, toMs: null, filters: BLUR }];
+
+        it("blurs from that moment, by the mask recorded from then; before it the picture is as recorded", async () => {
+          const lateMask = await makeMask("mask-late.webm", 1.5);
+          const out = await render("blur-late", camera({ filters: undefined, filterSpans: from(1500), masks: [{ rawPath: lateMask, offsetMs: 1500 }] }));
+          expect(out.failed).toEqual([]);
+          expect(out.skipped).toEqual([]);
+          // Before: nothing blurred.
+          expect(detail(out.video.path, "right", 0.7)).toBeGreaterThan(detail(asRecorded.video.path, "right", 0.7) * 0.8);
+          expect(detail(out.video.path, "left", 0.7)).toBeGreaterThan(detail(asRecorded.video.path, "left", 0.7) * 0.8);
+          // After: the background is, the person isn't.
+          expect(detail(out.video.path, "right", 2.3)).toBeLessThan(detail(asRecorded.video.path, "right", 2.3) * 0.25);
+          expect(detail(out.video.path, "left", 2.3)).toBeGreaterThan(detail(asRecorded.video.path, "left", 2.3) * 0.8);
+          expect(shape(out.video.path)).toBe(shape(asRecorded.video.path));
+          expect(out.video.durationMs).toBe(asRecorded.video.durationMs);
+        });
+
+        it("on, off and on again: each stretch by its own mask, sharp in between", async () => {
+          const first = await makeMask("mask-first.webm", 1);
+          const second = await makeMask("mask-second.webm", 1);
+          const spans = [{ fromMs: 0, toMs: 1000, filters: BLUR }, { fromMs: 2000, toMs: null, filters: BLUR }];
+          const out = await render("blur-twice", camera({ filters: undefined, filterSpans: spans, masks: [{ rawPath: first, offsetMs: 0 }, { rawPath: second, offsetMs: 2000 }] }));
+          expect(out.failed).toEqual([]);
+          const kept = (t: number) => detail(out.video.path, "right", t) / detail(asRecorded.video.path, "right", t);
+          expect(kept(0.5)).toBeLessThan(0.25);
+          expect(kept(1.5)).toBeGreaterThan(0.8);
+          expect(kept(2.5)).toBeLessThan(0.25);
+        });
+
+        it("a stretch with no mask to make it from stays as recorded, and the host is told; the rest is blurred", async () => {
+          const lateMask = await makeMask("mask-late2.webm", 1.5);
+          const out = await render("blur-part", camera({ filters: undefined, filterSpans: from(0), masks: [{ rawPath: lateMask, offsetMs: 1500 }] }));
+          expect(out.failed).toEqual(SAM_VIDEO);
+          expect(detail(out.video.path, "right", 0.7)).toBeGreaterThan(detail(asRecorded.video.path, "right", 0.7) * 0.8);
+          expect(detail(out.video.path, "right", 2.3)).toBeLessThan(detail(asRecorded.video.path, "right", 2.3) * 0.25);
+          // No mask at all: the file, as recorded, and told once.
+          const none = await render("blur-part-none", camera({ filters: undefined, filterSpans: from(1500) }));
+          expect(none.failed).toEqual(SAM_VIDEO);
+          expect(detail(none.video.path, "right", 2.3)).toBeGreaterThan(detail(asRecorded.video.path, "right", 2.3) * 0.8);
+        });
       });
 
       describe("a mask that can't be used costs the blur, never the file", () => {

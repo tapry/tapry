@@ -493,6 +493,44 @@ export const trackFilters = z.object({
 });
 export type TrackFilters = z.infer<typeof trackFilters>;
 
+/**
+ * A stretch of a recording during which a person had these filters on, in milliseconds from
+ * the recording's start. `toMs` null: to the end.
+ */
+export interface FilterSpan {
+  fromMs: number;
+  toMs: number | null;
+  filters: TrackFilters;
+}
+
+/**
+ * A person's filters over a recording, from their changes in time order (null: nothing on).
+ * `whole`: they had one choice throughout, so it applies to the whole file as it always did;
+ * `spans`: the choice changed, and each stretch with something on is listed.
+ */
+export function filterTimeline(changes: Array<{ atMs: number; filters: TrackFilters | null }>): { whole?: TrackFilters; spans?: FilterSpan[] } {
+  const on = (f: TrackFilters | null) => (f && (hasVideoFilters(f) || hasAudioFilters(f)) ? f : null);
+  const states: Array<{ atMs: number; filters: TrackFilters | null }> = [];
+  for (const c of [...changes].sort((a, b) => a.atMs - b.atMs)) {
+    const filters = on(c.filters);
+    const last = states.at(-1);
+    if (last && JSON.stringify(last.filters && trackFilters.parse(last.filters)) === JSON.stringify(filters && trackFilters.parse(filters))) continue;
+    // Two choices at the same moment: the later one is what the person ended on.
+    if (last && last.atMs === Math.max(0, c.atMs)) last.filters = filters;
+    else states.push({ atMs: Math.max(0, c.atMs), filters });
+  }
+  // Collapsing same-moment choices can leave neighbours equal.
+  const steps = states.filter((s, i) => i === 0 || JSON.stringify(s.filters) !== JSON.stringify(states[i - 1]!.filters));
+  if (steps.length === 0) return {};
+  if (steps.length === 1) return steps[0]!.filters ? { whole: steps[0]!.filters } : {};
+  const spans: FilterSpan[] = [];
+  steps.forEach((s, i) => {
+    // What they came in with counts from the recording's first moment.
+    if (s.filters) spans.push({ fromMs: i === 0 ? 0 : s.atMs, toMs: steps[i + 1]?.atMs ?? null, filters: s.filters });
+  });
+  return spans.length ? { spans } : {};
+}
+
 export const NO_FILTERS: TrackFilters = { brightness: 0, look: "none", touchUp: false, background: "none", noiseRemoval: false };
 
 /** Does anything here change the picture / the sound? */
@@ -518,8 +556,12 @@ export const LOOK_VALUES: Record<Look, { saturation: number; temperature: number
   mono: { saturation: 0, temperature: 6500 },
 };
 
-/** A person changes their filters during a session: applies to their tracks in recordings still open. */
-export const setFiltersBody = z.object({ filters: trackFilters });
+/** A person changes their filters during a session: their finished files follow it from that moment. */
+export const setFiltersBody = z.object({
+  filters: trackFilters,
+  /** When the person made the change, on the server's clock as their device estimates it. Left out: when it arrives. */
+  at: serverTime.optional(),
+});
 
 export const createTrackBody = z.object({
   trackId: z.string().regex(trackIdPattern).optional(),

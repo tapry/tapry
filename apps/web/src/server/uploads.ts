@@ -137,17 +137,44 @@ export class UploadService {
         throw new ApiError(409, "track_id_taken", "This track id is already in use");
       }
     }
+    // What the person had on when this camera or mic track began, at that moment in the
+    // recording. A shared screen has no filters of its own, and a mask only serves the blur.
+    // (A retry adds nothing: the first registration said it.)
+    if (inserted.length > 0 && (body.kind === "audio" || body.kind === "video")) {
+      await this.db.query("INSERT INTO filter_changes (recording_id, participant_id, at_ms, filters) VALUES ($1, $2, $3, $4)", [
+        body.recordingId,
+        p.id,
+        Math.max(0, body.startedAt - recording.started_at),
+        storedFilters(body.filters),
+      ]);
+    }
     this.onProgress(p.sessionId);
     return { trackId };
   }
 
   /**
-   * A person changes their filters during a session: kept on their own tracks in recordings
-   * that are still running, whole on each (a camera track's sound takes noise removal too).
-   * Only what processing does with the files changes: the uploads are never touched, so
-   * nothing here is refused, whatever state the recordings are in.
+   * A person changes their filters during a session. Their finished files follow the call: the
+   * choice is kept with its moment in each recording that is running (`at` is the device's
+   * estimate of the server's clock when they chose, held between the recording's start and now),
+   * and processing applies each choice from its moment on. The tracks also keep the latest
+   * choice, which is what says a recording has filters at all. The uploads are never touched,
+   * so nothing here is refused, whatever state the recordings are in.
    */
-  async setFilters(p: Participant, filters: TrackFilters) {
+  async setFilters(p: Participant, filters: TrackFilters, at?: number) {
+    const now = this.now();
+    const running = await this.db.query<{ id: string; started_at: number }>(
+      "SELECT id, started_at FROM recordings WHERE session_id = $1 AND status = 'recording' AND deleted_at IS NULL",
+      [p.sessionId],
+    );
+    for (const r of running) {
+      const when = Math.min(now, Math.max(Number(r.started_at), at ?? now));
+      await this.db.query("INSERT INTO filter_changes (recording_id, participant_id, at_ms, filters) VALUES ($1, $2, $3, $4)", [
+        r.id,
+        p.id,
+        when - Number(r.started_at),
+        storedFilters(filters),
+      ]);
+    }
     await this.db.query(
       `UPDATE tracks t SET filters = $3 FROM recordings r
        WHERE r.id = t.recording_id AND t.session_id = $1 AND t.participant_id = $2

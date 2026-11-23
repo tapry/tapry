@@ -281,7 +281,8 @@ export class ProcessingService {
               r.uploaded_at, r.processing_started_at, r.processed_at, r.transcribed_at, r.progress,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask') AS tracks,
               (SELECT count(*)::int FROM tracks t WHERE t.recording_id = r.id AND t.kind <> 'mask' AND t.status = 'recording') AS incomplete,
-              r.apply_filters, r.filters_failed, EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.filters IS NOT NULL) AS has_filters,
+              r.apply_filters, r.filters_failed, (EXISTS (SELECT 1 FROM tracks t WHERE t.recording_id = r.id AND t.filters IS NOT NULL)
+                OR EXISTS (SELECT 1 FROM filter_changes f WHERE f.recording_id = r.id AND f.filters IS NOT NULL)) AS has_filters,
               ${RECORDING_BYTES} AS bytes
        FROM recordings r
        JOIN sessions s ON s.id = r.session_id
@@ -536,6 +537,7 @@ export async function deleteRecordingIn(tx: Queryable, recordingId: string): Pro
 
   // What the host wrote about it goes with it, and the clips cut from it.
   await tx.query("DELETE FROM markers WHERE recording_id = $1", [recordingId]);
+  await tx.query("DELETE FROM filter_changes WHERE recording_id = $1", [recordingId]);
   await tx.query("DELETE FROM clips WHERE recording_id = $1", [recordingId]);
   await tx.query("DELETE FROM comments WHERE recording_id = $1", [recordingId]);
   // Drop work not started yet. A job a worker claimed meanwhile is 'running' when this

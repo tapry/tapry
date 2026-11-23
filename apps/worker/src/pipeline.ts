@@ -4,7 +4,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
-import { BRIGHTNESS_VALUES, LOOK_VALUES, VIDEO_TIERS, ffmpegFrameRate, videoTier, type FrameRate, type TrackFilters, type VideoHeight, type VideoQuality } from "@tapry/shared";
+import { BRIGHTNESS_VALUES, LOOK_VALUES, NO_FILTERS, VIDEO_TIERS, ffmpegFrameRate, videoTier, type FilterSpan, type FrameRate, type TrackFilters, type VideoHeight, type VideoQuality } from "@tapry/shared";
 import { FfmpegError, probeDurationMs, probeFrameTimesMs, probeStreams, probeVideoHeight, run } from "./ffmpeg.js";
 
 export interface TrackInput {
@@ -35,6 +35,15 @@ export interface TrackInput {
    * blur and `onFilterFailed` says so. A mask can only ever add the blur, never cost the file.
    */
   mask?: MaskInput;
+  /**
+   * The person changed their filters during the recording: each stretch with something on, in
+   * time from the recording's start. Given, it replaces `filters` and `mask`: the look, the
+   * noise removal and the blur each apply only during their stretches, and the rest of the file
+   * is as recorded, so the file follows what the call showed.
+   */
+  filterSpans?: FilterSpan[];
+  /** With `filterSpans` that blur: the person's masks, each used for the time it covers. */
+  masks?: MaskInput[];
 }
 
 /** A person's mask track: a small black-and-white video, white where the person is. */
@@ -245,6 +254,54 @@ export function videoLookFilters(filters: TrackFilters | undefined): string {
   return chain.join(",");
 }
 
+/** A stretch of time as ffmpeg's `enable` takes it, in seconds. */
+const during = (fromMs: number, toMs: number) => `between(t,${sec(Math.max(0, fromMs))},${sec(Math.max(0, toMs))})`;
+/** True during any of these stretches ([from, to] in ms). */
+const duringAny = (ranges: Array<[number, number]>) => ranges.map(([a, b]) => during(a, b)).join("+");
+/** Far past the end of any recording: a stretch that runs to the end. */
+const TO_THE_END_MS = 7 * 86_400_000;
+
+/**
+ * The picture filters of a person who changed them during the recording: each stretch's chain
+ * (as `videoLookFilters` makes it) switched on only for its time. They go on the camera's own
+ * frames, before alignment, so the times are the track's own: the recording's, less where the
+ * track starts in it. "" when no stretch changes the picture.
+ */
+export function timedLookFilters(spans: FilterSpan[], offsetMs: number): string {
+  const chain: string[] = [];
+  for (const span of spans) {
+    const to = (span.toMs ?? TO_THE_END_MS) - offsetMs;
+    if (to <= 0) continue;
+    const when = during(span.fromMs - offsetMs, to);
+    for (const filter of videoLookFilters(span.filters).split(",").filter(Boolean)) chain.push(`${filter}:enable='${when}'`);
+  }
+  return chain.join(",");
+}
+
+/** The stretches (ms from the recording's start, cut to `endMs`) during which `on` holds. */
+export function spanRanges(spans: FilterSpan[], on: (f: TrackFilters) => boolean, endMs: number): Array<[number, number]> {
+  return spans
+    .filter((s) => on(s.filters))
+    .map((s): [number, number] => [Math.max(0, s.fromMs), Math.min(endMs, s.toMs ?? endMs)])
+    .filter(([a, b]) => b > a);
+}
+
+/**
+ * Noise removal for part of the time only, on sound already on the recording's timeline: the
+ * cleaned copy (`clean`, as `audioCleanFilters` makes it, so it lines up exactly) is heard
+ * during the stretches and the untouched one outside them.
+ */
+export function timedCleanFilters(clean: string, ranges: Array<[number, number]>): string {
+  if (!clean || ranges.length === 0) return "";
+  const when = duringAny(ranges);
+  return [
+    "asplit[dry][wet]",
+    `[dry]volume=0:enable='${when}'[d]`,
+    `[wet]${clean},volume=0:enable='not(${when})'[w]`,
+    "[d][w]amix=inputs=2:normalize=0:dropout_transition=0",
+  ].join(";");
+}
+
 /**
  * The longest stretch of a person's video the mask may leave uncovered (before it starts, after
  * it ends, or between two of its frames) and still be used. Where there is no mask the picture
@@ -293,6 +350,52 @@ export function backgroundBlurGraph(o: { look: string; align: string; scale: str
     "[person][edge]alphamerge[fg]",
     `[bg][fg]overlay=format=yuv420${o.frame ? `,${o.frame}` : ""},format=yuv420p[v]`,
   ].join(";");
+}
+
+/** A mask and the stretches (ms from the recording's start) it blurs the background for. */
+export interface TimedMask {
+  maskOffsetMs: number;
+  ranges: Array<[number, number]>;
+}
+
+/**
+ * Background blur for part of the time only (-filter_complex, video out as [v]). Input 0 is
+ * the camera, inputs 1.. the masks, in order. Each mask makes the blurred picture exactly as
+ * `backgroundBlurGraph` does, and that picture is laid over the plain one only during the
+ * mask's stretches: outside them the frames are the camera's own.
+ */
+export function timedBlurGraph(o: { look: string; align: string; scale: string; frame: string; masks: TimedMask[]; height: number; fps?: string }): string {
+  const n = o.masks.length;
+  const graph = [
+    `[0:v]${o.look ? `${o.look},` : ""}${o.align},${o.scale},format=yuv420p,split=${n + 2}[base][soft]${o.masks.map((_, k) => `[sharp${k}]`).join("")}`,
+    `[soft]gblur=sigma=${num(o.height / 54)}${n > 1 ? `,split=${n}${o.masks.map((_, k) => `[bg${k}]`).join("")}` : "[bg0]"}`,
+  ];
+  let last = "base";
+  o.masks.forEach((m, k) => {
+    const late = Math.max(0, Math.round(m.maskOffsetMs));
+    const early = Math.max(0, Math.round(-m.maskOffsetMs));
+    const mask = [
+      "format=gray",
+      early ? `trim=start=${sec(early)},setpts=PTS-STARTPTS` : "",
+      `fps=${o.fps ?? FPS}:start_time=0`,
+      late ? `tpad=start_duration=${sec(late)}:start_mode=add:color=black` : "",
+      "tpad=stop=-1:stop_mode=add:color=black",
+      "lut=y='clip((val-64)*2,0,255)'",
+    ]
+      .filter(Boolean)
+      .join(",");
+    graph.push(
+      `[${k + 1}:v]${mask}[mask${k}]`,
+      `[mask${k}][sharp${k}]scale2ref=flags=bilinear[fit${k}][person${k}]`,
+      `[fit${k}]gblur=sigma=${num(o.height / 270)}[edge${k}]`,
+      `[person${k}][edge${k}]alphamerge[fg${k}]`,
+      `[bg${k}][fg${k}]overlay=format=yuv420[blur${k}]`,
+      `[${last}][blur${k}]overlay=format=yuv420:enable='${duringAny(m.ranges)}'[out${k}]`,
+    );
+    last = `out${k}`;
+  });
+  graph.push(`[${last}]${o.frame ? `${o.frame},` : ""}format=yuv420p[v]`);
+  return graph.join(";");
 }
 
 /** Touch-up: small sigmas, luma only, so skin evens out while eyes, hair and edges stay sharp. */
@@ -577,14 +680,17 @@ export async function renderRecording(tracks: TrackInput[], opts: PipelineOption
     const files = [output];
     // Noise removal comes before levelling, so the gain is worked out on the cleaned sound.
     // The aligned sound as recorded stays, as a second file, exactly as it would be without filters.
-    const cleaned = first.kind === "audio" ? pieces.find((p) => p.filters?.noiseRemoval)?.filters : undefined;
+    // Switched on and off during the recording: cleaned only while it was on.
+    const cleanRanges = first.kind === "audio" && first.filterSpans ? spanRanges(first.filterSpans, (f) => f.noiseRemoval, opts.durationMs) : [];
+    const cleaned = first.kind !== "audio" ? undefined : cleanRanges.length ? { ...NO_FILTERS, noiseRemoval: true } : pieces.find((p) => !p.filterSpans && p.filters?.noiseRemoval)?.filters;
     if (cleaned) {
       const originalPath = join(opts.workDir, `${first.trackId}.original.wav`);
       await rename(path, originalPath);
       try {
         const noiseFloorDb = await measureNoiseFloor(originalPath);
         floors.set(first.participantId, noiseFloorDb);
-        const clean = audioCleanFilters(cleaned, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
+        const whole = audioCleanFilters(cleaned, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
+        const clean = cleanRanges.length ? timedCleanFilters(whole, cleanRanges) : whole;
         await run(
           opts.ffmpeg,
           ["-y", "-hide_banner", "-nostdin", "-i", originalPath, "-af", `${clean},apad`, "-t", duration, "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", path],
@@ -707,7 +813,9 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   // The look goes on the camera's own frames, before alignment: the black that fills a late
   // start or the gap between pieces has to stay black (brightness would turn it grey, and
   // merging pieces relies on it). Noise removal: on the aligned sound, like the person's WAV.
-  const look = videoLookFilters(track.filters);
+  // Filters that changed during the recording apply stretch by stretch; one choice, to the whole file.
+  const spans = track.filterSpans?.length ? track.filterSpans : null;
+  const look = spans ? timedLookFilters(spans, track.offsetMs) : videoLookFilters(track.filters);
   const h = ctx.videoHeight ?? videoTier(opts.videoQuality).height;
   const wide = even((h * 16) / 9);
   const pad = `pad=${wide}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
@@ -718,11 +826,14 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   const shareEnd = isScreen && track.endOffsetMs !== undefined ? `,drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill:enable='gte(t,${sec(Math.max(0, track.endOffsetMs))})'` : "";
   const align = alignmentFilters("video", track.offsetMs, multi && !isScreen ? "black" : "clone", false, rate(opts));
   // Background blur needs a mask that covers this video; without one the file is made without it.
-  const wantsBlur = track.filters?.background === "blur";
-  const mask = wantsBlur ? await usableMask(track, ctx) : null;
+  const wantsBlur = spans ? spans.some((f) => f.filters.background === "blur") : track.filters?.background === "blur";
+  const mask = wantsBlur && !spans ? await usableMask(track, ctx) : null;
+  const timedBlur = wantsBlur && spans ? await timedMasks(track, spans, ctx) : null;
+  const cleanRanges = spans ? spanRanges(spans, (f) => f.noiseRemoval, opts.durationMs) : [];
+  const wantsClean = spans ? cleanRanges.length > 0 : !!track.filters?.noiseRemoval;
   try {
     let clean = "";
-    if (hasAudio && track.filters?.noiseRemoval) {
+    if (hasAudio && wantsClean) {
       let noiseFloorDb = ctx.noiseFloorDb;
       if (noiseFloorDb === undefined) {
         // No WAV of theirs to go by (the camera track carries the only sound): measure this track's.
@@ -739,9 +850,19 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
           await rm(sound, { force: true });
         }
       }
-      clean = audioCleanFilters(track.filters, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
+      clean = audioCleanFilters(spans ? { ...NO_FILTERS, noiseRemoval: true } : track.filters, { noiseFloorDb, delaySamples: await denoiseDelay(ctx) });
+      if (spans) clean = timedCleanFilters(clean, cleanRanges);
     }
-    const picture = mask
+    const picture = timedBlur?.masks.length
+      ? [...timedBlur.masks.flatMap((m) => [...RAW_INPUT_FLAGS, "-i", m.rawPath]),
+          "-filter_complex", timedBlurGraph({
+            look, align, height: h, fps: rate(opts),
+            masks: timedBlur.masks.map((m) => ({ maskOffsetMs: m.offsetMs, ranges: m.ranges })),
+            scale: multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2` : frame,
+            frame: multi ? pad : "",
+          }),
+          "-map", "[v]", ...(hasAudio ? ["-map", "0:a:0"] : [])]
+      : mask
       ? [...RAW_INPUT_FLAGS, "-i", mask.rawPath,
           "-filter_complex", backgroundBlurGraph({
             look, align, height: h, maskOffsetMs: mask.offsetMs, fps: rate(opts),
@@ -766,15 +887,57 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
     // A filter this ffmpeg can't run, or a mask it can't read, must never cost someone their
     // file: first without the blur (their look stays), then as recorded.
     if (mask) return renderPiece({ ...track, mask: undefined }, path, ctx);
-    if (!(look || track.filters?.noiseRemoval)) throw err;
-    const rendered = await renderPiece({ ...track, filters: undefined }, path, ctx);
+    if (timedBlur?.masks.length) return renderPiece({ ...track, masks: undefined }, path, ctx);
+    if (!(look || wantsClean)) throw err;
+    const rendered = await renderPiece({ ...track, filters: undefined, filterSpans: undefined, masks: undefined }, path, ctx);
     // Only now: had it failed again, the track is unreadable (skipped), not the filters.
     ctx.filterFailed?.(track);
     return rendered;
   }
   // The file is there, without the blur its person asked for.
-  if (wantsBlur && !mask) ctx.filterFailed?.(track);
+  if (spans ? timedBlur?.missed : wantsBlur && !mask) ctx.filterFailed?.(track);
   return hasAudio;
+}
+
+/**
+ * For a person whose blur came and went: which of their masks blur which stretches of this
+ * video. A mask is used for the time its own frames cover (read from the file, and whole: one
+ * with a hole of more than MASK_MAX_GAP_MS isn't used), within the stretches blur was on and
+ * within this video. Up to MASK_MAX_GAP_MS at either end of a stretch that the mask doesn't
+ * reach is blurred whole, as for a mask that covers the whole file. `missed`: blur was on for
+ * longer than that with no mask to make it from, so that part is as recorded and the host is told.
+ */
+async function timedMasks(track: TrackInput, spans: FilterSpan[], { opts }: RenderContext): Promise<{ masks: Array<MaskInput & { ranges: Array<[number, number]> }>; missed: boolean }> {
+  const videoStart = Math.max(0, track.offsetMs);
+  const videoEnd = Math.min(track.endOffsetMs ?? opts.durationMs, opts.durationMs);
+  const wanted = spanRanges(spans, (f) => f.background === "blur", opts.durationMs)
+    .map(([a, b]): [number, number] => [Math.max(a, videoStart), Math.min(b, videoEnd)])
+    .filter(([a, b]) => b > a);
+  const masks: Array<MaskInput & { ranges: Array<[number, number]> }> = [];
+  let covered = 0;
+  for (const mask of track.masks ?? []) {
+    let times: number[];
+    try {
+      times = await probeFrameTimesMs(opts.ffprobe, mask.rawPath, RAW_FORMATS);
+    } catch (err) {
+      if (!(err instanceof FfmpegError)) throw err;
+      continue;
+    }
+    if (times.length < 2 || times.some((t, i) => i > 0 && t - times[i - 1]! > MASK_MAX_GAP_MS)) continue;
+    const from = mask.offsetMs + times[0]!;
+    const to = mask.offsetMs + times.at(-1)!;
+    const ranges: Array<[number, number]> = [];
+    for (const [a, b] of wanted) {
+      const start = from - a <= MASK_MAX_GAP_MS ? a : from;
+      const end = b - to <= MASK_MAX_GAP_MS ? b : to;
+      if (end > start && start < b && end > a) ranges.push([Math.max(a, start), Math.min(b, end)]);
+    }
+    if (ranges.length === 0) continue;
+    covered += ranges.reduce((sum, [a, b]) => sum + (b - a), 0);
+    masks.push({ ...mask, ranges });
+  }
+  const asked = wanted.reduce((sum, [a, b]) => sum + (b - a), 0);
+  return { masks, missed: asked - covered > MASK_MAX_GAP_MS };
 }
 
 /**

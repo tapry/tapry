@@ -5,6 +5,11 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Filters in the finished files now follow the call.** A filter applies from the moment a
+  person switches it on to the moment they switch it off, instead of the last choice being
+  applied to the whole file. Background blur switched on during a recording is now in the file
+  from that moment (it was left out before). Each change is kept with its time; a person who
+  never changes their filters gets exactly the files they got before.
 - **Chat in the session.** A Chat button on the stage lets everyone in a session write to
   each other, with a count of what's new while the panel is closed. Messages go through the
   server, so they work when the call doesn't, and a device that was away catches up. They are

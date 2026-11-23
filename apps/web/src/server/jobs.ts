@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ffmpegFrameRate, studioSettings, trackFilters, type ClipShape, type TrackFilters } from "@tapry/shared";
+import { ffmpegFrameRate, filterTimeline, studioSettings, trackFilters, type ClipShape, type TrackFilters } from "@tapry/shared";
 import {
   CancelledError,
   concatChunks,
@@ -912,6 +912,20 @@ export class JobRunner {
     );
     if (tracks.length === 0) throw new Error("No uploaded media for this recording");
 
+    // Each person's filters over the recording, from their choices and when they made them.
+    // One choice throughout applies to the whole file as it always did; a choice that changed
+    // is applied stretch by stretch. Recordings from before choices were timed have none here,
+    // and their tracks' own filters apply whole.
+    const changes = await this.db.query<{ participant_id: string; at_ms: number; filters: unknown }>(
+      `SELECT f.participant_id, f.at_ms, f.filters FROM filter_changes f JOIN recordings r ON r.id = f.recording_id
+       WHERE f.recording_id = $1 AND r.apply_filters ORDER BY f.at_ms, f.id`,
+      [rec.id],
+    );
+    const timelines = new Map<string, ReturnType<typeof filterTimeline>>();
+    for (const id of new Set(changes.map((c) => c.participant_id))) {
+      timelines.set(id, filterTimeline(changes.filter((c) => c.participant_id === id).map((c) => ({ atMs: Number(c.at_ms), filters: filtersFor(c.filters).filters ?? null }))));
+    }
+
     const inputs: TrackInput[] = [];
     let lastEnd = rec.started_at;
     /** A track's chunks from storage, joined in order. */
@@ -958,13 +972,25 @@ export class JobRunner {
       }
       return collectedMasks.get(mask.id) ?? undefined;
     };
+    const masksOf = async (participantId: string): Promise<MaskInput[]> => {
+      const found: MaskInput[] = [];
+      for (const m of masks.filter((m) => m.participant_id === participantId)) {
+        const mask = await maskFor({ participant_id: participantId, started_at: m.started_at });
+        if (mask && !found.includes(mask)) found.push(mask);
+      }
+      return found;
+    };
     for (const [i, t] of tracks.entries()) {
       await this.progress(rec, { stage: "collecting", done: i, total: tracks.length, current: t.display_name });
       const { rawPath, hasGaps, endTs } = await collect(t.id);
       lastEnd = Math.max(lastEnd, endTs);
       // A shared screen is kept as it was: a person's look is for their camera.
-      const { filters } = t.kind === "screen" ? {} : filtersFor(t.filters);
+      const timeline = t.kind === "screen" ? {} : timelines.get(t.participant_id);
+      const filters = t.kind === "screen" ? undefined : timeline ? timeline.whole : filtersFor(t.filters).filters;
+      const spans = timeline?.spans;
       const mask = t.kind === "video" && filters?.background === "blur" ? await maskFor(t) : undefined;
+      // Blur that came and went: every whole mask of theirs, each good for the time it covers.
+      const blurMasks = t.kind === "video" && spans?.some((s) => s.filters.background === "blur") ? await masksOf(t.participant_id) : [];
       inputs.push({
         trackId: t.id,
         participantId: t.participant_id,
@@ -976,6 +1002,8 @@ export class JobRunner {
         endOffsetMs: endTs - rec.started_at,
         ...(filters && { filters }),
         ...(mask && { mask }),
+        ...(spans && { filterSpans: spans }),
+        ...(blurMasks.length > 0 && { masks: blurMasks }),
       });
     }
 

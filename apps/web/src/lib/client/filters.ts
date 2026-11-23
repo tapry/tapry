@@ -116,24 +116,33 @@ export interface FilterSync {
   stop(): void;
 }
 
+/** How long after a failed send the same choice goes again. */
+const RETRY_MS = 3000;
+
 /**
  * Sends a change of filters to the server (`PUT /sessions/:id/filters`), a moment after the last
- * change. `initial` is what the person had when they came in: new tracks carry their filters
- * themselves, so nothing is sent until something changes. A failed send is dropped quietly and
- * goes again with the next change; it never gets in the way of the recording.
+ * change, with when the person made it (`now`: the server's clock as this device estimates it),
+ * since their finished files follow the call from that moment. `initial` is what the person had
+ * when they came in: new tracks carry their filters themselves, so nothing is sent until
+ * something changes. A failed send goes again a few seconds later, with the time of the choice;
+ * it never gets in the way of the recording.
  */
 export function createFilterSync(
   ticket: { sessionId: string; token: string },
   initial: TrackFilters,
-  opts: { delayMs?: number; put?: (filters: TrackFilters) => Promise<unknown> } = {},
+  opts: { delayMs?: number; retryMs?: number; now?: () => number; put?: (filters: TrackFilters, at: number | undefined) => Promise<unknown> } = {},
 ): FilterSync {
   const put =
     opts.put ??
-    ((filters: TrackFilters) => apiFetch(`/sessions/${ticket.sessionId}/filters`, { method: "PUT", body: { filters }, token: ticket.token }));
+    ((filters: TrackFilters, at: number | undefined) =>
+      apiFetch(`/sessions/${ticket.sessionId}/filters`, { method: "PUT", body: { filters, ...(at !== undefined && { at }) }, token: ticket.token }));
   /** What the server has, as far as we know; null after a failure (so the next change always goes). */
   let sent: string | null = JSON.stringify(initial);
   let wanted = sent;
+  /** When the wanted choice was made. */
+  let wantedAt: number | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
   let chain: Promise<void> = Promise.resolve();
 
   const flush = () => {
@@ -143,17 +152,20 @@ export function createFilterSync(
       const body = wanted;
       if (body === sent) return;
       try {
-        await put(JSON.parse(body) as TrackFilters);
+        await put(JSON.parse(body) as TrackFilters, wantedAt);
         sent = body;
       } catch {
         sent = null;
+        if (!stopped && timer === undefined) timer = setTimeout(flush, opts.retryMs ?? RETRY_MS);
       }
     });
   };
 
   return {
     set(filters) {
-      wanted = JSON.stringify(filters);
+      const next = JSON.stringify(filters);
+      if (next !== wanted) wantedAt = opts.now ? Math.round(opts.now()) : undefined;
+      wanted = next;
       clearTimeout(timer);
       timer = wanted === sent ? undefined : setTimeout(flush, opts.delayMs ?? 400);
     },
@@ -164,6 +176,7 @@ export function createFilterSync(
       timer = setTimeout(flush, 0);
     },
     stop() {
+      stopped = true;
       clearTimeout(timer);
       timer = undefined;
     },

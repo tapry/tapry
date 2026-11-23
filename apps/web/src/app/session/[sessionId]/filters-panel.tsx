@@ -283,7 +283,7 @@ function BlurNote({ tone, on, blur }: { tone: Tone; on: boolean; blur: { status:
       role="status"
       data-testid="blur-status"
       data-blur={blur.problem ? "problem" : !on ? "off" : blur.status}
-      className={cn("mt-1.5 text-[13.5px] leading-snug text-pretty empty:hidden", blur.problem || blur.late ? (tone === "stage" ? "text-[#ffb4a2]" : "text-warn-strong") : TONE[tone].muted)}
+      className={cn("mt-1.5 text-[13.5px] leading-snug text-pretty empty:hidden", blur.problem ? (tone === "stage" ? "text-[#ffb4a2]" : "text-warn-strong") : TONE[tone].muted)}
     >
       {text}
     </p>

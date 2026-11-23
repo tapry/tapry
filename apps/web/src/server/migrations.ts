@@ -603,4 +603,17 @@ ALTER TABLE jobs ADD COLUMN cancel_requested boolean NOT NULL DEFAULT false;
 -- A person who asked to be shown mirrored in the call, on everyone's screen. Display only: never in the files.
 ALTER TABLE participants ADD COLUMN mirrored boolean NOT NULL DEFAULT false;
 `,
+  `
+-- A person's filters over a recording: each choice with its moment (ms from the recording's
+-- start), so their finished files follow what the call showed. filters null: nothing on.
+CREATE TABLE filter_changes (
+  id bigserial PRIMARY KEY,
+  recording_id text NOT NULL REFERENCES recordings(id),
+  participant_id text NOT NULL REFERENCES participants(id),
+  at_ms bigint NOT NULL,
+  filters jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX filter_changes_recording ON filter_changes (recording_id, participant_id, at_ms);
+`,
 ];

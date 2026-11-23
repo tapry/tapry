@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chunkStorageKey, NO_FILTERS, type TrackFilters } from "@tapry/shared";
+import { chunkStorageKey, filterTimeline, NO_FILTERS, type TrackFilters } from "@tapry/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { describeFilterFailures } from "../src/components/recording-filters";
 import { JobRunner } from "../src/server/jobs";
@@ -132,6 +132,71 @@ describe("filters", () => {
       }
       expect((await t.client().request("PUT", `/sessions/${t.sessionId}/filters`, {}, { token: t.guest.token })).status).toBe(400);
       expect((await t.client().request("PUT", `/sessions/${t.sessionId}/filters`, "{", { token: t.guest.token })).status).toBe(400);
+    });
+  });
+
+  describe("over time, so the files follow the call", () => {
+    const changes = async () =>
+      (await t.db.query<{ at_ms: number; filters: TrackFilters | null; participant_id: string }>("SELECT at_ms, filters, participant_id FROM filter_changes WHERE recording_id = $1 ORDER BY at_ms, id", [t.recordingId]))
+        .map((c) => [Number(c.at_ms), c.filters?.look ?? null]);
+    const startedAt = async () => Number((await t.db.query<{ started_at: number }>("SELECT started_at FROM recordings WHERE id = $1", [t.recordingId]))[0]!.started_at);
+
+    it("keeps what a track began with at its moment, and each change at the moment the person made it", async () => {
+      t.tick(2000);
+      await createTrack({ kind: "video" });
+      t.tick(8000);
+      // The device says when: its estimate of the server's clock, 400 ms before this arrives.
+      expect((await t.client().request("PUT", `/sessions/${t.sessionId}/filters`, { filters: WARM, at: t.now() - 400 }, { token: t.guest.token })).status).toBe(200);
+      t.tick(5000);
+      await setFilters(NO_FILTERS); // no time given: when it arrives
+      expect(await changes()).toEqual([[2000, null], [9600, "warm"], [15000, null]]);
+    });
+
+    it("holds a claimed time between the recording's start and now", async () => {
+      const start = await startedAt();
+      t.tick(3000);
+      await t.client().request("PUT", `/sessions/${t.sessionId}/filters`, { filters: WARM, at: start - 60_000 }, { token: t.guest.token });
+      await t.client().request("PUT", `/sessions/${t.sessionId}/filters`, { filters: QUIET, at: t.now() + 60_000 }, { token: t.guest.token });
+      expect((await changes()).map(([at]) => at)).toEqual([0, 3000]);
+    });
+
+    it("adds nothing for a registration sent again, a shared screen, or a recording that has stopped", async () => {
+      const trackId = (await createTrack({ kind: "video", filters: WARM })).body.trackId;
+      await createTrack({ kind: "video", filters: WARM, trackId });
+      await t.call(`/sessions/${t.sessionId}/tracks`, { recordingId: t.recordingId, kind: "screen", mimeType: "video/webm", startedAt: t.now() }, t.guest.token);
+      expect(await changes()).toHaveLength(1);
+      await stop();
+      await setFilters(QUIET);
+      expect(await changes()).toHaveLength(1);
+    });
+
+    it("goes with the recording when it is deleted", async () => {
+      await createTrack({ filters: WARM });
+      await stop();
+      await t.hostBrowser.del(`/studios/${t.studio.id}/recordings/${t.recordingId}`);
+      expect(await t.db.query("SELECT 1 FROM filter_changes WHERE recording_id = $1", [t.recordingId])).toEqual([]);
+    });
+
+    it("says a recording has filters when one was on for a while, though the person ended with none", async () => {
+      await createTrack({ kind: "video" });
+      await setFilters(WARM);
+      await setFilters(NO_FILTERS);
+      await stop();
+      expect((await summary()).hasFilters).toBe(true);
+    });
+
+    it("reads a person's choices as one for the whole file, or as stretches when it changed", () => {
+      const mono: TrackFilters = { ...NO_FILTERS, look: "mono" };
+      expect(filterTimeline([])).toEqual({});
+      expect(filterTimeline([{ atMs: 0, filters: null }, { atMs: 5, filters: NO_FILTERS }])).toEqual({});
+      // Came in with it and never changed it (camera and mic tracks each say so): the whole file.
+      expect(filterTimeline([{ atMs: 40, filters: mono }, { atMs: 42, filters: mono }])).toEqual({ whole: mono });
+      // Switched on at 10 s, off at 25 s.
+      expect(filterTimeline([{ atMs: 0, filters: null }, { atMs: 25_000, filters: null }, { atMs: 10_000, filters: mono }])).toEqual({ spans: [{ fromMs: 10_000, toMs: 25_000, filters: mono }] });
+      // What they began with counts from the first moment; the last choice runs to the end.
+      expect(filterTimeline([{ atMs: 300, filters: mono }, { atMs: 8000, filters: WARM }])).toEqual({ spans: [{ fromMs: 0, toMs: 8000, filters: mono }, { fromMs: 8000, toMs: null, filters: WARM }] });
+      // On and straight off again in the same moment leaves nothing.
+      expect(filterTimeline([{ atMs: 0, filters: null }, { atMs: 4000, filters: mono }, { atMs: 4000, filters: null }])).toEqual({});
     });
   });
 

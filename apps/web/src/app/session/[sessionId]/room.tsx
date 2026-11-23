@@ -63,10 +63,11 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   blurGiveUp.current = blur.giveUp;
 
   // A change of filters during the session goes to the server a moment later (new tracks carry
-  // theirs when they start). Never waited for; a failed send goes again with the next change.
+  // theirs when they start). Never waited for; a failed send goes again a few seconds later.
   const filterSync = useRef<FilterSync | null>(null);
   useEffect(() => {
-    const sync = createFilterSync(ticket, prefs.filters);
+    // Each change goes with its moment on the server's clock: the files follow the call from then.
+    const sync = createFilterSync(ticket, prefs.filters, { now: () => localNow() + (ready.clock?.offsetMs ?? 0) });
     filterSync.current = sync;
     // A track that reached the server late missed any change made before it: send the choice again.
     const off = onTrackRegistered((sessionId, filters) => sessionId === ticket.sessionId && sync.registered(filters));
@@ -141,7 +142,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   useEffect(() => {
     if (state && !producer) void controller.current?.sync(recording?.id ?? null);
   }, [state, recording?.id, producer]);
-  // The finished file is only blurred when the mask covers the recording from its start.
+  // Blur switched on after the recording began is in the file from that moment only: the panel says so.
   const blurAtStart = useRef<{ id: string; covered: boolean } | null>(null);
   if (recording && blurAtStart.current?.id !== recording.id) blurAtStart.current = { id: recording.id, covered: blur.status === "ready" };
   if (recording && blur.status !== "ready" && blurAtStart.current) blurAtStart.current.covered = false;

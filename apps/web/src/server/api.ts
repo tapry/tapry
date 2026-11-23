@@ -575,9 +575,10 @@ export function createApiHandlers(getServices: () => Promise<Services>) {
       return new Response(null, { status: 204 });
     }),
     /** A person's filters (how they look and sound in their files), for their tracks in the running recording. */
-    setFilters: asParticipant(async (svc, p, req) =>
-      json(200, await svc.uploads.setFilters(p, (await parseBody(req, setFiltersBody)).filters)),
-    ),
+    setFilters: asParticipant(async (svc, p, req) => {
+      const body = await parseBody(req, setFiltersBody);
+      return json(200, await svc.uploads.setFilters(p, body.filters, body.at));
+    }),
     /** The end screen: this participant's own files from the session, and the promo link. */
     ownRecordings: asParticipant(async (svc, p) =>
       json(200, await svc.processing.ownRecordings(p, await svc.billing.promoFor(p.sessionId, svc.guestPromoUrl))),

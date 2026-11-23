@@ -304,7 +304,7 @@ describe("telling the server about a change of filters", () => {
     await vi.advanceTimersByTimeAsync(300);
     expect(put).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
-    expect(put.mock.calls).toEqual([[mono]]);
+    expect(put.mock.calls).toEqual([[mono, undefined]]);
   });
 
   it("sends nothing when the choice is back where the server has it", async () => {
@@ -317,7 +317,7 @@ describe("telling the server about a change of filters", () => {
   });
 
   it("swallows a failed send and sends again with the next change, even back to the first choice", async () => {
-    const put = vi.fn<(f: TrackFilters) => Promise<void>>(async () => {});
+    const put = vi.fn<(f: TrackFilters, at: number | undefined) => Promise<void>>(async () => {});
     put.mockRejectedValueOnce(new Error("offline"));
     const sync = createFilterSync(ticket, NO_FILTERS, { put });
     sync.set(mono);
@@ -326,11 +326,35 @@ describe("telling the server about a change of filters", () => {
     // The server may or may not have it: the next change goes whatever it is.
     sync.set(NO_FILTERS);
     await vi.advanceTimersByTimeAsync(500);
-    expect(put.mock.calls).toEqual([[mono], [NO_FILTERS]]);
+    expect(put.mock.calls.map(([f]) => f)).toEqual([mono, NO_FILTERS]);
+  });
+
+  it("says when the person chose, not when it was sent, and tries a failed send again by itself", async () => {
+    let clock = 50_000;
+    const put = vi.fn<(f: TrackFilters, at: number | undefined) => Promise<void>>(async () => {});
+    put.mockRejectedValueOnce(new Error("offline"));
+    const sync = createFilterSync(ticket, NO_FILTERS, { put, now: () => clock });
+    sync.set(mono);
+    clock += 400;
+    await vi.advanceTimersByTimeAsync(400);
+    expect(put.mock.calls).toEqual([[mono, 50_000]]);
+    // Nothing changes meanwhile: it goes again a few seconds later, with the time of the choice.
+    clock += 3000;
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(put.mock.calls).toEqual([[mono, 50_000], [mono, 50_000]]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(put).toHaveBeenCalledTimes(2);
+    // Stopped: a failure after that isn't tried again.
+    put.mockRejectedValueOnce(new Error("offline"));
+    sync.set(NO_FILTERS);
+    await vi.advanceTimersByTimeAsync(400);
+    sync.stop();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(put).toHaveBeenCalledTimes(3);
   });
 
   it("sends the choice again when a track registers with older filters (it missed the change)", async () => {
-    const put = vi.fn(async () => {});
+    const put = vi.fn<(f: TrackFilters, at: number | undefined) => Promise<void>>(async () => {});
     const sync = createFilterSync(ticket, NO_FILTERS, { put });
     sync.set(mono);
     await vi.advanceTimersByTimeAsync(500);
@@ -340,7 +364,7 @@ describe("telling the server about a change of filters", () => {
     expect(put).toHaveBeenCalledTimes(1);
     sync.registered(NO_FILTERS); // started before the change, reached the server after it
     await vi.advanceTimersByTimeAsync(10);
-    expect(put.mock.calls).toEqual([[mono], [mono]]);
+    expect(put.mock.calls.map(([f]) => f)).toEqual([mono, mono]);
     sync.registered(undefined); // a track without filters counts as none
     await vi.advanceTimersByTimeAsync(10);
     expect(put).toHaveBeenCalledTimes(3);
