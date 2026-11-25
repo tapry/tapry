@@ -42,6 +42,12 @@ export function parsePrefs(raw: string | null | undefined): FilterPrefs {
   }
 }
 
+/**
+ * What a person's choices mean for their finished files: their filters, and "Others see me
+ * mirrored", which flips their video as the call shows it. This is what goes to the server.
+ */
+export const fileFilters = (prefs: FilterPrefs): TrackFilters => (prefs.mirrorForOthers ? { ...prefs.filters, mirrored: true } : prefs.filters);
+
 /** A track's filters as kept in its `meta` (strings only); undefined for tracks from before filters. */
 export function parseFilters(raw: string | undefined): TrackFilters | undefined {
   if (!raw) return undefined;

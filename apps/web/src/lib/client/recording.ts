@@ -19,7 +19,7 @@ import {
 } from "@tapry/recorder";
 import type { SessionTicket } from "@tapry/shared";
 import { loadTicket } from "./api";
-import { getFilterPrefs, parseFilters, trackRegistered } from "./filters";
+import { fileFilters, getFilterPrefs, parseFilters, trackRegistered } from "./filters";
 import { localNow } from "./clock";
 import { diagFor, isAppleWebKit, type Note } from "./diag";
 
@@ -496,7 +496,7 @@ function trackMeta(ticket: SessionTicket, recordingId: string): Record<string, s
     participantId: ticket.participantId,
     token: ticket.token,
     // Only noted for the server; the recorder gets the plain stream, as always.
-    filters: JSON.stringify(getFilterPrefs().filters),
+    filters: JSON.stringify(fileFilters(getFilterPrefs())),
   };
 }
 

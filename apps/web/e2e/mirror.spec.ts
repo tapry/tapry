@@ -1,6 +1,7 @@
 // "Others see me mirrored": a guest asks to be shown flipped, and the host's screen shows them
 // flipped, also when the host joins after the choice was made; switched off, it's as the camera
-// sees them again. The recording is never flipped (the recorder's track isn't touched).
+// sees them again. The recorder's track isn't touched: the finished video is flipped by the
+// worker for the time it was on (apps/worker tests).
 import { randomBytes } from "node:crypto";
 import { chromium, type Locator, type Page } from "@playwright/test";
 import { createStudio, expect, otherPerson, signInHost, test } from "./fixtures";

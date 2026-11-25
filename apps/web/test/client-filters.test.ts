@@ -9,6 +9,7 @@ import { FULL_PACE, MASK, MASK_EDGE, maskLevel, maskPixels, nextPace, SLOW, STEA
 import {
   createFilterSync,
   DEFAULT_PREFS,
+  fileFilters,
   FILTERS_KEY,
   getFilterPrefs,
   parseFilters,
@@ -43,6 +44,12 @@ describe("a person's filters, as kept on their device", () => {
     expect(parsePrefs(JSON.stringify({ filters: { brightness: 2, look: "cool", touchUp: true, noiseRemoval: true } })).filters.background).toBe("none");
     expect(parsePrefs(JSON.stringify({ filters: { look: "warm" } }))).toEqual({ filters: { ...NO_FILTERS, look: "warm" }, mirror: true, mirrorForOthers: false });
     expect(parsePrefs(JSON.stringify({ mirror: false, mirrorForOthers: false }))).toEqual({ filters: NO_FILTERS, mirror: false, mirrorForOthers: false });
+  });
+
+  it("mean, for the finished files, the filters plus being shown mirrored to the others (never the own-view mirror)", () => {
+    expect(fileFilters({ filters: mono, mirror: true, mirrorForOthers: false })).toEqual(mono);
+    expect(fileFilters({ filters: mono, mirror: false, mirrorForOthers: true })).toEqual({ ...mono, mirrored: true });
+    expect(fileFilters(DEFAULT_PREFS)).toEqual(NO_FILTERS);
   });
 
   it("drop filters that aren't ours (never a half-understood choice), keeping the mirror", () => {

@@ -278,6 +278,18 @@ export function timedLookFilters(spans: FilterSpan[], offsetMs: number): string 
   return chain.join(",");
 }
 
+/**
+ * "Others see me mirrored": the finished picture flipped, for the whole file or for the
+ * stretches it was on; "" when it never was. It goes last, on the picture already on the
+ * recording's timeline: after the blur (the mask is of the camera as it was) and the padding.
+ */
+export function mirrorFilter(track: Pick<TrackInput, "filters" | "filterSpans">, durationMs: number): string {
+  if (!track.filterSpans?.length) return track.filters?.mirrored ? "hflip" : "";
+  const ranges = spanRanges(track.filterSpans, (f) => f.mirrored === true, durationMs);
+  // hflip takes no settings of its own, so `enable` is its first: "hflip=enable=…".
+  return ranges.length ? `hflip=enable='${duringAny(ranges)}'` : "";
+}
+
 /** The stretches (ms from the recording's start, cut to `endMs`) during which `on` holds. */
 export function spanRanges(spans: FilterSpan[], on: (f: TrackFilters) => boolean, endMs: number): Array<[number, number]> {
   return spans
@@ -326,7 +338,7 @@ export const MASK_MAX_GAP_MS = 1000;
  *   the colour planes correctly); where it is fully white the pixels are the camera's own.
  * `frame` is what follows for a piece of several (the padding to 16:9), or "".
  */
-export function backgroundBlurGraph(o: { look: string; align: string; scale: string; frame: string; maskOffsetMs: number; height: number; fps?: string }): string {
+export function backgroundBlurGraph(o: { look: string; align: string; scale: string; frame: string; maskOffsetMs: number; height: number; fps?: string; mirror?: string }): string {
   const late = Math.max(0, Math.round(o.maskOffsetMs));
   const early = Math.max(0, Math.round(-o.maskOffsetMs));
   const mask = [
@@ -348,7 +360,7 @@ export function backgroundBlurGraph(o: { look: string; align: string; scale: str
     "[mask][sharp]scale2ref=flags=bilinear[fit][person]",
     `[fit]gblur=sigma=${num(o.height / 270)}[edge]`,
     "[person][edge]alphamerge[fg]",
-    `[bg][fg]overlay=format=yuv420${o.frame ? `,${o.frame}` : ""},format=yuv420p[v]`,
+    `[bg][fg]overlay=format=yuv420${o.frame ? `,${o.frame}` : ""}${o.mirror ? `,${o.mirror}` : ""},format=yuv420p[v]`,
   ].join(";");
 }
 
@@ -364,7 +376,7 @@ export interface TimedMask {
  * `backgroundBlurGraph` does, and that picture is laid over the plain one only during the
  * mask's stretches: outside them the frames are the camera's own.
  */
-export function timedBlurGraph(o: { look: string; align: string; scale: string; frame: string; masks: TimedMask[]; height: number; fps?: string }): string {
+export function timedBlurGraph(o: { look: string; align: string; scale: string; frame: string; masks: TimedMask[]; height: number; fps?: string; mirror?: string }): string {
   const n = o.masks.length;
   const graph = [
     `[0:v]${o.look ? `${o.look},` : ""}${o.align},${o.scale},format=yuv420p,split=${n + 2}[base][soft]${o.masks.map((_, k) => `[sharp${k}]`).join("")}`,
@@ -394,7 +406,7 @@ export function timedBlurGraph(o: { look: string; align: string; scale: string; 
     );
     last = `out${k}`;
   });
-  graph.push(`[${last}]${o.frame ? `${o.frame},` : ""}format=yuv420p[v]`);
+  graph.push(`[${last}]${o.frame ? `${o.frame},` : ""}${o.mirror ? `${o.mirror},` : ""}format=yuv420p[v]`);
   return graph.join(";");
 }
 
@@ -829,6 +841,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
   const wantsBlur = spans ? spans.some((f) => f.filters.background === "blur") : track.filters?.background === "blur";
   const mask = wantsBlur && !spans ? await usableMask(track, ctx) : null;
   const timedBlur = wantsBlur && spans ? await timedMasks(track, spans, ctx) : null;
+  const mirror = isScreen ? "" : mirrorFilter(track, opts.durationMs);
   const cleanRanges = spans ? spanRanges(spans, (f) => f.noiseRemoval, opts.durationMs) : [];
   const wantsClean = spans ? cleanRanges.length > 0 : !!track.filters?.noiseRemoval;
   try {
@@ -856,7 +869,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
     const picture = timedBlur?.masks.length
       ? [...timedBlur.masks.flatMap((m) => [...RAW_INPUT_FLAGS, "-i", m.rawPath]),
           "-filter_complex", timedBlurGraph({
-            look, align, height: h, fps: rate(opts),
+            look, align, height: h, fps: rate(opts), mirror,
             masks: timedBlur.masks.map((m) => ({ maskOffsetMs: m.offsetMs, ranges: m.ranges })),
             scale: multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2` : frame,
             frame: multi ? pad : "",
@@ -865,13 +878,13 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
       : mask
       ? [...RAW_INPUT_FLAGS, "-i", mask.rawPath,
           "-filter_complex", backgroundBlurGraph({
-            look, align, height: h, maskOffsetMs: mask.offsetMs, fps: rate(opts),
+            look, align, height: h, maskOffsetMs: mask.offsetMs, fps: rate(opts), mirror,
             // An even size before the padding, for the colour planes of the mask.
             scale: multi ? `scale=${wide}:${h}:force_original_aspect_ratio=decrease:force_divisible_by=2` : frame,
             frame: multi ? pad : "",
           }),
           "-map", "[v]", ...(hasAudio ? ["-map", "0:a:0"] : [])]
-      : ["-vf", `${look ? `${look},` : ""}${align},${frame}${shareEnd},format=yuv420p`];
+      : ["-vf", `${look ? `${look},` : ""}${align},${frame}${shareEnd}${mirror ? `,${mirror}` : ""},format=yuv420p`];
     await run(
       opts.ffmpeg,
       [...INPUT_FLAGS, "-i", track.rawPath,
@@ -888,7 +901,7 @@ async function renderPiece(track: TrackInput, path: string, ctx: RenderContext &
     // file: first without the blur (their look stays), then as recorded.
     if (mask) return renderPiece({ ...track, mask: undefined }, path, ctx);
     if (timedBlur?.masks.length) return renderPiece({ ...track, masks: undefined }, path, ctx);
-    if (!(look || wantsClean)) throw err;
+    if (!(look || wantsClean || mirror)) throw err;
     const rendered = await renderPiece({ ...track, filters: undefined, filterSpans: undefined, masks: undefined }, path, ctx);
     // Only now: had it failed again, the track is unreadable (skipped), not the filters.
     ctx.filterFailed?.(track);

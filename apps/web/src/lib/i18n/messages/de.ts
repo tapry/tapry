@@ -201,7 +201,7 @@ export const de: Messages = {
   "filters.mirror": "Meine Ansicht spiegeln",
   "filters.mirrorHint": "Ändert nur, was Sie sehen.",
   "filters.mirrorOthers": "Andere sehen mich gespiegelt",
-  "filters.mirrorOthersHint": "Spiegelt Ihr Bild im Anruf auf allen Bildschirmen. Ihre Aufnahme wird nicht gespiegelt.",
+  "filters.mirrorOthersHint": "Spiegelt Ihr Bild im Anruf auf allen Bildschirmen und in Ihrem fertigen Video, solange es eingeschaltet ist.",
   "filters.brightness": "Helligkeit",
   "filters.b0": "Unverändert",
   "filters.b1": "Heller",

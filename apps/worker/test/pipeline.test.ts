@@ -805,6 +805,31 @@ describe.skipIf(!hasFfmpeg)("with ffmpeg", () => {
       expect(stat(mono.path, "SATAVG")).toBeLessThan(1.5);
     });
 
+    it("mirrored: the finished picture is flipped left to right, for the whole file or only while it was on", async () => {
+      /** The colour of one side of the frame at `t` (the test pattern differs left to right). */
+      const side = (file: string, which: "left" | "right", t: number) =>
+        ["YAVG", "UAVG", "VAVG"].map((key) =>
+          Number.parseFloat(
+            execFileSync(ffmpeg, ["-v", "error", "-ss", String(t), "-i", file, "-frames:v", "1",
+              "-vf", `crop=iw/3:ih:${which === "left" ? "0" : "2*iw/3"}:0,signalstats,metadata=print:key=lavfi.signalstats.${key}:file=-`, "-f", "null", "-"])
+              .toString().match(new RegExp(`${key}=([\\d.]+)`))![1]!,
+          ),
+        );
+      const near = (a: number[], b: number[]) => a.every((x, i) => Math.abs(x - b[i]!) < 4);
+      // The pattern's two sides really differ, or this test says nothing.
+      expect(near(side(plain.path, "left", 1.5), side(plain.path, "right", 1.5))).toBe(false);
+
+      const whole = await renderVideo("mirror-whole", with_({ mirrored: true }));
+      expect(near(side(whole.path, "left", 1.5), side(plain.path, "right", 1.5))).toBe(true);
+      expect(near(side(whole.path, "right", 1.5), side(plain.path, "left", 1.5))).toBe(true);
+      expect(shape(whole.path)).toBe(shape(plain.path));
+
+      const [part] = await renderRecording([{ ...video(), filterSpans: [{ fromMs: 1500, toMs: null, filters: with_({ mirrored: true }) }] }], { ffmpeg, ffprobe, workDir: join(dir, "mirror-late"), durationMs: 3000, videoQuality: "720p" });
+      expect(near(side(part!.path, "left", 0.7), side(plain.path, "left", 0.7))).toBe(true); // before: as recorded
+      expect(near(side(part!.path, "left", 2.3), side(plain.path, "right", 2.3))).toBe(true); // after: flipped
+      expect(shape(part!.path)).toBe(shape(plain.path));
+    });
+
     it("a look switched on during the recording starts there: before it the picture is as recorded", async () => {
       const mono = with_({ look: "mono" });
       const [out] = await renderRecording([{ ...video(), filterSpans: [{ fromMs: 1500, toMs: null, filters: mono }] }], { ffmpeg, ffprobe, workDir: join(dir, "look-late"), durationMs: 3000, videoQuality: "720p" });

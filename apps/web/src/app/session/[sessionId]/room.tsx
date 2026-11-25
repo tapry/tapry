@@ -15,7 +15,7 @@ import { useBlackCamera } from "@/lib/client/black-camera";
 import { mb } from "@/lib/format";
 import { useCall, type CallStatus } from "@/lib/client/call";
 import { localNow } from "@/lib/client/clock";
-import { createFilterSync, onTrackRegistered, useFilterPrefs, type FilterSync } from "@/lib/client/filters";
+import { createFilterSync, fileFilters, onTrackRegistered, useFilterPrefs, type FilterSync } from "@/lib/client/filters";
 import { useBackgroundBlur } from "@/lib/client/person-mask";
 import { alertAdvice, alertLabel, talkNudge, talkShares, useQualityAlerts } from "@/lib/client/quality";
 import { getPipeline, RecordingController } from "@/lib/client/recording";
@@ -67,7 +67,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const filterSync = useRef<FilterSync | null>(null);
   useEffect(() => {
     // Each change goes with its moment on the server's clock: the files follow the call from then.
-    const sync = createFilterSync(ticket, prefs.filters, { now: () => localNow() + (ready.clock?.offsetMs ?? 0) });
+    const sync = createFilterSync(ticket, fileFilters(prefs), { now: () => localNow() + (ready.clock?.offsetMs ?? 0) });
     filterSync.current = sync;
     // A track that reached the server late missed any change made before it: send the choice again.
     const off = onTrackRegistered((sessionId, filters) => sessionId === ticket.sessionId && sync.registered(filters));
@@ -78,8 +78,9 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
     // Only where it starts from: later changes come through the effect below.
   }, [ticket]);
   useEffect(() => {
-    if (!ended) filterSync.current?.set(prefs.filters);
-  }, [prefs.filters, ended]);
+    if (!ended) filterSync.current?.set(fileFilters(prefs));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefs.filters, prefs.mirrorForOthers, ended]);
 
   useEffect(() => followSession(ticket.sessionId, ticket.token, setState, setConnection), [ticket]);
   // Text messages: not for someone recording alone, who has nobody to write to.

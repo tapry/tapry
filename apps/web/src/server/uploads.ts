@@ -1,7 +1,6 @@
 import {
   chunkStorageKey,
-  hasAudioFilters,
-  hasVideoFilters,
+  hasFileFilters,
   type TrackFilters,
   type commitChunkBody,
   type completeTrackBody,
@@ -332,7 +331,7 @@ export class UploadService {
 }
 
 /** How filters are kept on a track: null when nothing is switched on. */
-const storedFilters = (f: TrackFilters | undefined) => (f && (hasVideoFilters(f) || hasAudioFilters(f)) ? JSON.stringify(f) : null);
+const storedFilters = (f: TrackFilters | undefined) => (f && hasFileFilters(f) ? JSON.stringify(f) : null);
 
 /**
  * The host deleted the recording, or its originals were removed after the retention period

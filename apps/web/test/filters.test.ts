@@ -152,6 +152,16 @@ describe("filters", () => {
       expect(await changes()).toEqual([[2000, null], [9600, "warm"], [15000, null]]);
     });
 
+    it("keeps \"Others see me mirrored\" as a choice for the files, by itself too", async () => {
+      const trackId = (await createTrack({ kind: "video", filters: { mirrored: true } })).body.trackId;
+      expect(await stored(trackId)).toEqual({ ...NO_FILTERS, mirrored: true });
+      t.tick(4000);
+      await setFilters(NO_FILTERS);
+      const rows = await t.db.query<{ at_ms: number; filters: TrackFilters | null }>("SELECT at_ms, filters FROM filter_changes WHERE recording_id = $1 ORDER BY at_ms, id", [t.recordingId]);
+      expect(rows.map((r) => [Number(r.at_ms), r.filters?.mirrored ?? null])).toEqual([[0, true], [4000, null]]);
+      expect(filterTimeline(rows.map((r) => ({ atMs: Number(r.at_ms), filters: r.filters })))).toEqual({ spans: [{ fromMs: 0, toMs: 4000, filters: { ...NO_FILTERS, mirrored: true } }] });
+    });
+
     it("holds a claimed time between the recording's start and now", async () => {
       const start = await startedAt();
       t.tick(3000);

@@ -5,6 +5,9 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **"Others see me mirrored" is now in the finished video too.** The person's video file (and
+  their tile in the combined video) is flipped for the time the switch was on, as the call
+  showed them. "Mirror my view" still only changes your own preview.
 - **Filters in the finished files now follow the call.** A filter applies from the moment a
   person switches it on to the moment they switch it off, instead of the last choice being
   applied to the whole file. Background blur switched on during a recording is now in the file

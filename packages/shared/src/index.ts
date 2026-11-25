@@ -490,6 +490,12 @@ export const trackFilters = z.object({
   background: z.enum(BACKGROUNDS).default("none"),
   /** Takes steady background noise (fans, hiss) out of the microphone. */
   noiseRemoval: z.boolean().default(false),
+  /**
+   * "Others see me mirrored": the person's finished video is flipped, as the call shows them.
+   * Only for the files: on screens the flip is the tile's (see `participants.mirrored`), so this
+   * is never part of what decides how the live picture is drawn. Left out: not flipped.
+   */
+  mirrored: z.boolean().optional(),
 });
 export type TrackFilters = z.infer<typeof trackFilters>;
 
@@ -509,7 +515,7 @@ export interface FilterSpan {
  * `spans`: the choice changed, and each stretch with something on is listed.
  */
 export function filterTimeline(changes: Array<{ atMs: number; filters: TrackFilters | null }>): { whole?: TrackFilters; spans?: FilterSpan[] } {
-  const on = (f: TrackFilters | null) => (f && (hasVideoFilters(f) || hasAudioFilters(f)) ? f : null);
+  const on = (f: TrackFilters | null) => (f && hasFileFilters(f) ? f : null);
   const states: Array<{ atMs: number; filters: TrackFilters | null }> = [];
   for (const c of [...changes].sort((a, b) => a.atMs - b.atMs)) {
     const filters = on(c.filters);
@@ -538,6 +544,8 @@ export const hasVideoFilters = (f: TrackFilters) => f.brightness !== 0 || f.look
 /** Does this need the device to work out where the person is (a mask)? */
 export const needsMask = (f: TrackFilters) => f.background !== "none";
 export const hasAudioFilters = (f: TrackFilters) => f.noiseRemoval;
+/** Does anything here change the person's finished files? (The live picture asks `hasVideoFilters`.) */
+export const hasFileFilters = (f: TrackFilters) => hasVideoFilters(f) || hasAudioFilters(f) || f.mirrored === true;
 
 /**
  * The numbers behind the picture filters, one table for the live preview (canvas) and the

@@ -201,7 +201,7 @@ export const fr: Messages = {
   "filters.mirror": "Inverser mon image",
   "filters.mirrorHint": "Ne change que ce que vous voyez.",
   "filters.mirrorOthers": "Les autres me voient inversé",
-  "filters.mirrorOthersHint": "Inverse votre image sur l'écran de chacun pendant l'appel. Votre enregistrement n'est pas inversé.",
+  "filters.mirrorOthersHint": "Inverse votre image sur l'écran de chacun pendant l'appel, et dans votre vidéo finale tant que c'est activé.",
   "filters.brightness": "Luminosité",
   "filters.b0": "Tel quel",
   "filters.b1": "Plus clair",
