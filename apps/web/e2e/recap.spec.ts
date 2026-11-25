@@ -30,8 +30,14 @@ test("a guest asks for their recording by email, and the link opens their own fi
     await host.waitForTimeout(8_000);
     await host.getByRole("button", { name: "Stop recording" }).click();
     await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /✓ Uploaded/], { timeout: 60_000 });
-    host.once("dialog", (d) => d.accept());
-    await host.getByRole("button", { name: "End session" }).click();
+    // Asked in the page, not by a browser prompt; Cancel leaves the session as it is.
+    await host.getByRole("button", { name: "End session for everyone" }).click();
+    await expect(host.getByRole("alertdialog")).toContainText("End the session for everyone?");
+    await host.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
+    await expect(host.getByRole("alertdialog")).toHaveCount(0);
+    await expect(host.getByTestId("session-ended")).toHaveCount(0);
+    await host.getByRole("button", { name: "End session for everyone" }).click();
+    await host.getByTestId("end-session-confirm").click();
     await expect(guest.getByTestId("session-ended")).toContainText("All done!", { timeout: 30_000 });
 
     const recap = guest.getByTestId("recap-email");

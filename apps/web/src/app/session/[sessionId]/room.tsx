@@ -239,6 +239,8 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
   const nudge = isHost && recording && state ? talkNudge(state.health, recording.id, ticket.participantId) : null;
 
   const [panelOpen, setPanelOpen] = useState(true);
+  /** The host pressed End session and is being asked whether they mean it. */
+  const [endAsking, setEndAsking] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const lastRecording = state?.recording ?? null;
 
@@ -964,13 +966,7 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
                   </div>
                 )}
                 {isHost && (
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    className="mt-auto w-full"
-                    disabled={busy}
-                    onClick={() => confirm("End the session for everyone?") && hostAction("/end")}
-                  >
+                  <Button variant="danger" size="sm" className="mt-auto w-full" disabled={busy} onClick={() => setEndAsking(true)}>
                     End session for everyone
                   </Button>
                 )}
@@ -982,6 +978,56 @@ export function Room({ ticket, ready }: { ticket: SessionTicket; ready: ReadyToJ
               </div>
             </aside>
           )}
+        </div>
+      )}
+
+      {endAsking && !ended && (
+        // Asked here, in the page, over everything: a browser prompt can be switched off for good and says nothing about the recording.
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4"
+          onPointerDown={(e) => e.target === e.currentTarget && setEndAsking(false)}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") return;
+            e.stopPropagation();
+            setEndAsking(false);
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="end-session-title"
+            aria-describedby="end-session-text"
+            data-testid="end-session-ask"
+            className="flex w-full max-w-[420px] animate-fade-up flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,.5)]"
+          >
+            <div className="flex flex-col gap-1.5">
+              <h2 id="end-session-title" className="text-[17px] font-medium text-text">
+                End the session for everyone?
+              </h2>
+              <p id="end-session-text" className="text-sm leading-normal text-pretty text-text-2">
+                {recording
+                  ? "The recording stops now. What each person hasn't uploaded yet still uploads from their device."
+                  : "Everyone leaves the call, and nobody can record in this session any more."}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" size="md" autoFocus disabled={busy} onClick={() => setEndAsking(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="record"
+                size="md"
+                disabled={busy}
+                data-testid="end-session-confirm"
+                onClick={() => {
+                  setEndAsking(false);
+                  void hostAction("/end");
+                }}
+              >
+                End session
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

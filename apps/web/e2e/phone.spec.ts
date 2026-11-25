@@ -77,8 +77,8 @@ test("a guest on a phone joins, is recorded and sees the end screen; the studio'
   }
   await host.getByRole("button", { name: "Stop recording" }).click();
   await expect(host.getByTestId("participant-upload")).toHaveText([/✓ Uploaded/, /✓ Uploaded/], { timeout: 60_000 });
-  host.once("dialog", (d) => d.accept());
-  await host.getByRole("button", { name: "End session" }).click();
+  await host.getByRole("button", { name: "End session for everyone" }).click();
+  await host.getByTestId("end-session-confirm").click();
   await expect(guest.getByTestId("session-ended")).toContainText("All done!", { timeout: 30_000 });
   await fits(guest, "5-end");
   await phone.close();

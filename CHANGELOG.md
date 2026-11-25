@@ -5,6 +5,8 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Ending a session asks in the page**, in a dialog over the studio that says what happens
+  to a running recording, instead of the browser's own prompt.
 - **"Others see me mirrored" is now in the finished video too.** The person's video file (and
   their tile in the combined video) is flipped for the time the switch was on, as the call
   showed them. "Mirror my view" still only changes your own preview.

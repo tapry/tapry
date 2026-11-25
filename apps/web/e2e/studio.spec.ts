@@ -388,8 +388,8 @@ test("host and guest: green room, join, Record/Stop, end session", async ({ page
     await guestPage.getByRole("button", { name: "Join the studio" }).click({ timeout: 20_000 });
     await expect(guestPage.getByText("Waiting for the host to start recording.")).toBeVisible();
 
-    host.once("dialog", (d) => d.accept());
-    await host.getByRole("button", { name: "End session" }).click();
+    await host.getByRole("button", { name: "End session for everyone" }).click();
+    await host.getByTestId("end-session-confirm").click();
     await expect(host.getByTestId("session-ended")).toContainText("That's a wrap");
     await expect(host.getByRole("button", { name: "Record", exact: true })).toHaveCount(0);
 
