@@ -259,7 +259,7 @@ describe("own storage on Tapry Cloud", () => {
     expect([res.status, res.body.error]).toEqual([403, "plan_without_own_storage"]);
   });
 
-  it("is the only storage of the Own storage plan: no session opens until a bucket is connected, then hours aren't limited", async () => {
+  it("is the only storage of the Own storage plan: no session opens until a bucket is connected, and the plan's hours are for the processing", async () => {
     const t = await server({ cloud: true });
     await setPlan(t, "own_storage");
     expect((await t.host.get("/storage/own")).body).toMatchObject({ allowed: true, required: true, target: null });
@@ -273,10 +273,11 @@ describe("own storage on Tapry Cloud", () => {
     const rec = await t.record();
     expect(pieces(t.buckets.get("my-recordings")!)).toHaveLength(1);
     expect(pieces(t.serverStorage)).toEqual([]);
-    t.tick(200 * 3_600_000); // far past any hosted plan's hours
+    t.tick(20 * 3_600_000); // within the plan's 25 hours
     await rec.end();
     await t.record();
-    expect((await t.host.get("/billing")).body.plan).toMatchObject({ id: "own_storage", hours: null, filesDays: null });
+    // The files are the customer's to keep (no keeping time); the hours are counted, since the processing is ours.
+    expect((await t.host.get("/billing")).body.plan).toMatchObject({ id: "own_storage", hours: 25, filesDays: null });
   });
 
   it("stops being used when the plan no longer includes it, without touching what is in the bucket", async () => {

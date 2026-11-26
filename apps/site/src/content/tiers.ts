@@ -4,6 +4,11 @@
 // match BILLING_PRICES on the app server, which maps the same ids to plans when Paddle's webhook
 // reports a subscription. Plans and limits themselves: packages/shared PLANS.
 //
+// The ids below are the $19 / $39 prices made on 13 Nov 2026. Pricing v5 (26 Nov 2026) lists
+// Creator at $24 and Studio at $49: before selling opens, add those prices in Paddle and put
+// their ids here and in BILLING_PRICES; the ids below then serve the founding price (the first
+// 100 subscribers). Never delete a price in Paddle.
+//
 // listed: what the page shows until Paddle's own localized price arrives (or if it can't be
 // fetched, e.g. a blocker). Paddle's totals replace it as returned: no maths on these.
 export interface Tier {
@@ -24,7 +29,7 @@ export const TIERS: Tier[] = [
     description: "The same software on a server you don’t have to run, for one host.",
     features: ["15 recording hours a month", "Full HD video", "Finished files kept for 30 days", "Transcripts included", "Up to 10 people in a recording"],
     priceId: { month: "pri_01m79er3538jn4a8pfs74h959s", year: "pri_01m79ese1xv5g21e7nkf17qt1b" },
-    listed: { month: "$19", year: "$190" },
+    listed: { month: "$24", year: "$240" },
     highlight: true,
   },
   {
@@ -33,7 +38,7 @@ export const TIERS: Tier[] = [
     description: "For studios that record every week and share the work.",
     features: ["40 recording hours a month", "3 seats", "Video up to 4K", "Your logo and colour on guest pages", "Finished files kept for 60 days", "Transcripts included"],
     priceId: { month: "pri_01m79f3sbb5r30bzh4xpt9v2qk", year: "pri_01m79f4dh1y8yjzapav2d0909t" },
-    listed: { month: "$39", year: "$390" },
+    listed: { month: "$49", year: "$490" },
   },
   {
     name: "Team",

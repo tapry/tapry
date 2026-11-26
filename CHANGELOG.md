@@ -5,6 +5,10 @@ version is 0.x, a minor release can change behaviour or configuration (the notes
 
 ## Unreleased
 
+- **Tapry Cloud prices changed before selling opens** (pricing v5, `docs/plan/06-monetization.md`):
+  Creator is $24 a month (was $19) and Studio $49 (was $39); the Own storage plan now has 25
+  recording hours a month (it had no limit); the education discount is 20% (was 30%). Team and
+  the organisation prices are unchanged. Self-hosted servers have no plans and are not affected.
 - **Ending a session asks in the page**, in a dialog over the studio that says what happens
   to a running recording, instead of the browser's own prompt.
 - **"Others see me mirrored" is now in the finished video too.** The person's video file (and

@@ -7,20 +7,19 @@ import { Plans } from "./pricing";
 export const metadata = pageMeta({
   title: "Pricing: free to self-host · Tapry",
   description: HAS_CLOUD
-    ? `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, the hosted version, starts free${HAS_CHECKOUT ? " and has plans from $19 a month" : "; paid plans from $19 a month open soon"}.`
+    ? `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, the hosted version, starts free${HAS_CHECKOUT ? " and has plans from $24 a month" : "; paid plans from $24 a month open soon"}.`
     : `Self-hosting Tapry is free, with no limits on recordings or hours (AGPL-3.0). Tapry Cloud, a hosted version, is planned and not open yet: ${CLOUD_NEWS} to hear when it is.`,
   path: "/pricing/",
 });
 
 // [label, self-hosted, Cloud Creator, Cloud Studio, Cloud Team]; a row with no values is a group heading.
 // The Self-hosted column describes the software as released. The Cloud columns are the plan
-// (docs/plan/06-monetization.md, pricing v4): only what it states.
+// (docs/plan/06-monetization.md, pricing v5): only what it states.
 const ROWS: Array<[string, string?, string?, string?, string?]> = [
   ["Plan"],
-  ["Price", "$0", "$19 / month", "$39 / month", "$149 / month"],
-  ["Paid yearly", "—", "$190", "$390", "$1,490"],
+  ["Price", "$0", "$24 / month", "$49 / month", "$149 / month"],
+  ["Paid yearly", "—", "$240", "$490", "$1,490"],
   ["Recording hours", "Unlimited", "15 / month", "40 / month", "80 / month"],
-  ["Extra hours", "—", "$2 each", "$2 each", "$2 each"],
   ["Seats", "Your server, your accounts", "1", "3", "5"],
   ["Video", "Up to 4K", "Full HD", "Up to 4K", "Up to 4K"],
   ["Your logo and colour on guest pages", "✓", "—", "✓", "✓"],
@@ -44,9 +43,9 @@ const ROWS: Array<[string, string?, string?, string?, string?]> = [
 // A link only where the offer can be taken up today; the rest say how to ask.
 const MORE: Array<[string, string, string, string | null, string | null]> = [
   ["Free cloud", "$0", "2 recording hours a month, finished files kept 7 days. Guests see a “Record your own” link at the end.", HAS_CLOUD ? SIGNUP_URL : null, "Start free"],
-  ["Own storage", "$12 a month", "Tapry Cloud runs the studio and records into your own S3 or R2 bucket, with no limit on hours within fair use.", HAS_CHECKOUT ? checkoutUrl("own_storage", false) : null, "Choose Own storage"],
+  ["Own storage", "$12 a month", "Tapry Cloud runs the studio and records into your own S3 or R2 bucket: 25 recording hours a month, and the files stay yours.", HAS_CHECKOUT ? checkoutUrl("own_storage", false) : null, "Choose Own storage"],
   ["Support for self-hosting", "$2,400 a year", "For an organisation running Tapry on its own server: email support, help with updates and the documents a data-protection review asks for.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
-  ["Business", "From $4,800 a year", "Hosted, with single sign-on, an audit log and retention policies. These features aren’t built yet.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
+  ["Business", "From $4,800 a year", "Hosted, from 120 recording hours a month and 10 seats, with files kept 180 days and payment by invoice. Single sign-on and an audit log are planned and not built yet.", `mailto:${CONTACT_EMAIL}`, "Write to us"],
 ];
 /** Which of those exist today, for the "planned" label. */
 const AVAILABLE = new Set(HAS_CLOUD ? ["Free cloud", ...(HAS_CHECKOUT ? ["Own storage"] : []), "Support for self-hosting"] : []);
@@ -60,17 +59,18 @@ const FAQ: Array<[string, string]> = [
   [
     HAS_CLOUD ? "Can I keep files in my own bucket?" : "When does Tapry Cloud open, and can I keep files in my own bucket?",
     HAS_CLOUD
-      ? "Yes. The Own storage plan, $12 a month, records into your own S3 or R2 bucket, with no limit on hours within fair use. You connect the bucket on the Storage page, and Tapry checks it can write there before using it."
-      : `Tapry Cloud isn’t available yet, and the plans above may still change. The plan also has a $12 a month option that records into your own S3 or R2 bucket, with no limit on hours within fair use. To hear when it opens, ${CLOUD_NEWS}.`,
+      ? "Yes. The Own storage plan, $12 a month, records into your own S3 or R2 bucket, with 25 recording hours a month. You connect the bucket on the Storage page, and Tapry checks it can write there before using it."
+      : `Tapry Cloud isn’t available yet, and the plans above may still change. The plan also has a $12 a month option that records into your own S3 or R2 bucket, with 25 recording hours a month. To hear when it opens, ${CLOUD_NEWS}.`,
   ],
   [
     "How will recording hours be counted?",
     "Per recording, not per person: an hour with four people is one hour. The cloud plans keep the original uploads for 7 days after processing and the finished files for the plan’s period; download what you want to keep longer. Each recording shows its date.",
   ],
-  ["Is there a discount for schools and non-profits?", `Education and non-profit organisations get 30% off the Creator, Studio and Team plans: write to ${CONTACT_EMAIL} from your organisation’s address. Self-hosting is free for everyone.`],
+  ["Is there a discount for schools and non-profits?", `Education and non-profit organisations get 20% off the Creator, Studio and Team plans: write to ${CONTACT_EMAIL} from your organisation’s address. Self-hosting is free for everyone.`],
   ...(HAS_CLOUD && !HAS_CHECKOUT
     ? ([
         ["When can I buy a paid plan?", "Soon. The free plan is open now. Join the waitlist on the plan you want and you get one email when it can be bought; the prices above are the ones planned and may still change."],
+        ["Is there a price for early subscribers?", "Yes. The first 100 subscribers to Creator or Studio pay $19 or $39 a month instead of $24 or $49, for as long as they stay subscribed. The waitlist hears first."],
       ] as Array<[string, string]>)
     : []),
   ...(HAS_CHECKOUT

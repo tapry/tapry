@@ -34,7 +34,7 @@ describe("education accounts", () => {
     const t = await cloud();
     const { c, user } = await t.signup("prof@um5.ac.ma");
     // Typing an academic address isn't enough: it has to be confirmed.
-    expect((await expectOk(c.get("/billing/education"))).body).toMatchObject({ status: "none", automatic: false, owner: true, freeHours: 10, discountPercent: 30, discountActive: false });
+    expect((await expectOk(c.get("/billing/education"))).body).toMatchObject({ status: "none", automatic: false, owner: true, freeHours: 10, discountPercent: 20, discountActive: false });
     await t.db.query("UPDATE users SET email_verified_at = now() WHERE id = $1", [user.id]);
     expect((await expectOk(c.get("/billing/education"))).body.automatic).toBe(true);
     expect((await expectOk(c.get("/billing"))).body.plan.hours).toBe(2);

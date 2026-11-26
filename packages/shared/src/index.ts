@@ -675,12 +675,14 @@ export interface Plan {
   branding: boolean;
 }
 
+/** The plans of pricing v5 (docs/plan/06-monetization.md, 26 Nov 2026): change both together, and the website's pricing page. */
 export const PLANS: Record<PlanId, Plan> = {
   free: { id: "free", name: "Free", monthlyUsd: 0, hours: 2, filesDays: 7, originalsDays: 7, badge: true, ownStorage: "no", seats: 1, video4k: false, aiNotes: false, branding: false },
-  // Everything is in the customer's bucket: nothing of ours to meter or to delete.
-  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true, aiNotes: true, branding: false },
-  creator: { id: "creator", name: "Creator", monthlyUsd: 19, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false, aiNotes: true, branding: false },
-  studio: { id: "studio", name: "Studio", monthlyUsd: 39, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true, aiNotes: true, branding: true },
+  // Everything is in the customer's bucket: nothing of ours to delete. The hours are for the
+  // processing, which runs on our server whoever holds the files.
+  own_storage: { id: "own_storage", name: "Own storage", monthlyUsd: 12, hours: 25, filesDays: null, originalsDays: null, badge: false, ownStorage: "required", seats: 1, video4k: true, aiNotes: true, branding: false },
+  creator: { id: "creator", name: "Creator", monthlyUsd: 24, hours: 15, filesDays: 30, originalsDays: 7, badge: false, ownStorage: "no", seats: 1, video4k: false, aiNotes: true, branding: false },
+  studio: { id: "studio", name: "Studio", monthlyUsd: 49, hours: 40, filesDays: 60, originalsDays: 7, badge: false, ownStorage: "no", seats: 3, video4k: true, aiNotes: true, branding: true },
   team: { id: "team", name: "Team", monthlyUsd: 149, hours: 80, filesDays: 90, originalsDays: 7, badge: false, ownStorage: "no", seats: 5, video4k: true, aiNotes: true, branding: true },
   business: { id: "business", name: "Business", monthlyUsd: null, hours: null, filesDays: null, originalsDays: null, badge: false, ownStorage: "allowed", seats: null, video4k: true, aiNotes: true, branding: true },
 };
@@ -713,7 +715,7 @@ export interface BillingOverview {
 /** Recording hours a month on the Free plan for a verified education account (Free has `PLANS.free.hours`). */
 export const EDUCATION_FREE_HOURS = 10;
 /** What a verified education account pays less on Creator, Studio and Team (docs/plan/06-monetization.md). */
-export const EDUCATION_DISCOUNT_PERCENT = 30;
+export const EDUCATION_DISCOUNT_PERCENT = 20;
 
 /** `GET /api/billing/education`: whether the account is an education account. Tapry Cloud only. */
 export interface EducationStatus {

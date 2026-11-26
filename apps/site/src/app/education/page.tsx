@@ -19,7 +19,7 @@ export default function EducationPage() {
   const cloud = HAS_CLOUD
     ? [
         "A verified education account records 10 hours a month on the Free plan instead of 2.",
-        HAS_CHECKOUT ? "Creator, Studio and Team are 30% off for education accounts." : "Paid plans aren’t open yet. When they are, Creator, Studio and Team will be 30% off for education accounts.",
+        HAS_CHECKOUT ? "Creator, Studio and Team are 20% off for education accounts." : "Paid plans aren’t open yet. When they are, Creator, Studio and Team will be 20% off for education accounts.",
         "An account whose owner has a confirmed address at a school or university (.edu, .ac.uk and the like) is recognised by itself. Other schools ask from Settings, Plan, and we look at each request by hand.",
       ]
     : [`Tapry Cloud, the hosted version, is planned. It is meant to give education accounts more free hours and a discount; to hear when it opens, ${CLOUD_NEWS}.`];

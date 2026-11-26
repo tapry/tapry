@@ -133,7 +133,7 @@ these prices is needed to test with a fake card.
 
 ## Only the owner can do
 
-- Open the merchant-of-record account and confirm payouts to Morocco (`docs/plan/09-risks-legal.md`). Paddle or Lemon Squeezy: the code takes either.
+- Open the merchant-of-record account and confirm payouts to Morocco (`docs/plan/09-risks-legal.md`). Paddle: Lemon Squeezy, which the code also reads, is closing (see the table below).
 - Create the products and prices there, and give this server the price ids, checkout addresses and webhook secret.
 - A domain, a server, storage and an email provider for the hosted version.
 - Make the repository and images public.
@@ -146,7 +146,7 @@ From the providers' own pages unless marked. Not legal or tax advice; re-check b
 |---|---|---|---|
 | **Paddle Billing** | Yes: Morocco is not on its unsupported list; individuals skip business verification | Bank wire or Payoneer, monthly, minimum $100 | 5% + $0.50 |
 | **Creem** | Listed, but its bank-payout cell for Morocco is blank: ask support in writing first | Bank (USD/EUR), minimum $50 | 3.9% + $0.40 |
-| **Lemon Squeezy** | Yes, pays to Moroccan banks, but it is steering sellers to Stripe Managed Payments, which excludes Morocco | Bank, 1% per payout | 5% + $0.50, plus surcharges |
+| **Lemon Squeezy** | **Closing**: no new sign-ups since 16 Nov 2026 and it stops processing on 31 March 2027 (its own pricing page, read 25 Nov 2026). Not a route any more | Bank, 1% per payout | 5% + $0.50, plus surcharges |
 | Stripe, Stripe Managed Payments, Polar, Dodo Payments | No | | |
 | FastSpring, 2Checkout, Gumroad, Wise Business | Not stated on their pages | | |
 | PayPal, Payoneer | Receive only: not a merchant of record, no tax handling | | |
@@ -166,8 +166,8 @@ naming their school:
 - anything else is a request the admin approves or declines in Settings, Plan. On a server
   without email, no address is ever confirmed, so every request comes to the admin.
 
-The 30% discount on Creator, Studio and Team is **not applied by Tapry**: it is a discount
-made in Paddle. To switch it on when selling reopens: create a 30% recurring discount in
+The 20% discount on Creator, Studio and Team (pricing v5; 30% before) is **not applied by Tapry**: it is a discount
+made in Paddle. To switch it on when selling reopens: create a 20% recurring discount in
 Paddle restricted to those prices, and put its id (`dsc_…`) in
 `BILLING_PADDLE_EDUCATION_DISCOUNT`. The checkout then opens with it for verified education
 accounts only. Not yet run against Paddle. The website's `/education` page says paid plans
